@@ -1,4 +1,4 @@
-**Elkarte development repository**
+**elkarte.net site repository**
 
 Elkarte is licensed under [BSD 3-clause license](http://www.opensource.org/licenses/BSD-3-Clause).
 
@@ -53,8 +53,8 @@ https://gist.github.com/3342247
 
 Developer Documentation
 ===
-Coding standards documentation: [Coding standards](https://github.com/elkarte/Elkarte/wiki/Coding-Standards)
+ElkArte coding standards documentation: [Coding standards](https://github.com/elkarte/Elkarte/wiki/Coding-Standards)
 
-Architecture documentation: [Architecture](https://github.com/elkarte/Elkarte/wiki/Architecture)
+ElkArte architecture documentation: [Architecture](https://github.com/elkarte/Elkarte/wiki/Architecture)
 
 Each is work in progress, and welcomes your comments and corrections.
