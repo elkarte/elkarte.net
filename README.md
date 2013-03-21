@@ -27,6 +27,9 @@ To work normally with the repository, initially, after you fork/clone it, please
 Subsequently, to keep the submodule up to date, you only need to do:
 * git submodule update
 
+More information on submodules:
+
+http://git-scm.com/book/en/Git-Tools-Submodules
 
 Site and IRC
 ===
