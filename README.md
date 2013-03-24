@@ -14,22 +14,7 @@ by signing off your contributions, you acknowledge that you can and do license y
 
 Please see [How to contribute](https://github.com/elkarte/Elkarte/blob/master/CONTRIBUTING.md) for information on how to contribute to the development process.
 
-Submodules:
-===
-The elkarte.net site repository contains the core Elk repository as submodule.
 
-This allows us to keep the site up to date with the core software, by updating the module, when the main repo changes. (and we want to pull the changes on the site)
-
-To work normally with the repository, initially, after you fork/clone it, please do:
-* git submodule init (in your main elkarte.net directory)
-* git submodule update (to pull in the contents of elk directory, meaning the contents of the submodule)
-
-Subsequently, to keep the submodule up to date, you only need to do:
-* git submodule update
-
-More information on submodules:
-
-http://git-scm.com/book/en/Git-Tools-Submodules
 
 Site and IRC
 ===
