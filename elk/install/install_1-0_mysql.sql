@@ -33,6 +33,21 @@ VALUES
 # --------------------------------------------------------
 
 #
+# Table structure for table `antispam_questions`
+#
+
+CREATE TABLE {$db_prefix}antispam_questions (
+  id_question tinyint(4) unsigned NOT NULL auto_increment,
+  question text NOT NULL default '',
+  answer text NOT NULL default '',
+  language varchar(50) NOT NULL default '',
+  PRIMARY KEY (id_question),
+  KEY language (language(30))
+) ENGINE=MyISAM;
+
+# --------------------------------------------------------
+
+#
 # Table structure for table `approval_queue`
 #
 
@@ -150,6 +165,7 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 1, 'post_attachment'),
 	(0, 1, 'post_new'),
 	(0, 1, 'post_draft'),
+	(0, 1, 'postby_email'),
 	(0, 1, 'post_autosave_draft'),
 	(0, 1, 'post_reply_any'),
 	(0, 1, 'post_reply_own'),
@@ -241,6 +257,7 @@ VALUES (-1, 1, 'poll_view'),
 	(0, 2, 'poll_vote'),
 	(0, 2, 'post_attachment'),
 	(0, 2, 'post_new'),
+	(0, 2, 'postby_email'),
 	(0, 2, 'post_draft'),
 	(0, 2, 'post_autosave_draft'),
 	(0, 2, 'post_reply_any'),
@@ -677,13 +694,13 @@ VALUES ('Independence Day', '0004-07-04'),
 	('Labor Day', '2010-09-06'),
 	('Labor Day', '2011-09-05'),
 	('Labor Day', '2012-09-03'),
-	('Labor Day', '2013-09-09'),
-	('Labor Day', '2014-09-08'),
+	('Labor Day', '2013-09-02'),
+	('Labor Day', '2014-09-01'),
 	('Labor Day', '2015-09-07'),
 	('Labor Day', '2016-09-05'),
 	('Labor Day', '2017-09-04'),
 	('Labor Day', '2018-09-03'),
-	('Labor Day', '2019-09-09'),
+	('Labor Day', '2019-09-02'),
 	('Labor Day', '2020-09-07'),
 	('D-Day', '0004-06-06');
 # --------------------------------------------------------
@@ -733,6 +750,7 @@ CREATE TABLE {$db_prefix}custom_fields (
   mask varchar(255) NOT NULL default '',
   show_reg tinyint(3) NOT NULL default '0',
   show_display tinyint(3) NOT NULL default '0',
+  show_memberlist tinyint(3) NOT NULL default '0',
   show_profile varchar(20) NOT NULL default 'forumprofile',
   private tinyint(3) NOT NULL default '0',
   active tinyint(3) NOT NULL default '1',
@@ -753,6 +771,16 @@ CREATE TABLE {$db_prefix}group_moderators (
   id_group smallint(5) unsigned NOT NULL default '0',
   id_member mediumint(8) unsigned NOT NULL default '0',
   PRIMARY KEY (id_group, id_member)
+) ENGINE=MyISAM;
+
+#
+# Table structure for table `follow_ups`
+#
+
+CREATE TABLE {$db_prefix}follow_ups (
+  follow_up int(10) NOT NULL default '0',
+  derived_from int(10) NOT NULL default '0',
+  PRIMARY KEY (follow_up, derived_from)
 ) ENGINE=MyISAM;
 
 #
@@ -789,6 +817,8 @@ CREATE TABLE {$db_prefix}log_activity (
   posts smallint(5) unsigned NOT NULL default '0',
   registers smallint(5) unsigned NOT NULL default '0',
   most_on smallint(5) unsigned NOT NULL default '0',
+  pm smallint(5) unsigned NOT NULL default '0',
+  email smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY (date),
   KEY most_on (most_on)
 ) ENGINE=MyISAM;
@@ -1178,6 +1208,7 @@ CREATE TABLE {$db_prefix}mail_queue (
   send_html tinyint(3) NOT NULL default '0',
   priority tinyint(3) NOT NULL default '1',
   private tinyint(1) NOT NULL default '0',
+  message_id int(10) NOT NULL default '0',
   PRIMARY KEY  (id_mail),
   KEY time_sent (time_sent),
   KEY mail_priority (priority, id_mail)
@@ -1640,8 +1671,10 @@ VALUES
 	(10, 0, 120, 1, 'd', 1, 'paid_subscriptions'),
 	(11, 0, 120, 1, 'd', 1, 'remove_temp_attachments'),
 	(12, 0, 180, 1, 'd', 1, 'remove_topic_redirect'),
-	(13, 0, 240, 1, 'd', 1, 'remove_old_drafts');
-	
+	(13, 0, 240, 1, 'd', 0, 'remove_old_drafts'),
+	(14, 0, 0, 6, 'h', 0, 'remove_old_followups'),
+	(15, 0, 360, 10, 'm', 0, 'maillist_fetch_IMAP');
+
 # --------------------------------------------------------
 
 #
@@ -1827,6 +1860,7 @@ VALUES ('elkVersion', '{$current_version}'),
 	('cache_enable', '1'),
 	('reg_verification', '1'),
 	('visual_verification_type', '3'),
+	('visual_verification_num_chars', '6'),
 	('enable_buddylist', '1'),
 	('birthday_email', 'happy_birthday'),
 	('dont_repeat_theme_core', '1'),
@@ -2015,6 +2049,7 @@ VALUES (1, 'name', '{$default_theme_name}'),
 
 INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'display_quick_reply', '1');
 INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'posts_apply_ignore_list', '1');
+INSERT INTO {$db_prefix}themes (id_member, id_theme, variable, value) VALUES (-1, 1, 'drafts_autosave_enabled', '1');
 # --------------------------------------------------------
 
 #
@@ -2104,4 +2139,43 @@ CREATE TABLE {$db_prefix}log_badbehavior (
 	PRIMARY KEY (id),
 	INDEX ip (ip),
 	INDEX user_agent (user_agent)
+) ENGINE=MyISAM;
+
+#
+# Table structure for table `postby_emails`
+#
+CREATE TABLE {$db_prefix}postby_emails (
+	id_email varchar(50) NOT NULL,
+	time_sent int(10) NOT NULL default '0',
+	email_to varchar(50) NOT NULL,
+	PRIMARY KEY (id_email)
+) ENGINE=MyISAM;
+
+#
+# Table structure for table `postby_emails_error`
+#
+CREATE TABLE {$db_prefix}postby_emails_error (
+	id_email int(10) NOT NULL auto_increment,
+	error varchar(255) NOT NULL default '',
+	data_id varchar(255) NOT NULL default '0',
+	subject varchar(255) NOT NULL default '',
+	id_message int(10) NOT NULL default '0',
+	id_board smallint(5) NOT NULL default '0',
+	email_from varchar(50) NOT NULL default '',
+	message_type char(10) NOT NULL default '',
+	message mediumtext NOT NULL default '',
+	PRIMARY KEY (id_email)
+) ENGINE=MyISAM;
+
+#
+# Table structure for table `postby_emails_filters`
+#
+CREATE TABLE {$db_prefix}postby_emails_filters (
+	id_filter int(10) NOT NULL auto_increment,
+	filter_style char(5) NOT NULL default '',
+	filter_type varchar(255) NOT NULL default '',
+	filter_to varchar(255) NOT NULL default '',
+	filter_from varchar(255) NOT NULL default '',
+	filter_name varchar(255) NOT NULL default '',
+	PRIMARY KEY (id_filter)
 ) ENGINE=MyISAM;

@@ -14,6 +14,9 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Interface for the bit up the print page.
+ */
 function template_print_above()
 {
 	global $context, $txt, $topic, $scripturl;
@@ -28,7 +31,7 @@ function template_print_above()
 		<meta name="robots" content="noindex" />
 		<link rel="canonical" href="', $context['canonical_url'], '" />
 		<title>', $txt['print_page'], ' - ', $context['topic_subject'], '</title>
-		<style type="text/css">
+		<style>
 			body, a {
 				color: #000;
 				background: #fff;
@@ -88,7 +91,7 @@ function template_print_above()
 				height: 1px;
 				border: 0;
 				color: black;
-				background-color: black;
+				background: black;
 			}
 			.voted {
 				font-weight: bold;
@@ -123,6 +126,9 @@ function template_print_above()
 		<div id="posts">';
 }
 
+/**
+ * Interface for print page central view.
+ */
 function template_main()
 {
 	global $context, $txt, $scripturl, $topic;
@@ -162,7 +168,7 @@ function template_main()
 
 			foreach ($context['printattach'][$post['id_msg']] as $attach)
 				echo '
-					<img width="' . $attach['width'] . '" height="' . $attach['height'] . '" src="', $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attach['id_attach'] . '" alt="" />';
+					<img style="width:' . $attach['width'] . 'px; height:' . $attach['height'] . 'px" src="', $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attach['id_attach'] . '" alt="" />';
 		}
 
 		echo '
@@ -170,6 +176,9 @@ function template_main()
 	}
 }
 
+/**
+ * Interface for the bit down the print page.
+ */
 function template_print_below()
 {
 	global $topic, $txt, $scripturl;

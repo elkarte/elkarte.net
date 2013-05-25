@@ -28,6 +28,8 @@ require_once(ADMINDIR . '/ManagePaid.php');
 // For any admin emailing.
 require_once(SUBSDIR . '/Admin.subs.php');
 
+require_once(SUBSDIR . '/Members.subs.php');
+
 loadLanguage('ManagePaid');
 
 // If there's literally nothing coming in, let's take flight!
@@ -52,6 +54,8 @@ if (!empty($modSettings['paid_email_to']))
 			'id' => 0,
 		);
 }
+
+$db = database();
 
 // We need to see whether we can find the correct payment gateway,
 // we'll going to go through all our gateway scripts and find out
@@ -83,22 +87,13 @@ if (empty($member_id))
 	generateSubscriptionError($txt['paid_empty_member']);
 
 // Verify the member.
-$request = $smcFunc['db_query']('', '
-	SELECT id_member, member_name, real_name, email_address
-	FROM {db_prefix}members
-	WHERE id_member = {int:current_member}',
-	array(
-		'current_member' => $member_id,
-	)
-);
+$member_info = getBasicMemberData($member_id);
 // Didn't find them?
-if ($smcFunc['db_num_rows']($request) === 0)
+if (empty($member_info))
 	generateSubscriptionError(sprintf($txt['paid_could_not_find_member'], $member_id));
-$member_info = $smcFunc['db_fetch_assoc']($request);
-$smcFunc['db_free_result']($request);
 
 // Get the subscription details.
-$request = $smcFunc['db_query']('', '
+$request = $db->query('', '
 	SELECT cost, length, name
 	FROM {db_prefix}subscriptions
 	WHERE id_subscribe = {int:current_subscription}',
@@ -108,14 +103,14 @@ $request = $smcFunc['db_query']('', '
 );
 
 // Didn't find it?
-if ($smcFunc['db_num_rows']($request) === 0)
+if ($db->num_rows($request) === 0)
 	generateSubscriptionError(sprintf($txt['paid_count_not_find_subscription'], $member_id, $subscription_id));
 
-$subscription_info = $smcFunc['db_fetch_assoc']($request);
-$smcFunc['db_free_result']($request);
+$subscription_info = $db->fetch_assoc($request);
+$db->free_result($request);
 
 // We wish to check the pending payments to make sure we are expecting this.
-$request = $smcFunc['db_query']('', '
+$request = $db->query('', '
 	SELECT id_sublog, payments_pending, pending_details, end_time
 	FROM {db_prefix}log_subscribed
 	WHERE id_subscribe = {int:current_subscription}
@@ -126,10 +121,10 @@ $request = $smcFunc['db_query']('', '
 		'current_member' => $member_id,
 	)
 );
-if ($smcFunc['db_num_rows']($request) === 0)
+if ($db->num_rows($request) === 0)
 	generateSubscriptionError(sprintf($txt['paid_count_not_find_subscription_log'], $member_id, $subscription_id));
-$subscription_info += $smcFunc['db_fetch_assoc']($request);
-$smcFunc['db_free_result']($request);
+$subscription_info += $db->fetch_assoc($request);
+$db->free_result($request);
 
 // Is this a refund etc?
 if ($gatewayClass->isRefund())
@@ -151,7 +146,7 @@ if ($gatewayClass->isRefund())
 	}
 
 	// Mark it as complete so we have a record.
-	$smcFunc['db_query']('', '
+	$db->query('', '
 		UPDATE {db_prefix}log_subscribed
 		SET end_time = {int:current_time}
 		WHERE id_subscribe = {int:current_subscription}
@@ -173,7 +168,7 @@ if ($gatewayClass->isRefund())
 			'REFUNDNAME' => $member_info['member_name'],
 			'REFUNDUSER' => $member_info['real_name'],
 			'PROFILELINK' => $scripturl . '?action=profile;u=' . $member_id,
-			'DATE' => timeformat(time(), false),
+			'DATE' => standardTime(time(), false),
 		);
 
 		emailAdmins('paid_subscription_refund', $replacements, $notify_users);
@@ -206,7 +201,7 @@ elseif ($gatewayClass->isPayment() || $gatewayClass->isSubscription())
 
 		$subscription_info['pending_details'] = empty($real_details) ? '' : serialize($real_details);
 
-		$smcFunc['db_query']('', '
+		$db->query('', '
 			UPDATE {db_prefix}log_subscribed
 			SET payments_pending = {int:payments_pending}, pending_details = {string:pending_details}
 			WHERE id_sublog = {int:current_subscription_item}',
@@ -262,7 +257,7 @@ elseif ($gatewayClass->isPayment() || $gatewayClass->isSubscription())
 			'SUBEMAIL' => $member_info['email_address'],
 			'PRICE' => sprintf($modSettings['paid_currency_symbol'], $total_cost),
 			'PROFILELINK' => $scripturl . '?action=profile;u=' . $member_id,
-			'DATE' => timeformat(time(), false),
+			'DATE' => standardTime(time(), false),
 		);
 
 		emailAdmins('paid_subscription_new', $replacements, $notify_users);
@@ -295,7 +290,7 @@ $gatewayClass->close();
  */
 function generateSubscriptionError($text)
 {
-	global $modSettings, $notify_users, $smcFunc;
+	global $modSettings, $notify_users;
 
 	// Send an email?
 	if (!empty($modSettings['paid_email']))
@@ -311,7 +306,7 @@ function generateSubscriptionError($text)
 	if (!empty($_POST))
 	{
 		foreach ($_POST as $key => $val)
-			$text .= '<br />' . $smcFunc['htmlspecialchars']($key) . ': ' . $smcFunc['htmlspecialchars']($val);
+			$text .= '<br />' . Util::htmlspecialchars($key) . ': ' . Util::htmlspecialchars($val);
 	}
 
 	// Then just log and die.

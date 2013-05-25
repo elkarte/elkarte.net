@@ -29,7 +29,9 @@ if (!defined('ELKARTE'))
  */
 function createMenu($menuData, $menuOptions = array())
 {
-	global $context, $settings, $options, $txt, $modSettings, $scripturl, $smcFunc, $user_info, $options;
+	global $context, $settings, $options, $txt, $modSettings, $scripturl, $user_info, $options;
+
+	$db = database();
 
 	// Work out where we should get our images from.
 	$context['menu_image_path'] = file_exists($settings['theme_dir'] . '/images/admin/change_menu.png') ? $settings['images_url'] . '/admin' : $settings['default_images_url'] . '/admin';
@@ -262,7 +264,7 @@ function createMenu($menuData, $menuOptions = array())
 	// Almost there - load the template and add to the template layers.
 	loadTemplate(isset($menuOptions['template_name']) ? $menuOptions['template_name'] : 'GenericMenu');
 	$menu_context['layer_name'] = (isset($menuOptions['layer_name']) ? $menuOptions['layer_name'] : 'generic_menu') . $menuOptions['menu_type'];
-	$context['template_layers'][] = $menu_context['layer_name'];
+	Template_Layers::getInstance()->add($menu_context['layer_name']);
 
 	// Check we had something - for sanity sake.
 	if (empty($include_data))
@@ -293,9 +295,7 @@ function destroyMenu($menu_id = 'last')
 	if (!isset($context[$menu_name]))
 		return false;
 
-	$layer_index = array_search($context[$menu_name]['layer_name'], $context['template_layers']);
-	if ($layer_index !== false)
-		unset($context['template_layers'][$layer_index]);
+	Template_Layers::getInstance()->remove($context[$menu_name]['layer_name']);
 
 	unset($context[$menu_name]);
 }
@@ -305,25 +305,24 @@ function destroyMenu($menu_id = 'last')
  * $selectedMenu is the array of menu information,
  *  with the format as retrieved from createMenu()
  *
- * $selectedMenu['function'] can be an array or a string:
- *  an array, array('controller_name', 'method_name')
- *  a string, 'function_name'
+ * If $selectedMenu['controller'] is set, then it is a class,
+ * and $selectedMenu['function'] will be a method of it.
+ * If it is not set, then $selectedMenu['function'] is
+ * simply a function to call.
  *
  * @param array $selectedMenu
  */
 function callMenu($selectedMenu)
 {
-	// We use only $selectedMenu['function']
-	// which can be, for example for object oriented controllers:
-	// function'     an array, array('ManageAttachments_Controller', 'action_attachments')
-	// or, for procedural controllers
-	// 'function'     a string, 'action_managemail'
+	// We use only $selectedMenu['function'] and
+	//  $selectedMenu['controller'] if the latter is set.
 
-	if (is_array($selectedMenu['function']))
+	if (!empty($selectedMenu['controller']))
 	{
-		// 'function' => array ('controller_name', 'method_name')
-		$controller = new $selectedMenu['function'][0]();
-		$controller->{$selectedMenu['function'][1]}();
+		// 'controller' => 'ManageAttachments_Controller'
+		// 'function' => 'action_avatars'
+		$controller = new $selectedMenu['controller']();
+		$controller->{$selectedMenu['function']}();
 	}
 	else
 	{

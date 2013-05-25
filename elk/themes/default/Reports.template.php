@@ -14,10 +14,12 @@
  * @version 1.0 Alpha
  */
 
-// Choose which type of report to run?
+/**
+ * Interface to allow to choose which type of report to run.
+ */
 function template_report_type()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt;
 
 	echo '
 	<div id="admincenter">
@@ -42,7 +44,8 @@ function template_report_type()
 			echo '
 							<dd>', $type['description'], '</dd>';
 	}
-		echo '
+
+	echo '
 						</dl>
 						<input type="submit" name="continue" value="', $txt['generate_reports_continue'], '" class="button_submit" />
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -53,10 +56,12 @@ function template_report_type()
 	</div>';
 }
 
-// This is the standard template for showing reports in.
+/**
+ * This is the standard template for showing reports in.
+ */
 function template_main()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $txt;
 
 	echo '
 	<div id="admincenter">
@@ -135,34 +140,41 @@ function template_main()
 			$row_number++;
 			$alternate = !$alternate;
 		}
+
 		echo '
 			</tbody>
 		</table>
 		<br />';
 	}
+
 	echo '
 		</div>
 	</div>';
 }
 
-// Header of the print page!
+/**
+ * Header of the print page.
+ */
 function template_print_above()
 {
-	global $context, $settings, $txt;
+	global $context, $settings;
 
 	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"', $context['right_to_left'] ? ' dir="rtl"' : '', '>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $context['page_title'], '</title>
-		<link rel="stylesheet" type="text/css" href="', $settings['default_theme_url'], '/css/report.css" />
+		<link rel="stylesheet" href="', $settings['default_theme_url'], '/css/report.css" />
 	</head>
 	<body>';
 }
 
+/**
+ * Print a report.
+ */
 function template_print()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context;
 
 	// Go through each table!
 	foreach ($context['tables'] as $table)
@@ -226,13 +238,16 @@ function template_print()
 			$row_number++;
 			$alternate = !$alternate;
 		}
+
 		echo '
 			</table>
 		</div><br />';
 	}
 }
 
-// Footer of the print page.
+/**
+ * Footer of the print page.
+ */
 function template_print_below()
 {
 	echo '

@@ -5,6 +5,7 @@ global $context;
 
 $txt['post_reply'] = 'Post reply';
 $txt['message_icon'] = 'Message icon';
+$txt['post_in_board'] = 'Post in the board';
 $txt['subject_not_filled'] = 'The subject field was not filled out. It is required.';
 $txt['message_body_not_filled'] = 'The message body was not filled out. It is required.';
 // Use numeric entities in the below string.
@@ -180,8 +181,8 @@ $txt['digest_subject_daily'] = 'Daily Digest';
 $txt['digest_subject_weekly'] = 'Weekly Digest';
 $txt['digest_intro_daily'] = 'Below is a summary of all activity in your subscribed boards and topics at %1$s today. To unsubscribe please visit the link below.';
 $txt['digest_intro_weekly'] = 'Below is a summary of all activity in your subscribed boards and topics at %1$s this week. To unsubscribe please visit the link below.';
-$txt['digest_new_topics'] = 'The following topics have been started';
-$txt['digest_new_topics_line'] = '"%1$s" in "%2$s"';
+$txt['digest_new_topics'] = 'The following topics were started';
+$txt['digest_new_topics_line'] = '"%1$s" in the %2$s board';
 $txt['digest_new_replies'] = 'Replies have been made in the following topics';
 $txt['digest_new_replies_one'] = '1 reply in "%1$s"';
 $txt['digest_new_replies_many'] = '%1$d replies in "%2$s"';

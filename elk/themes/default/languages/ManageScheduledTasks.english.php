@@ -23,7 +23,7 @@ $txt['scheduled_task_daily_digest'] = 'Daily Notification Summary';
 $txt['scheduled_task_desc_daily_digest'] = 'Emails out the daily digest for notification subscribers.';
 $txt['scheduled_task_weekly_digest'] = 'Weekly Notification Summary';
 $txt['scheduled_task_desc_weekly_digest'] = 'Emails out the weekly digest for notification subscribers.';
-$txt['scheduled_task_fetchFiles'] = 'Fetch Elkarte Version Information';
+$txt['scheduled_task_fetchFiles'] = 'Fetch ElkArte Version Information';
 $txt['scheduled_task_desc_fetchFiles'] = 'Retrieves javascript files containing current revision levels, notifications of updates and other information.';
 $txt['scheduled_task_birthdayemails'] = 'Send Birthday Emails';
 $txt['scheduled_task_desc_birthdayemails'] = 'Sends out emails wishing members a happy birthday.';
@@ -61,3 +61,6 @@ $txt['scheduled_log_empty_log_confirm'] = 'Are you sure you want to completely c
 
 $txt['scheduled_task_remove_old_drafts'] = 'Remove old drafts';
 $txt['scheduled_task_desc_remove_old_drafts'] = 'Deletes drafts older than the number of days defined in the draft settings in the admin panel.';
+
+$txt['scheduled_task_remove_old_followups'] = 'Remove old follow-ups';
+$txt['scheduled_task_desc_remove_old_followups'] = 'Deletes follow-up entries still present in the database, but pointing to non-existent topics.';

@@ -14,10 +14,12 @@
  * @version 1.0 Alpha
  */
 
-// This is the main sidebar for the personal messages section.
+/**
+ * This is the main sidebar for the personal messages section.
+ */
 function template_pm_above()
 {
-	global $context, $settings, $txt;
+	global $context, $txt;
 
 	echo '
 					<div id="personal_messages">';
@@ -43,20 +45,25 @@ function template_pm_above()
 						</div>';
 }
 
-// Just the end of the index bar, nothing special.
+/**
+ * The end of the index bar, for personal messages page.
+ */
 function template_pm_below()
 {
 	echo '
 					</div>';
 }
 
+/**
+ * Messages folder.
+ */
 function template_folder()
 {
-	global $context, $settings, $scripturl, $options, $modSettings, $txt;
+	global $context, $scripturl, $options, $txt;
 
 	// The every helpful javascript!
 	echo '
-						<script type="text/javascript"><!-- // --><![CDATA[
+						<script><!-- // --><![CDATA[
 							var allLabels = {};
 							var currentLabels = {};
 							var txt_pm_msg_label_remove = "', $txt['pm_msg_label_remove'], '";
@@ -560,16 +567,18 @@ function template_build_pmposter_div($message)
 	return $poster_div;
 }
 
-// Just list all the personal message subjects - to make templates easier.
+/**
+ * Just list all the personal message subjects - to make templates easier.
+ */
 function template_subject_list()
 {
-	global $context, $settings, $modSettings, $txt, $scripturl;
+	global $context, $settings, $txt, $scripturl;
 
 	echo '
 						<table class="table_grid">
 						<thead>
 							<tr class="catbg">
-								<th style="width:4%" class="centercol first_th">
+								<th style="width:4%" class="centertext first_th">
 									<a href="', $scripturl, '?action=pm;view;f=', $context['folder'], ';start=', $context['start'], ';sort=', $context['sort_by'], ($context['sort_direction'] == 'up' ? '' : ';desc'), ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : ''), '"><img src="', $settings['images_url'], '/im_switch.png" alt="', $txt['pm_change_view'], '" title="', $txt['pm_change_view'], '" width="16" height="16" /></a>
 								</th>
 								<th class="lefttext" style="width:22%">
@@ -581,7 +590,7 @@ function template_subject_list()
 								<th class="lefttext">
 									<a href="', $scripturl, '?action=pm;f=', $context['folder'], ';start=', $context['start'], ';sort=name', $context['sort_by'] == 'name' && $context['sort_direction'] == 'up' ? ';desc' : '', $context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : '', '">', ($context['from_or_to'] == 'from' ? $txt['from'] : $txt['to']), $context['sort_by'] == 'name' ? ' <img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
 								</th>
-								<th style="width:4%" class="centercol last_th">
+								<th style="width:4%" class="centertext last_th">
 									<input type="checkbox" onclick="invertAll(this, this.form);" class="input_check" />
 								</th>
 							</tr>
@@ -599,8 +608,8 @@ function template_subject_list()
 	{
 		echo '
 							<tr class="', $next_alternate ? 'windowbg' : 'windowbg2', '">
-								<td style="width:4%;text-align:center">
-									<script type="text/javascript"><!-- // --><![CDATA[
+								<td class="centertext" style="width:4%">
+									<script><!-- // --><![CDATA[
 										currentLabels[', $message['id'], '] = {';
 
 		if (!empty($message['labels']))
@@ -621,7 +630,7 @@ function template_subject_list()
 								<td>', $message['time'], '</td>
 								<td>', ($context['display_mode'] != 0 && $context['current_pm'] == $message['id'] ? '<img src="' . $settings['images_url'] . '/selected.png" alt="*" />' : ''), '<a href="', ($context['display_mode'] == 0 || $context['current_pm'] == $message['id'] ? '' : ($scripturl . '?action=pm;pmid=' . $message['id'] . ';kstart;f=' . $context['folder'] . ';start=' . $context['start'] . ';sort=' . $context['sort_by'] . ($context['sort_direction'] == 'up' ? ';' : ';desc') . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : ''))), '#msg', $message['id'], '">', $message['subject'], $message['is_unread'] ? '&nbsp;<span class="new_posts">' . $txt['new'] . '</span>' : '', '</a></td>
 								<td>', ($context['from_or_to'] == 'from' ? $message['member']['link'] : (empty($message['recipients']['to']) ? '' : implode(', ', $message['recipients']['to']))), '</td>
-								<td class="centercol" style="width:4%">
+								<td class="centertext" style="width:4%">
 									<input type="checkbox" name="pms[]" id="deletelisting', $message['id'], '" value="', $message['id'], '"', $message['is_selected'] ? ' checked="checked"' : '', ' onclick="if (document.getElementById(\'deletedisplay', $message['id'], '\')) document.getElementById(\'deletedisplay', $message['id'], '\').checked = this.checked;" class="input_check" />
 								</td>
 							</tr>';
@@ -679,9 +688,12 @@ function template_subject_list()
 						</div>';
 }
 
+/**
+ * Page to search in PMs.
+ */
 function template_search()
 {
-	global $context, $settings, $scripturl, $modSettings, $txt;
+	global $context, $settings, $scripturl, $txt;
 
 	echo '
 	<form action="', $scripturl, '?action=pm;sa=search2" method="post" accept-charset="UTF-8" name="searchform" id="searchform">
@@ -755,6 +767,9 @@ function template_search()
 						</label><br />
 						<label for="subject_only">
 							<input type="checkbox" name="subject_only" id="subject_only" value="1"', !empty($context['search_params']['subject_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_subject_only'], '
+						</label><br />
+						<label for="sent_only">
+							<input type="checkbox" name="sent_only" id="sent_only" value="1"', !empty($context['search_params']['sent_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_sent_only'], '
 						</label>
 					</dd>
 					<dt class="between">',
@@ -813,7 +828,7 @@ function template_search()
 
 			// Some javascript for the advanced toggling
 			echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			createEventListener(window);
 			window.addEventListener("load", initSearch, false);
 
@@ -855,9 +870,12 @@ function template_search()
 	</form>';
 }
 
+/**
+ * Template for the results of search in PMs.
+ */
 function template_search_results()
 {
-	global $context, $settings, $scripturl, $modSettings, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 		<div class="cat_bar">
@@ -1153,7 +1171,7 @@ function template_send()
 
 	// The vars used to preview a personal message without loading a new page.
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var post_box_name = "', $context['post_box_name'], '";
 			var form_name = "postmodify";
 			var preview_area = "pm";
@@ -1217,7 +1235,7 @@ function template_send()
 	</div><br class="clear" />';
 
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var oPersonalMessageSend = new smf_PersonalMessageSend({
 				sSelf: \'oPersonalMessageSend\',
 				sSessionId: smf_session_id,
@@ -1260,10 +1278,12 @@ function template_send()
 		// ]]></script>';
 }
 
-// This template asks the user whether they wish to empty out their folder/messages.
+/**
+ * This template asks the user whether they wish to empty out their folder/messages.
+ */
 function template_ask_delete()
 {
-	global $context, $settings, $scripturl, $modSettings, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 		<div class="cat_bar">
@@ -1277,10 +1297,12 @@ function template_ask_delete()
 		</div>';
 }
 
-// This template asks the user what messages they want to prune.
+/**
+ * This template asks the user what messages they want to prune.
+ */
 function template_prune()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 	<form action="', $scripturl, '?action=pm;sa=prune" method="post" accept-charset="UTF-8" onsubmit="return confirm(\'', $txt['pm_prune_warning'], '\');">
@@ -1297,10 +1319,12 @@ function template_prune()
 	</form>';
 }
 
-// Here we allow the user to setup labels, remove labels and change rules for labels (i.e, do quite a bit)
+/**
+ * Here we allow the user to setup labels, remove labels and change rules for labels (i.e, do quite a bit)
+ */
 function template_labels()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 	<form action="', $scripturl, '?action=pm;sa=manlabels" method="post" accept-charset="UTF-8">
@@ -1346,7 +1370,7 @@ function template_labels()
 				<td>
 					<input type="text" name="label_name[', $label['id'], ']" value="', $label['name'], '" size="30" maxlength="30" class="input_text" />
 				</td>
-				<td style="width:4%;text-align:center">
+				<td class="centertext" style="width:4%">
 					<input type="checkbox" class="input_check" name="delete_label[', $label['id'], ']" />
 				</td>
 			</tr>';
@@ -1393,10 +1417,12 @@ function template_labels()
 	</form>';
 }
 
-// Template for reporting a personal message.
+/**
+ * Template for reporting a personal message.
+ */
 function template_report_message()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<form action="', $scripturl, '?action=pm;sa=report;l=', $context['current_label_id'], '" method="post" accept-charset="UTF-8">
@@ -1447,10 +1473,12 @@ function template_report_message()
 	</form>';
 }
 
-// Little template just to say "Yep, it's been submitted"
+/**
+ * Little template just to say "Yep, it's been submitted".
+ */
 function template_report_message_complete()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 		<div class="cat_bar">
@@ -1467,7 +1495,7 @@ function template_report_message_complete()
 // Manage rules.
 function template_rules()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<form action="', $scripturl, '?action=pm;sa=manrules" method="post" accept-charset="UTF-8" name="manRules" id="manrules">
@@ -1511,7 +1539,7 @@ function template_rules()
 				<td>
 					<a href="', $scripturl, '?action=pm;sa=manrules;add;rid=', $rule['id'], '">', $rule['name'], '</a>
 				</td>
-				<td style="width:4%;text-align:center">
+				<td class="centertext" style="width:4%">
 					<input type="checkbox" name="delrule[', $rule['id'], ']" class="input_check" />
 				</td>
 			</tr>';
@@ -1539,13 +1567,15 @@ function template_rules()
 
 }
 
-// Template for adding/editing a rule.
+/**
+ * Template for adding/editing a rule.
+ */
 function template_add_rule()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var criteriaNum = 0;
 		var actionNum = 0;
 		var groups = new Array()
@@ -1725,7 +1755,7 @@ function template_add_rule()
 
 	// Now setup all the bits!
 		echo '
-	<script type="text/javascript"><!-- // --><![CDATA[';
+	<script><!-- // --><![CDATA[';
 
 	foreach ($context['rule']['criteria'] as $k => $c)
 		echo '
@@ -1752,10 +1782,12 @@ function template_add_rule()
 		// ]]></script>';
 }
 
-// Template for showing all the PM drafts of the user.
+/**
+ * Template for showing all the PM drafts of the user.
+ */
 function template_showPMDrafts()
 {
-	global $context, $settings, $scripturl, $modSettings, $txt;
+	global $context, $settings, $scripturl, $txt;
 
 	echo '
 		<div class="cat_bar">

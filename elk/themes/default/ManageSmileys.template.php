@@ -14,10 +14,12 @@
  * @version 1.0 Alpha
  */
 
-// Editing the smiley sets.
+/**
+ * Editing the smiley sets.
+ */
 function template_editsets()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">';
@@ -36,7 +38,7 @@ function template_editsets()
 		</div>
 	</div>
 
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		window.smfForum_scripturl = smf_scripturl;
 		window.smfForum_sessionid = smf_session_id;
 		window.smfForum_sessionvar = smf_session_var;
@@ -44,10 +46,10 @@ function template_editsets()
 
 	if (empty($modSettings['disable_elk_js']))
 		echo '
-	<script type="text/javascript" src="', $scripturl, '?action=viewadminfile;filename=latest-smileys.js"></script>';
+	<script src="', $scripturl, '?action=viewadminfile;filename=latest-smileys.js"></script>';
 
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		function smfSetLatestSmileys()
 		{
 			if (typeof(window.smfLatestSmileys) != "undefined")
@@ -71,10 +73,12 @@ function template_editsets()
 	// ]]></script>';
 }
 
-// Modifying a smiley set.
+/**
+ * Modifying a smiley set.
+ */
 function template_modifyset()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">
@@ -109,11 +113,13 @@ function template_modifyset()
 						</dt>
 						<dd>
 							', $modSettings['smileys_url'], '/';
+
 		if ($context['current_set']['id'] == 'default')
 			echo '<strong>default</strong><input type="hidden" name="smiley_sets_path" id="smiley_sets_path" value="default" />';
 		elseif (empty($context['smiley_set_dirs']))
 			echo '
 							<input type="text" name="smiley_sets_path" id="smiley_sets_path" value="', $context['current_set']['path'], '" class="input_text" /> ';
+
 		else
 		{
 			echo '
@@ -124,6 +130,7 @@ function template_modifyset()
 			echo '
 							</select> ';
 		}
+
 		echo '
 							/..
 						</dd>
@@ -157,10 +164,12 @@ function template_modifyset()
 	</div>';
 }
 
-// Editing an individual smiley
+/**
+ * Editing an individual smiley.
+ */
 function template_modifysmiley()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">
@@ -207,6 +216,7 @@ function template_modifysmiley()
 				echo '
 							</select>';
 			}
+
 			echo '
 						</dd>
 						<dt>
@@ -242,7 +252,7 @@ function template_modifysmiley()
 		</form>
 	</div>
 
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		function updatePreview()
 		{
 			var currentImage = document.getElementById("preview");
@@ -251,10 +261,12 @@ function template_modifysmiley()
 	// ]]></script>';
 }
 
-// Adding a new smiley.
+/**
+ * Adding a new smiley.
+ */
 function template_addsmiley()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">
@@ -331,6 +343,7 @@ function template_addsmiley()
 					</fieldset>
 
 					<dl id="uploadMore" style="display: none;" class="settings">';
+
 	foreach ($context['smiley_sets'] as $smiley_set)
 		echo '
 						<dt>
@@ -339,6 +352,7 @@ function template_addsmiley()
 						<dd>
 							<input type="file" name="individual_', $smiley_set['name'], '" onchange="selectMethod(\'upload\');" class="input_file" />
 						</dd>';
+
 	echo '
 					</dl>
 				</div>
@@ -388,7 +402,9 @@ function template_addsmiley()
 	</div>';
 }
 
-// Ordering smileys.
+/**
+ * Ordering smileys.
+ */
 function template_setorder()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -440,10 +456,12 @@ function template_setorder()
 	</div>';
 }
 
-// Editing an individual message icon
+/**
+ * Editing an individual message icon.
+ */
 function template_editicon()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt;
 
 	echo '
 	<div id="admincenter">
@@ -456,6 +474,7 @@ function template_editicon()
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">';
+
 	if (!$context['new_icon'])
 		echo '
 						<dt>
@@ -464,6 +483,7 @@ function template_editicon()
 						<dd>
 							<img src="', $context['icon']['image_url'], '" alt="', $context['icon']['title'], '" />
 						</dd>';
+
 	echo '
 						<dt>
 							<strong><label for="icon_filename">', $txt['smileys_filename'], '</label>: </strong><br /><span class="smalltext">', $txt['icons_filename_all_png'], '</span>

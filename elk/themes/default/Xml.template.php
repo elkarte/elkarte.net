@@ -329,6 +329,28 @@ function template_check_username()
 </smf>';
 }
 
+function template_generic_xml_buttons()
+{
+	global $context;
+
+	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
+<elk>
+	<buttons>';
+	foreach ($context['xml_data'] as $button)
+	{
+		echo '
+		<button>';
+		foreach ($button as $key => $val)
+			echo '
+			<', $key, '><![CDATA[', cleanXml($val), ']]></', $key, '>';
+		echo '
+		</button>';
+	}
+	echo '
+	</buttons>
+</elk>';
+}
+
 // This prints XML in it's most generic form.
 function template_generic_xml()
 {
@@ -374,7 +396,7 @@ function template_webslice_header_above()
 	global $settings;
 
 	echo '
-	<link rel="stylesheet" href="', $settings['default_theme_url'], '/css/wireless.css" type="text/css" />';
+	<link rel="stylesheet" href="', $settings['default_theme_url'], '/css/wireless.css" />';
 }
 
 function template_webslice_header_below()
@@ -388,7 +410,7 @@ function template_webslice_recent_posts()
 
 	echo '
 	<div style="width: 100%; height: 100%; border: 1px solid black; padding: 0; margin: 0 0 0 0; font: 100.01%/100% Verdana, Helvetica, sans-serif;">
-		<div style="background-color: #080436; color: #ffffff; padding: 4px;">
+		<div style="background: #080436; color: #ffffff; padding: 4px;">
 			', cleanXml($txt['recent_posts']), '
 		</div>';
 
@@ -396,7 +418,7 @@ function template_webslice_recent_posts()
 	foreach ($context['recent_posts_data'] as $item)
 	{
 		echo '
-		<div style="background-color: ', $alternate ? '#ECEDF3' : '#F6F6F6', '; font-size: 90%; padding: 2px;">
+		<div style="background: ', $alternate ? '#ECEDF3' : '#F6F6F6', '; font-size: 90%; padding: 2px;">
 			<strong><a href="', $item['link'], '">', cleanXml($item['subject']), '</a></strong> ', cleanXml($txt['by']), ' ', cleanXml(!empty($item['poster']['link']) ? '<a href="' . $item['poster']['link'] . '">' . $item['poster']['name'] . '</a>' : $item['poster']['name']), '
 		</div>';
 		$alternate = !$alternate;
@@ -429,6 +451,6 @@ function template_xml_draft()
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
 <drafts>
-	<draft id="', $context['id_draft'], '"><![CDATA[', $txt['draft_saved_on'], ': ', timeformat($context['draft_saved_on']), ']]></draft>
+	<draft id="', $context['id_draft'], '"><![CDATA[', $txt['draft_saved_on'], ': ', relativeTime($context['draft_saved_on']), ']]></draft>
 </drafts>';
 }

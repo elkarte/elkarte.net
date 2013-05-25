@@ -14,9 +14,12 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Template for the bit to show when merge topics is finished.
+ */
 function template_merge_done()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 		<div id="merge_topics">
@@ -41,9 +44,12 @@ function template_merge_done()
 	<br class="clear" />';
 }
 
+/**
+ * Template to allow merge of two topics.
+ */
 function template_merge()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 		<div id="merge_topics">
@@ -70,7 +76,7 @@ function template_merge()
 							<strong>', $txt['target_board'], ':</strong>
 						</dt>
 						<dd>
-							<form action="' . $scripturl . '?action=mergetopics;from=' . $context['origin_topic'] . ';targetboard=' . $context['target_board'] . ';board=' . $context['current_board'] . '.0" method="post" accept-charset="UTF-8">
+							<form action="' . $scripturl . '?action=mergetopics;from=', $context['origin_topic'] . ';targetboard=' . $context['target_board'], ';board=', $context['current_board'], '.0" method="post" accept-charset="UTF-8">
 								<input type="hidden" name="from" value="' . $context['origin_topic'] . '" />
 								<select name="targetboard" onchange="this.form.submit();">';
 			foreach ($context['boards'] as $board)
@@ -132,9 +138,12 @@ function template_merge()
 		</div>';
 }
 
+/**
+ * Template for the extra options for a topics merge.
+ */
 function template_merge_extra_options()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="merge_topics">
@@ -145,22 +154,23 @@ function template_merge_extra_options()
 			<table class="bordercolor table_grid">
 				<thead>
 					<tr class="catbg">
-						<th scope="col" class="first_th" style="text-align:center;width:10px">', $txt['merge_check'], '</th>
+						<th scope="col" class="first_th centertext" style="width:6em">', $txt['merge_check'], '</th>
 						<th scope="col" class="lefttext">', $txt['subject'], '</th>
 						<th scope="col" class="lefttext">', $txt['started_by'], '</th>
 						<th scope="col" class="lefttext">', $txt['last_post'], '</th>
-						<th scope="col" class="last_th" style="width:20px">' . $txt['merge_include_notifications'] . '</th>
+						<th scope="col" class="last_th centertext" style="width:10em">' . $txt['merge_include_notifications'] . '</th>
 					</tr>
 				</thead>
 				<tbody>';
+
 		foreach ($context['topics'] as $topic)
 			echo '
 					<tr class="windowbg2">
 						<td class="centertext">
-							<input type="checkbox" class="input_check" name="topics[]" value="' . $topic['id'] . '" checked="checked" />
+							<input type="checkbox" class="input_check" name="topics[]" value="', $topic['id'], '" checked="checked" />
 						</td>
 						<td>
-							<a href="' . $scripturl . '?topic=' . $topic['id'] . '.0" target="_blank" class="new_win">' . $topic['subject'] . '</a>
+							<a href="', $scripturl, '?topic=', $topic['id'], '.0" target="_blank" class="new_win">', $topic['subject'] . '</a>
 						</td>
 						<td>
 							', $topic['started']['link'], '<br />
@@ -174,6 +184,7 @@ function template_merge_extra_options()
 							<input type="checkbox" class="input_check" name="notifications[]" value="' . $topic['id'] . '" checked="checked" />
 						</td>
 					</tr>';
+
 		echo '
 				</tbody>
 			</table>
@@ -185,9 +196,11 @@ function template_merge_extra_options()
 					<fieldset id="merge_subject" class="merge_options">
 						<legend>', $txt['merge_select_subject'], '</legend>
 						<select name="subject" onchange="this.form.custom_subject.style.display = (this.options[this.selectedIndex].value != 0) ? \'none\': \'\' ;">';
+
 	foreach ($context['topics'] as $topic)
 		echo '
 							<option value="', $topic['id'], '"' . ($topic['selected'] ? ' selected="selected"' : '') . '>', $topic['subject'], '</option>';
+
 	echo '
 							<option value="0">', $txt['merge_custom_subject'], ':</option>
 						</select>
@@ -211,6 +224,7 @@ function template_merge_extra_options()
 						</ul>
 					</fieldset>';
 	}
+
 	if (!empty($context['polls']))
 	{
 		echo '
@@ -220,15 +234,16 @@ function template_merge_extra_options()
 		foreach ($context['polls'] as $poll)
 			echo '
 							<li>
-								<input type="radio" name="poll" value="' . $poll['id'] . '"' . ($poll['selected'] ? ' checked="checked"' : '') . ' class="input_radio" /> ' . $poll['question'] . ' (' . $txt['topic'] . ': <a href="' . $scripturl . '?topic=' . $poll['topic']['id'] . '.0" target="_blank" class="new_win">' . $poll['topic']['subject'] . '</a>)
+								<input type="radio" name="poll" value="' . $poll['id'] . '"' . ($poll['selected'] ? ' checked="checked"' : '') . ' class="input_radio" /> ', $poll['question'], ' (', $txt['topic'], ': <a href="', $scripturl, '?topic=', $poll['topic']['id'], '.0" target="_blank" class="new_win">', $poll['topic']['subject'], '</a>)
 							</li>';
 		echo '
 							<li>
-								<input type="radio" name="poll" value="-1" class="input_radio" /> (' . $txt['merge_no_poll'] . ')
+								<input type="radio" name="poll" value="-1" class="input_radio" /> (', $txt['merge_no_poll'], ')
 							</li>
 						</ul>
 					</fieldset>';
 	}
+
 	echo '
 					<div class="auto_flow">
 						<input type="submit" value="' . $txt['merge'] . '" class="button_submit" />

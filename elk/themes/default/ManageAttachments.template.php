@@ -14,15 +14,22 @@
  * @version 1.0 Alpha
  */
 
-// Template template wraps around the simple settings page to add javascript functionality.
+/**
+ * Template template wraps around the simple settings page to add javascript functionality.
+ * (section below)
+ */
 function template_avatar_settings_above()
 {
 }
 
+/**
+ * Template template wraps around the simple settings page to add javascript functionality.
+ * (section above)
+ */
 function template_avatar_settings_below()
 {
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 	var fUpdateStatus = function ()
 	{
 		document.getElementById("avatar_max_width_external").disabled = document.getElementById("avatar_download_external").checked;
@@ -37,6 +44,9 @@ function template_avatar_settings_below()
 ';
 }
 
+/**
+ * Forum maintenance page.
+ */
 function template_maintenance()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -174,13 +184,13 @@ function template_maintenance()
 						<div id="show_progress" class="padding"></div>
 						<br class="clear_right" />
 					</form>
-					<script type="text/javascript"><!-- // --><![CDATA[
+					<script><!-- // --><![CDATA[
 						function start_progress() {
 							setTimeout(\'show_msg()\', 1000);
 						}
 
 						function show_msg() {
-							$(\'#progress_msg\').html(\'<div><img src="', $settings['actual_images_url'], '/loading.gif" alt="loading.gif" width="35" height="35" />&nbsp; ', $txt['attachment_transfer_progress'] , '<\/div>\');
+							$(\'#progress_msg\').html(\'<div><img src="', $settings['actual_images_url'], '/loading.gif" alt="loading.gif" style="width:35px; height:35px" />&nbsp; ', $txt['attachment_transfer_progress'] , '<\/div>\');
 							show_progress();
 						}
 
@@ -195,9 +205,12 @@ function template_maintenance()
 			<br class="clear" />';
 }
 
+/**
+ * Repair attachments page
+ */
 function template_attachment_repair()
 {
-	global $context, $txt, $scripturl, $settings;
+	global $context, $txt, $scripturl;
 
 	// If we've completed just let them know!
 	if ($context['completed'])
@@ -265,6 +278,9 @@ function template_attachment_repair()
 	}
 }
 
+/**
+ * Section on the page for attachments directories paths.
+ */
 function template_attach_paths()
 {
 	global $modSettings;

@@ -58,7 +58,7 @@ function action_jumpto()
 	global $context;
 
 	// Find the boards/categories they can see.
-	require_once(SUBSDIR . '/MessageIndex.subs.php');
+	require_once(SUBSDIR . '/Boards.subs.php');
 	$boardListOptions = array(
 		'use_permissions' => true,
 		'selected_board' => isset($context['current_board']) ? $context['current_board'] : 0,
@@ -155,8 +155,9 @@ function action_corefeatures()
 	$validation = validateSession();
 	if (empty($validation))
 	{
-		require_once(ADMINDIR . '/ManageSettings.php');
-		$result = ModifyCoreFeatures();
+		require_once(ADMINDIR . '/ManageCoreFeatures.php');
+		$controller = new ManageCoreFeatures_Controller();
+		$result = $controller->action_index();
 
 		// Load up the core features of the system
 		if (empty($result))
@@ -226,6 +227,7 @@ function action_previews()
 		'newsletterpreview' => array('action_newsletterpreview'),
 		'sig_preview' => array('action_sig_preview'),
 		'warning_preview' => array('action_warning_preview'),
+		'bounce_preview' => array('action_bounce_preview'),
 	);
 
 	$context['sub_template'] = 'generic_xml';
@@ -244,13 +246,13 @@ function action_previews()
  */
 function action_newspreview()
 {
-	global $context, $smcFunc;
+	global $context;
 
 	// Needed for parse bbc
 	require_once(SUBSDIR . '/Post.subs.php');
 
 	$errors = array();
-	$news = !isset($_POST['news']) ? '' : $smcFunc['htmlspecialchars']($_POST['news'], ENT_QUOTES);
+	$news = !isset($_POST['news']) ? '' : Util::htmlspecialchars($_POST['news'], ENT_QUOTES);
 	if (empty($news))
 		$errors[] = array('value' => 'no_news');
 	else
@@ -305,7 +307,9 @@ function action_newsletterpreview()
  */
 function action_sig_preview()
 {
-	global $context, $smcFunc, $txt, $user_info;
+	global $context, $txt, $user_info;
+
+	$db = database();
 
 	require_once(SUBSDIR . '/Profile.subs.php');
 	loadLanguage('Profile');
@@ -321,21 +325,12 @@ function action_sig_preview()
 	$errors = array();
 	if (!empty($user) && $can_change)
 	{
+		require_once(SUBSDIR . '/Members.subs.php');
 		// Get the current signature
-		$request = $smcFunc['db_query']('', '
-			SELECT signature
-			FROM {db_prefix}members
-			WHERE id_member = {int:id_member}
-			LIMIT 1',
-			array(
-				'id_member' => $user,
-			)
-		);
-		list($current_signature) = $smcFunc['db_fetch_row']($request);
-		$smcFunc['db_free_result']($request);
+		$member = getBasicMemberData($user, array('preferences' => true));
 
-		censorText($current_signature);
-		$current_signature = parse_bbc($current_signature, true, 'sig' . $user);
+		censorText($member['signature']);
+		$member['signature'] = parse_bbc($member['signature'], true, 'sig' . $user);
 
 		// And now what they want it to be
 		$preview_signature = !empty($_POST['signature']) ? $_POST['signature'] : '';
@@ -365,9 +360,9 @@ function action_sig_preview()
 		'children' => array()
 	);
 
-	if (isset($current_signature))
+	if (isset($member['signature']))
 		$context['xml_data']['signatures']['children'][] = array(
-			'value' => $current_signature,
+			'value' => $member['signature'],
 			'attributes' => array('type' => 'current'),
 		);
 
@@ -396,7 +391,7 @@ function action_sig_preview()
  */
 function action_warning_preview()
 {
-	global $context, $smcFunc, $txt, $user_info, $scripturl, $mbname;
+	global $context, $txt, $user_info, $scripturl, $mbname;
 
 	require_once(SUBSDIR . '/Post.subs.php');
 	loadLanguage('Errors');
@@ -408,7 +403,7 @@ function action_warning_preview()
 	if (allowedTo('issue_warning'))
 	{
 		$warning_body = !empty($_POST['body']) ? trim(censorText($_POST['body'])) : '';
-		$context['preview_subject'] = !empty($_POST['title']) ? trim($smcFunc['htmlspecialchars']($_POST['title'])) : '';
+		$context['preview_subject'] = !empty($_POST['title']) ? trim(Util::htmlspecialchars($_POST['title'])) : '';
 		if (isset($_POST['issuing']))
 		{
 			if (empty($_POST['title']) || empty($_POST['body']))
@@ -454,6 +449,77 @@ function action_warning_preview()
 	}
 	else
 		$context['post_error']['messages'][] = array('value' => $txt['cannot_issue_warning'], 'attributes' => array('type' => 'error'));
+
+	$context['sub_template'] = 'pm';
+}
+
+/**
+ * Used to preview custom email bounce templates before they are saved for use
+ */
+function action_bounce_preview()
+{
+	global $context, $txt, $scripturl, $mbname, $modSettings;
+
+	require_once(SUBSDIR . '/Post.subs.php');
+	loadLanguage('Errors');
+	loadLanguage('ModerationCenter');
+
+	$context['post_error']['messages'] = array();
+
+	// If you can't approve emails, what are you doing here?
+	if (allowedTo('approve_emails'))
+	{
+		$body = !empty($_POST['body']) ? trim(censorText($_POST['body'])) : '';
+		$context['preview_subject'] = !empty($_POST['title']) ? trim(Util::htmlspecialchars($_POST['title'])) : '';
+
+		if (isset($_POST['issuing']))
+		{
+			if (empty($_POST['title']) || empty($_POST['body']))
+				$context['post_error']['messages'][] = $txt['warning_notify_blank'];
+		}
+		else
+		{
+			if (empty($_POST['title']))
+				$context['post_error']['messages'][] = $txt['mc_warning_template_error_no_title'];
+
+			if (empty($_POST['body']))
+				$context['post_error']['messages'][] = $txt['mc_warning_template_error_no_body'];
+			// Add in few replacements.
+			/**
+			 * These are the defaults:
+			 * - {FORUMNAME} - Forum Name, the full name with all the bells
+			 * - {FORUMNAMESHORT} - Short and simple name
+			 * - {SCRIPTURL} - Web address of forum.
+			 * - {ERROR} - The error that was generated by the post, its unique to the post so cant render it here
+			 * - {SUBJECT} - The subject of the email thats being discussed, unique to the post so cant render it here
+			 * - {REGARDS} - Standard email sign-off.
+			 * - {EMAILREGARDS} - Maybe a bit more friendly sign-off.
+			 */
+			$find = array(
+				'{FORUMNAME}',
+				'{FORUMNAMESHORT}',
+				'{SCRIPTURL}',
+				'{REGARDS}',
+				'{EMAILREGARDS}',
+			);
+			$replace = array(
+				$mbname,
+				(!empty($modSettings['maillist_sitename']) ? $modSettings['maillist_sitename'] : $mbname),
+				$scripturl,
+				$txt['regards_team'],
+				(!empty($modSettings['maillist_sitename_regards']) ? $modSettings['maillist_sitename_regards'] : '')
+			);
+			$body = str_replace($find, $replace, $body);
+		}
+
+		// Deal with any BBC so it looks good for the preview
+		if (!empty($_POST['body']))
+		{
+			preparsecode($body);
+			$body = parse_bbc($body, true);
+		}
+		$context['preview_message'] = $body;
+	}
 
 	$context['sub_template'] = 'pm';
 }

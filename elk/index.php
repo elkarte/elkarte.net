@@ -19,29 +19,40 @@
  *
  */
 
-$forum_version = 'ELKARTE 1.0 Alpha';
+$forum_version = 'ELKARTE 1.0-dev-20132505';
 
-// Get everything started up...
+// First things first, but not necessarily in that order.
 define('ELKARTE', 1);
+
 if (function_exists('set_magic_quotes_runtime'))
 	@set_magic_quotes_runtime(0);
 error_reporting(defined('E_STRICT') ? E_ALL | E_STRICT : E_ALL);
 $time_start = microtime(true);
 
-// This makes it so headers can be sent!
+// Turn on output buffering.
 ob_start();
 
-// Do some cleaning, just in case.
+// We don't need no globals.
 foreach (array('db_character_set', 'cachedir') as $variable)
 	if (isset($GLOBALS[$variable]))
 		unset($GLOBALS[$variable], $GLOBALS[$variable]);
 
-// Load the settings...
+// Ready to load the site settings.
 require_once(dirname(__FILE__) . '/Settings.php');
 
-// Make absolutely sure the new directories are defined.
+// Make sure the paths are correct... at least try to fix them.
+if (!file_exists($boarddir) && file_exists(dirname(__FILE__) . '/agreement.txt'))
+	$boarddir = dirname(__FILE__);
+if (!file_exists($sourcedir) && file_exists($boarddir . '/sources'))
+	$sourcedir = $boarddir . '/sources';
+
+// Check that directories which didn't exist in past releases are initialized.
 if ((empty($cachedir) || !file_exists($cachedir)) && file_exists($boarddir . '/cache'))
 	$cachedir = $boarddir . '/cache';
+if ((empty($extdir) || !file_exists($extdir)) && file_exists($sourcedir . '/ext'))
+	$extdir = $sourcedir . '/ext';
+if ((empty($languagedir) || !file_exists($languagedir)) && file_exists($boarddir . '/themes/default/languages'))
+	$languagedir = $boarddir . '/themes/default/languages';
 
 // Time to forget about variables and go with constants!
 DEFINE('BOARDDIR', $boarddir);
@@ -53,9 +64,9 @@ DEFINE('SOURCEDIR', $sourcedir);
 DEFINE('ADMINDIR', $sourcedir . '/admin');
 DEFINE('CONTROLLERDIR', $sourcedir . '/controllers');
 DEFINE('SUBSDIR', $sourcedir . '/subs');
-unset($boarddir, $cachedir, $sourcedir);
+unset($boarddir, $cachedir, $sourcedir, $languagedir, $extdir);
 
-// And important includes.
+// Files we cannot live without.
 require_once(SOURCEDIR . '/QueryString.php');
 require_once(SOURCEDIR . '/Session.php');
 require_once(SOURCEDIR . '/Subs.php');
@@ -66,8 +77,10 @@ require_once(SUBSDIR . '/Cache.subs.php');
 require_once(SOURCEDIR . '/Security.php');
 require_once(SOURCEDIR . '/BrowserDetect.class.php');
 require_once(SOURCEDIR . '/Errors.class.php');
+require_once(SUBSDIR . '/Util.class.php');
+require_once(SUBSDIR . '/TemplateLayers.class.php');
 
-// If $maintenance is set specifically to 2, then we're upgrading or something.
+// Forum in extended maintenance mode? Our trip ends here with a bland message.
 if (!empty($maintenance) && $maintenance == 2)
 	display_maintenance_message();
 
@@ -77,11 +90,16 @@ $smcFunc = array();
 // Initiate the database connection and define some database functions to use.
 loadDatabase();
 
-// Load the settings from the settings table, and perform operations like optimizing.
+// It's time for settings loaded from the database.
 reloadSettings();
 
-// Clean the request variables, add slashes, etc.
+// Temporarily, compatibility for access to utility functions through $smcFunc is enabled by default.
+Util::compat_init();
+
+// Clean the request!
 cleanRequest();
+
+// Our good ole' contextual array, which will hold everything
 $context = array();
 
 // Seed the random generator.
@@ -142,6 +160,9 @@ function elk_main()
 		die("\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x21\xF9\x04\x01\x00\x00\x00\x00\x2C\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3B");
 	}
 
+	// We should set our security headers now.
+	frameOptionsHeader();
+
 	// Load the user's cookie (or set as guest) and load their settings.
 	loadUserSettings();
 
@@ -174,7 +195,7 @@ function elk_main()
 	// Do some logging, unless this is an attachment, avatar, toggle of editor buttons, theme option, XML feed etc.
 	if (empty($_REQUEST['action']) || !in_array($_REQUEST['action'], $no_stat_actions))
 	{
-		// Log this user as online.
+		// I see you!
 		writeLog();
 
 		// Track forum statistics and hits...?

@@ -14,9 +14,12 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Show an interface to ask the user the options for split topics.
+ */
 function template_ask()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="split_topics">
@@ -27,25 +30,47 @@ function template_ask()
 			</div>
 			<div class="windowbg">
 				<div class="content">
-					<p class="split_topics">
-						<strong><label for="subname">', $txt['subject_new_topic'], '</label>:</strong>
-						<input type="text" name="subname" id="subname" value="', $context['message']['subject'], '" size="25" class="input_text" />
-					</p>
-					<ul class="reset split_topics">
-						<li>
-							<input type="radio" id="onlythis" name="step2" value="onlythis" checked="checked" class="input_radio" /> <label for="onlythis">', $txt['split_this_post'], '</label>
-						</li>
-						<li>
-							<input type="radio" id="afterthis" name="step2" value="afterthis" class="input_radio" /> <label for="afterthis">', $txt['split_after_and_this_post'], '</label>
-						</li>
-						<li>
-							<input type="radio" id="selective" name="step2" value="selective" class="input_radio" /> <label for="selective">', $txt['select_split_posts'], '</label>
-						</li>
-					</ul>
-					<hr class="hrcolor" />
-					<div class="auto_flow">
-						<input type="submit" value="', $txt['split'], '" class="button_submit" />
-						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+					<div class="split_topics">
+						<p>
+							<strong><label for="subname">', $txt['subject_new_topic'], '</label>:</strong>
+							<input type="text" name="subname" id="subname" value="', $context['message']['subject'], '" size="25" class="input_text" />
+						</p>
+						<ul class="reset split_topics">
+							<li>
+								<input type="radio" id="onlythis" name="step2" value="onlythis" checked="checked" class="input_radio" /> <label for="onlythis">', $txt['split_this_post'], '</label>
+							</li>
+							<li>
+								<input type="radio" id="afterthis" name="step2" value="afterthis" class="input_radio" /> <label for="afterthis">', $txt['split_after_and_this_post'], '</label>
+							</li>
+							<li>
+								<input type="radio" id="selective" name="step2" value="selective" class="input_radio" /> <label for="selective">', $txt['select_split_posts'], '</label>
+							</li>
+						</ul>
+						<hr class="hrcolor" />
+						<label for="messageRedirect"><input type="checkbox" name="messageRedirect" id="messageRedirect" onclick="document.getElementById(\'reasonArea\').style.display = this.checked ? \'block\' : \'none\';" class="input_check" /> ', $txt['splittopic_notification'], '.</label>
+						<fieldset id="reasonArea" style="margin-top: 1ex; display: none;', '">
+							<dl class="settings">
+								<dt>
+									', $txt['moved_why'], '
+								</dt>
+								<dd>
+									<textarea name="reason" rows="4" cols="40">', $txt['splittopic_default'], '</textarea>
+								</dd>
+							</dl>
+						</fieldset>';
+	if (!empty($context['can_move']))
+		echo '
+						<p>
+							<label for="move_new_topic"><input type="checkbox" name="move_new_topic" id="move_new_topic" onclick="document.getElementById(\'board_list\').style.display = this.checked ? \'\' : \'none\';" class="input_check" /> ',$txt['splittopic_move'] , '.</label>', template_select_boards('board_list'), '
+							<script><!-- // --><![CDATA[
+								document.getElementById(\'board_list\').style.display = \'none\';
+							// ]]></script>
+						</p>';
+	echo '
+						<div class="auto_flow">
+							<input type="submit" value="', $txt['split'], '" class="button_submit" />
+							<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						</div>
 					</div>
 				</div>
 			</div>
@@ -53,9 +78,12 @@ function template_ask()
 	</div>';
 }
 
+/**
+ * Split topics main page.
+ */
 function template_main()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="split_topics">
@@ -81,6 +109,9 @@ function template_main()
 	</div>';
 }
 
+/**
+ * Interface to allow selection of messages to split.
+ */
 function template_select()
 {
 	global $context, $settings, $txt, $scripturl;
@@ -132,6 +163,7 @@ function template_select()
 				<ul id="messages_selected" class="split_messages smalltext reset">';
 
 	if (!empty($context['selected']['messages']))
+	{
 		foreach ($context['selected']['messages'] as $message)
 			echo '
 					<li class="windowbg', $message['alternate'] ? '2' : '', '" id="selected_', $message['id'], '">
@@ -144,6 +176,7 @@ function template_select()
 							<div class="post">', $message['body'], '</div>
 						</div>
 					</li>';
+	}
 
 	echo '
 					<li class="dummy" />
@@ -153,13 +186,15 @@ function template_select()
 			<div class="flow_auto">
 				<input type="hidden" name="topic" value="', $context['current_topic'], '" />
 				<input type="hidden" name="subname" value="', $context['new_subject'], '" />
+				<input type="hidden" name="move_to_board" value="', $context['move_to_board'], '" />
+				<input type="hidden" name="reason" value="', $context['reason'], '" />
 				<input type="submit" value="', $txt['split'], '" class="button_submit" />
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			</div>
 		</form>
 	</div>
 
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var start = new Array();
 		start[0] = ', $context['not_selected']['start'], ';
 		start[1] = ', $context['selected']['start'], ';
@@ -174,6 +209,7 @@ function template_select()
 			else
 				return true;
 		}
+
 		function onDocReceived(XMLDoc)
 		{
 			var i, j, pageIndex;

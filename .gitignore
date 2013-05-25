@@ -1,7 +1,10 @@
-Settings.php
-Settings_bak.php
-db_last_error.php
-cache/data*.php
-Packages/backups/*
-Packages/temp
+elk/Settings.php
+elk/Settings_bak.php
+elk/db_last_error.php
+elk/cache/data*.php
+elk/packages/backups/*
+elk/packages/temp
 *.*~
+*/.buildpath
+*/.project
+*/.settings

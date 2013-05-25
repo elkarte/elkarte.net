@@ -69,8 +69,23 @@ function template_init()
 	// Set the following variable to true if this theme requires the optional theme strings file to be loaded.
 	$settings['require_theme_strings'] = false;
 
+	// This is used for the color variants
+	$settings['theme_variants'] = array('white', 'blue', 'red');
+
 	// Set the following variable to true is this theme wants to display the avatar of the user that posted the last post on the board index and message index
 	$settings['avatars_on_indexes'] = false;
+
+	// This bit of template is used by default in the main menu to create the number next to the title of the menu to indicate for example the number of unread messages
+	$settings['menu_numeric_notice'] = ' [<strong>%1$s</strong>]';
+
+	// This slightly more complex array, instead, will deal with page indexes as frequently requested by Ant :P
+	$settings['page_index_template'] = array(
+		'base_link' => '<span class="pagelink"><a class="navPages" href="{base_link}">%2$s</a> </span>',
+		'previous_page' => '<span class="previous_page">{prev_txt}</span>',
+		'current_page' => '<span class="pagelink"><span class="current_page"><strong>%1$s</strong></span></span>',
+		'next_page' => '<span class="next_page">{next_txt}</span>',
+		'expand_pages' => '<span class="expand_pages" onclick="{onclick_handler}" onmouseover="this.style.cursor=\'pointer\';"><strong> ... </strong></span>',
+	);
 }
 
 /**
@@ -81,9 +96,10 @@ function template_html_above()
 	global $context, $settings, $scripturl, $txt, $modSettings;
 
 	// Show right to left and the character set for ease of translating.
-	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"', $context['right_to_left'] ? ' dir="rtl"' : '', '>
-<head>';
+	echo '<!DOCTYPE html>
+<html', $context['right_to_left'] ? ' dir="rtl"' : '', '>
+<head>
+	<title>', $context['page_title_html_safe'], '</title>';
 
 	// Tell IE to render the page in standards not compatibility mode. really for ie >= 8
 	// Note if this is not in the first 4k, its ignored, thats why its here
@@ -97,30 +113,30 @@ function template_html_above()
 	// Save some database hits, if a width for multiple wrappers is set in admin.
 	if (!empty($settings['forum_width']))
 		echo '
-	<style type="text/css">#wrapper, .frame {width: ', $settings['forum_width'], ';}</style>';
+	<style>
+		#wrapper, .frame {
+			width: ', $settings['forum_width'], ';
+		}
+	</style>';
 
 	// Quick and dirty testing of RTL horrors. Remove before production build.
 	//echo '
-	//<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
+	//<link rel="stylesheet" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
 
 	// RTL languages require an additional stylesheet.
 	if ($context['right_to_left'])
-	{
 		echo '
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
 
-		if (!empty($context['theme_variant']))
-			echo '
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/rtl', $context['theme_variant'], '.css?alp21" />';
-	}
+	if (!empty($context['theme_variant']))
+		echo '
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />';
 
 	echo '
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="viewport" content="width=device-width" />
 	<meta name="description" content="', $context['page_title_html_safe'], '" />', !empty($context['meta_keywords']) ? '
 	<meta name="keywords" content="' . $context['meta_keywords'] . '" />' : '';
-
-	echo '
-	<title>', $context['page_title_html_safe'], '</title>';
 
 	// Please don't index these Mr Robot.
 	if (!empty($context['robot_no_index']))
@@ -166,12 +182,21 @@ function template_html_above()
 	// Output any remaining HTML headers. (from mods, maybe?)
 	echo $context['html_headers'];
 
+	// A little help for our friends
+	echo '
+	<!--[if lt IE 9]>
+		<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->';
+
 	echo '
 </head>
 <body id="', $context['browser_body_id'], '" class="action_', !empty($context['current_action']) ? htmlspecialchars($context['current_action']) : (!empty($context['current_board']) ?
 		'messageindex' : (!empty($context['current_topic']) ? 'display' : 'home')), !empty($context['current_board']) ? ' board_' . htmlspecialchars($context['current_board']) : '', '">';
 }
 
+/**
+ * Section above the main contents of the page, after opening the body tag
+ */
 function template_body_above()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -180,7 +205,7 @@ function template_body_above()
 	echo '
 	<div id="top_section">
 		<div class="frame">
-			<ul class="floatleft">';
+			<span id="top_section_notice" class="floatleft">';
 
 	// If the user is logged in, display the time, or a maintenance warning for admins.
 	if ($context['user']['is_logged'])
@@ -188,24 +213,22 @@ function template_body_above()
 		// Is the forum in maintenance mode?
 		if ($context['in_maintenance'] && $context['user']['is_admin'])
 			echo '
-				<li class="notice">', $txt['maintain_mode_on'], '</li>';
+				<span class="notice">', $txt['maintain_mode_on'], '</span>';
 		else
-			echo '
-				<li>', $context['current_time'], '</li>';
+			echo $context['current_time'];
 	}
 	// Otherwise they're a guest. Ask them to either register or login.
 	else
-		echo '
-				<li>', sprintf($txt[$context['can_register'] ? 'welcome_guest_register' : 'welcome_guest'], $txt['guest_title'], $scripturl . '?action=login'), '</li>';
+		echo sprintf($txt[$context['can_register'] ? 'welcome_guest_register' : 'welcome_guest'], $txt['guest_title'], $scripturl . '?action=login');
 
 	echo '
-			</ul>';
+			</span>';
 
 	if ($context['allow_search'])
 	{
 		echo '
 			<form id="search_form" class="floatright" action="', $scripturl, '?action=search2" method="post" accept-charset="UTF-8">
-				<input type="text" name="search" value="" class="input_text" />&nbsp;';
+				<input type="text" name="search" value="" class="input_text" placeholder="', $txt['search'], '" />&nbsp;';
 
 		// Using the quick search dropdown?
 		if (!empty($modSettings['search_dropdown']))
@@ -263,7 +286,7 @@ function template_body_above()
 			</h1>';
 
 	echo '
-			', empty($settings['site_slogan']) ? '<img id="logo" src="' . $settings['images_url'] . '/logo_elk.png" alt="Elkarte Community" title="Elkarte Community" />' : '<div id="siteslogan" class="floatright">' . $settings['site_slogan'] . '</div>', '';
+			', empty($settings['site_slogan']) ? '<img id="logo" src="' . $settings['images_url'] . (!empty($context['theme_variant']) ? '/'. $context['theme_variant'] . '/logo_elk.png' : '/logo_elk.png' ) . '" alt="Elkarte Community" title="Elkarte Community" />' : '<div id="siteslogan" class="floatright">' . $settings['site_slogan'] . '</div>', '';
 
 	echo'
 		</div>
@@ -278,10 +301,10 @@ function template_body_above()
 	if (!empty($context['show_login_bar']))
 	{
 		echo '
-						<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+						<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 						<form id="guest_form" action="', $scripturl, '?action=login2;quicklogin" method="post" accept-charset="UTF-8" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
-							<input type="text" name="user" size="10" class="input_text" />
-							<input type="password" name="passwrd" size="10" class="input_password" />
+							<input type="text" name="user" size="10" class="input_text" placeholder="', $txt['username'], '" />
+							<input type="password" name="passwrd" size="10" class="input_password" placeholder="', $txt['password'], '" />
 							<select name="cookielength">
 								<option value="60">', $txt['one_hour'], '</option>
 								<option value="1440">', $txt['one_day'], '</option>
@@ -354,6 +377,9 @@ function template_body_above()
 			<div id="main_content_section">';
 }
 
+/**
+ * Section down the page, before closing body
+ */
 function template_body_below()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -390,6 +416,9 @@ function template_body_below()
 	</div>';
 }
 
+/**
+ * Section down the page, at closing html tag
+ */
 function template_html_below()
 {
 	// load in any javascipt that could be defered to the end of the page
@@ -406,7 +435,7 @@ function template_html_below()
  */
 function theme_linktree($force_show = false)
 {
-	global $context, $settings, $options, $shown_linktree, $scripturl, $txt;
+	global $context, $settings, $shown_linktree, $scripturl, $txt;
 
 	// If linktree is empty, just return - also allow an override.
 	if (empty($context['linktree']) || (!empty($context['dont_default_linktree']) && !$force_show))
@@ -534,7 +563,7 @@ function template_menu()
 	// Define the upper_section toggle in JavaScript.
 	// Note that this definition had to be shifted for the js to work with the new markup.
 	echo '
-				<script type="text/javascript"><!-- // --><![CDATA[
+				<script><!-- // --><![CDATA[
 					var oMainHeaderToggle = new smc_Toggle({
 						bToggleEnabled: true,
 						bCurrentlyCollapsed: ', empty($context['minmax_preferences']['upshrink']) ? 'false' : 'true', ',
@@ -573,7 +602,7 @@ function template_menu()
  */
 function template_button_strip($button_strip, $direction = '', $strip_options = array())
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt;
 
 	if (!is_array($strip_options))
 		$strip_options = array();
@@ -660,7 +689,7 @@ function template_select_boards($name, $label = '', $extra = '')
 
 		foreach ($category['boards'] as $board)
 			echo '
-			<option value="', $board['id'], '"', !empty($board['selected']) ? ' selected="selected"' : '', !empty($context['current_board']) && $board['id'] == $context['current_board'] ? ' disabled="disabled"' : '', '>', $board['child_level'] > 0 ? str_repeat('==', $board['child_level'] - 1) . '=&gt; ' : '', $board['name'], '</option>';
+			<option value="', $board['id'], '"', !empty($board['selected']) ? ' selected="selected"' : '', !empty($context['current_board']) && $board['id'] == $context['current_board'] && $context['boards_current_disabled'] ? ' disabled="disabled"' : '', '>', $board['child_level'] > 0 ? str_repeat('==', $board['child_level'] - 1) . '=&gt; ' : '', $board['name'], '</option>';
 		echo '
 		</optgroup>';
 	}

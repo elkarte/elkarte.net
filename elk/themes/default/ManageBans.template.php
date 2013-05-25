@@ -14,9 +14,12 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Template to edit bans
+ */
 function template_ban_edit()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="manage_bans">
@@ -31,7 +34,7 @@ function template_ban_edit()
 		echo '
 			<div class="information">', $txt['ban_add_notes'], '</div>';
 
-	// If there were errors for sending the PM, show them.
+	// If there were errors creating the ban, show them.
 	template_show_error('ban_errors');
 
 	echo '
@@ -162,7 +165,8 @@ function template_ban_edit()
 	echo '
 				<input type="submit" name="', $context['ban']['is_new'] ? 'add_ban' : 'modify_ban', '" value="', $context['ban']['is_new'] ? $txt['ban_add'] : $txt['ban_modify'], '" class="button_submit" />
 				<input type="hidden" name="old_expire" value="', $context['ban']['expiration']['days'], '" />
-				<input type="hidden" name="bg" value="', $context['ban']['id'], '" />
+				<input type="hidden" name="bg" value="', $context['ban']['id'], '" />', isset($context['ban']['from_user']) ? '
+				<input type="hidden" name="u" value="' . $context['ban_suggestions']['member']['id'] . '" />' : '', '
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 				<input type="hidden" name="', $context['admin-bet_token_var'], '" value="', $context['admin-bet_token'], '" />
 			</div>
@@ -177,7 +181,7 @@ function template_ban_edit()
 
 	echo '
 	</div>
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var fUpdateStatus = function ()
 		{
 			document.getElementById("expire_date").disabled = !document.getElementById("expires_one_day").checked;
@@ -225,9 +229,12 @@ function template_ban_edit()
 		}// ]]></script>';
 }
 
+/**
+ * Template to edit ban triggers
+ */
 function template_ban_edit_trigger()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $settings, $txt, $modSettings;
 
 	echo '
 	<div id="manage_bans">
@@ -289,8 +296,8 @@ function template_ban_edit_trigger()
 		</form>
 	</div>
 
-	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
+	<script><!-- // --><![CDATA[
 		var oAddMemberSuggest = new smc_AutoSuggest({
 			sSelf: \'oAddMemberSuggest\',
 			sSessionId: smf_session_id,

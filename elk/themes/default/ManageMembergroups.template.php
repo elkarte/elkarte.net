@@ -14,19 +14,23 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Regular membergroups list template
+ */
 function template_regular_membergroups_list()
 {
-	global $context, $settings, $scripturl, $txt;
-
 	template_show_list('regular_membergroups_list');
 	echo '<br /><br />';
 	template_show_list('post_count_membergroups_list');
 
 }
 
+/**
+ * Template for a new group
+ */
 function template_new_group()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">
@@ -43,6 +47,7 @@ function template_new_group()
 						<dd>
 							<input type="text" name="group_name" id="group_name_input" size="30" class="input_text" />
 						</dd>';
+
 	if ($context['undefined_group'])
 	{
 		echo '
@@ -74,6 +79,7 @@ function template_new_group()
 						<dd>
 							<input type="text" name="min_posts" id="min_posts_input" size="5" class="input_text" />
 						</dd>';
+
 	if (!$context['post_group'] || !empty($modSettings['permission_enable_postgroups']))
 	{
 		echo '
@@ -89,9 +95,11 @@ function template_new_group()
 								<select name="inheritperm" id="inheritperm_select" onclick="document.getElementById(\'perm_type_inherit\').checked = true;">
 									<option value="-1">', $txt['membergroups_guests'], '</option>
 									<option value="0" selected="selected">', $txt['membergroups_members'], '</option>';
+
 		foreach ($context['groups'] as $group)
 			echo '
 									<option value="', $group['id'], '">', $group['name'], '</option>';
+
 		echo '
 								</select>
 								<br />
@@ -100,9 +108,11 @@ function template_new_group()
 								<select name="copyperm" id="copyperm_select" onclick="document.getElementById(\'perm_type_copy\').checked = true;">
 									<option value="-1">', $txt['membergroups_guests'], '</option>
 									<option value="0" selected="selected">', $txt['membergroups_members'], '</option>';
+
 		foreach ($context['groups'] as $group)
 			echo '
 									<option value="', $group['id'], '">', $group['name'], '</option>';
+
 		echo '
 								</select>
 								<br />
@@ -133,10 +143,11 @@ function template_new_group()
 					<input type="submit" value="', $txt['membergroups_add_group'], '" class="button_submit" />
 				</div>
 			</div>';
+
 	if ($context['undefined_group'])
 	{
 		echo '
-			<script type="text/javascript"><!-- // --><![CDATA[
+			<script><!-- // --><![CDATA[
 				function swapPostGroup(isChecked)
 				{
 					var min_posts_text = document.getElementById(\'min_posts_text\');
@@ -146,6 +157,7 @@ function template_new_group()
 				swapPostGroup(', $context['post_group'] ? 'true' : 'false', ');
 			// ]]></script>';
 	}
+
 	echo '
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 			<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
@@ -153,6 +165,9 @@ function template_new_group()
 	</div>';
 }
 
+/**
+ * Template edit group
+ */
 function template_edit_group()
 {
 	global $context, $settings, $scripturl, $txt;
@@ -321,7 +336,7 @@ function template_edit_group()
 			<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
 		</form>
 	</div>
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		aIconLists[aIconLists.length] = new IconList({
 			sBackReference: "aIconLists[" + aIconLists.length + "]",
 			sIconIdPrefix: "msg_icon_",
@@ -344,8 +359,8 @@ function template_edit_group()
 			sItemBackgroundHover: "#e0e0f0"
 		});
 	// ]]></script>
-	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
+	<script><!-- // --><![CDATA[
 		var oModeratorSuggest = new smc_AutoSuggest({
 			sSelf: \'oModeratorSuggest\',
 			sSessionId: smf_session_id,
@@ -374,7 +389,7 @@ function template_edit_group()
 
 	if ($context['group']['allow_post_group'])
 		echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			function swapPostGroup(isChecked)
 			{
 				var min_posts_text = document.getElementById(\'min_posts_text\');
@@ -394,6 +409,12 @@ function template_edit_group()
 		// ]]></script>';
 }
 
+/**
+ * Template to edit the boards and groups access to them
+ *
+ * @param int $form_id
+ * @param bool $collapse
+ */
 function template_add_edit_group_boards_list($form_id, $collapse = true)
 {
 	global $context, $txt, $modSettings;
@@ -466,7 +487,7 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 									<input type="radio" name="select_all" id="deny_all" class="input_radio" onclick="selectAllRadio(this, this.form, \'boardaccess\', \'deny\');" /> <label for="deny_all">', $txt['board_perms_deny'], '</label>
 								</span>
 							</fieldset>
-							<script type="text/javascript"><!-- // --><![CDATA[
+							<script><!-- // --><![CDATA[
 								$(document).ready(function () {
 									$(".select_all_box").each(function () {
 										$(this).removeClass(\'select_all_box\');
@@ -477,13 +498,15 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 	if ($collapse)
 		echo '
 							<a href="javascript:void(0);" onclick="document.getElementById(\'visible_boards\').style.display = \'block\'; document.getElementById(\'visible_boards_link\').style.display = \'none\'; return false;" id="visible_boards_link" style="display: none;">[ ', $txt['membergroups_select_visible_boards'], ' ]</a>
-							<script type="text/javascript"><!-- // --><![CDATA[
+							<script><!-- // --><![CDATA[
 								document.getElementById("visible_boards_link").style.display = "";
 								document.getElementById("visible_boards").style.display = "none";
 							// ]]></script>';
 }
 
-// Templating for viewing the members of a group.
+/**
+ * Templating for viewing the members of a group.
+ */
 function template_group_members()
 {
 	global $context, $settings, $scripturl, $txt;
@@ -562,7 +585,7 @@ function template_group_members()
 						<th ', empty($context['group']['assignable']) ? ' class="last_th" colspan="2"' : '', '><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=posts', $context['sort_by'] == 'posts' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['posts'], $context['sort_by'] == 'posts' ? ' <img src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '','</a></th>';
 	if (!empty($context['group']['assignable']))
 		echo '
-						<th class="last_th" style="width:4%;text-align:center"><input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" /></th>';
+						<th class="last_th centertext" style="width:4%"><input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" /></th>';
 	echo '
 					</tr>
 				</thead>
@@ -612,7 +635,7 @@ function template_group_members()
 						<td', empty($context['group']['assignable']) ? ' colspan="2"' : '', '>', $member['posts'], '</td>';
 		if (!empty($context['group']['assignable']))
 			echo '
-						<td style="width:4%;text-align:center">
+						<td class="centertext" style="width:4%">
 							<input type="checkbox" name="rem[]" value="', $member['id'], '" class="input_check" ', ($context['user']['id'] == $member['id'] && $context['group']['id'] == 1 ? 'onclick="if (this.checked) return confirm(\'' . $txt['membergroups_members_deadmin_confirm'] . '\')" ' : ''), '/>
 						</td>';
 		echo '
@@ -665,8 +688,8 @@ function template_group_members()
 
 	if (!empty($context['group']['assignable']))
 		echo '
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
+		<script><!-- // --><![CDATA[
 			var oAddMemberSuggest = new smc_AutoSuggest({
 				sSelf: \'oAddMemberSuggest\',
 				sSessionId: smf_session_id,
@@ -683,10 +706,12 @@ function template_group_members()
 		// ]]></script>';
 }
 
-// Allow the moderator to enter a reason to each user being rejected.
+/**
+ * Allow the moderator to enter a reason to each user being rejected.
+ */
 function template_group_request_reason()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	// Show a welcome message to the user.
 	echo '
