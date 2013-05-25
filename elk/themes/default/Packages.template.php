@@ -16,12 +16,11 @@
 
 function template_main()
 {
-	global $context, $settings;
 }
 
 function template_view_package()
 {
-	global $context, $settings, $txt, $scripturl, $smcFunc;
+	global $context, $settings, $txt, $scripturl;
 
 	echo '
 	<div id="admincenter">
@@ -258,7 +257,7 @@ function template_view_package()
 					echo '
 					<tr class="windowbg', $alternate ? '' : '2', '">
 						<td>', isset($packageaction['operations']) ? '<img id="operation_img_' . $action_num . '" src="' . $settings['images_url'] . '/selected_open.png" alt="*" style="display: none;" />' : '', '</td>
-						<td style="width:30px;text-align:center">
+						<td class="centertext" style="width:30px">
 							<input type="checkbox" name="theme_changes[]" value="', !empty($action['value']) ? $action['value'] : '', '" id="dummy_theme_', $id, '" class="input_check" ', (!empty($action['not_mod']) ? '' : 'disabled="disabled"'), ' ', !empty($context['themes_locked']) ? 'checked="checked"' : '', '/>
 						</td>
 						<td>', $action['type'], '</td>
@@ -341,7 +340,7 @@ function template_view_package()
 
 	// Toggle options.
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var aOperationElements = new Array();';
 
 		// Operations.
@@ -374,7 +373,7 @@ function template_view_package()
 
 	// Get the currently selected item from a select list
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 	function get_selected(id)
 	{
 		var aSelected = document.getElementById(id);
@@ -390,7 +389,7 @@ function template_view_package()
 	// And a bit more for database changes.
 	if ($context['uninstalling'] && !empty($context['database_changes']))
 		echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var database_changes_area = document.getElementById(\'db_changes_div\');
 		var db_vis = false;
 		database_changes_area.style.display = "none";
@@ -399,12 +398,12 @@ function template_view_package()
 
 function template_extract_package()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	if (!empty($context['redirect_url']))
 	{
 		echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		setTimeout("doRedirect();", ', empty($context['redirect_timeout']) ? '5000' : $context['redirect_timeout'], ');
 
 		function doRedirect()
@@ -478,7 +477,7 @@ function template_extract_package()
 
 function template_list()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="admincenter">
@@ -507,7 +506,7 @@ function template_list()
 
 function template_examine()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="admincenter">
@@ -548,7 +547,7 @@ function template_browse()
 				</div>
 			</div>
 
-			<script type="text/javascript"><!-- // --><![CDATA[
+			<script><!-- // --><![CDATA[
 				window.smfForum_scripturl = smf_scripturl;
 				window.smfForum_sessionid = smf_session_id;
 				window.smfForum_sessionvar = smf_session_var;';
@@ -561,10 +560,10 @@ function template_browse()
 
 		if (empty($modSettings['disable_elk_js']))
 			echo '
-			<script type="text/javascript" src="', $scripturl, '?action=viewadminfile;filename=latest-packages.js"></script>';
+			<script src="', $scripturl, '?action=viewadminfile;filename=latest-packages.js"></script>';
 
 		echo '
-			<script type="text/javascript"><!-- // --><![CDATA[
+			<script><!-- // --><![CDATA[
 				var tempOldOnload;
 				smfSetLatestPackages();
 			// ]]></script>
@@ -626,7 +625,7 @@ function template_browse()
 	echo '
 	</div>
 
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var oAdvancedPanelToggle = new smc_Toggle({
 			bToggleEnabled: true,
 			bCurrentlyCollapsed: ', empty($context['admin_preferences']['pkg']) ? 'true' : 'false', ',
@@ -659,8 +658,8 @@ function template_browse()
 			},
 		});
 	// ]]></script>
-	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
+	<script><!-- // --><![CDATA[
 			var oAddVersionSuggest = new smc_AutoSuggest({
 			sSelf: \'oAddVersionSuggest\',
 			sSessionId: smf_session_id,
@@ -674,7 +673,7 @@ function template_browse()
 
 function template_servers()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	if (!empty($context['package_ftp']['error']))
 			echo '
@@ -825,7 +824,7 @@ function template_servers()
 
 function template_package_confirm()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt;
 
 	echo '
 	<div id="admincenter">
@@ -843,7 +842,7 @@ function template_package_confirm()
 
 function template_package_list()
 {
-	global $context, $settings, $txt, $scripturl, $smcFunc;
+	global $context, $settings, $txt;
 
 	echo '
 	<div id="admincenter">
@@ -912,7 +911,7 @@ function template_package_list()
 
 					// Mark as installed and current?
 					if ($package['is_installed'] && !$package['is_newer'])
-						echo '<img src="', $settings['images_url'], '/icons/package_', $package['is_current'] ? 'installed' : 'old', '.png" width="12" height="11" class="centericon" style="margin-left: 2ex;" alt="', $package['is_current'] ? $txt['package_installed_current'] : $txt['package_installed_old'], '" />';
+						echo '<img src="', $settings['images_url'], '/icons/package_', $package['is_current'] ? 'installed' : 'old', '.png" class="centericon" style="width: 12px; height: 11px; margin-left: 2ex;" alt="', $package['is_current'] ? $txt['package_installed_current'] : $txt['package_installed_old'], '" />';
 
 					echo '
 							</strong>
@@ -921,7 +920,7 @@ function template_package_list()
 					// Show the mod type?
 					if ($package['type'] != '')
 						echo '
-								<li class="package_section">', $txt['package_type'], ':&nbsp; ', $smcFunc['ucwords']($smcFunc['strtolower']($package['type'])), '</li>';
+								<li class="package_section">', $txt['package_type'], ':&nbsp; ', Util::ucwords(Util::strtolower($package['type'])), '</li>';
 					// Show the version number?
 					if ($package['version'] != '')
 						echo '
@@ -971,7 +970,7 @@ function template_package_list()
 		{
 			$section_count = count($context['package_list']);
 			echo '
-			<script type="text/javascript"><!-- // --><![CDATA[';
+			<script><!-- // --><![CDATA[';
 			foreach ($context['package_list'] as $section => $ps)
 			{
 				echo '
@@ -1021,7 +1020,7 @@ function template_package_list()
 
 function template_downloaded()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="admincenter">
@@ -1046,7 +1045,7 @@ function template_downloaded()
 
 function template_install_options()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="admincenter">
@@ -1103,7 +1102,7 @@ function template_install_options()
 
 function template_control_chmod()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt;
 
 	// Nothing to do? Brilliant!
 	if (empty($context['package_ftp']))
@@ -1182,13 +1181,13 @@ function template_control_chmod()
 	// Hide the details of the list.
 	if (empty($context['package_ftp']['form_elements_only']))
 		echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			document.getElementById(\'need_writable_list\').style.display = \'none\';
 		// ]]></script>';
 
 	// Quick generate the test button.
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		// Generate a "test ftp" button.
 		var generatedButton = false;
 		function generateFTPTest()
@@ -1244,14 +1243,14 @@ function template_control_chmod()
 
 	// Make sure the button gets generated last.
 	$context['insert_after_template'] .= '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		generateFTPTest();
 	// ]]></script>';
 }
 
 function template_ftp_required()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $txt;
 
 	echo '
 		<fieldset>
@@ -1273,10 +1272,10 @@ function template_view_operations()
 	<head>
 		<title>', $txt['operation_title'], '</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/admin.css?alp21" />
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/script.js?alp21"></script>
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/theme.js?alp21"></script>
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/admin.css?alp21" />
+		<script src="', $settings['default_theme_url'], '/scripts/script.js?alp21"></script>
+		<script src="', $settings['default_theme_url'], '/scripts/theme.js?alp21"></script>
 	</head>
 	<body>
 		<div class="padding windowbg">
@@ -1297,7 +1296,7 @@ function template_file_permissions()
 
 	// This will handle expanding the selection.
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var oRadioColors = {
 			0: "#D1F7BF",
 			1: "#FFBBBB",
@@ -1522,12 +1521,12 @@ function template_file_permissions()
 			<thead>
 				<tr class="catbg">
 					<th class="first_th lefttext" style="width:30%">&nbsp;', $txt['package_file_perms_name'], '&nbsp;</th>
-					<th style="width:30%" class="lefttext">', $txt['package_file_perms_status'], '</th>
-					<th style="width:8%;text-align:center"><span class="filepermissions">', $txt['package_file_perms_status_read'], '</span></th>
-					<th style="width:8%;text-align:center"><span class="filepermissions">', $txt['package_file_perms_status_write'], '</span></th>
-					<th style="width:8%;text-align:center"><span class="filepermissions">', $txt['package_file_perms_status_execute'], '</span></th>
-					<th style="width:8%;text-align:center"><span class="filepermissions">', $txt['package_file_perms_status_custom'], '</span></th>
-					<th class="last_th" style="width:8%;text-align:center"><span class="filepermissions">', $txt['package_file_perms_status_no_change'], '</span></th>
+					<th class="lefttext" style="width:30%">', $txt['package_file_perms_status'], '</th>
+					<th class="centertext" style="width:8%"><span class="filepermissions">', $txt['package_file_perms_status_read'], '</span></th>
+					<th class="centertext" style="width:8%"><span class="filepermissions">', $txt['package_file_perms_status_write'], '</span></th>
+					<th class="centertext" style="width:8%"><span class="filepermissions">', $txt['package_file_perms_status_execute'], '</span></th>
+					<th class="centertext" style="width:8%"><span class="filepermissions">', $txt['package_file_perms_status_custom'], '</span></th>
+					<th class="last_th centertext" style="width:8%"><span class="filepermissions">', $txt['package_file_perms_status_no_change'], '</span></th>
 				</tr>
 			</thead>
 			<tbody>';
@@ -1550,11 +1549,11 @@ function template_file_permissions()
 						<span style="color: ', ($dir['perms']['chmod'] ? 'green' : 'red'), '">', ($dir['perms']['chmod'] ? $txt['package_file_perms_writable'] : $txt['package_file_perms_not_writable']), '</span>
 						', ($dir['perms']['perms'] ? '&nbsp;(' . $txt['package_file_perms_chmod'] . ': ' . substr(sprintf('%o', $dir['perms']['perms']), -4) . ')' : ''), '
 					</td>
-					<td class="perm_read" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $name, ']" value="read" class="input_radio" /></td>
-					<td class="perm_write" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $name, ']" value="writable" class="input_radio" /></td>
-					<td class="perm_execute" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $name, ']" value="execute" class="input_radio" /></td>
-					<td class="perm_custom" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $name, ']" value="custom" class="input_radio" /></td>
-					<td class="perm_nochange" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $name, ']" value="no_change" checked="checked" class="input_radio" /></td>
+					<td class="perm_read centertext" style="width:8%"><input type="radio" name="permStatus[', $name, ']" value="read" class="input_radio" /></td>
+					<td class="perm_write centertext" style="width:8%"><input type="radio" name="permStatus[', $name, ']" value="writable" class="input_radio" /></td>
+					<td class="perm_execute centertext" style="width:8%"><input type="radio" name="permStatus[', $name, ']" value="execute" class="input_radio" /></td>
+					<td class="perm_custom centertext" style="width:8%"><input type="radio" name="permStatus[', $name, ']" value="custom" class="input_radio" /></td>
+					<td class="perm_nochange centertext" style="width:8%"><input type="radio" name="permStatus[', $name, ']" value="no_change" checked="checked" class="input_radio" /></td>
 				</tr>
 			';
 
@@ -1659,19 +1658,16 @@ function template_permission_show_contents($ident, $contents, $level, $has_more 
 					<span class="', ($dir['perms']['chmod'] ? 'success' : 'error'), '">', ($dir['perms']['chmod'] ? $txt['package_file_perms_writable'] : $txt['package_file_perms_not_writable']), '</span>
 					', ($dir['perms']['perms'] ? '&nbsp;(' . $txt['package_file_perms_chmod'] . ': ' . substr(sprintf('%o', $dir['perms']['perms']), -4) . ')' : ''), '
 				</td>
-				<td class="perm_read" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="read" class="input_radio" /></td>
-				<td class="perm_write" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="writable" class="input_radio" /></td>
-				<td class="perm_execute" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="execute" class="input_radio" /></td>
-				<td class="perm_custom" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="custom" class="input_radio" /></td>
-				<td class="perm_nochange" style="text-align:center; width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="no_change" checked="checked" class="input_radio" /></td>
+				<td class="perm_read centertext" style="width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="read" class="input_radio" /></td>
+				<td class="perm_write centertext" style="width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="writable" class="input_radio" /></td>
+				<td class="perm_execute centertext" style="width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="execute" class="input_radio" /></td>
+				<td class="perm_custom centertext" style="width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="custom" class="input_radio" /></td>
+				<td class="perm_nochange centertext" style="width:8%"><input type="radio" name="permStatus[', $ident . '/' . $name, ']" value="no_change" checked="checked" class="input_radio" /></td>
 			</tr>
 			<tr id="insert_div_loc_' . $cur_ident . '" style="display: none;"><td></td></tr>';
 
 			if (!empty($dir['contents']))
-			{
 				template_permission_show_contents($ident . '/' . $name, $dir['contents'], $level + 1, !empty($dir['more_files']));
-
-			}
 		}
 	}
 
@@ -1698,7 +1694,7 @@ function template_permission_show_contents($ident, $contents, $level, $has_more 
 		if ($level > 1 && !$isFound)
 			echo '
 		</tbody>
-		</table><script type="text/javascript"><!-- // --><![CDATA[
+		</table><script><!-- // --><![CDATA[
 			expandFolder(\'', $js_ident, '\', \'\');
 		// ]]></script>
 		<table class="table_grid">
@@ -1792,7 +1788,7 @@ function template_pause_action_permissions()
 
 	// Just the countdown stuff
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var countdown = ', $countDown, ';
 		var txt_message = "', $txt['not_done_continue'], '";
 		doAutoSubmit();

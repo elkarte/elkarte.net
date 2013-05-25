@@ -14,13 +14,15 @@
  * @version 1.0 Alpha
  */
 
-// This is just the basic "login" form.
+/**
+ * This is just the basic "login" form.
+ */
 function template_login()
 {
 	global $context, $settings, $scripturl, $modSettings, $txt;
 
 	echo '
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+		<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 
 		<form action="', $scripturl, '?action=login2" name="frmLogin" id="frmLogin" method="post" accept-charset="UTF-8" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
 		<div class="tborder login">
@@ -82,19 +84,21 @@ function template_login()
 
 	// Focus on the correct input - username or password.
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			document.forms.frmLogin.', isset($context['default_username']) && $context['default_username'] != '' ? 'passwrd' : 'user', '.focus();
 		// ]]></script>';
 }
 
-// Tell a guest to get lost or login!
+/**
+ * Tell a guest to get lost or login!
+ */
 function template_kick_guest()
 {
 	global $context, $settings, $scripturl, $modSettings, $txt;
 
 	// This isn't that much... just like normal login but with a message at the top.
 	echo '
-	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+	<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 	<form action="', $scripturl, '?action=login2" method="post" accept-charset="UTF-8" name="frmLogin" id="frmLogin"', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
 		<div class="tborder login">
 			<div class="cat_bar">
@@ -154,26 +158,28 @@ function template_kick_guest()
 
 	// Do the focus thing...
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			document.forms.frmLogin.user.focus();
 		// ]]></script>';
 }
 
-// This is for maintenance mode.
+/**
+ * This is for maintenance mode.
+ */
 function template_maintenance()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
 
 	// Display the administrator's message at the top.
 	echo '
-<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 <form action="', $scripturl, '?action=login2" method="post" accept-charset="UTF-8"', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
 	<div class="tborder login" id="maintenance_mode">
 		<div class="cat_bar">
 			<h3 class="catbg">', $context['title'], '</h3>
 		</div>
 		<p class="description">
-			<img class="floatleft" src="', $settings['images_url'], '/construction.png" width="40" height="40" alt="', $txt['in_maintain_mode'], '" />
+			<img class="floatleft" src="', $settings['images_url'], '/construction.png" style="width:40px; height:40px" alt="', $txt['in_maintain_mode'], '" />
 			', $context['description'], '<br class="clear" />
 		</p>
 		<div class="title_bar">
@@ -200,14 +206,16 @@ function template_maintenance()
 </form>';
 }
 
-// This is for the security stuff - makes administrators login every so often.
+/**
+ * This is for the security stuff - makes administrators login every so often.
+ */
 function template_admin_login()
 {
 	global $context, $settings, $scripturl, $txt;
 
 	// Since this should redirect to whatever they were doing, send all the get data.
 	echo '
-<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
 
 <form action="', $scripturl, $context['get_data'], '" method="post" accept-charset="UTF-8" name="frmLogin" id="frmLogin" onsubmit="hash', ucfirst($context['sessionCheckType']), 'Password(this, \'', $context['user']['username'], '\', \'', $context['session_id'], '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');">
 	<div class="tborder login" id="admin_login">
@@ -239,15 +247,17 @@ function template_admin_login()
 
 	// Focus on the password box.
 	echo '
-<script type="text/javascript"><!-- // --><![CDATA[
+<script><!-- // --><![CDATA[
 	document.forms.frmLogin.', $context['sessionCheckType'], '_pass.focus();
 // ]]></script>';
 }
 
-// Activate your account manually?
+/**
+ * Activate your account manually?
+ */
 function template_retry_activate()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	// Just ask them for their code so they can try it again...
 	echo '
@@ -273,10 +283,12 @@ function template_retry_activate()
 		</form>';
 }
 
-// Activate your account manually?
+/**
+ * Activate your account manually?
+ */
 function template_resend()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	// Just ask them for their code so they can try it again...
 	echo '

@@ -17,7 +17,7 @@
 // The main calendar - January, for example.
 function template_main()
 {
-	global $context, $settings, $txt, $scripturl, $modSettings;
+	global $context, $txt, $scripturl, $modSettings;
 
 	echo '
 		<div id="calendar">
@@ -61,7 +61,7 @@ function template_main()
 // Template for posting a calendar event.
 function template_event_post()
 {
-	global $context, $settings, $txt, $scripturl, $modSettings;
+	global $context, $txt, $scripturl, $modSettings;
 
 	// Start the javascript for drop down boxes...
 	echo '
@@ -196,7 +196,7 @@ function template_event_post()
 // Display a monthly calendar grid.
 function template_show_month_grid($grid_name)
 {
-	global $context, $settings, $txt, $scripturl, $modSettings, $smcFunc;
+	global $context, $settings, $txt, $scripturl, $modSettings;
 
 	if (!isset($context['calendar_grid_' . $grid_name]))
 		return false;
@@ -231,7 +231,7 @@ function template_show_month_grid($grid_name)
 	}
 
 	echo '
-				<table cellspacing="1" class="calendar_table">';
+				<table class="calendar_table">';
 
 	// Show each day of the week.
 	if (empty($calendar_data['disable_day_titles']))
@@ -246,7 +246,7 @@ function template_show_month_grid($grid_name)
 		foreach ($calendar_data['week_days'] as $day)
 		{
 			echo '
-						<th class="days" scope="col" ', $calendar_data['size'] == 'small' ? 'style="font-size: x-small;"' : '', '>', !empty($calendar_data['short_day_titles']) ? ($smcFunc['substr']($txt['days'][$day], 0, 1)) : $txt['days'][$day], '</th>';
+						<th class="days" scope="col" ', $calendar_data['size'] == 'small' ? 'style="font-size: x-small;"' : '', '>', !empty($calendar_data['short_day_titles']) ? (Util::substr($txt['days'][$day], 0, 1)) : $txt['days'][$day], '</th>';
 		}
 		echo '
 					</tr>';

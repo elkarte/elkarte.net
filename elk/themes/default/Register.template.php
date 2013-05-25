@@ -19,12 +19,30 @@
  */
 function template_registration_agreement()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt;
 
 	echo '
 		<form action="', $scripturl, '?action=register" method="post" accept-charset="UTF-8" id="registration">
 			<div class="cat_bar">
-				<h3 class="catbg">', $txt['registration_agreement'], '</h3>
+				<h3 class="catbg">', $txt['registration_agreement'];
+	if (!empty($context['languages']))
+	{
+		if (count($context['languages']) === 1)
+			foreach ($context['languages'] as $lang_key => $lang_val)
+				echo '
+				<input type="hidden" name="lngfile" value="', $lang_key, '" />';
+		else
+		{
+			echo '
+				<select onchange="this.form.submit()" class="floatright" name="lngfile">';
+			foreach ($context['languages'] as $lang_key => $lang_val)
+				echo '
+					<option value="', $lang_key, '"', empty($lang_val['selected']) ? '' : ' selected="selected"', '>',  $lang_val['name'], '</option>';
+			echo '
+				</select>';
+		}
+	}
+	echo '</h3>
 			</div>
 			<div class="roundframe">
 				<p>', $context['agreement'], '</p>
@@ -54,14 +72,16 @@ function template_registration_agreement()
 
 }
 
-// Before registering - get their information.
+/**
+ * Before registering - get their information.
+ */
 function template_registration_form()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
 
 	echo '
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/register.js"></script>
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script src="', $settings['default_theme_url'], '/scripts/register.js"></script>
+		<script><!-- // --><![CDATA[
 			function verifyAgree()
 			{
 				if (currentAuthMethod == \'passwd\' && document.forms.registration.smf_autov_pwmain.value != document.forms.registration.smf_autov_pwverify.value)
@@ -360,7 +380,7 @@ function template_registration_form()
 			<input type="hidden" name="step" value="2" />
 		</form>
 
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var regTextStrings = {
 				"username_valid": "', $txt['registration_username_available'], '",
 				"username_invalid": "', $txt['registration_username_unavailable'], '",
@@ -377,10 +397,12 @@ function template_registration_form()
 		// ]]></script>';
 }
 
-// After registration... all done ;).
+/**
+ * After registration... all done ;).
+ */
 function template_after()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context;
 
 	// Not much to see here, just a quick... "you're now registered!" or what have you.
 	echo '
@@ -394,10 +416,12 @@ function template_after()
 		</div>';
 }
 
-// Template for giving instructions about COPPA activation.
+/**
+ * Template for giving instructions about COPPA activation.
+ */
 function template_coppa()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	// Formulate a nice complicated message!
 	echo '
@@ -443,19 +467,21 @@ function template_coppa()
 			</div>';
 }
 
-// An easily printable form for giving permission to access the forum for a minor.
+/**
+ * An easily printable form for giving permission to access the forum for a minor.
+ */
 function template_coppa_form()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt;
 
 	// Show the form (As best we can)
 	echo '
-		<table style="width:100%;text-align:center" class="tborder">
+		<table class="tborder centertext" style="width:100%" >
 			<tr>
-				<td style="text-align:left">', $context['forum_contacts'], '</td>
+				<td class="lefttext">', $context['forum_contacts'], '</td>
 			</tr>
 			<tr>
-				<td style="text-align:right">
+				<td class="righttext">
 					<em>', $txt['coppa_form_address'], '</em>: ', $context['ul'], '<br />
 					', $context['ul'], '<br />
 					', $context['ul'], '<br />
@@ -463,13 +489,13 @@ function template_coppa_form()
 				</td>
 			</tr>
 			<tr>
-				<td style="text-align:right">
+				<td class="righttext">
 					<em>', $txt['coppa_form_date'], '</em>: ', $context['ul'], '
 					<br /><br />
 				</td>
 			</tr>
 			<tr>
-				<td style="text-align:left">
+				<td class="lefttext">
 					', $context['coppa_body'], '
 				</td>
 			</tr>
@@ -477,10 +503,12 @@ function template_coppa_form()
 		<br />';
 }
 
-// Show a window containing the spoken verification code.
+/**
+ * Show a window containing the spoken verification code.
+ */
 function template_verification_sound()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $settings, $txt;
 
 	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"', $context['right_to_left'] ? ' dir="rtl"' : '', '>
@@ -488,15 +516,16 @@ function template_verification_sound()
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $txt['visual_verification_sound'], '</title>
 		<meta name="robots" content="noindex" />
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
-		<style type="text/css">';
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
+		<style>';
 
 	// Just show the help text and a "close window" link.
 	echo '
 		</style>
 	</head>
 	<body style="margin: 1ex;">
-		<div class="windowbg description" style="text-align: center;">';
+		<div class="windowbg description centertext">';
+
 	if (isBrowser('is_ie'))
 		echo '
 			<object classid="clsid:22D6F312-B0F6-11D0-94AB-0080C74C7E95" type="audio/x-wav">
@@ -508,6 +537,7 @@ function template_verification_sound()
 			<object type="audio/x-wav" data="', $context['verification_sound_href'], '">
 				<a href="', $context['verification_sound_href'], '" rel="nofollow">', $context['verification_sound_href'], '</a>
 			</object>';
+
 	echo '
 		<br />
 		<a href="', $context['verification_sound_href'], ';sound" rel="nofollow">', $txt['visual_verification_sound_again'], '</a><br />
@@ -518,9 +548,12 @@ function template_verification_sound()
 </html>';
 }
 
+/**
+ * Show a page for admins to register new members.
+ */
 function template_admin_register()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	echo '
 	<div id="admincenter">
@@ -609,10 +642,12 @@ function template_admin_register()
 	<br class="clear" />';
 }
 
-// Form for editing the agreement shown for people registering to the forum.
+/**
+ * Form for editing the agreement shown for people registering to the forum.
+ */
 function template_edit_agreement()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	// Just a big box to edit the text file ;).
 	echo '
@@ -657,8 +692,6 @@ function template_edit_agreement()
 					</div>';
 	}
 
-
-
 	// Show the actual agreement in an oversized text box.
 	echo '
 					<p class="agreement">
@@ -679,9 +712,12 @@ function template_edit_agreement()
 		</form>';
 }
 
+/**
+ * Interface to edit reserved words in admin panel.
+ */
 function template_edit_reserved_words()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 		<form id="admin_form_wrapper" class="windowbg2" action="', $scripturl, '?action=admin;area=regcenter" method="post" accept-charset="UTF-8">
@@ -729,9 +765,12 @@ function template_edit_reserved_words()
 		</form>';
 }
 
+/**
+ * Interface for contact form.
+ */
 function template_contact_form()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	echo '
 		<div class="cat_bar">
@@ -756,6 +795,7 @@ function template_contact_form()
 					<dd>
 						<textarea id="contactmessage" name="contactmessage" cols="50" rows="10" tabindex="', $context['tabindex']++, '">', !empty($context['contactmessage']) ? $context['contactmessage'] : '', '</textarea>
 					</dd>';
+
 			if ($context['require_verification'])
 			{
 					echo '
@@ -766,6 +806,7 @@ function template_contact_form()
 							', template_control_verification($context['visual_verification_id'], 'all'), '
 					</dd>';
 			}
+
 			echo '
 				</dl>
 				<hr class="hrcolor" />
@@ -779,6 +820,9 @@ function template_contact_form()
 		</form>';
 }
 
+/**
+ * Show a success page when contact form is submitted.
+ */
 function template_contact_form_done()
 {
 	global $txt;

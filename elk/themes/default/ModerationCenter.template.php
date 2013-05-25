@@ -14,6 +14,10 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Template for the main page of moderation center.
+ * It shows blocks with information.
+ */
 function template_moderation_center()
 {
 	global $context;
@@ -24,6 +28,7 @@ function template_moderation_center()
 						<div id="mod_main_section" >';
 
 	$alternate = true;
+
 	// Show all the blocks they want to see.
 	foreach ($context['mod_blocks'] as $block)
 	{
@@ -44,6 +49,9 @@ function template_moderation_center()
 					</div>';
 }
 
+/**
+ * Template to show latest news.
+ */
 function template_latest_news()
 {
 	global $settings, $txt, $scripturl;
@@ -62,9 +70,9 @@ function template_latest_news()
 
 	// This requires a lot of javascript...
 	echo '
-								<script type="text/javascript" src="', $scripturl, '?action=viewadminfile;filename=current-version.js"></script>
-								<script type="text/javascript" src="', $scripturl, '?action=viewadminfile;filename=latest-news.js"></script>
-								<script type="text/javascript"><!-- // --><![CDATA[
+								<script src="', $scripturl, '?action=viewadminfile;filename=current-version.js"></script>
+								<script src="', $scripturl, '?action=viewadminfile;filename=latest-news.js"></script>
+								<script><!-- // --><![CDATA[
 									var oAdminIndex = new smf_AdminIndex({
 										sSelf: \'oAdminCenter\',
 										bLoadAnnouncements: true,
@@ -85,10 +93,12 @@ function template_latest_news()
 
 }
 
-// Show all the group requests the user can see.
+/**
+ * Show all the group requests the user can see.
+ */
 function template_group_requests_block()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 								<div class="cat_bar">
@@ -119,10 +129,12 @@ function template_group_requests_block()
 								</div>';
 }
 
-// A block to show the current top reported posts.
+/**
+ * A block to show the current top reported posts.
+ */
 function template_reported_posts_block()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 								<div class="cat_bar">
@@ -155,7 +167,7 @@ function template_reported_posts_block()
 
 function template_watched_users()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 						<div class="cat_bar">
@@ -229,7 +241,7 @@ function template_notes()
 
 function template_reported_posts()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 					<form id="reported_posts" action="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';start=', $context['start'], '" method="post" accept-charset="UTF-8">
@@ -311,10 +323,12 @@ function template_reported_posts()
 					</form>';
 }
 
-// Show a list of all the unapproved posts
+/**
+ * Show a list of all the unapproved posts
+ */
 function template_unapproved_posts()
 {
-	global $settings, $options, $context, $txt, $scripturl;
+	global $options, $context, $txt, $scripturl;
 
 	// Just a big table of it all really...
 	echo '
@@ -479,8 +493,6 @@ function template_viewmodreport()
 							</div>
 							<br />';
 
-	$alt = false;
-
 	template_show_list('moderation_actions_list');
 
 	echo '
@@ -489,7 +501,11 @@ function template_viewmodreport()
 					</div>';
 }
 
-// Callback function for showing a watched users post in the table.
+/**
+ * Callback function for showing a watched users post in the table.
+ *
+ * @param int $post
+ */
 function template_user_watch_post_callback($post)
 {
 	global $scripturl, $context, $txt, $delete_button;
@@ -522,10 +538,12 @@ function template_user_watch_post_callback($post)
 	return $output_html;
 }
 
-// Moderation settings
+/**
+ * Moderation settings.
+ */
 function template_moderation_settings()
 {
-	global $settings, $context, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="modcenter">
@@ -592,7 +610,9 @@ function template_moderation_settings()
 	</div>';
 }
 
-// Show a notice sent to a user.
+/**
+ * Show a notice sent to a user.
+ */
 function template_show_notice()
 {
 	global $txt, $settings, $context;
@@ -603,7 +623,7 @@ function template_show_notice()
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $context['page_title'], '</title>
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
 	</head>
 	<body>
 		<div class="cat_bar">
@@ -629,10 +649,12 @@ function template_show_notice()
 
 }
 
-// Add or edit a warning template.
+/**
+ * Add or edit a warning template.
+ */
 function template_warn_template()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="modcenter">
@@ -702,7 +724,7 @@ function template_warn_template()
 		</form>
 	</div>
 
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		$(document).ready(function() {
 			$("#preview_button").click(function() {
 				return ajax_getTemplatePreview();

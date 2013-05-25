@@ -94,6 +94,7 @@ $txt['todayMod'] = 'Enable shorthand date display';
 $txt['today_disabled'] = 'Disabled';
 $txt['today_only'] = 'Only Today';
 $txt['yesterday_today'] = 'Today &amp; Yesterday';
+$txt['relative_time'] = 'Use relative times';
 $txt['topbottomEnable'] = 'Enable Go Up/Go Down buttons';
 $txt['onlineEnable'] = 'Show online/offline in posts and PMs';
 $txt['enableVBStyleLogin'] = 'Show a quick login on every page';
@@ -116,7 +117,7 @@ $txt['karmaLabel'] = 'Karma label';
 $txt['karmaApplaudLabel'] = 'Karma applaud label';
 $txt['karmaSmiteLabel'] = 'Karma smite label';
 
-$txt['caching_information'] = 'ELKARTE supports caching through the use of accelerators. The currently supported accelerators include:
+$txt['caching_information'] = 'ElkArte supports caching through the use of accelerators. The currently supported accelerators include:
 <ul class="normallist">
 	<li>APC</li>
 	<li>eAccelerator</li>
@@ -217,6 +218,7 @@ $txt['configure_verification_means'] = 'Configure Verification Methods';
 $txt['setting_qa_verification_number'] = 'Number of verification questions user must answer';
 $txt['setting_qa_verification_number_desc'] = '(0 to disable; questions are set below)';
 $txt['configure_verification_means_desc'] = '<span class="smalltext">Below you can set which anti-spam features you wish to have enabled whenever a user needs to verify they are a human. Note that the user will have to pass <em>all</em> verification so if you enable both a verification image and a question/answer test they need to complete both to proceed.</span>';
+$txt['setting_visual_verification_num_chars'] = 'Number of characters in the verification image';
 $txt['setting_visual_verification_type'] = 'Visual verification image to display';
 $txt['setting_visual_verification_type_desc'] = 'The more complex the image the harder it is for bots to bypass';
 $txt['setting_image_verification_off'] = 'None';
@@ -232,6 +234,7 @@ $txt['setup_verification_questions_desc'] = '<span class="smalltext">If you want
 $txt['setup_verification_question'] = 'Question';
 $txt['setup_verification_answer'] = 'Answer';
 $txt['setup_verification_add_more'] = 'Add another question';
+$txt['setup_verification_add_more_answers'] = 'Add another answer';
 
 $txt['moderation_settings'] = 'Moderation Settings';
 $txt['setting_warning_enable'] = 'Enable User Warning System';
@@ -297,6 +300,7 @@ $txt['custom_edit_registration_disable'] = 'No';
 $txt['custom_edit_registration_allow'] = 'Yes';
 $txt['custom_edit_registration_require'] = 'Yes, and require entry';
 $txt['custom_edit_display'] = 'Show on Topic View';
+$txt['custom_edit_memberlist'] = 'Show on Memberlist View';
 $txt['custom_edit_picktype'] = 'Field Type';
 
 $txt['custom_edit_max_length'] = 'Maximum Length';
@@ -355,6 +359,8 @@ $txt['core_settings_item_ih'] = 'Integration Hooks Management';
 $txt['core_settings_item_ih_desc'] = 'This feature allows you to enable or disable any integration hooks added by modifications. Changing hooks can prevent your forum from working properly, so use this feature only if you know what you are doing.';
 $txt['core_settings_item_k'] = 'Karma';
 $txt['core_settings_item_k_desc'] = 'Karma is a feature that shows the popularity of a member. Members, if allowed, can \'applaud\' or \'smite\' other members, which is how their popularity is calculated.';
+$txt['core_settings_item_pe'] = 'Post by Email Management';
+$txt['core_settings_item_pe_desc'] = 'This will allow users of your forum to reply to emailed notifications and personal messages and have them post directly as a reply to the appropriate thread or PM.  This provides a familiar mailist feel.  Use of this functionality will require additional setup steps on your hosting provider.';
 $txt['core_settings_item_ml'] = 'Moderation, Administration and User Logs';
 $txt['core_settings_item_ml_desc'] = 'Enable the moderation and administration logs to keep an audit trail of all the key actions taken on your forum. Also allows forum moderators to view a history of key changes a user makes to their profile.';
 $txt['core_settings_item_pm'] = 'Post Moderation';
@@ -384,11 +390,11 @@ $txt['lang_entries_not_writable'] = '<strong>Warning:</strong> The language file
 $txt['languages_ltr'] = 'Right to Left';
 
 $txt['add_language'] = 'Add Language';
-$txt['add_language_elk'] = 'Download from Elkarte\'s GitHub Repository';
+$txt['add_language_elk'] = 'Download from ElkArte Languages Repository';
 $txt['add_language_elk_browse'] = 'Type name of language to search for or leave blank to search for all.';
 $txt['add_language_elk_install'] = 'Install';
 $txt['add_language_elk_found'] = 'The following languages were found. Click the install link next to the language you wish to install, you will then be taken to the package manager to install.';
-$txt['add_language_error_no_response'] = 'The Simple Machines (R) site is not responding. Please try again later.';
+$txt['add_language_error_no_response'] = 'The ElkArte site is not responding. Please try again later.';
 $txt['add_language_error_no_files'] = 'No files could be found.';
 $txt['add_language_elk_desc'] = 'Description';
 $txt['add_language_elk_utf8'] = 'UTF-8';
@@ -426,7 +432,12 @@ $txt['languages_download_exists_same'] = 'Identical';
 $txt['languages_download_exists_different'] = 'Different';
 $txt['languages_download_copy'] = 'Copy';
 $txt['languages_download_not_chmod'] = 'You cannot proceed with the installation until all files selected to be copied are writable.';
-$txt['languages_download_illegal_paths'] = 'Package contains illegal paths - please contact Elkarte';
+$txt['languages_download_illegal_paths'] = 'Package contains illegal paths - please contact ElkArte';
 $txt['languages_download_complete'] = 'Installation Complete';
 $txt['languages_download_complete_desc'] = 'Language pack installed successfully. Please click <a href="%1$s">here</a> to return to the languages page';
 $txt['languages_delete_confirm'] = 'Are you sure you want to delete this language?';
+
+$txt['setting_frame_security'] = 'Frame Security Options';
+$txt['setting_frame_security_SAMEORIGIN'] = 'Allow Same Origin';
+$txt['setting_frame_security_DENY'] = 'Deny all frames';
+$txt['setting_frame_security_DISABLE'] = 'Disabled';

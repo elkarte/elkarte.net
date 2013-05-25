@@ -190,6 +190,10 @@ INSERT INTO {$db_prefix}scheduled_tasks
 	(next_time, time_offset, time_regularity, time_unit, disabled, task)
 VALUES
 	(0, 240, 1, 'd', 0, 'remove_old_drafts');
+INSERT INTO {$db_prefix}scheduled_tasks
+	(next_time, time_offset, time_regularity, time_unit, disabled, task)
+VALUES
+	(0, 0, 6, 'h', 0, 'remove_old_followups');
 ---#
 
 /******************************************************************************/
@@ -273,7 +277,8 @@ CREATE TABLE {$db_prefix}user_drafts (
 ---# Adding draft permissions...
 ---{
 // We cannot do this twice
-if (@$modSettings['smfVersion'] < '2.1')
+// @todo this won't work when you upgrade from smf
+if (@$modSettings['ourVersion'] < '1.0')
 {
 	// Anyone who can currently post unapproved topics we assume can create drafts as well ...
 	$request = upgrade_query("
@@ -294,7 +299,7 @@ if (@$modSettings['smfVersion'] < '2.1')
 				(id_group, id_board, permission, add_deny)
 			VALUES
 				" . implode(',', $inserts));
-				
+
 	// Next we find people who can send PM's, and assume they can save pm_drafts as well
 	$request = upgrade_query("
 		SELECT id_group, add_deny, permission

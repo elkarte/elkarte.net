@@ -17,7 +17,7 @@
 // announce a topic
 function template_announce()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="announcement">
@@ -64,7 +64,7 @@ function template_announce()
 
 function template_announcement_send()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt, $scripturl;
 
 	echo '
 	<div id="announcement">
@@ -92,7 +92,7 @@ function template_announcement_send()
 		</form>
 	</div>
 	<br />
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var countdown = 2;
 		var txt_message = "', $txt['announce_continue'], '";
 		doAutoSubmit();
