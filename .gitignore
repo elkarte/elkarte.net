@@ -5,4 +5,4 @@ elk/cache/data*.php
 elk/packages/backups/*
 elk/packages/temp
 *.*~
-elk/install
+
