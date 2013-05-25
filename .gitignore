@@ -5,4 +5,6 @@ elk/cache/data*.php
 elk/packages/backups/*
 elk/packages/temp
 *.*~
-
+*/.buildpath
+*/.project
+*/.settings
