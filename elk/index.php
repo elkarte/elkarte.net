@@ -19,7 +19,7 @@
  *
  */
 
-$forum_version = 'ELKARTE 1.0 Alpha';
+$forum_version = 'ELKARTE 1.0-dev-20132505';
 
 // First things first, but not necessarily in that order.
 define('ELKARTE', 1);
@@ -78,6 +78,7 @@ require_once(SOURCEDIR . '/Security.php');
 require_once(SOURCEDIR . '/BrowserDetect.class.php');
 require_once(SOURCEDIR . '/Errors.class.php');
 require_once(SUBSDIR . '/Util.class.php');
+require_once(SUBSDIR . '/TemplateLayers.class.php');
 
 // Forum in extended maintenance mode? Our trip ends here with a bland message.
 if (!empty($maintenance) && $maintenance == 2)

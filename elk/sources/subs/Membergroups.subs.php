@@ -831,7 +831,7 @@ function membersInGroups($postGroups, $normalGroups = array(), $include_hidden =
 /**
  * Returns details of membergroups based on the id
  *
- * @param array/int $group_ids the IDs of the groups.
+ * @param array/int $group_id the IDs of the groups. (Note: yes, this is $group_id and NOT $group_ids)
  * @param integer $limit = 1 the number of results returned (default 1, if null/false/0 returns all).
  * @param bool $detailed = false if true then it returns more fields (default false).
  *  false returns: id_group, group_name, group_type.
@@ -841,18 +841,18 @@ function membersInGroups($postGroups, $normalGroups = array(), $include_hidden =
  *
  * @return array|false
  */
-function membergroupsById($group_ids, $limit = 1, $detailed = false, $assignable = false, $protected = false)
+function membergroupsById($group_id, $limit = 1, $detailed = false, $assignable = false, $protected = false)
 {
 	$db = database();
 
-	if (empty($group_ids))
+	if (empty($group_id))
 		return false;
 
-	if (!is_array($group_ids))
-		$group_ids = array($group_ids);
+	if (!is_array($group_id))
+		$group_ids = array($group_id);
 
 	$groups = array();
-	$group_ids = array_map('intval', $group_ids);
+	$group_ids = array_map('intval', $group_id);
 
 	$request = $db->query('', '
 		SELECT id_group, group_name, group_type' . (!$detailed ? '' : ',
@@ -1034,10 +1034,12 @@ function getBasicMembergroupData($includes = array(), $excludes = array(), $sort
  */
 function getGroups($groupList)
 {
+	global $txt;
+
 	$db = database();
 
 	$groups = array();
-	if (in_array(0, $groups))
+	if (in_array(0, $groupList))
 	{
 		$groups[0] = array(
 			'id' => 0,
@@ -1048,20 +1050,20 @@ function getGroups($groupList)
 
 	// Get all membergroups that have access to the board the announcement was made on.
 	$request = $db->query('', '
-		SELECT mg.id_group, COUNT(mem.id_member) AS num_members
+		SELECT mg.id_group, mg.group_name, COUNT(mem.id_member) AS num_members
 		FROM {db_prefix}membergroups AS mg
 			LEFT JOIN {db_prefix}members AS mem ON (mem.id_group = mg.id_group OR FIND_IN_SET(mg.id_group, mem.additional_groups) != 0 OR mg.id_group = mem.id_post_group)
 		WHERE mg.id_group IN ({array_int:group_list})
 		GROUP BY mg.id_group',
 		array(
-			'group_list' => $groups,
+			'group_list' => $groupList,
 		)
 	);
 	while ($row = $db->fetch_assoc($request))
 	{
 		$groups[$row['id_group']] = array(
 			'id' => $row['id_group'],
-			'name' => '',
+			'name' => $row['group_name'],
 			'member_count' => $row['num_members'],
 		);
 	}
