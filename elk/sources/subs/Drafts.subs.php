@@ -16,7 +16,7 @@
  */
 function create_pm_draft($draft, $recipientList)
 {
-	global $smcFunc;
+	$db = database();
 
 	$draft_columns = array(
 		'id_reply' => 'int',
@@ -38,7 +38,7 @@ function create_pm_draft($draft, $recipientList)
 		serialize($recipientList),
 		$draft['outbox'],
 	);
-	$smcFunc['db_insert']('',
+	$db->insert('',
 		'{db_prefix}user_drafts',
 		$draft_columns,
 		$draft_parameters,
@@ -48,7 +48,7 @@ function create_pm_draft($draft, $recipientList)
 	);
 
 	// get the new id
-	$draft['id_draft'] = $smcFunc['db_insert_id']('{db_prefix}user_drafts', 'id_draft');
+	$draft['id_draft'] = $db->insert_id('{db_prefix}user_drafts', 'id_draft');
 
 	return $draft['id_draft'];
 }
@@ -61,9 +61,9 @@ function create_pm_draft($draft, $recipientList)
  */
 function modify_pm_draft($draft, $recipientList)
 {
-	global $smcFunc;
+	$db = database();
 
-	$smcFunc['db_query']('', '
+	$db->query('', '
 		UPDATE {db_prefix}user_drafts
 		SET id_reply = {int:id_reply},
 			type = {int:type},
@@ -94,7 +94,9 @@ function modify_pm_draft($draft, $recipientList)
  */
 function create_post_draft($draft)
 {
-	global $smcFunc, $modSettings;
+	global $modSettings;
+
+	$db = database();
 
 	$draft_columns = array(
 		'id_topic' => 'int',
@@ -122,7 +124,7 @@ function create_post_draft($draft)
 		$draft['locked'],
 		$draft['sticky']
 	);
-	$smcFunc['db_insert']('',
+	$db->insert('',
 		'{db_prefix}user_drafts',
 		$draft_columns,
 		$draft_parameters,
@@ -132,7 +134,7 @@ function create_post_draft($draft)
 	);
 
 	// get the id of the new draft
-	$draft['id_draft'] = $smcFunc['db_insert_id']('{db_prefix}user_drafts', 'id_draft');
+	$draft['id_draft'] = $db->insert_id('{db_prefix}user_drafts', 'id_draft');
 
 	return $draft['id_draft'];
 }
@@ -144,9 +146,9 @@ function create_post_draft($draft)
  */
 function modify_post_draft($draft)
 {
-	global $smcFunc;
+	$db = database();
 
-	$smcFunc['db_query']('', '
+	$db->query('', '
 		UPDATE {db_prefix}user_drafts
 		SET
 			id_topic = {int:id_topic},
@@ -187,10 +189,10 @@ function modify_post_draft($draft)
  */
 function load_draft($id_draft, $uid, $type = 0, $drafts_keep_days = 0, $check = true)
 {
-	global $smcFunc;
+	$db = database();
 
 	// load in a draft from the DB
-	$request = $smcFunc['db_query']('', '
+	$request = $db->query('', '
 		SELECT *
 		FROM {db_prefix}user_drafts
 		WHERE id_draft = {int:id_draft}' . ($check ? '
@@ -207,12 +209,12 @@ function load_draft($id_draft, $uid, $type = 0, $drafts_keep_days = 0, $check = 
 	);
 
 	// no results?
-	if (!$smcFunc['db_num_rows']($request))
+	if (!$db->num_rows($request))
 		return false;
 
 	// load up the data
-	$draft_info = $smcFunc['db_fetch_assoc']($request);
-	$smcFunc['db_free_result']($request);
+	$draft_info = $db->fetch_assoc($request);
+	$db->free_result($request);
 
 	// a little cleaning
 	$draft_info['body'] = !empty($draft_info['body']) ? str_replace('<br />', "\n", un_htmlspecialchars(stripslashes($draft_info['body']))) : '';
@@ -231,21 +233,23 @@ function load_draft($id_draft, $uid, $type = 0, $drafts_keep_days = 0, $check = 
  * @param int $drafts_keep_days - number of days to consider a draft is still valid
  * @return type
  */
-function load_user_drafts($member_id, $topic = false, $draft_type = 0, $drafts_keep_days = 0)
+function load_user_drafts($member_id, $draft_type = 0, $topic = false, $drafts_keep_days = 0, $order = '', $limit = '')
 {
-	global $smcFunc;
+	$db = database();
 
 	// load the drafts that the user has available for the given type & action
 	$user_drafts = array();
-	$request = $smcFunc['db_query']('', '
-		SELECT *
-		FROM {db_prefix}user_drafts
-		WHERE id_member = {int:id_member}' . ((!empty($topic) && $draft_type === 0) ? '
+	$request = $db->query('', '
+		SELECT ud.*' . ($draft_type === 0 ? ',b.id_board, b.name AS bname' : '') . '
+		FROM {db_prefix}user_drafts as ud' . ($draft_type === 0 ? '
+			INNER JOIN {db_prefix}boards AS b ON (b.id_board = ud.id_board)' : '') . '
+		WHERE ud.id_member = {int:id_member}' . ((!empty($topic) && $draft_type === 0) ? '
 			AND id_topic = {int:id_topic}' : (!empty($topic) ? '
 			AND id_reply = {int:id_topic}' : '')) . '
 			AND type = {int:draft_type}' . (!empty($drafts_keep_days) ? '
-			AND poster_time > {int:time}' : '') . '
-		ORDER BY poster_time DESC',
+			AND poster_time > {int:time}' : '') . (!empty($order) ? '
+		ORDER BY ' . $order : '') . (!empty($limit) ? '
+		LIMIT ' . $limit : ''),
 		array(
 			'id_member' => $member_id,
 			'id_topic' => (int) $topic,
@@ -255,9 +259,9 @@ function load_user_drafts($member_id, $topic = false, $draft_type = 0, $drafts_k
 	);
 
 	// place them in the draft array
-	while ($row = $smcFunc['db_fetch_assoc']($request))
+	while ($row = $db->fetch_assoc($request))
 		$user_drafts[] = $row;
-	$smcFunc['db_free_result']($request);
+	$db->free_result($request);
 
 	return $user_drafts;
 }
@@ -273,7 +277,7 @@ function load_user_drafts($member_id, $topic = false, $draft_type = 0, $drafts_k
  */
 function deleteDrafts($id_draft, $member_id = -1, $check = true)
 {
-	global $smcFunc;
+	$db = database();
 
 	// Only a single draft.
 	if (is_numeric($id_draft))
@@ -283,7 +287,7 @@ function deleteDrafts($id_draft, $member_id = -1, $check = true)
 	if (empty($id_draft))
 		return false;
 
-	$smcFunc['db_query']('', '
+	$db->query('', '
 			DELETE FROM {db_prefix}user_drafts
 			WHERE id_draft IN ({array_int:id_draft})' . ($check ? '
 				AND  id_member = {int:id_member}' : ''),
@@ -304,9 +308,11 @@ function deleteDrafts($id_draft, $member_id = -1, $check = true)
  */
 function draftsCount($member_id, $draft_type)
 {
-	global $modSettings, $smcFunc;
+	global $modSettings;
 
-	$request = $smcFunc['db_query']('', '
+	$db = database();
+
+	$request = $db->query('', '
 		SELECT COUNT(id_draft)
 		FROM {db_prefix}user_drafts
 		WHERE id_member = {int:id_member}
@@ -318,8 +324,67 @@ function draftsCount($member_id, $draft_type)
 			'time' => (!empty($modSettings['drafts_keep_days']) ? (time() - ($modSettings['drafts_keep_days'] * 86400)) : 0),
 		)
 	);
-	list ($msgCount) = $smcFunc['db_fetch_row']($request);
-	$smcFunc['db_free_result']($request);
+	list ($msgCount) = $db->fetch_row($request);
+	$db->free_result($request);
 
 	return $msgCount;
+}
+
+/**
+ * Given a list of userid's for a PM, finds the member name associated with the ID
+ * so it can be presented to the user.
+ *  - keeps track of bcc and to names for the PM
+ *
+ * @todo this is the same as whats in PersonalMessage.controller, when that gets refractored
+ *       this should go away and use the refractored PM subs
+ */
+function draftsRecipients($allRecipients, $recipient_ids)
+{
+	$db = database();
+
+	// holds our results
+	$recipients = array(
+		'to' => array(),
+		'bcc' => array(),
+	);
+
+	require_once(SUBSDIR . '/Members.subs.php');
+	// get all the member names that this PM is goign to
+	$results = getBasicMemberData($allRecipients);
+	foreach ($results as $result)
+	{
+		// load the to/bcc name array
+		$recipientType = in_array($result['id_member'], $recipient_ids['bcc']) ? 'bcc' : 'to';
+		$recipients[$recipientType][] = $result['real_name'];
+	}
+
+	return $recipients;
+}
+
+/**
+ * Gets all old drafts older than x days
+ * @param int $days
+ * @return array
+ */
+function getOldDrafts($days)
+{
+	$db = database();
+
+	$drafts = array();
+
+	// Find all of the old drafts
+	$request = $db->query('', '
+		SELECT id_draft
+		FROM {db_prefix}user_drafts
+		WHERE poster_time <= {int:poster_time_old}',
+		array(
+			'poster_time_old' => time() - (86400 * $days),
+		)
+	);
+
+	while ($row = $db->fetch_row($request))
+		$drafts[] = (int) $row[0];
+	$db->free_result($request);
+
+	return $drafts;
 }

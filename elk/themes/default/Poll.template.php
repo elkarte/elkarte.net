@@ -14,14 +14,17 @@
  * @version 1.0 Alpha
  */
 
+/**
+ * Interface to allow edit of a poll.
+ */
 function template_poll_edit()
 {
-	global $context, $settings, $txt, $scripturl;
+	global $context, $txt;
 
 	// Some javascript for adding more options.
 	if (!empty($context['form_url']))
 		echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		var pollOptionNum = 0, pollTabIndex;
 		var pollOptionId = ', $context['last_choice_id'], ';
 		var txt_option = "', $txt['option'], '";

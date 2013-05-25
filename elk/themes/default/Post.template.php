@@ -14,14 +14,16 @@
  * @version 1.0 Alpha
  */
 
-// The main template for the post page.
+/**
+ * The main template for the post page.
+ */
 function template_main()
 {
 	global $context, $settings, $options, $txt, $scripturl, $modSettings, $counter;
 
 	// Start the javascript... and boy is there a lot.
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[';
+		<script><!-- // --><![CDATA[';
 
 	// When using Go Back due to fatal_error, allow the form to be re-submitted with changes.
 	if (isBrowser('is_firefox'))
@@ -146,8 +148,16 @@ function template_main()
 
 	echo '
 							</select>
-							<img src="', $context['icon_url'], '" name="icons" hspace="15" alt="" />
-						</dd>
+							<img src="', $context['icon_url'], '" id="icons" style="margin:0 7px" alt="" /> 
+						</dd>';
+	if (!empty($context['show_boards_dropdown']))
+		echo '
+						<dt class="clear_left">
+							', $txt['post_in_board'], ':
+						</dt>
+						<dd>', template_select_boards('post_in_board'), '
+						</dd>';
+	echo '
 					</dl>';
 
 	// Are you posting a calendar event?
@@ -331,7 +341,7 @@ function template_main()
 			// Show more boxes if they aren't approaching that limit.
 			if ($context['num_allowed_attachments'] > 1)
 				echo '
-								<script type="text/javascript"><!-- // --><![CDATA[
+								<script><!-- // --><![CDATA[
 									var allowed_attachments = ', $context['num_allowed_attachments'], ';
 									var current_attachment = 1;
 									var txt_more_attachments_error = "', $txt['more_attachments_error'], '";
@@ -375,7 +385,7 @@ function template_main()
 
 	echo '
 					</div>';
-	
+
 	// If the admin enabled the drafts feature, show a draft selection box
 	if (!empty($modSettings['drafts_enabled']) && !empty($context['drafts']) && !empty($options['drafts_show_saved_enabled']))
 	{
@@ -385,7 +395,7 @@ function template_main()
 							<img id="postDraftExpand" class="panel_toggle" style="display: none;" src="', $settings['images_url'], '/', empty($context['minmax_preferences']['draft']) ? 'collapse' : 'expand', '.png" alt="-" /> <strong><a href="#" id="postDraftExpandLink">', $txt['draft_load'], '</a></strong>
 						</h4>
 					</div>
-					<div id="postDraftOptions"', empty($context['minmax_preferences']['draft']) ? '' : ' style="display: none;"', '>>
+					<div id="postDraftOptions"', empty($context['minmax_preferences']['draft']) ? '' : ' style="display: none;"', '>
 						<dl class="settings">
 							<dt>
 								<strong>', $txt['subject'], '</strong>
@@ -437,6 +447,11 @@ function template_main()
 		echo '
 			<input type="hidden" name="last_msg" value="', $context['topic_last_message'], '" />';
 
+	// If we are starting a new topic starting from another one, here is the place to remember some details
+	if (!empty($context['original_post']))
+		echo '
+			<input type="hidden" name="followup" value="' . $context['original_post'] . '" />';
+
 	echo '
 			<input type="hidden" name="additional_options" id="additional_options" value="', $context['show_additional_options'] ? '1' : '0', '" />
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -445,7 +460,7 @@ function template_main()
 
 	// The variables used to preview a post without loading a new page.
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var post_box_name = "', $context['post_box_name'], '";
 			var form_name = "postmodify";
 			var preview_area = "post";
@@ -585,14 +600,14 @@ function template_main()
 			}
 
 			echo '
-					<div class="list_posts smalltext" id="msg_', $post['id'], '_body">', $post['message'], '</div>
+					<div class="list_posts smalltext" id="msg_', $post['id'], '_body">', $post['body'], '</div>
 				</div>
 			</div>';
 		}
 
 		echo '
 		</div>
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var post_box_name = "', $context['post_box_name'], '";
 			var aIgnoreToggles = new Array();';
 
@@ -621,7 +636,9 @@ function template_main()
 	}
 }
 
-// The template for the spellchecker.
+/**
+ * The template for the spellchecker.
+ */
 function template_spellcheck()
 {
 	global $context, $settings, $txt;
@@ -632,23 +649,20 @@ function template_spellcheck()
 	<head>
 		<title>', $txt['spell_check'], '</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<link rel="stylesheet" type="text/css" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
-		<style type="text/css">
-			body, td
-			{
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />
+		<style>
+			body, td {
 				font-size: small;
 				margin: 0;
 				background: #f0f0f0;
 				color: #000;
 				padding: 10px;
 			}
-			.highlight
-			{
+			.highlight {
 				color: red;
 				font-weight: bold;
 			}
-			#spellview
-			{
+			#spellview {
 				border-style: outset;
 				border: 1px solid black;
 				padding: 5px;
@@ -661,14 +675,14 @@ function template_spellcheck()
 
 	// As you may expect - we need a lot of javascript for this... load it from the separate files.
 	echo '
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script><!-- // --><![CDATA[
 			var spell_formname = window.opener.spell_formname;
 			var spell_fieldname = window.opener.spell_fieldname;
 			var spell_full = window.opener.spell_full;
 		// ]]></script>
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/spellcheck.js"></script>
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/script.js"></script>
-		<script type="text/javascript"><!-- // --><![CDATA[
+		<script src="', $settings['default_theme_url'], '/scripts/spellcheck.js"></script>
+		<script src="', $settings['default_theme_url'], '/scripts/script.js"></script>
+		<script><!-- // --><![CDATA[
 			', $context['spell_js'], '
 		// ]]></script>
 	</head>
@@ -699,6 +713,9 @@ function template_spellcheck()
 </html>';
 }
 
+/**
+ * Interface to allow quote.
+ */
 function template_quotefast()
 {
 	global $context, $settings, $txt;
@@ -708,12 +725,12 @@ function template_quotefast()
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $txt['retrieving_quote'], '</title>
-		<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/script.js"></script>
+		<script src="', $settings['default_theme_url'], '/scripts/script.js"></script>
 	</head>
 	<body>
 		', $txt['retrieving_quote'], '
 		<div id="temporary_posting_area" style="display: none;"></div>
-		<script type="text/javascript"><!-- // --><![CDATA[';
+		<script><!-- // --><![CDATA[';
 
 	if ($context['close_window'])
 		echo '

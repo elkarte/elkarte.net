@@ -14,7 +14,9 @@
  * @version 1.0 Alpha
  */
 
-// Displays a sortable listing of all members registered on the forum.
+/**
+ * Displays a sortable listing of all members registered on the forum.
+ */
 function template_main()
 {
 	global $context, $settings, $scripturl, $txt;
@@ -51,12 +53,12 @@ function template_main()
 		// This is a selected column, so underline it or some such.
 		if ($column['selected'])
 			echo '
-					<th scope="col" class="', isset($column['class']) ? ' ' . $column['class'] : '', '" style="width: auto;"' . (isset($column['colspan']) ? ' colspan="' . $column['colspan'] . '"' : '') . ' nowrap="nowrap">
+					<th scope="col" class="', isset($column['class']) ? ' ' . $column['class'] : '', '" style="width: auto;white-space: nowrap"' . (isset($column['colspan']) ? ' colspan="' . $column['colspan'] . '"' : '') . '>
 						<a href="' . $column['href'] . '" rel="nofollow">' . $column['label'] . '</a><img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" /></th>';
 		// This is just some column... show the link and be done with it.
 		else
 			echo '
-					<th scope="col" class="', isset($column['class']) ? ' ' . $column['class'] : '', '"', isset($column['width']) ? ' style="width:"' . $column['width'] . '"' : '', isset($column['colspan']) ? ' colspan="' . $column['colspan'] . '"' : '', '>
+					<th scope="col" class="', isset($column['class']) ? ' ' . $column['class'] : '', '"', isset($column['width']) ? ' style="width:' . $column['width'] . '"' : '', isset($column['colspan']) ? ' colspan="' . $column['colspan'] . '"' : '', '>
 						', $column['link'], '</th>';
 	}
 	echo '
@@ -76,39 +78,52 @@ function template_main()
 						', $context['can_send_pm'] ? '<a href="' . $member['online']['href'] . '" title="' . $member['online']['text'] . '">' : '', $settings['use_image_buttons'] ? '<img src="' . $member['online']['image_href'] . '" alt="' . $member['online']['text'] . '" class="centericon" />' : $member['online']['label'], $context['can_send_pm'] ? '</a>' : '', '
 					</td>
 					<td class="lefttext">', $member['link'], '</td>';
+
 			if ($context['can_send_email'])
 				echo '
 					<td class="centertext">', $member['show_email'] == 'no' ? '' : '<a href="' . $scripturl . '?action=emailuser;sa=email;uid=' . $member['id'] . '" rel="nofollow"><img src="' . $settings['images_url'] . '/profile/email_sm.png" alt="' . $txt['email'] . '" title="' . $txt['email'] . ' ' . $member['name'] . '" /></a>', '</td>';
 
-		if (!isset($context['disabled_fields']['website']))
-			echo '
+			if (!isset($context['disabled_fields']['website']))
+				echo '
 					<td class="centertext">', $member['website']['url'] != '' ? '<a href="' . $member['website']['url'] . '" target="_blank" class="new_win"><img src="' . $settings['images_url'] . '/profile/www.png" alt="' . $member['website']['title'] . '" title="' . $member['website']['title'] . '" /></a>' : '', '</td>';
 
-		// Group and date.
-		echo '
+			// Group and date.
+			echo '
 					<td class="lefttext">', empty($member['group']) ? $member['post_group'] : $member['group'], '</td>
 					<td class="lefttext">', $member['registered_date'], '</td>';
 
-		if (!isset($context['disabled_fields']['posts']))
-		{
-			echo '
-					<td style="white-space: nowrap;width:15px">', $member['posts'], '</td>
-					<td class="statsbar" style="width:120px">';
-
-			if (!empty($member['post_percent']))
+			if (!isset($context['disabled_fields']['posts']))
+			{
 				echo '
-						<div class="bar" style="width: ', $member['post_percent'] + 4, 'px;">
-							<div style="width: ', $member['post_percent'], 'px;"></div>
-						</div>';
+						<td class="statsbar">';
+
+				// show a relative bar graph of posts
+				if (isset($member['post_percent']))
+					echo '
+							<div class="postsbar">
+								<div class="bar" style="width: ', $member['post_percent'] * 0.6, '%;"></div>
+								<span class="righttext" style="white-space: nowrap;">', $member['posts'], '</span>
+							</div>';
+				else
+					echo '
+							<span class="righttext" style="white-space: nowrap;">', $member['posts'], '</span>';
+
+				echo '
+						</td>';
+			}
+
+			// Any custom fields on display?
+			if (!empty($context['custom_profile_fields']['columns']))
+			{
+				foreach ($context['custom_profile_fields']['columns'] as $key => $column)
+					echo '
+						<td class="lefttext">', $member['options'][substr($key, 5)], '</td>';
+			}
 
 			echo '
-					</td>';
-		}
+					</tr>';
 
-		echo '
-				</tr>';
-
-			$alternate = !$alternate;
+				$alternate = !$alternate;
 		}
 	}
 	// No members?
@@ -138,7 +153,9 @@ function template_main()
 
 }
 
-// A page allowing people to search the member list.
+/**
+ * A page allowing people to search the member list.
+ */
 function template_search()
 {
 	global $context, $settings, $scripturl, $txt;

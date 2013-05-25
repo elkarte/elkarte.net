@@ -14,7 +14,9 @@
  * @version 1.0 Alpha
  */
 
-// Template for listing all the current categories and boards.
+/**
+ * Template for listing all the current categories and boards.
+ */
 function template_main()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -108,10 +110,12 @@ function template_main()
 	</div>';
 }
 
-// Template for editing/adding a category on the forum.
+/**
+ * Template for editing/adding a category on the forum.
+ */
 function template_modify_category()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	// Print table header.
 	echo '
@@ -190,10 +194,12 @@ function template_modify_category()
 	</div>';
 }
 
-// A template to confirm if a user wishes to delete a category - and whether they want to save the boards.
+/**
+ * A template to confirm if a user wishes to delete a category - and whether they want to save the boards.
+ */
 function template_confirm_category_delete()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	// Print table header.
 	echo '
@@ -244,7 +250,9 @@ function template_confirm_category_delete()
 	</div>';
 }
 
-// Below is the template for adding/editing an board on the forum.
+/**
+ * Below is the template for adding/editing an board on the forum.
+ */
 function template_modify_board()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -433,7 +441,7 @@ function template_modify_board()
 							<div id="moderator_container"></div>
 						</dd>
 					</dl>
-					<script type="text/javascript"><!-- // --><![CDATA[
+					<script><!-- // --><![CDATA[
 						$(document).ready(function () {
 							$(".select_all_box").each(function () {
 								$(this).removeClass(\'select_all_box\');
@@ -572,8 +580,8 @@ function template_modify_board()
 		</form>
 	</div>
 
-<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-<script type="text/javascript"><!-- // --><![CDATA[
+<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
+<script><!-- // --><![CDATA[
 	var oModeratorSuggest = new smc_AutoSuggest({
 		sSelf: \'oModeratorSuggest\',
 		sSessionId: smf_session_id,
@@ -602,7 +610,7 @@ function template_modify_board()
 
 	// Javascript for deciding what to show.
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		function refreshOptions()
 		{
 			var redirect = document.getElementById("redirect_enable");
@@ -630,10 +638,12 @@ function template_modify_board()
 	// ]]></script>';
 }
 
-// A template used when a user is deleting a board with child boards in it - to see what they want to do with them.
+/**
+ * A template used when a user is deleting a board with child boards in it - to see what they want to do with them.
+ */
 function template_confirm_board_delete()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	// Print table header.
 	echo '

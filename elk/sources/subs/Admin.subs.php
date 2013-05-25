@@ -22,11 +22,14 @@ if (!defined('ELKARTE'))
 
 /**
  * Get a list of versions that are currently installed on the server.
+ *
  * @param array $checkFor
  */
 function getServerVersions($checkFor)
 {
-	global $txt, $db_connection, $_PHPA, $smcFunc, $memcached, $modSettings;
+	global $txt, $db_connection, $_PHPA, $memcached, $modSettings;
+
+	$db = database();
 
 	loadLanguage('Admin');
 
@@ -50,13 +53,13 @@ function getServerVersions($checkFor)
 	// Now lets check for the Database.
 	if (in_array('db_server', $checkFor))
 	{
-		db_extend();
+		$db = database();
 		if (!isset($db_connection) || $db_connection === false)
 			trigger_error('getServerVersions(): you need to be connected to the database in order to get its server version', E_USER_NOTICE);
 		else
 		{
-			$versions['db_server'] = array('title' => sprintf($txt['support_versions_db'], $smcFunc['db_title']), 'version' => '');
-			$versions['db_server']['version'] = $smcFunc['db_get_version']();
+			$versions['db_server'] = array('title' => sprintf($txt['support_versions_db'], $db->db_title()), 'version' => '');
+			$versions['db_server']['version'] = $db->db_server_version();
 		}
 	}
 
@@ -97,6 +100,8 @@ function getServerVersions($checkFor)
  *   language files found in the default theme directory (grouped by language).
  *
  * @param array &$versionOptions
+ *
+ * @return array
  */
 function getFileVersions(&$versionOptions)
 {
@@ -236,171 +241,13 @@ function getFileVersions(&$versionOptions)
 		foreach ($version_info['default_language_versions'] as $language => $dummy)
 			ksort($version_info['default_language_versions'][$language]);
 	}
+
 	return $version_info;
 }
 
 /**
- * Update the Settings.php file.
- *
- * The most important function in this file for mod makers happens to be the
- * updateSettingsFile() function, but it shouldn't be used often anyway.
- *
- * - updates the Settings.php file with the changes supplied in config_vars.
- * - expects config_vars to be an associative array, with the keys as the
- *   variable names in Settings.php, and the values the variable values.
- * - does not escape or quote values.
- * - preserves case, formatting, and additional options in file.
- * - writes nothing if the resulting file would be less than 10 lines
- *   in length (sanity check for read lock.)
- * - check for changes to db_last_error and passes those off to a separate handler
- * - attempts to create a backup file and will use it should the writing of the
- *   new settings file fail
- *
- * @param array $config_vars
- */
-function updateSettingsFile($config_vars)
-{
-	global $context;
-
-	// Updating the db_last_error, then don't mess around with Settings.php
-	if (count($config_vars) === 1 && isset($config_vars['db_last_error']))
-	{
-		updateDbLastError($config_vars['db_last_error']);
-		return;
-	}
-
-	// When was Settings.php last changed?
-	$last_settings_change = filemtime(BOARDDIR . '/Settings.php');
-
-	// Load the settings file.
-	$settingsArray = trim(file_get_contents(BOARDDIR . '/Settings.php'));
-
-	// Break it up based on \r or \n, and then clean out extra characters.
-	if (strpos($settingsArray, "\n") !== false)
-		$settingsArray = explode("\n", $settingsArray);
-	elseif (strpos($settingsArray, "\r") !== false)
-		$settingsArray = explode("\r", $settingsArray);
-	else
-		return;
-
-	// Presumably, the file has to have stuff in it for this function to be called :P.
-	if (count($settingsArray) < 10)
-		return;
-
-	// remove any /r's that made there way in here
-	foreach ($settingsArray as $k => $dummy)
-		$settingsArray[$k] = strtr($dummy, array("\r" => '')) . "\n";
-
-	// go line by line and see whats changing
-	for ($i = 0, $n = count($settingsArray); $i < $n; $i++)
-	{
-		// Don't trim or bother with it if it's not a variable.
-		if (substr($settingsArray[$i], 0, 1) != '$')
-			continue;
-
-		$settingsArray[$i] = trim($settingsArray[$i]) . "\n";
-
-		// Look through the variables to set....
-		foreach ($config_vars as $var => $val)
-		{
-			// be sure someone is not updating db_last_error this with a group
-			if ($var === 'db_last_error')
-			{
-				updateDbLastError($val);
-				unset($config_vars[$var]);
-			}
-			elseif (strncasecmp($settingsArray[$i], '$' . $var, 1 + strlen($var)) == 0)
-			{
-				$comment = strstr(substr($settingsArray[$i], strpos($settingsArray[$i], ';')), '#');
-				$settingsArray[$i] = '$' . $var . ' = ' . $val . ';' . ($comment == '' ? '' : "\t\t" . rtrim($comment)) . "\n";
-
-				// This one's been 'used', so to speak.
-				unset($config_vars[$var]);
-			}
-		}
-
-		// End of the file ... maybe
-		if (substr(trim($settingsArray[$i]), 0, 2) == '?' . '>')
-			$end = $i;
-	}
-
-	// This should never happen, but apparently it is happening.
-	if (empty($end) || $end < 10)
-		$end = count($settingsArray) - 1;
-
-	// Still more variables to go?  Then lets add them at the end.
-	if (!empty($config_vars))
-	{
-		if (trim($settingsArray[$end]) == '?' . '>')
-			$settingsArray[$end++] = '';
-		else
-			$end++;
-
-		// Add in any newly defined vars that were passed
-		foreach ($config_vars as $var => $val)
-			$settingsArray[$end++] = '$' . $var . ' = ' . $val . ';' . "\n";
-	}
-	else
-		$settingsArray[$end] = trim($settingsArray[$end]);
-
-	// Sanity error checking: the file needs to be at least 12 lines.
-	if (count($settingsArray) < 12)
-		return;
-
-	// Try to avoid a few pitfalls:
-	//  - like a possible race condition,
-	//  - or a failure to write at low diskspace
-	//
-	// Check before you act: if cache is enabled, we can do a simple write test
-	// to validate that we even write things on this filesystem.
-	if ((!defined('CACHEDIR') || !file_exists(CACHEDIR)) && file_exists(BOARDDIR . '/cache'))
-		$tmp_cache = BOARDDIR . '/cache';
-	else
-		$tmp_cache = CACHEDIR;
-
-	$test_fp = @fopen($tmp_cache . '/settings_update.tmp', "w+");
-	if ($test_fp)
-	{
-		fclose($test_fp);
-		$written_bytes = file_put_contents($tmp_cache . '/settings_update.tmp', 'test', LOCK_EX);
-		@unlink($tmp_cache . '/settings_update.tmp');
-
-		if ($written_bytes !== 4)
-		{
-			// Oops. Low disk space, perhaps. Don't mess with Settings.php then.
-			// No means no. :P
-			return;
-		}
-	}
-
-	// Protect me from what I want! :P
-	clearstatcache();
-	if (filemtime(BOARDDIR . '/Settings.php') === $last_settings_change)
-	{
-		// save the old before we do anything
-		$file = BOARDDIR . '/Settings.php';
-		$settings_backup_fail = !@is_writable(BOARDDIR . '/Settings_bak.php') || !@copy(BOARDDIR . '/Settings.php', BOARDDIR . '/Settings_bak.php');
-		$settings_backup_fail = !$settings_backup_fail ? (!file_exists(BOARDDIR . '/Settings_bak.php') || filesize(BOARDDIR . '/Settings_bak.php') === 0) : $settings_backup_fail;
-
-		// write out the new
-		$write_settings = implode('', $settingsArray);
-		$written_bytes = file_put_contents(BOARDDIR . '/Settings.php', $write_settings, LOCK_EX);
-
-		// survey says ...
-		if ($written_bytes !== strlen($write_settings) && !$settings_backup_fail)
-		{
-			// Well this is not good at all, lets see if we can save this
-			$context['settings_message'] = 'settings_error';
-
-			if (file_exists(BOARDDIR . '/Settings_bak.php'))
-				@copy(BOARDDIR . '/Settings_bak.php', BOARDDIR . '/Settings.php');
-		}
-	}
-}
-
-/**
  * Saves the time of the last db error for the error log
- * - Done separately from updateSettingsFile to avoid race conditions
+ * - Done separately from Settings_Form::save_file() to avoid race conditions
  *   which can occur during a db error
  * - If it fails Settings.php will assume 0
  *
@@ -418,7 +265,9 @@ function updateDbLastError($time)
  */
 function updateAdminPreferences()
 {
-	global $options, $context, $smcFunc, $settings, $user_info;
+	global $options, $context, $settings, $user_info;
+
+	$db = database();
 
 	// This must exist!
 	if (!isset($context['admin_preferences']))
@@ -428,7 +277,7 @@ function updateAdminPreferences()
 	$options['admin_preferences'] = serialize($context['admin_preferences']);
 
 	// Just check we haven't ended up with something theme exclusive somehow.
-	$smcFunc['db_query']('', '
+	$db->query('', '
 		DELETE FROM {db_prefix}themes
 		WHERE id_theme != {int:default_theme}
 		AND variable = {string:admin_preferences}',
@@ -439,7 +288,7 @@ function updateAdminPreferences()
 	);
 
 	// Update the themes table.
-	$smcFunc['db_insert']('replace',
+	$db->insert('replace',
 		'{db_prefix}themes',
 		array('id_member' => 'int', 'id_theme' => 'int', 'variable' => 'string-255', 'value' => 'string-65534'),
 		array($user_info['id'], 1, 'admin_preferences', $options['admin_preferences']),
@@ -452,9 +301,9 @@ function updateAdminPreferences()
 
 /**
  * Send all the administrators a lovely email.
- * - loads all users who are admins or have the admin forum permission.
- * - uses the email template and replacements passed in the parameters.
- * - sends them an email.
+ * It loads all users who are admins or have the admin forum permission.
+ * It uses the email template and replacements passed in the parameters.
+ * It sends them an email.
  *
  * @param string $template
  * @param array $replacements
@@ -462,13 +311,15 @@ function updateAdminPreferences()
  */
 function emailAdmins($template, $replacements = array(), $additional_recipients = array())
 {
-	global $smcFunc, $language, $modSettings;
+	global $language, $modSettings;
+
+	$db = database();
 
 	// We certainly want this.
 	require_once(SUBSDIR . '/Mail.subs.php');
 
 	// Load all groups which are effectively admins.
-	$request = $smcFunc['db_query']('', '
+	$request = $db->query('', '
 		SELECT id_group
 		FROM {db_prefix}permissions
 		WHERE permission = {string:admin_forum}
@@ -481,11 +332,11 @@ function emailAdmins($template, $replacements = array(), $additional_recipients 
 		)
 	);
 	$groups = array(1);
-	while ($row = $smcFunc['db_fetch_assoc']($request))
+	while ($row = $db->fetch_assoc($request))
 		$groups[] = $row['id_group'];
-	$smcFunc['db_free_result']($request);
+	$db->free_result($request);
 
-	$request = $smcFunc['db_query']('', '
+	$request = $db->query('', '
 		SELECT id_member, member_name, real_name, lngfile, email_address
 		FROM {db_prefix}members
 		WHERE (id_group IN ({array_int:group_list}) OR FIND_IN_SET({raw:group_array_implode}, additional_groups) != 0)
@@ -498,7 +349,7 @@ function emailAdmins($template, $replacements = array(), $additional_recipients 
 		)
 	);
 	$emails_sent = array();
-	while ($row = $smcFunc['db_fetch_assoc']($request))
+	while ($row = $db->fetch_assoc($request))
 	{
 		// Stick their particulars in the replacement data.
 		$replacements['IDMEMBER'] = $row['id_member'];
@@ -514,7 +365,7 @@ function emailAdmins($template, $replacements = array(), $additional_recipients 
 		// Track who we emailed so we don't do it twice.
 		$emails_sent[] = $row['email_address'];
 	}
-	$smcFunc['db_free_result']($request);
+	$db->free_result($request);
 
 	// Any additional users we must email this to?
 	if (!empty($additional_recipients))
