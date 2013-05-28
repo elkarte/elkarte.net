@@ -3,7 +3,7 @@
 
 /* Normal, standard links. */
 a:link, a:visited {
-	color: #222;
+	color: #666;
 	text-decoration: none;
 }
 a:hover {
@@ -13,7 +13,7 @@ a:hover {
 
 /* Links that open in a new window. */
 a.new_win:link, a.new_win:visited {
-	color: #222;
+	color: #666;
 	text-decoration: none;
 }
 a.new_win:hover {
@@ -2101,7 +2101,7 @@ div#pollmoderation {
 }
 .poster span.name {
 	display: block;
-	padding: 6px 0;
+	padding: 6px;
 	line-height: 1.5em;
 	text-align: center;
 	color: #C06002;
@@ -2109,8 +2109,6 @@ div#pollmoderation {
 	cursor: pointer;
 	font-weight: bold;
 	overflow: hidden;
-	white-space: nowrap;
-	text-overflow: ellipsis;
 }
 .poster h4, .poster h4 a, .poster li:hover h4 a, .poster h4 a:hover .poster li.sfhover h4 a, .poster h4 a:focus {
 	margin: 0 0 0 0;
@@ -2256,7 +2254,6 @@ div#pollmoderation {
 }
 .avatar img {
 	border: 0;
-	width: 70px;
 }
 
 /* End nifty new flyout. */

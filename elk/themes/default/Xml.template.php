@@ -340,6 +340,7 @@ function template_generic_xml_buttons()
 	{
 		echo '
 		<button>';
+		log_error($button, 'user');
 		foreach ($button as $key => $val)
 			echo '
 			<', $key, '><![CDATA[', cleanXml($val), ']]></', $key, '>';
