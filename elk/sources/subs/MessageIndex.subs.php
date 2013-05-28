@@ -19,7 +19,6 @@ function messageIndexTopics($id_board, $id_member, $start, $per_page, $sort_by, 
 	$db = database();
 
 	$topics = array();
-
 	$topic_ids = array();
 
 	// Extra-query for the pages after the first

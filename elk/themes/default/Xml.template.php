@@ -336,7 +336,6 @@ function template_generic_xml_buttons()
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
 <elk>
 	<buttons>';
-	// log_error($context['xml_data'], 'user');
 	foreach ($context['xml_data'] as $button)
 	{
 		echo '
