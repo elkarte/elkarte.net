@@ -990,8 +990,7 @@ class ManageMembers_Controller
 		loadLanguage('Login');
 
 		// Sort out where we are going...
-		// @todo is this way for lazyness and a bit of readability, feel free to change it if you don't like it
-		$current_filter = $conditions['activated_status'] = (int) $_REQUEST['orig_filter'];
+		$current_filter = (int) $_REQUEST['orig_filter'];
 
 		// If we are applying a filter do just that - then redirect.
 		if (isset($_REQUEST['filter']) && $_REQUEST['filter'] != $_REQUEST['orig_filter'])
@@ -1004,28 +1003,32 @@ class ManageMembers_Controller
 		// Are we dealing with members who have been waiting for > set amount of time?
 		if (isset($_POST['time_passed']))
 		{
-			$conditions['time_before'] = time() - 86400 * (int) $_POST['time_passed'];
+			$timeBefore = time() - 86400 * (int) $_POST['time_passed'];
+			$condition = '
+				AND date_registered < {int:time_before}';
 		}
 		// Coming from checkboxes - validate the members passed through to us.
 		else
 		{
-			$conditions['members'] = array();
+			$members = array();
 			foreach ($_POST['todoAction'] as $id)
-				$conditions['members'][] = (int) $id;
+				$members[] = (int) $id;
+			$condition = '
+				AND id_member IN ({array_int:members})';
 		}
 
-		$data = retrieveMemberData($conditions);
+		$data = retrieveMemberData($condition, $current_filter, $timeBefore, $members);
 		if($data['member_count'] == 0)
 			redirectexit('action=admin;area=viewmembers;sa=browse;type=' . $_REQUEST['type'] . ';sort=' . $_REQUEST['sort'] . ';filter=' . $current_filter . ';start=' . $_REQUEST['start']);
 
 		$member_info = $data['member_info'];
-		$conditions['members'] = $data['members'];
+		$members = $data['members'];
 
 		// Are we activating or approving the members?
 		if ($_POST['todo'] == 'ok' || $_POST['todo'] == 'okemail')
 		{
 			// Approve / activate this member.
-			approveMembers($conditions);
+			approveMembers($members, $condition, $timeBefore, $current_filter);
 
 			// Do we have to let the integration code know about the activations?
 			if (!empty($modSettings['integrate_activate']))
@@ -1059,19 +1062,17 @@ class ManageMembers_Controller
 			// We have to do this for each member I'm afraid.
 			foreach ($member_info as $member)
 			{
-				$conditions['selected_member'] = $member['id'];
-
 				// Generate a random activation code.
-				$conditions['validation_code'] = generateValidationCode();
+				$validation_code = generateValidationCode();
 
 				// Set these members for activation - I know this includes two id_member checks but it's safer than bodging $condition ;).
-				enforceReactivation($conditions);
+				enforceReactivation($member, $condition, $current_filter, $members, $timeBefore, $validation_code);
 
 				$replacements = array(
 					'USERNAME' => $member['name'],
-					'ACTIVATIONLINK' => $scripturl . '?action=activate;u=' . $member['id'] . ';code=' . $conditions['validation_code'],
+					'ACTIVATIONLINK' => $scripturl . '?action=activate;u=' . $member['id'] . ';code=' . $validation_code,
 					'ACTIVATIONLINKWITHOUTCODE' => $scripturl . '?action=activate;u=' . $member['id'],
-					'ACTIVATIONCODE' => $conditions['validation_code'],
+					'ACTIVATIONCODE' => $validation_code,
 				);
 
 				$emaildata = loadEmailTemplate('admin_approve_activation', $replacements, $member['language']);
@@ -1082,7 +1083,7 @@ class ManageMembers_Controller
 		elseif ($_POST['todo'] == 'reject' || $_POST['todo'] == 'rejectemail')
 		{
 			require_once(SUBSDIR . '/Members.subs.php');
-			deleteMembers($conditions['members']);
+			deleteMembers($members);
 
 			// Send email telling them they aren't welcome?
 			if ($_POST['todo'] == 'rejectemail')
@@ -1102,7 +1103,7 @@ class ManageMembers_Controller
 		elseif ($_POST['todo'] == 'delete' || $_POST['todo'] == 'deleteemail')
 		{
 			require_once(SUBSDIR . '/Members.subs.php');
-			deleteMembers($conditions['members']);
+			deleteMembers($members);
 
 			// Send email telling them they aren't welcome?
 			if ($_POST['todo'] == 'deleteemail')
@@ -1153,7 +1154,7 @@ class ManageMembers_Controller
 
 		// If they haven't been deleted, update the post group statistics on them...
 		if (!in_array($_POST['todo'], array('delete', 'deleteemail', 'reject', 'rejectemail', 'remind')))
-			updateStats('postgroups', $conditions['members']);
+			updateStats('postgroups', $members);
 
 		redirectexit('action=admin;area=viewmembers;sa=browse;type=' . $_REQUEST['type'] . ';sort=' . $_REQUEST['sort'] . ';filter=' . $current_filter . ';start=' . $_REQUEST['start']);
 	}

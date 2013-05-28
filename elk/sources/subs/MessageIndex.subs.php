@@ -14,7 +14,11 @@ if (!defined('ELKARTE'))
 
 function messageIndexTopics($id_board, $id_member, $start, $per_page, $sort_by, $sort_column, $indexOptions)
 {
+	global $settings;
+
 	$db = database();
+
+	$topics = array();
 
 	$topic_ids = array();
 

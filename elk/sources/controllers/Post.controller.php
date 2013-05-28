@@ -86,6 +86,7 @@ class Post_Controller
 		}
 
 		// Check if it's locked. It isn't locked if no topic is specified.
+		$first_subject = '';
 		if (!empty($topic))
 		{
 			$request = $db->query('', '
@@ -289,6 +290,8 @@ class Post_Controller
 					fatal_lang_error('invalid_year', false);
 
 				// Get a list of boards they can post in.
+				require_once(SUBSDIR . '/Boards.subs.php');
+
 				$boards = boardsAllowedTo('post_new');
 				if (empty($boards))
 					fatal_lang_error('cannot_post_new', 'user');
@@ -317,7 +320,7 @@ class Post_Controller
 			if (empty($options['no_new_reply_warning']) && isset($_REQUEST['last_msg']) && $context['topic_last_message'] > $_REQUEST['last_msg'])
 			{
 				require_once(SUBSDIR . '/Topic.subs.php');
-				$context['new_replies'] = messagesSince($topic, (int) $_REQUEST['last_msg'], $modSettings['postmod_active'] && !allowedTo('approve_posts'));
+				$context['new_replies'] = countMessagesSince($topic, (int) $_REQUEST['last_msg'], false, $modSettings['postmod_active'] && !allowedTo('approve_posts'));
 
 				if (!empty($context['new_replies']))
 				{
