@@ -660,6 +660,9 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 		array()
 	);
 
+	// Are we doing something here?
+	$sent = 0;
+
 	// Using the posting email function in either group or list mode
 	if ($maillist)
 	{
@@ -689,7 +692,6 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 			)
 		);
 		$boards = array();
-		$sent = 0;
 		while ($row = $db->fetch_assoc($members))
 		{
 			// for this member/board, loop through the topics and see if we should send it
@@ -1354,7 +1356,7 @@ function modifyPost(&$msgOptions, &$topicOptions, &$posterOptions)
 		if (!empty($modSettings['search_custom_index_config']))
 		{
 			require_once(SUBSDIR . '/Messages.subs.php');
-			$message = getExistingMessage($msgOptions['id'], true);
+			$message = getMessageInfo($msgOptions['id'], true);
 			$msgOptions['old_body'] = $message['body'];
 			$db->free_result($request);
 		}
