@@ -212,15 +212,25 @@ function onDocSent(XMLDoc)
 
 	// Show a list of errors (if any).
 	var errors = XMLDoc.getElementsByTagName('smf')[0].getElementsByTagName('errors')[0];
-	var errorList = new Array();
+	var errorList = '';
+	var errorCode = '';
 
+	// @todo: this should stay together with the rest of the error handling or should use errorbox_handler (at the moment it cannot be used because is not enough generic)
 	for (var i = 0, numErrors = errors.getElementsByTagName('error').length; i < numErrors; i++)
-		errorList[errorList.length] = errors.getElementsByTagName('error')[i].firstChild.nodeValue;
+	{
+		errorCode = errors.getElementsByTagName('error')[i].attributes.getNamedItem("code").value;
+		errorList += '<li id="post_error_' + errorCode + '" class="error">' + errors.getElementsByTagName('error')[i].firstChild.nodeValue + '</li>';
+	}
 
-	document.getElementById('errors').style.display = numErrors == 0 ? 'none' : '';
-	document.getElementById('errors').className = errors.getAttribute('serious') == 1 ? 'errorbox' : 'noticebox';
-	document.getElementById('error_serious').style.display = numErrors == 0 ? 'none' : '';
-	setInnerHTML(document.getElementById('error_list'), numErrors == 0 ? '' : errorList.join('<br />'));
+	document.getElementById('post_error').style.display = numErrors == 0 ? 'none' : '';
+	document.getElementById('post_error').className = errors.getAttribute('serious') == 1 ? 'errorbox' : 'noticebox';
+
+	oError_box = $(document.getElementById('post_error'));
+	if ($.trim(oError_box.children("#post_error_list").html()) === '')
+		oError_box.append("<ul id='post_error_list'></ul>");
+
+	// Add the error it and show it
+	setInnerHTML(document.getElementById('post_error_list'), numErrors == 0 ? '' : errorList);
 
 	// Show a warning if the topic has been locked.
 	if (bPost)
@@ -274,7 +284,7 @@ function onDocSent(XMLDoc)
 				newPostsHTML += '<div class="windowbg' + (++reply_counter % 2 == 0 ? '2' : '') + ' core_posts"><div class="content" id="msg' + newPosts[i].getAttribute("id") + '"><div class="floatleft"><h5>' + txt_posted_by + ': ' + newPosts[i].getElementsByTagName("poster")[0].firstChild.nodeValue + '</h5><span class="smalltext">&#171;&nbsp;<strong>' + txt_on + ':</strong> ' + newPosts[i].getElementsByTagName("time")[0].firstChild.nodeValue + '&nbsp;&#187;</span> <span class="new_posts" id="image_new_' + newPosts[i].getAttribute("id") + '">' + txt_new + '</span></div>';
 
 				if (can_quote)
-					newPostsHTML += '<ul class="reset smalltext quickbuttons" id="msg_' + newPosts[i].getAttribute('id') + '_quote"><li><a href="#postmodify" onclick="return insertQuoteFast(' + newPosts[i].getAttribute('id') + ');" class="quote_button"><span>' + txt_bbc_quote + '</span></a></li></ul>';
+					newPostsHTML += '<ul class="smalltext quickbuttons" id="msg_' + newPosts[i].getAttribute('id') + '_quote"><li><a href="#postmodify" onclick="return insertQuoteFast(' + newPosts[i].getAttribute('id') + ');" class="quote_button"><span>' + txt_bbc_quote + '</span></a></li></ul>';
 
 				newPostsHTML += '<br class="clear" />';
 
@@ -328,9 +338,9 @@ function addPollOption()
 				pollTabIndex = document.forms[form_name].elements[i].tabIndex;
 			}
 	}
-	pollOptionNum++
-	pollOptionId++
-	pollTabIndex++
+	pollOptionNum++;
+	pollOptionId++;
+	pollTabIndex++;
 	setOuterHTML(document.getElementById('pollMoreOptions'), '<li><label for="options-' + pollOptionId + '">' + txt_option + ' ' + pollOptionNum + '</label>: <input type="text" name="options[' + pollOptionId + ']" id="options-' + pollOptionId + '" value="" size="80" maxlength="255" tabindex="' + pollTabIndex + '" class="input_text" /></li><li id="pollMoreOptions"></li>');
 }
 

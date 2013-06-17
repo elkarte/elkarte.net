@@ -21,11 +21,10 @@ if (!defined('ELKARTE'))
 /**
  * Profile history main function.
  * Re-directs to sub-actions (@todo it should only set the context)
- *
  */
 function action_history()
 {
-	global $context, $txt, $scripturl, $modSettings, $user_profile;
+	global $context, $txt, $modSettings, $user_profile;
 
 	$memID = currentMemberID();
 
@@ -72,8 +71,7 @@ function action_history()
  */
 function action_trackactivity($memID)
 {
-	global $scripturl, $txt, $modSettings;
-	global $user_profile, $context;
+	global $scripturl, $txt, $modSettings, $user_profile, $context;
 
 	$db = database();
 
@@ -81,8 +79,10 @@ function action_trackactivity($memID)
 	isAllowedTo('moderate_forum');
 
 	$context['last_ip'] = $user_profile[$memID]['member_ip'];
+
 	if ($context['last_ip'] != $user_profile[$memID]['member_ip2'])
 		$context['last_ip2'] = $user_profile[$memID]['member_ip2'];
+
 	$context['member']['name'] = $user_profile[$memID]['real_name'];
 
 	// Set the options for the list component.
@@ -233,8 +233,9 @@ function action_trackactivity($memID)
 	$db->free_result($request);
 
 	// Find other users that might use the same IP.
-	$ips = array_unique($ips);
 	$context['members_in_range'] = array();
+
+	$ips = array_unique($ips);
 	if (!empty($ips))
 	{
 		// Get member ID's which are in messages...
@@ -259,6 +260,7 @@ function action_trackactivity($memID)
 		if (!empty($message_members))
 		{
 			require_once(SUBSDIR . '/Members.subs.php');
+
 			// Get the latest activated member's display name.
 			$result = getBasicMemberData($message_members);
 			foreach ($result as $row)
@@ -388,7 +390,7 @@ function list_getIPMessageCount($where, $where_vars = array())
  */
 function list_getIPMessages($start, $items_per_page, $sort, $where, $where_vars = array())
 {
-	global $txt, $scripturl;
+	global $scripturl;
 
 	$db = database();
 
@@ -436,8 +438,7 @@ function list_getIPMessages($start, $items_per_page, $sort, $where, $where_vars 
  */
 function action_trackip($memID = 0)
 {
-	global $user_profile, $scripturl, $txt, $user_info, $modSettings;
-	global $context;
+	global $user_profile, $scripturl, $txt, $user_info, $modSettings, $context;
 
 	$db = database();
 
@@ -725,10 +726,7 @@ function action_trackip($memID = 0)
  */
 function action_tracklogin($memID = 0)
 {
-	global $user_profile, $scripturl, $txt, $user_info, $modSettings;
-	global $context;
-
-	$db = database();
+	global $scripturl, $txt, $context;
 
 	// Gonna want this for the list.
 	require_once(SUBSDIR . '/List.subs.php');
@@ -814,7 +812,7 @@ function list_getLoginCount($where, $where_vars = array())
 	$request = $db->query('', '
 		SELECT COUNT(*) AS message_count
 		FROM {db_prefix}member_logins
-		WHERE id_member = {int:id_member}',
+		WHERE ' . $where,
 		array(
 			'id_member' => $where_vars['current_member'],
 		)
@@ -837,14 +835,12 @@ function list_getLoginCount($where, $where_vars = array())
  */
 function list_getLogins($start, $items_per_page, $sort, $where, $where_vars = array())
 {
-	global $txt, $scripturl;
-
 	$db = database();
 
 	$request = $db->query('', '
 		SELECT time, ip, ip2
 		FROM {db_prefix}member_logins
-		WHERE {int:id_member}
+		WHERE ' . $where .'
 		ORDER BY time DESC',
 		array(
 			'id_member' => $where_vars['current_member'],

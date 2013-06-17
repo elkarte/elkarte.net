@@ -27,8 +27,8 @@ function template_report_sent_above()
 
 function template_main()
 {
-	global $context, $settings, $options, $txt, $scripturl, $modSettings;
-		// Yeah, I know, though at the moment is the only way...
+	global $context, $settings, $options, $txt, $scripturl;
+	// Yeah, I know, though at the moment is the only way...
 	global $removableMessageIDs, $ignoredMsgs;
 
 	// Show the topic information - icon, subject, etc.
@@ -89,8 +89,8 @@ function template_main()
 		// Showing the sidebar posting area?
 		if (empty($options['hide_poster_area']))
 			echo '
-							<div class="poster">', template_build_poster_div($message, $ignoring), '</div>
-							<div class="postarea">';
+						<div class="poster">', template_build_poster_div($message, $ignoring), '</div>
+						<div class="postarea">';
 
 		echo '
 							<div class="keyinfo">
@@ -217,6 +217,15 @@ function template_main()
 						echo '
 										<li><a href="' . $scripturl . '?action=reporttm;topic=' . $context['current_topic'] . '.' . $message['counter'] . ';msg=' . $message['id'] . '" class="warn_button">' . $txt['report_to_mod'] . '</a></li>';
 
+			// Can they like this post
+			if ($message['can_like'])
+						echo '
+										<li><a href="', $scripturl, '?action=likes;sa=likepost;topic=', $context['current_topic'], 'msg=' . $message['id'], ';msg=', $message['id'], ';', $context['session_var'], '=', $context['session_id'], '" class="like_button">', $txt['like_post'], '</a></li>';
+			// Or remove the like they made
+			elseif ($message['can_unlike'])
+						echo '
+										<li><a href="', $scripturl, '?action=likes;sa=unlikepost;topic=', $context['current_topic'], 'msg=' . $message['id'], ';msg=', $message['id'], ';', $context['session_var'], '=', $context['session_id'], '" class="unlike_button">', $txt['unlike_post'], '</a></li>';
+
 			echo '
 									</ul>';
 		}
@@ -245,6 +254,11 @@ function template_main()
 									</ul>
 								</li>';
 
+		// Has anyone liked this post?
+		if (!empty($message['like_counter']))
+			echo '
+										<li class="quick_edit"><img src="', $settings['images_url'], '/icons/heart.png" alt="', $txt['likes'], '" title="', $txt['liked_by'], ' ', implode(', ', $context['likes'][$message['id']]['member']), '" class="likes">', $message['like_counter'], ' ', $txt['likes'], '</li>';
+
 		echo '
 							</ul>
 						</div>';
@@ -266,7 +280,7 @@ function template_main()
 					$shown = true;
 					echo '
 							<div class="custom_fields_above_signature">
-								<ul class="reset nolist">';
+								<ul class="nolist">';
 				}
 
 				echo '
@@ -401,6 +415,12 @@ function template_quickreply_below()
 		echo '
 		<br class="clear" />';
 
+	// tooltips for likes
+	echo '
+		<script><!-- // --><![CDATA[
+			$(".likes").SiteTooltip({hoverIntent: {sensitivity: 10, interval: 150, timeout: 50}});
+		// ]]></script>';
+
 	// draft autosave available and the user has it enabled?
 	if (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']) && !empty($options['display_quick_reply']))
 		echo '
@@ -409,8 +429,6 @@ function template_quickreply_below()
 					sSelf: \'oDraftAutoSave\',
 					sLastNote: \'draft_lastautosave\',
 					sLastID: \'id_draft\',
-					sSceditorID: ' . (!empty($context['post_box_name']) ? "'" . $context['post_box_name'] . "'" : "null") . ',
-					sType: \'', (!empty($options['use_editor_quick_reply']) ? 'qpost' : 'quick'), '\',
 					iBoard: ', (empty($context['current_board']) ? 0 : $context['current_board']), ',
 					iFreq: ', isset($context['drafts_autosave_frequency']) ? $context['drafts_autosave_frequency'] : 30000, ',
 				});
@@ -847,7 +865,7 @@ function template_display_poll_above()
 							<p class="smallpadding">', $context['poll']['allowed_warning'], '</p>';
 
 		echo '
-							<ul class="reset options">';
+							<ul class="options">';
 
 		// Show each option with its button - a radio likely.
 		foreach ($context['poll']['options'] as $option)
@@ -893,7 +911,7 @@ function template_display_calendar_above()
 				</div>
 				<div class="windowbg">
 					<div class="content">
-						<ul class="reset">';
+						<ul>';
 
 	foreach ($context['linked_calendar_events'] as $event)
 		echo '
@@ -917,14 +935,7 @@ function template_pages_and_buttons_above()
 			<a id="msg', $context['first_message'], '"></a>', $context['first_new_message'] ? '<a name="new" id="new"></a>' : '';
 
 	// Show the page index... "Pages: [1]".
-	echo '
-			<div class="pagesection">
-				', template_button_strip($context['normal_buttons'], 'right'), '
-				', !empty($modSettings['topbottomEnable']) ? $context['menu_separator'] . '<a id="pagetop" href="#bot" class="topbottom floatleft">' . $txt['go_down'] . '</a>' : '', '
-				<div class="pagelinks floatleft">
-					', $context['page_index'], '
-				</div>
-			</div>';
+	template_pagesection('normal_buttons', 'right', 'go_down');
 }
 
 function template_pages_and_buttons_below()
@@ -933,14 +944,7 @@ function template_pages_and_buttons_below()
 
 
 	// Show the page index... "Pages: [1]".
-	echo '
-			<div class="pagesection">
-				', template_button_strip($context['normal_buttons'], 'right'), '
-				', !empty($modSettings['topbottomEnable']) ? $context['menu_separator'] . '<a id="pagebot" href="#top" class="topbottom floatleft">' . $txt['go_up'] . '</a>' : '', '
-				<div class="pagelinks floatleft">
-					', $context['page_index'], '
-				</div>
-			</div>';
+	template_pagesection('normal_buttons', 'right');
 
 	// Show the lower breadcrumbs.
 	theme_linktree();

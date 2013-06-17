@@ -32,7 +32,7 @@ class Calendar_Controller
 	 * It goes to the month and year passed in 'month' and 'year' by get or post.
 	 * It is accessed through ?action=calendar.
 	 */
-	function action_calendar()
+	public function action_calendar()
 	{
 		global $txt, $context, $modSettings, $scripturl, $options;
 
@@ -79,8 +79,10 @@ class Calendar_Controller
 		// Make sure the year and month are in valid ranges.
 		if ($curPage['month'] < 1 || $curPage['month'] > 12)
 			fatal_lang_error('invalid_month', false);
+
 		if ($curPage['year'] < $modSettings['cal_minyear'] || $curPage['year'] > $modSettings['cal_maxyear'])
 			fatal_lang_error('invalid_year', false);
+
 		// If we have a day clean that too.
 		if ($context['view_week'])
 		{
@@ -116,9 +118,11 @@ class Calendar_Controller
 		$calendarOptions['show_week_links'] = false;
 		$calendarOptions['size'] = 'small';
 		$context['calendar_grid_current'] = getCalendarGrid($curPage['month'], $curPage['year'], $calendarOptions);
+
 		// Only show previous month if it isn't pre-January of the min-year
 		if ($context['calendar_grid_current']['previous_calendar']['year'] > $modSettings['cal_minyear'] || $curPage['month'] != 1)
 			$context['calendar_grid_prev'] = getCalendarGrid($context['calendar_grid_current']['previous_calendar']['month'], $context['calendar_grid_current']['previous_calendar']['year'], $calendarOptions);
+
 		// Only show next month if it isn't post-December of the max-year
 		if ($context['calendar_grid_current']['next_calendar']['year'] < $modSettings['cal_maxyear'] || $curPage['month'] != 12)
 			$context['calendar_grid_next'] = getCalendarGrid($context['calendar_grid_current']['next_calendar']['month'], $context['calendar_grid_current']['next_calendar']['year'], $calendarOptions);
@@ -138,11 +142,13 @@ class Calendar_Controller
 			'url' => $scripturl . '?action=calendar',
 			'name' => $txt['calendar']
 		);
+
 		// Add the current month to the linktree.
 		$context['linktree'][] = array(
 			'url' => $scripturl . '?action=calendar;year=' . $context['current_year'] . ';month=' . $context['current_month'],
 			'name' => $txt['months'][$context['current_month']] . ' ' . $context['current_year']
 		);
+
 		// If applicable, add the current week to the linktree.
 		if ($context['view_week'])
 			$context['linktree'][] = array(
@@ -169,12 +175,10 @@ class Calendar_Controller
 	 * It uses the event_post sub template in the Calendar template.
 	 * It is accessed with ?action=calendar;sa=post.
 	 */
-	function action_event_post()
+	public function action_event_post()
 	{
 		global $context, $txt, $user_info, $scripturl;
 		global $modSettings, $topic;
-
-		$db = database();
 
 		// Well - can they?
 		isAllowedTo('calendar_post');
@@ -220,35 +224,22 @@ class Calendar_Controller
 				);
 				insertEvent($eventOptions);
 			}
-
 			// Deleting...
 			elseif (isset($_REQUEST['deleteevent']))
 				removeEvent($_REQUEST['eventid']);
-
 			// ... or just update it?
 			else
 			{
 				// There could be already a topic you are not allowed to modify
 				if (!allowedTo('post_new') && empty($modSettings['disableNoPostingCalendarEdits']))
-				{
-					$request = $db->query('', '
-						SELECT id_board, id_topic
-						FROM {db_prefix}calendar
-						WHERE id_event = {int:id_event}
-						LIMIT 1',
-						array(
-							'id_event' => $_REQUEST['eventid'],
-					));
-					list ($id_board, $id_topic) = $db->fetch_row($request);
-					$db->free_result($request);
-				}
+					$eventProperties = getEventProperties($_REQUEST['eventid'], true);
 
 				$eventOptions = array(
 					'title' => Util::substr($_REQUEST['evtitle'], 0, 100),
 					'span' => empty($modSettings['cal_allowspan']) || empty($_POST['span']) || $_POST['span'] == 1 || empty($modSettings['cal_maxspan']) || $_POST['span'] > $modSettings['cal_maxspan'] ? 0 : min((int) $modSettings['cal_maxspan'], (int) $_POST['span'] - 1),
 					'start_date' => strftime('%Y-%m-%d', mktime(0, 0, 0, (int) $_REQUEST['month'], (int) $_REQUEST['day'], (int) $_REQUEST['year'])),
-					'board' => isset($id_board) ? (int) $id_board : 0,
-					'topic' => isset($id_topic) ? (int) $id_topic : 0,
+					'board' => isset($eventProperties['id_board']) ? (int) $eventProperties['id_board'] : 0,
+					'topic' => isset($eventProperties['id_topic']) ? (int) $eventProperties['id_topic'] : 0,
 				);
 
 				modifyEvent($_REQUEST['eventid'], $eventOptions);
@@ -343,9 +334,9 @@ class Calendar_Controller
 	 *
 	 * @todo .... allow for week or month export files as well?
 	 */
-	function action_ical()
+	public function action_ical()
 	{
-		global $forum_version, $context, $modSettings, $webmaster_email, $mbname;
+		global $forum_version, $modSettings, $webmaster_email, $mbname;
 
 		// You can't export if the calendar export feature is off.
 		if (empty($modSettings['cal_export']))

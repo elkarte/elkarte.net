@@ -16,7 +16,7 @@
 
 function template_main()
 {
-	global $context, $settings, $options, $txt, $scripturl, $modSettings;
+	global $context, $settings, $txt, $scripturl;
 
 	echo '
 	<div id="boardindex_table" class="boardindex_table">
@@ -142,7 +142,7 @@ function template_main()
 				echo '
 					<tr id="board_', $board['id'], '_children" class="windowbg2">
 						<td colspan="3" class="windowbg children">
-							<p><strong>', $txt['parent_boards'], '</strong>: ', implode(', ', $children), '</p>
+							<p><strong>', $txt['parent_boards'], '</strong>: ', implode(' - ', $children), '</p>
 						</td>
 					</tr>';
 				}
@@ -238,7 +238,7 @@ function template_info_center()
 			// latest_post has link, href, time, subject, short_subject (shortened with...), and topic. (its id.)
 			echo '
 				<p id="infocenter_onepost" class="inline">
-					<a href="', $scripturl, '?action=recent">', $txt['recent_view'], '</a>&nbsp;&quot;', sprintf($txt['is_recent_updated'], '&quot;' . $context['latest_post']['link'], '&quot;'), ' (', $context['latest_post']['time'], ')<br />
+					<a href="', $scripturl, '?action=recent">', $txt['recent_view'], '</a>&nbsp;&quot;', sprintf($txt['is_recent_updated'], '&quot;' . $context['latest_post']['link'], '&quot;'), ' (<time datetime="', htmlTime($context['latest_post']['timestamp']), '">', $context['latest_post']['time'], '</time>)<br />
 				</p>';
 		}
 		// Show lots of posts.
@@ -262,7 +262,7 @@ function template_info_center()
 						<td class="recentpost"><strong>', $post['link'], '</strong></td>
 						<td class="recentposter">', $post['poster']['link'], '</td>
 						<td class="recentboard">', $post['board']['link'], '</td>
-						<td class="recenttime">', $post['time'], '</td>
+						<td class="recenttime"><time datetime="', htmlTime($post['time']), '">', $post['time'], '</time></td>
 					</tr>';
 			echo '
 				</table>';
@@ -358,7 +358,7 @@ function template_info_center()
 	echo $context['show_who'] ? '</a>' : '', '
 
 				&nbsp;-&nbsp;', $txt['most_online_today'], ': <strong>', comma_format($modSettings['mostOnlineToday']), '</strong>&nbsp;-&nbsp;
-				', $txt['most_online_ever'], ': ', comma_format($modSettings['mostOnline']), ' (', relativeTime($modSettings['mostDate']), ')<br />';
+				', $txt['most_online_ever'], ': ', comma_format($modSettings['mostOnline']), ' (<time datetime="', htmlTime($modSettings['mostDate']), '">', relativeTime($modSettings['mostDate']), '</time>)<br />';
 
 	// Assuming there ARE users online... each user in users_online has an id, username, name, group, href, and link.
 	if (!empty($context['users_online']))
@@ -384,7 +384,7 @@ function template_info_center()
 					', $context['allow_pm'] ? '<a href="' . $scripturl . '?action=pm">' : '', '<img class="icon" src="', $settings['images_url'], '/message_sm.png" alt="" />', $txt['personal_message'], '', $context['allow_pm'] ? '</a>' : '', '
 				</h4>
 			</div>
-			<p class="pminfo">
+			<p class="inline">
 					', empty($context['user']['messages']) ? $txt['you_have_no_msg'] : ($context['user']['messages'] == 1 ? sprintf($txt['you_have_one_msg'], $scripturl . '?action=pm') : sprintf($txt['you_have_many_msgs'], $scripturl . '?action=pm', $context['user']['messages'])), '
 			</p>';
 	}
@@ -448,7 +448,7 @@ function template_news_fader()
 				', $txt['news'], '
 			</h3>
 		</div>
-		<ul class="reset" id="smfFadeScroller"', empty($options['collapse_news_fader']) ? '' : ' style="display: none;"', '>
+		<ul id="smfFadeScroller"', empty($options['collapse_news_fader']) ? '' : ' style="display: none;"', '>
 			<li>
 				', implode('</li><li>', $context['news_lines']), '
 			</li>

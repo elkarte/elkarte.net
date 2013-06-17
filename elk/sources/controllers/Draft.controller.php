@@ -18,7 +18,9 @@ if (!defined('ELKARTE'))
 loadLanguage('Drafts');
 require_once(SUBSDIR . '/Drafts.subs.php');
 
-
+/**
+ * Draft controller.
+ */
 class Draft_Controller
 {
 	/**
@@ -33,7 +35,7 @@ class Draft_Controller
 	 * @param int $draft_type
 	 * @return boolean
 	 */
-	function action_showDrafts($member_id, $topic = false, $draft_type = 0)
+	public function action_showDrafts($member_id, $topic = false, $draft_type = 0)
 	{
 		global $scripturl, $context, $txt, $modSettings;
 
@@ -58,14 +60,14 @@ class Draft_Controller
 			// Post drafts
 			if ($draft_type === 0)
 				$context['drafts'][] = array(
-					'subject' => empty($draft['subject']) ? $txt['drafts_none'] : censorText(shorten_subject(stripslashes($draft['subject']), 24)),
+					'subject' => empty($draft['subject']) ? $txt['drafts_none'] : censorText(shorten_text(stripslashes($draft['subject']), !empty($modSettings['draft_subject_length']) ? $modSettings['draft_subject_length'] : 24)),
 				'poster_time' => relativeTime($draft['poster_time']),
 					'link' => '<a href="' . $scripturl . '?action=post;board=' . $draft['id_board'] . ';' . (!empty($draft['id_topic']) ? 'topic='. $draft['id_topic'] .'.0;' : '') . 'id_draft=' . $draft['id_draft'] . '">' . (!empty($draft['subject']) ? $draft['subject'] : $txt['drafts_none']) . '</a>',
 				);
 			// PM drafts
 			elseif ($draft_type === 1)
 				$context['drafts'][] = array(
-					'subject' => empty($draft['subject']) ? $txt['drafts_none'] : censorText(shorten_subject(stripslashes($draft['subject']), 24)),
+					'subject' => empty($draft['subject']) ? $txt['drafts_none'] : censorText(shorten_text(stripslashes($draft['subject']), !empty($modSettings['draft_subject_length']) ? $modSettings['draft_subject_length'] : 24)),
 				'poster_time' => relativeTime($draft['poster_time']),
 					'link' => '<a href="' . $scripturl . '?action=pm;sa=send;id_draft=' . $draft['id_draft'] . '">' . (!empty($draft['subject']) ? $draft['subject'] : $txt['drafts_none']) . '</a>',
 				);
@@ -79,7 +81,7 @@ class Draft_Controller
 	 *
 	 * @param int $draft_type = 0
 	 */
-	function action_showProfileDrafts($draft_type = 0)
+	public function action_showProfileDrafts($draft_type = 0)
 	{
 		global $txt, $scripturl, $modSettings, $context;
 
@@ -188,13 +190,14 @@ class Draft_Controller
 	 * Show all PM drafts of the current user
 	 * Uses the showpmdraft template
 	 * Allows for the deleting and loading/editing of PM drafts
-	 *
 	 */
-	function action_showPMDrafts()
+	public function action_showPMDrafts()
 	{
 		global $txt, $user_info, $scripturl, $modSettings, $context;
 
+		require_once(SUBSDIR . '/Profile.subs.php');
 		$memID = currentMemberID(false);
+
 		// @todo: is necessary? Added because the default was -1
 		if (empty($memID))
 			$memID = -1;

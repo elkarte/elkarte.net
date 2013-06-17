@@ -22,6 +22,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Post Controller
+ */
 class Post_Controller
 {
 	/**
@@ -39,8 +42,7 @@ class Post_Controller
 	function action_post()
 	{
 		global $txt, $scripturl, $topic, $modSettings, $board;
-		global $user_info, $context, $settings;
-		global $options, $language;
+		global $user_info, $context, $options, $language;
 
 		$db = database();
 
@@ -52,18 +54,20 @@ class Post_Controller
 
 		$post_errors = error_context::context('post', 1);
 		$attach_errors = error_context::context('attachment', 1);
+		$first_subject = '';
 
 		// Posting an event?
 		$context['make_event'] = isset($_REQUEST['calendar']);
 		$context['robot_no_index'] = true;
-		Template_Layers::getInstance()->add('postarea');
+		$template_layers = Template_Layers::getInstance();
+		$template_layers->add('postarea');
 
 		// You must be posting to *some* board.
 		if (empty($board) && !$context['make_event'])
 			fatal_lang_error('no_board', false);
 
 		if ($context['make_event'])
-			Template_Layers::getInstance()->add('make_event');
+			$template_layers->add('make_event');
 
 		require_once(SUBSDIR . '/Post.subs.php');
 		require_once(SUBSDIR . '/Messages.subs.php');
@@ -86,7 +90,6 @@ class Post_Controller
 		}
 
 		// Check if it's locked. It isn't locked if no topic is specified.
-		$first_subject = '';
 		if (!empty($topic))
 		{
 			$request = $db->query('', '
@@ -173,6 +176,7 @@ class Post_Controller
 		$context['can_move'] = allowedTo('move_any');
 		$context['move'] = !empty($_REQUEST['move']);
 		$context['announce'] = !empty($_REQUEST['announce']);
+
 		// You can only announce topics that will get approved...
 		$context['can_announce'] = allowedTo('announce_topic') && $context['becomes_approved'];
 		$context['locked'] = !empty($locked) || !empty($_REQUEST['lock']);
@@ -187,6 +191,7 @@ class Post_Controller
 		// Don't allow a post if it's locked and you aren't all powerful.
 		if ($locked && !allowedTo('moderate_board'))
 			fatal_lang_error('topic_locked', false);
+
 		// Check the users permissions - is the user allowed to add or post a poll?
 		if (isset($_REQUEST['poll']) && $modSettings['pollMode'] == '1')
 		{
@@ -234,7 +239,6 @@ class Post_Controller
 			// Start loading up the event info.
 			$context['event'] = array();
 			$context['event']['title'] = isset($_REQUEST['evtitle']) ? htmlspecialchars(stripslashes($_REQUEST['evtitle'])) : '';
-
 			$context['event']['id'] = isset($_REQUEST['eventid']) ? (int) $_REQUEST['eventid'] : -1;
 			$context['event']['new'] = $context['event']['id'] == -1;
 
@@ -275,6 +279,7 @@ class Post_Controller
 				// You must have a month and year specified!
 				if (!isset($_REQUEST['month']))
 					$_REQUEST['month'] = $today['mon'];
+
 				if (!isset($_REQUEST['year']))
 					$_REQUEST['year'] = $today['year'];
 
@@ -286,6 +291,7 @@ class Post_Controller
 				// Make sure the year and month are in the valid range.
 				if ($context['event']['month'] < 1 || $context['event']['month'] > 12)
 					fatal_lang_error('invalid_month', false);
+
 				if ($context['event']['year'] < $modSettings['cal_minyear'] || $context['event']['year'] > $modSettings['cal_maxyear'])
 					fatal_lang_error('invalid_year', false);
 
@@ -364,8 +370,10 @@ class Post_Controller
 			{
 				if (!isset($_REQUEST['subject']))
 					$_REQUEST['subject'] = '';
+
 				if (!isset($_REQUEST['message']))
 					$_REQUEST['message'] = '';
+
 				if (!isset($_REQUEST['icon']))
 					$_REQUEST['icon'] = 'xx';
 
@@ -431,15 +439,9 @@ class Post_Controller
 			// Are you... a guest?
 			if ($user_info['is_guest'])
 			{
-				$_REQUEST['guestname'] = !isset($_REQUEST['guestname']) ? '' : trim($_REQUEST['guestname']);
-				$_REQUEST['email'] = !isset($_REQUEST['email']) ? '' : trim($_REQUEST['email']);
-
-				$_REQUEST['guestname'] = htmlspecialchars($_REQUEST['guestname']);
-				$context['name'] = $_REQUEST['guestname'];
-				$_REQUEST['email'] = htmlspecialchars($_REQUEST['email']);
-				$context['email'] = $_REQUEST['email'];
-
-				$user_info['name'] = $_REQUEST['guestname'];
+				$context['name'] = !isset($_REQUEST['guestname']) ? '' : Util::htmlspecialchars(trim($_REQUEST['guestname']));
+				$context['email'] = !isset($_REQUEST['email']) ? '' : Util::htmlspecialchars(trim($_REQUEST['email']));
+				$user_info['name'] = $context['name'];
 			}
 
 			// Only show the preview stuff if they hit Preview.
@@ -485,14 +487,14 @@ class Post_Controller
 			$context['destination'] = 'post2;start=' . $_REQUEST['start'] . (isset($_REQUEST['msg']) ? ';msg=' . $_REQUEST['msg'] . ';' . $context['session_var'] . '=' . $context['session_id'] : '') . (isset($_REQUEST['poll']) ? ';poll' : '');
 			$context['submit_label'] = isset($_REQUEST['msg']) ? $txt['save'] : $txt['post'];
 
-			list($form_subject, $form_message) = getFormMsgSubject(false, $topic, $first_subject);
-
 			// Previewing an edit?
 			if (isset($_REQUEST['msg']) && !empty($topic))
 			{
 				require_once(SUBSDIR . '/Messages.subs.php');
+
 				// Get the existing message.
-				$message = getExistingMessage((int) $_REQUEST['msg'], $topic);
+				$message = messageDetails((int) $_REQUEST['msg'], $topic);
+
 				// The message they were trying to edit was most likely deleted.
 				// @todo Change this error message?
 				if ($message === false)
@@ -695,6 +697,7 @@ class Post_Controller
 
 					$context['attachments']['quantity']++;
 					$context['attachments']['total_size'] += $attachment['size'];
+
 					if (!isset($context['files_in_session_warning']))
 						$context['files_in_session_warning'] = $txt['attached_files_in_session'];
 
@@ -757,10 +760,12 @@ class Post_Controller
 		{
 			require_once(SUBSDIR . '/Topic.subs.php');
 			$only_approved = $modSettings['postmod_active'] && !allowedTo('approve_posts');
+
 			if (isset($_REQUEST['xml']))
 				$limit = empty($context['new_replies']) ? 0 : (int) $context['new_replies'];
 			else
 				$limit = empty($modSettings['topicSummaryPosts']) ? 0 : (int) $modSettings['topicSummaryPosts'];
+
 			$before = isset($_REQUEST['msg']) ? array('before' => (int) $_REQUEST['msg']) : array();
 
 			$counter = 0;
@@ -782,16 +787,20 @@ class Post_Controller
 
 		// Build the link tree.
 		if (empty($topic))
+		{
 			$context['linktree'][] = array(
 				'name' => '<em>' . $txt['start_new_topic'] . '</em>'
 			);
+		}
 		else
+		{
 			$context['linktree'][] = array(
 				'url' => $scripturl . '?topic=' . $topic . '.' . $_REQUEST['start'],
 				'name' => $form_subject,
 				'extra_before' => '<span><strong class="nav">' . $context['page_title'] . ' ( </strong></span>',
 				'extra_after' => '<span><strong class="nav"> )</strong></span>'
 			);
+		}
 
 		$context['subject'] = addcslashes($form_subject, '"');
 		$context['message'] = str_replace(array('"', '<', '>', '&nbsp;'), array('&quot;', '&lt;', '&gt;', ' '), $form_message);
@@ -806,8 +815,9 @@ class Post_Controller
 			require_once(CONTROLLERDIR . '/Draft.controller.php');
 			$controller = new Draft_Controller();
 			$controller->action_showDrafts($user_info['id'], $topic);
+
 			if (!empty($context['drafts']))
-				Template_Layers::getInstance()->add('load_drafts');
+				$template_layers->add('load_drafts');
 		}
 
 		// Needed for the editor and message icons.
@@ -835,10 +845,11 @@ class Post_Controller
 
 		$context['attached'] = '';
 		$context['make_poll'] = isset($_REQUEST['poll']);
+
 		if ($context['make_poll'])
 		{
 			loadTemplate('Poll');
-			Template_Layers::getInstance()->add('poll_edit');
+			$template_layers->add('poll_edit');
 		}
 
 		// Message icons - customized or not, retrieve them...
@@ -877,22 +888,25 @@ class Post_Controller
 			$context['can_post_attachment_unapproved'] = allowedTo('post_attachment');
 			$context['attachment_restrictions'] = array();
 			$context['allowed_extensions'] = strtr(strtolower($modSettings['attachmentExtensions']), array(',' => ', '));
+
 			$attachmentRestrictionTypes = array('attachmentNumPerPostLimit', 'attachmentPostLimit', 'attachmentSizeLimit');
 			foreach ($attachmentRestrictionTypes as $type)
+			{
 				if (!empty($modSettings[$type]))
 				{
 					$context['attachment_restrictions'][] = sprintf($txt['attach_restrict_' . $type], comma_format($modSettings[$type], 0));
+
 					// Show some numbers. If they exist.
 					if ($type == 'attachmentNumPerPostLimit' && $context['attachments']['quantity'] > 0)
 						$context['attachment_restrictions'][] = sprintf($txt['attach_remaining'], $modSettings['attachmentNumPerPostLimit'] - $context['attachments']['quantity']);
 					elseif ($type == 'attachmentPostLimit' && $context['attachments']['total_size'] > 0)
 						$context['attachment_restrictions'][] = sprintf($txt['attach_available'], comma_format(round(max($modSettings['attachmentPostLimit'] - ($context['attachments']['total_size'] / 1028), 0)), 0));
 				}
+			}
 		}
 
 		$context['back_to_topic'] = isset($_REQUEST['goback']) || (isset($_REQUEST['msg']) && !isset($_REQUEST['subject']));
 		$context['show_additional_options'] = !empty($_POST['additional_options']) || isset($_SESSION['temp_attachments']['post']) || isset($_GET['additionalOptions']);
-
 		$context['is_new_topic'] = empty($topic);
 		$context['is_new_post'] = !isset($_REQUEST['msg']);
 		$context['is_first_post'] = $context['is_new_topic'] || (isset($_REQUEST['msg']) && $_REQUEST['msg'] == $id_first_msg);
@@ -918,10 +932,8 @@ class Post_Controller
 	 */
 	function action_post2()
 	{
-		global $board, $topic, $txt, $modSettings, $context;
+		global $board, $topic, $txt, $modSettings, $context, $user_settings;
 		global $user_info, $board_info, $options, $scripturl, $settings;
-
-		$db = database();
 
 		// Sneaking off, are we?
 		if (empty($_POST) && empty($topic))
@@ -980,12 +992,15 @@ class Post_Controller
 			$keep_temp = array();
 			$keep_ids = array();
 			foreach ($_POST['attach_del'] as $dummy)
+			{
 				if (strpos($dummy, 'post_tmp_' . $user_info['id']) !== false)
 					$keep_temp[] = $dummy;
 				else
 					$keep_ids[] = (int) $dummy;
+			}
 
 			if (isset($_SESSION['temp_attachments']))
+			{
 				foreach ($_SESSION['temp_attachments'] as $attachID => $attachment)
 				{
 					if ((isset($_SESSION['temp_attachments']['post']['files'], $attachment['name']) && in_array($attachment['name'], $_SESSION['temp_attachments']['post']['files'])) || in_array($attachID, $keep_temp) || strpos($attachID, 'post_tmp_' . $user_info['id']) === false)
@@ -994,6 +1009,7 @@ class Post_Controller
 					unset($_SESSION['temp_attachments'][$attachID]);
 					unlink($attachment['tmp_name']);
 				}
+			}
 
 			if (!empty($_REQUEST['msg']))
 			{
@@ -1147,7 +1163,7 @@ class Post_Controller
 			$_REQUEST['msg'] = (int) $_REQUEST['msg'];
 
 			require_once(SUBSDIR . '/Messages.subs.php');
-			$msgInfo = getMessageInfo($_REQUEST['msg'], true);
+			$msgInfo = basicMessageInfo($_REQUEST['msg'], true);
 
 			if (empty($msgInfo))
 				fatal_lang_error('cant_find_messages', false);
@@ -1238,11 +1254,12 @@ class Post_Controller
 		// If the poster is a guest evaluate the legality of name and email.
 		if ($posterIsGuest)
 		{
-			$_POST['guestname'] = !isset($_POST['guestname']) ? '' : trim($_POST['guestname']);
-			$_POST['email'] = !isset($_POST['email']) ? '' : trim($_POST['email']);
+			$_POST['guestname'] = !isset($_POST['guestname']) ? '' : Util::htmlspecialchars(trim($_POST['guestname']));
+			$_POST['email'] = !isset($_POST['email']) ? '' : Util::htmlspecialchars(trim($_POST['email']));
 
 			if ($_POST['guestname'] == '' || $_POST['guestname'] == '_')
 				$post_errors->addError('no_name');
+
 			if (Util::strlen($_POST['guestname']) > 25)
 				$post_errors->addError('long_name');
 
@@ -1253,6 +1270,7 @@ class Post_Controller
 				{
 					if (!allowedTo('moderate_forum') && (!isset($_POST['email']) || $_POST['email'] == ''))
 						$post_errors->addError('no_email');
+
 					if (!allowedTo('moderate_forum') && preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['email']) == 0)
 						$post_errors->addError('bad_email');
 				}
@@ -1272,6 +1290,7 @@ class Post_Controller
 		// Check the subject and message.
 		if (!isset($_POST['subject']) || Util::htmltrim(Util::htmlspecialchars($_POST['subject'])) === '')
 			$post_errors->addError('no_subject', 0);
+
 		if (!isset($_POST['message']) || Util::htmltrim(Util::htmlspecialchars($_POST['message']), ENT_QUOTES) === '')
 			$post_errors->addError('no_message');
 		elseif (!empty($modSettings['max_messageLength']) && Util::strlen($_POST['message']) > $modSettings['max_messageLength'])
@@ -1317,8 +1336,10 @@ class Post_Controller
 
 			// Get rid of empty ones.
 			foreach ($_POST['options'] as $k => $option)
+			{
 				if ($option == '')
 					unset($_POST['options'][$k], $_POST['options'][$k]);
+			}
 
 			// What are you going to vote between with one choice?!?
 			if (count($_POST['options']) < 2)
@@ -1348,6 +1369,7 @@ class Post_Controller
 			if (!allowedTo('post_new', $new_board))
 			{
 				$post_in_board = boardInfo($new_board);
+
 				if (!empty($post_in_board))
 					$post_errors->addError(array('post_new_board', array($post_in_board['name'])));
 				else
@@ -1400,14 +1422,16 @@ class Post_Controller
 				$_POST['poll_hide'] = 0;
 			else
 				$_POST['poll_hide'] = (int) $_POST['poll_hide'];
-			$_POST['poll_change_vote'] = isset($_POST['poll_change_vote']) ? 1 : 0;
 
+			$_POST['poll_change_vote'] = isset($_POST['poll_change_vote']) ? 1 : 0;
 			$_POST['poll_guest_vote'] = isset($_POST['poll_guest_vote']) ? 1 : 0;
+
 			// Make sure guests are actually allowed to vote generally.
 			if ($_POST['poll_guest_vote'])
 			{
 				require_once(SUBSDIR . '/Members.subs.php');
 				$allowedVoteGroups = groupsAllowedTo('poll_vote', $board);
+
 				if (!in_array(-1, $allowedVoteGroups['allowed']))
 					$_POST['poll_guest_vote'] = 0;
 			}
@@ -1529,6 +1553,7 @@ class Post_Controller
 			'attachments' => empty($attachIDs) ? array() : $attachIDs,
 			'approved' => $becomesApproved,
 		);
+
 		$topicOptions = array(
 			'id' => empty($topic) ? 0 : $topic,
 			'board' => $board,
@@ -1538,6 +1563,7 @@ class Post_Controller
 			'mark_as_read' => true,
 			'is_approved' => !$modSettings['postmod_active'] || empty($topic) || !empty($board_info['cur_topic_approved']),
 		);
+
 		$posterOptions = array(
 			'id' => $user_info['id'],
 			'name' => $_POST['guestname'],
@@ -1587,6 +1613,7 @@ class Post_Controller
 
 			require_once(SUBSDIR . '/FollowUps.subs.php');
 			require_once(SUBSDIR . '/Messages.subs.php');
+
 			// Time to update the original message with a pointer to the new one
 			if (!empty($original_post) && canAccessMessage($original_post))
 				linkMessages($original_post, $topic);
@@ -1672,7 +1699,7 @@ class Post_Controller
 
 		// Log an act of moderation - modifying.
 		if (!empty($moderationAction))
-			logAction('modify', array('topic' => $topic, 'message' => (int) $_REQUEST['msg'], 'member' => $row['id_member'], 'board' => $board));
+			logAction('modify', array('topic' => $topic, 'message' => (int) $_REQUEST['msg'], 'member' => $msgInfo['id_member'], 'board' => $board));
 
 		if (isset($_POST['lock']) && $_POST['lock'] != 2)
 			logAction(empty($_POST['lock']) ? 'unlock' : 'lock', array('topic' => $topicOptions['id'], 'board' => $topicOptions['board']));
@@ -1765,7 +1792,7 @@ class Post_Controller
 	 */
 	function action_quotefast()
 	{
-		global $modSettings, $user_info, $txt, $settings, $context;
+		global $modSettings, $user_info, $context;
 
 		$db = database();
 
@@ -1884,7 +1911,7 @@ class Post_Controller
 		require_once(SUBSDIR . '/Post.subs.php');
 
 		// Assume the first message if no message ID was given.
-		// @todo: candidate for messageInfo
+		// @todo: candidate for messageTopicDetails
 		$request = $db->query('', '
 			SELECT
 				t.locked, t.num_replies, t.id_member_started, t.id_first_msg,
@@ -2004,6 +2031,7 @@ class Post_Controller
 				'body' => isset($_POST['message']) ? $_POST['message'] : null,
 				'icon' => isset($_REQUEST['icon']) ? preg_replace('~[\./\\\\*\':"<>]~', '', $_REQUEST['icon']) : null,
 			);
+
 			$topicOptions = array(
 				'id' => $topic,
 				'board' => $board,
@@ -2011,6 +2039,7 @@ class Post_Controller
 				'sticky_mode' => isset($_POST['sticky']) && !empty($modSettings['enableStickyTopics']) ? (int) $_POST['sticky'] : null,
 				'mark_as_read' => true,
 			);
+
 			$posterOptions = array();
 
 			// Only consider marking as editing if they have edited the subject, message or icon.
@@ -2132,8 +2161,6 @@ class Post_Controller
 	function action_spellcheck()
 	{
 		global $txt, $context;
-
-		$db = database();
 
 		// A list of "words" we know about but pspell doesn't.
 		$known_words = array('elkarte', 'php', 'mysql', 'www', 'gif', 'jpeg', 'png', 'http', 'grandia', 'terranigma', 'rpgs');

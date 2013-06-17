@@ -94,7 +94,8 @@ class Site_Dispatcher
 			// home page: board index
 			if (empty($board) && empty($topic))
 			{
-				// @todo Unless we have a custom home page registered...
+				// Reminder: hooks need to account for multiple mods setting this hook.
+				call_integration_hook('integrate_frontpage', array(&$default_action));
 
 				// was it, wasn't it....
 				if (empty($this->_function_name))
@@ -182,7 +183,6 @@ class Site_Dispatcher
 			'removepoll' => array('Poll.controller.php', 'Poll_Controller', 'action_removepoll'),
 			'removetopic2' => array('RemoveTopic.controller.php', 'RemoveTopic_Controller', 'action_removetopic2'),
 			'reporttm' => array('Emailuser.controller.php', 'Emailuser_Controller', 'action_reporttm'),
-			'requestmembers' => array('Members.controller.php', 'Members_Controller', 'action_requestmembers'),
 			'restoretopic' => array('RemoveTopic.controller.php', 'RemoveTopic_Controller', 'action_restoretopic'),
 			'search' => array('Search.controller.php', 'action_plushsearch1'),
 			'search2' => array('Search.controller.php', 'action_plushsearch2'),
@@ -312,6 +312,9 @@ class Site_Dispatcher
 			if (method_exists($controller, 'pre_dispatch'))
 				$controller->pre_dispatch();
 
+			$hook = substr($this->_function_name, -1) == 2 ? substr($this->_function_name, 0, -1) : $this->_function_name;
+			call_integration_hook('integrate_' . $hook . '_before');
+
 			// 3, 2, ... and go
 			if (method_exists($controller, $this->_function_name))
 				$controller->{$this->_function_name}();
@@ -327,9 +330,12 @@ class Site_Dispatcher
 				// things went pretty bad, huh?
 				// board index :P
 				require_once(CONTROLLERDIR . '/BoardIndex.controller.php');
+				call_integration_hook('integrate_action_boardindex_before');
 				$controller = new BoardIndex_Controller();
-				return $this->action_boardindex();
+				$this->action_boardindex();
+				call_integration_hook('integrate_action_boardindex_after');
 			}
+			call_integration_hook('integrate_' . $hook . '_after');
 		}
 		else
 		{

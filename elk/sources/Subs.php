@@ -289,7 +289,7 @@ function updateMemberData($members, $data)
 		'date_registered', 'posts', 'id_group', 'last_login', 'instant_messages', 'unread_messages',
 		'new_pm', 'pm_prefs', 'gender', 'hide_email', 'show_online', 'pm_email_notify', 'pm_receive_from', 'karma_good', 'karma_bad',
 		'notify_announcements', 'notify_send_body', 'notify_regularity', 'notify_types',
-		'id_theme', 'is_activated', 'id_msg_last_visit', 'id_post_group', 'total_time_logged_in', 'warning',
+		'id_theme', 'is_activated', 'id_msg_last_visit', 'id_post_group', 'total_time_logged_in', 'warning', 'likes_given', 'likes_received',
 	);
 	$knownFloats = array(
 		'time_offset',
@@ -417,6 +417,7 @@ function updateMemberData($members, $data)
  * @param array $changeArray
  * @param bool $update = false
  * @param bool $debug = false
+ * @todo: add debugging features, $debug isn't used 
  */
 function updateSettings($changeArray, $update = false, $debug = false)
 {
@@ -502,13 +503,19 @@ function updateSettings($changeArray, $update = false, $debug = false)
  * @param bool $flexible_start = false
  * @param bool $show_prevnext = true
  */
-function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flexible_start = false, $show_prevnext = true)
+function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flexible_start = false, $show = array())
 {
 	global $modSettings, $context, $txt, $settings;
 
 	// Save whether $start was less than 0 or not.
 	$start = (int) $start;
 	$start_invalid = $start < 0;
+	$show_defaults = array(
+		'prev_next' => true,
+		'all' => false,
+	);
+
+	$show = array_merge($show_defaults, $show);
 
 	// Make sure $start is a proper variable - not less than 0.
 	if ($start_invalid)
@@ -539,6 +546,15 @@ function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flex
 		$display_page = ($start + $num_per_page) > $max_value ? $max_value : ($start + $num_per_page);
 		if ($start != $counter - $max_value && !$start_invalid)
 			$pageindex .= $display_page > $counter - $num_per_page ? ' ' : sprintf($base_link, $display_page, str_replace('{next_txt}', $txt['next'], $settings['page_index_template']['next_page']));
+
+		// The "all" button
+		if ($show['all'])
+		{
+			if ($show['all_selected'])
+				$pageindex .= sprintf($settings['page_index_template']['current_page'], $txt['all']);
+			else
+				$pageindex .= sprintf(str_replace('.%1$d', '.%1$s', $base_link), '0;all', str_replace('{all_txt}', $txt['all'], $settings['page_index_template']['all']));
+		}
 	}
 	else
 	{
@@ -546,7 +562,7 @@ function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flex
 		$PageContiguous = (int) ($modSettings['compactTopicPagesContiguous'] - ($modSettings['compactTopicPagesContiguous'] % 2)) / 2;
 
 		// Show the "prev page" link. (>prev page< 1 ... 6 7 [8] 9 10 ... 15 next page)
-		if (!empty($start) && $show_prevnext)
+		if (!empty($start) && $show['prev_next'])
 			$pageindex = sprintf($base_link, $start - $num_per_page, str_replace('{prev_txt}', $txt['prev'], $settings['page_index_template']['previous_page']));
 		else
 			$pageindex = '';
@@ -591,8 +607,17 @@ function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flex
 			$pageindex .= sprintf($base_link, $tmpMaxPages, $tmpMaxPages / $num_per_page + 1);
 
 		// Show the "next page" link. (prev page 1 ... 6 7 [8] 9 10 ... 15 >next page<)
-		if ($start != $tmpMaxPages && $show_prevnext)
+		if ($start != $tmpMaxPages && $show['prev_next'])
 			$pageindex .= sprintf($base_link, $start + $num_per_page, str_replace('{next_txt}', $txt['next'], $settings['page_index_template']['next_page']));
+
+		// The "all" button
+		if ($show['all'])
+		{
+			if ($show['all_selected'])
+				$pageindex .= sprintf($settings['page_index_template']['current_page'], $txt['all']);
+			else
+				$pageindex .= sprintf(str_replace('.%1$d', '.%1$s', $base_link), '0;all', str_replace('{all_txt}', $txt['all'], $settings['page_index_template']['all']));
+		}
 	}
 
 	return $pageindex;
@@ -786,6 +811,21 @@ function relativeTime($timestamp, $show_today = true, $offset_type = false)
 }
 
 /**
+ * Used to render a timestamp to html5 <time> tag format.
+ *
+ * @param int $timestamp
+ * @return string
+ */
+function htmlTime($timestamp)
+{
+	global $modSettings, $user_info;
+
+	$time = date('Y-m-d H:i', $timestamp + ($user_info['time_offset'] + $modSettings['time_offset']) * 3600);
+
+	return $time;
+}
+
+/**
  * Removes special entities from strings.  Compatibility...
  * Faster than html_entity_decode
  *
@@ -805,57 +845,40 @@ function un_htmlspecialchars($string)
 }
 
 /**
- * Shorten a subject + internationalization concerns.
- *
- * - shortens a subject so that it is either shorter than length, or that length plus an ellipsis.
- * - respects internationalization characters and entities as one character.
- * - avoids trailing entities.
- * - returns the shortened string.
- *
- * @param string $subject
- * @param int $len
- */
-function shorten_subject($subject, $len)
-{
-	// It was already short enough!
-	if (Util::strlen($subject) <= $len)
-		return $subject;
-
-	// Shorten it by the length it was too long, and strip off junk from the end.
-	return Util::substr($subject, 0, $len) . '...';
-}
-
-/**
  * Shorten a string of text
  *
- * - shortens a text string so that it is approximately a certain length or under
- * - attempts to break the string on the first word boundary after the allowed length
- * - if resulting length is > len plus buffer then it is truncated to length plus an ellipsis.
+ * - shortens a text string so that it is either shorter than length, or that length plus an ellipsis.
+ * - optionally attempts to break the string on a word boundary approximately at the allowed length
+ * - if using cutword and the resulting length is > len plus buffer then it is truncated to length plus an ellipsis.
  * - respects internationalization characters and entities as one character.
  * - returns the shortened string.
  *
  * @param string $text
  * @param int $len
- * @param int $buffer maximum length overflow to allow cutting on a word boundary
+ * @param bool $cutword try to cut at a word boundary
+ * @param int $buffer maximum length overflow to allow when cutting on a word boundary
  */
-function shorten_text($text, $len = 384, $buffer = 12)
+function shorten_text($text, $len = 384, $cutword = false, $buffer = 12)
 {
-	$current = Util::strlen($text);
-
-	// Its to long so lets cut it down to size
-	if ($current > $len)
+	// If its to long, cut it down to size
+	if (Util::strlen($text) > $len)
 	{
-		// Look for len characters and cut on first word boundary after
-		preg_match('~(.{' . $len . '}.*?)\b~s', $text, $matches);
+		if ($cutword)
+		{
+			// Look for len - buffer characters and cut on first word boundary after
+			preg_match('~(.{' . ($len - $buffer) . '}.*?)\b~s', $text, $matches);
 
-		// Always one clown in the audience who likes long words or not using the spacebar
-		if (Util::strlen($matches[1]) > $len + $buffer)
-			$matches[1] = substr($matches[1], 0, $len);
+			// Always one clown in the audience who likes long words or not using the spacebar
+			if (Util::strlen($matches[1]) > $len + $buffer)
+				$matches[1] = Util::substr($matches[1], 0, $len);
 
-		return rtrim($matches[1]) . '...';
+			$text = rtrim($matches[1]) . ' ...';
+		}
+		else
+			$text = Util::substr($text, 0, $len) . '...';
 	}
-	else
-		return $text;
+
+	return $text;
 }
 
 /**
@@ -932,7 +955,6 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 {
 	global $txt, $scripturl, $context, $modSettings, $user_info;
 
-	$db = database();
 	static $bbc_codes = array(), $itemcodes = array(), $no_autolink_tags = array();
 	static $disabled;
 
@@ -1083,8 +1105,8 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			array(
 				'tag' => 'acronym',
 				'type' => 'unparsed_equals',
-				'before' => '<acronym title="$1">',
-				'after' => '</acronym>',
+				'before' => '<abbr title="$1">',
+				'after' => '</abbr>',
 				'quoted' => 'optional',
 				'disabled_after' => ' ($1)',
 			),
@@ -2471,7 +2493,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
  */
 function parsesmileys(&$message)
 {
-	global $modSettings, $txt, $user_info, $context;
+	global $modSettings, $txt, $user_info;
 
 	$db = database();
 	static $smileyPregSearch = null, $smileyPregReplacements = array();
@@ -2946,7 +2968,6 @@ function setupThemeContext($forceload = false)
 function setMemoryLimit($needed, $in_use = false)
 {
 	// everything in bytes
-	$memory_used = 0;
 	$memory_current = memoryReturnBytes(ini_get('memory_limit'));
 	$memory_needed = memoryReturnBytes($needed);
 
@@ -3132,7 +3153,7 @@ function template_header()
  */
 function theme_copyright()
 {
-	global $forum_copyright, $context, $boardurl, $forum_version, $txt, $modSettings;
+	global $forum_copyright, $forum_version;
 
 	// Don't display copyright for things like SSI.
 	if (!isset($forum_version))
@@ -3232,6 +3253,7 @@ function template_javascript($do_defered = false)
 
 				// If we are loading JQuery and we are set to 'auto' load, put in our remote success or load local check
 				if ($id === 'jquery' && (!isset($modSettings['jquery_source']) || $modSettings['jquery_source'] === 'auto'))
+					// @todo: $loadjquery isn't used anywhere, probably a bug..
 					$loadjquery = true;
 			}
 		}
@@ -3381,7 +3403,7 @@ function getAttachmentFilename($filename, $attachment_id, $dir = null, $new = fa
  */
 function getLegacyAttachmentFilename($filename, $attachment_id, $dir = null, $new = false)
 {
-	global $modSettings, $db_character_set;
+	global $modSettings;
 
 	$clean_name = $filename;
 
@@ -3536,8 +3558,6 @@ function host_from_ip($ip)
  */
 function text2words($text, $max_chars = 20, $encrypt = false)
 {
-	global $context;
-
 	// Step 1: Remove entities/things we don't consider words:
 	$words = preg_replace('~(?:[\x0B\0\x{A0}\t\r\s\n(){}\\[\\]<>!@$%^*.,:+=`\~\?/\\\\]+|&(?:amp|lt|gt|quot);)+~u', ' ', strtr($text, array('<br />' => ' ')));
 
@@ -3589,7 +3609,7 @@ function text2words($text, $max_chars = 20, $encrypt = false)
  */
 function create_button($name, $alt, $label = '', $custom = '', $force_use = false)
 {
-	global $settings, $txt, $context;
+	global $settings, $txt;
 
 	// Does the current loaded theme have this and we are not forcing the usage of this function?
 	if (function_exists('template_create_button') && !$force_use)
@@ -3830,6 +3850,7 @@ function setupMenuContext()
 				// Make sure the last button truely is the last button.
 				if (!empty($button['is_last']))
 				{
+                    // @todo: $last_button not initialized, probably a bug..
 					if (isset($last_button))
 						unset($menu_buttons[$last_button]['is_last']);
 					$last_button = $act;
@@ -4138,8 +4159,6 @@ function remove_integration_function($hook, $function, $file = '')
 */
 function sanitizeMSCutPaste($string)
 {
-	global $context;
-
 	if (empty($string))
 		return $string;
 

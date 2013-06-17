@@ -21,6 +21,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Message Index Controller
+ */
 class MessageIndex_Controller
 {
 	/**
@@ -30,8 +33,6 @@ class MessageIndex_Controller
 	{
 		global $txt, $scripturl, $board, $modSettings, $context;
 		global $options, $settings, $board_info, $user_info;
-
-		$db = database();
 
 		// Fairly often, we'll work with boards. Current board, child boards.
 		require_once(SUBSDIR . '/Boards.subs.php');
@@ -48,6 +49,7 @@ class MessageIndex_Controller
 
 		$context['name'] = $board_info['name'];
 		$context['description'] = $board_info['description'];
+		$template_layers = Template_Layers::getInstance();
 
 		// How many topics do we have in total?
 		$board_info['total_topics'] = allowedTo('approve_posts') ? $board_info['num_topics'] + $board_info['unapproved_topics'] : $board_info['num_topics'] + $board_info['unapproved_user_topics'];
@@ -67,6 +69,7 @@ class MessageIndex_Controller
 					$context['robot_no_index'] = true;
 			}
 		}
+
 		if (!empty($_REQUEST['start']) && (!is_numeric($_REQUEST['start']) || $_REQUEST['start'] % $context['messages_per_page'] != 0))
 			$context['robot_no_index'] = true;
 
@@ -79,7 +82,7 @@ class MessageIndex_Controller
 		}
 
 		// We only know these.
-		if (isset($_REQUEST['sort']) && !in_array($_REQUEST['sort'], array('subject', 'starter', 'last_poster', 'replies', 'views', 'first_post', 'last_post')))
+		if (isset($_REQUEST['sort']) && !in_array($_REQUEST['sort'], array('subject', 'starter', 'last_poster', 'replies', 'views', 'likes', 'first_post', 'last_post')))
 			$_REQUEST['sort'] = 'last_post';
 
 		// Make sure the starting place makes sense and construct the page index.
@@ -87,6 +90,7 @@ class MessageIndex_Controller
 			$context['page_index'] = constructPageIndex($scripturl . '?board=' . $board . '.%1$d;sort=' . $_REQUEST['sort'] . (isset($_REQUEST['desc']) ? ';desc' : ''), $_REQUEST['start'], $board_info['total_topics'], $maxindex, true);
 		else
 			$context['page_index'] = constructPageIndex($scripturl . '?board=' . $board . '.%1$d', $_REQUEST['start'], $board_info['total_topics'], $maxindex, true);
+
 		$context['start'] = &$_REQUEST['start'];
 
 		// Set a canonical URL for this page.
@@ -266,12 +270,10 @@ class MessageIndex_Controller
 			{
 				// Limit them to $modSettings['preview_characters'] characters
 				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], $row['first_smileys'], $row['id_first_msg']), array('<br />' => '&#10;')));
-				if (Util::strlen($row['first_body']) > $modSettings['preview_characters'])
-					$row['first_body'] = Util::substr($row['first_body'], 0, $modSettings['preview_characters']) . '...';
+				$row['first_body'] = shorten_text($row['first_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
 
 				$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], $row['last_smileys'], $row['id_last_msg']), array('<br />' => '&#10;')));
-				if (Util::strlen($row['last_body']) > $modSettings['preview_characters'])
-					$row['last_body'] = Util::substr($row['last_body'], 0, $modSettings['preview_characters']) . '...';
+				$row['last_body'] = shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
 
 				// Censor the subject and message preview.
 				censorText($row['first_subject']);
@@ -308,7 +310,7 @@ class MessageIndex_Controller
 
 				// We can't pass start by reference.
 				$start = -1;
-				$pages .= constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d', $start, $row['num_replies'] + 1, $context['messages_per_page'], true, false);
+				$pages .= constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d', $start, $row['num_replies'] + 1, $context['messages_per_page'], true, array('prev_next' => false));
 
 				// If we can use all, show all.
 				if (!empty($modSettings['enableAllMessages']) && $row['num_replies'] + 1 < $modSettings['enableAllMessages'])
@@ -323,6 +325,7 @@ class MessageIndex_Controller
 			{
 				if (!isset($context['icon_sources'][$row['first_icon']]))
 					$context['icon_sources'][$row['first_icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $row['first_icon'] . '.png') ? 'images_url' : 'default_images_url';
+
 				if (!isset($context['icon_sources'][$row['last_icon']]))
 					$context['icon_sources'][$row['last_icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $row['last_icon'] . '.png') ? 'images_url' : 'default_images_url';
 			}
@@ -330,6 +333,7 @@ class MessageIndex_Controller
 			{
 				if (!isset($context['icon_sources'][$row['first_icon']]))
 					$context['icon_sources'][$row['first_icon']] = 'images_url';
+
 				if (!isset($context['icon_sources'][$row['last_icon']]))
 					$context['icon_sources'][$row['last_icon']] = 'images_url';
 			}
@@ -394,8 +398,8 @@ class MessageIndex_Controller
 				'is_sticky' => !empty($modSettings['enableStickyTopics']) && !empty($row['is_sticky']),
 				'is_locked' => !empty($row['locked']),
 				'is_poll' => $modSettings['pollMode'] == '1' && $row['id_poll'] > 0,
-				'is_hot' => $row['num_replies'] >= $modSettings['hotTopicPosts'],
-				'is_very_hot' => $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
+				'is_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicPosts'] : $row['num_replies'] >= $modSettings['hotTopicPosts'],
+				'is_very_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicVeryPosts'] : $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
 				'is_posted_in' => false,
 				'icon' => $row['first_icon'],
 				'icon_url' => $settings[$context['icon_sources'][$row['first_icon']]] . '/post/' . $row['first_icon'] . '.png',
@@ -407,9 +411,11 @@ class MessageIndex_Controller
 				'pages' => $pages,
 				'replies' => comma_format($row['num_replies']),
 				'views' => comma_format($row['num_views']),
+				'likes' => comma_format($row['num_likes']),
 				'approved' => $row['approved'],
 				'unapproved_posts' => $row['unapproved_posts'],
 			);
+
 			if (!empty($settings['avatars_on_indexes']))
 				$context['topics'][$row['id_topic']]['last_post']['member']['avatar'] = array(
 					'name' => $row['avatar'],
@@ -487,11 +493,11 @@ class MessageIndex_Controller
 		}
 
 		if (!empty($context['boards']) && (!empty($options['show_children']) || $context['start'] == 0))
-			Template_Layers::getInstance()->add('display_child_boards');
+			$template_layers->add('display_child_boards');
 
 		// If there are children, but no topics and no ability to post topics...
 		$context['no_topic_listing'] = !empty($context['boards']) && empty($context['topics']) && !$context['can_post_new'];
-		Template_Layers::getInstance()->add('pages_and_buttons');
+		$template_layers->add('pages_and_buttons');
 
 		addJavascriptVar('notification_board_notice', $context['is_marked_notify'] ? $txt['notification_disable_board'] : $txt['notification_enable_board'], true);
 
@@ -532,6 +538,7 @@ class MessageIndex_Controller
 
 		// This is going to be needed to send off the notifications and for updateLastMessages().
 		require_once(SUBSDIR . '/Post.subs.php');
+
 		// Process process process data.
 		require_once(SUBSDIR . '/Topic.subs.php');
 
@@ -1005,11 +1012,13 @@ class MessageIndex_Controller
 			logAction('move', array('topic' => $topic[0], 'board_from' => $topic[1], 'board_to' => $topic[2]));
 			sendNotifications($topic[0], 'move');
 		}
+
 		foreach ($lockCache as $topic)
 		{
 			logAction($lockStatus[$topic] ? 'lock' : 'unlock', array('topic' => $topic, 'board' => $lockCacheBoards[$topic]));
 			sendNotifications($topic, $lockStatus[$topic] ? 'lock' : 'unlock');
 		}
+		
 		foreach ($stickyCache as $topic)
 		{
 			logAction($stickyCacheStatus[$topic] ? 'unsticky' : 'sticky', array('topic' => $topic, 'board' => $stickyCacheBoards[$topic]));

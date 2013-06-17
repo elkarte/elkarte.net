@@ -35,10 +35,10 @@ class Display_Controller
 	function action_index()
 	{
 		global $scripturl, $txt, $modSettings, $context, $settings;
-
-		$db = database();
 		global $options, $user_info, $board_info, $topic, $board;
 		global $attachments, $messages_request, $topicinfo, $language, $all_posters;
+
+		$db = database();
 
 		// What are you gonna display if these are empty?!
 		if (empty($topic))
@@ -60,6 +60,7 @@ class Display_Controller
 
 		// How much are we sticking on each page?
 		$context['messages_per_page'] = empty($modSettings['disableCustomPerPage']) && !empty($options['messages_per_page']) ? $options['messages_per_page'] : $modSettings['defaultMaxMessages'];
+		$template_layers = Template_Layers::getInstance();
 
 		// Let's do some work on what to search index.
 		if (count($_GET) > 2)
@@ -148,10 +149,9 @@ class Display_Controller
 		else
 			$context['total_visible_posts'] = $context['num_replies'] + $topicinfo['unapproved_posts'] + ($topicinfo['approved'] ? 1 : 0);
 
-		require_once(SUBSDIR . '/Messages.subs.php');
 		// When was the last time this topic was replied to?  Should we warn them about it?
-		$mgsOptions = getMessageInfo($topicinfo['id_last_msg'], true);
-
+		require_once(SUBSDIR . '/Messages.subs.php');
+		$mgsOptions = basicMessageInfo($topicinfo['id_last_msg'], true);
 		$context['oldTopicError'] = !empty($modSettings['oldTopicDays']) && $mgsOptions['poster_time'] + $modSettings['oldTopicDays'] * 86400 < time() && empty($topicinfo['is_sticky']);
 
 		// The start isn't a number; it's information about what to do, where to go.
@@ -202,7 +202,6 @@ class Display_Controller
 					$_REQUEST['start'] = empty($options['view_newest_first']) ? $context['start_from'] : $context['total_visible_posts'] - $context['start_from'] - 1;
 				}
 			}
-
 			// Link to a message...
 			elseif (substr($_REQUEST['start'], 0, 3) == 'msg')
 			{
@@ -240,7 +239,7 @@ class Display_Controller
 		// Create a previous next string if the selected theme has it as a selected option.
 		$context['previous_next'] = $modSettings['enablePreviousNext'] ? '<a href="' . $scripturl . '?topic=' . $topic . '.0;prev_next=prev#new">' . $txt['previous_next_back'] . '</a> - <a href="' . $scripturl . '?topic=' . $topic . '.0;prev_next=next#new">' . $txt['previous_next_forward'] . '</a>' : '';
 		if (!empty($context['topic_derived_from']))
-			$context['previous_next'] .= ' - <a href="' . $scripturl . '?msg=' . $context['topic_derived_from']['derived_from'] . '">' . sprintf($txt['topic_derived_from'], '<em>' . shorten_subject($context['topic_derived_from']['subject'], 25)) . '</em></a>';
+			$context['previous_next'] .= ' - <a href="' . $scripturl . '?msg=' . $context['topic_derived_from']['derived_from'] . '">' . sprintf($txt['topic_derived_from'], '<em>' . shorten_text($context['topic_derived_from']['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24)) . '</em></a>';
 
 		// Check if spellchecking is both enabled and actually working. (for quick reply.)
 		$context['show_spellchecking'] = !empty($modSettings['enableSpellChecking']) && function_exists('pspell_new');
@@ -274,7 +273,7 @@ class Display_Controller
 		// Did we report a post to a moderator just now?
 		$context['report_sent'] = isset($_GET['reportsent']);
 		if ($context['report_sent'])
-			Template_Layers::getInstance()->add('report_sent');
+			$template_layers->add('report_sent');
 
 		// Let's get nosey, who is viewing this topic?
 		if (!empty($settings['display_who_viewing']))
@@ -292,7 +291,7 @@ class Display_Controller
 			$_REQUEST['start'] = -1;
 
 		// Construct the page index, allowing for the .START method...
-		$context['page_index'] = constructPageIndex($scripturl . '?topic=' . $topic . '.%1$d', $_REQUEST['start'], $context['total_visible_posts'], $context['messages_per_page'], true);
+		$context['page_index'] = constructPageIndex($scripturl . '?topic=' . $topic . '.%1$d', $_REQUEST['start'], $context['total_visible_posts'], $context['messages_per_page'], true, array('all' => $can_show_all, 'all_selected' => isset($_REQUEST['all'])));
 		$context['start'] = $_REQUEST['start'];
 
 		// This is information about which page is current, and which page we're on - in case you don't like the constructed page index. (again, wireles..)
@@ -311,20 +310,13 @@ class Display_Controller
 		);
 
 		// If they are viewing all the posts, show all the posts, otherwise limit the number.
-		if ($can_show_all)
+		if ($can_show_all && isset($_REQUEST['all']))
 		{
-			if (isset($_REQUEST['all']))
-			{
-				// No limit! (actually, there is a limit, but...)
-				$context['messages_per_page'] = -1;
-				$context['page_index'] .= empty($modSettings['compactTopicPagesEnable']) ? '<strong>' . $txt['all'] . '</strong> ' : '[<strong>' . $txt['all'] . '</strong>] ';
+			// No limit! (actually, there is a limit, but...)
+			$context['messages_per_page'] = -1;
 
-				// Set start back to 0...
-				$_REQUEST['start'] = 0;
-			}
-			// They aren't using it, but the *option* is there, at least.
-			else
-				$context['page_index'] .= '&nbsp;<a href="' . $scripturl . '?topic=' . $topic . '.0;all">' . $txt['all'] . '</a> ';
+			// Set start back to 0...
+			$_REQUEST['start'] = 0;
 		}
 
 		// Build the link tree.
@@ -336,6 +328,7 @@ class Display_Controller
 		// Build a list of this board's moderators.
 		$context['moderators'] = &$board_info['moderators'];
 		$context['link_moderators'] = array();
+
 		if (!empty($board_info['moderators']))
 		{
 			// Add a link for each moderator...
@@ -428,14 +421,15 @@ class Display_Controller
 			if (!empty($context['linked_calendar_events']))
 			{
 				$context['linked_calendar_events'][count($context['linked_calendar_events']) - 1]['is_last'] = true;
-				Template_Layers::getInstance()->add('display_calendar');
+				$template_layers->add('display_calendar');
 			}
 		}
 
 		// Create the poll info if it exists.
 		if ($context['is_poll'])
 		{
-			Template_Layers::getInstance()->add('display_poll');
+			$template_layers->add('display_poll');
+
 			// Get information on the poll
 			require_once(SUBSDIR . '/Poll.subs.php');
 			$pollinfo = pollInfo($topicinfo['id_poll']);
@@ -459,6 +453,7 @@ class Display_Controller
 				{
 					// ;id,timestamp,[vote,vote...]; etc
 					$guestinfo = explode(';', $_COOKIE['guest_poll_vote']);
+
 					// Find the poll we're after.
 					foreach ($guestinfo as $i => $guestvoted)
 					{
@@ -466,6 +461,7 @@ class Display_Controller
 						if ($guestvoted[0] == $topicinfo['id_poll'])
 							break;
 					}
+
 					// Has the poll been reset since guest voted?
 					if ($pollinfo['reset_poll'] > $guestvoted[1])
 					{
@@ -510,7 +506,7 @@ class Display_Controller
 					'id' => $pollinfo['id_member'],
 					'name' => $pollinfo['poster_name'],
 					'href' => $pollinfo['id_member'] == 0 ? '' : $scripturl . '?action=profile;u=' . $pollinfo['id_member'],
-					'link' => $pollinfo['id_member'] == 0 ? $polinfo['poster_name'] : '<a href="' . $scripturl . '?action=profile;u=' . $pollinfo['id_member'] . '">' . $pollinfo['poster_name'] . '</a>'
+					'link' => $pollinfo['id_member'] == 0 ? $pollinfo['poster_name'] : '<a href="' . $scripturl . '?action=profile;u=' . $pollinfo['id_member'] . '">' . $pollinfo['poster_name'] . '</a>'
 				)
 			);
 
@@ -695,6 +691,14 @@ class Display_Controller
 			// What?  It's not like it *couldn't* be only guests in this topic...
 			if (!empty($posters))
 				loadMemberData($posters);
+
+			// Load in the likes for this group of messages
+			if (!empty($modSettings['likes_enabled']))
+			{
+				require_once(SUBSDIR . '/Likes.subs.php');
+				$context['likes'] = loadLikes($messages, true);
+			}
+
 			$messages_request = $db->query('', '
 				SELECT
 					m.id_msg, m.icon, m.subject, m.poster_time, m.poster_ip, m.id_member, m.modified_time, m.modified_name, m.body,
@@ -880,8 +884,8 @@ class Display_Controller
 			$context['mod_buttons'][] = array('text' => 'restore_topic', 'image' => '', 'lang' => true, 'url' => $scripturl . '?action=restoretopic;topics=' . $context['current_topic'] . ';' . $context['session_var'] . '=' . $context['session_id']);
 
 		if ($context['can_reply'] && !empty($options['display_quick_reply']))
-			Template_Layers::getInstance()->add('quickreply');
-		Template_Layers::getInstance()->add('pages_and_buttons');
+			$template_layers->add('quickreply');
+		$template_layers->add('pages_and_buttons');
 
 		// Allow adding new buttons easily.
 		call_integration_hook('integrate_display_buttons');
@@ -913,9 +917,10 @@ class Display_Controller
 		// We are restoring messages. We handle this in another place.
 		if (isset($_REQUEST['restore_selected']))
 			redirectexit('action=restoretopic;msgs=' . implode(',', $messages) . ';' . $context['session_var'] . '=' . $context['session_id']);
+
 		if (isset($_REQUEST['split_selection']))
 		{
-			$mgsOptions = getMessageInfo(min($messages), true);
+			$mgsOptions = basicMessageInfo(min($messages), true);
 
 			$_SESSION['split_selection'][$topic] = $messages;
 			redirectexit('action=splittopics;sa=selectTopics;topic=' . $topic . '.0;subname_enc=' .urlencode($mgsOptions['subject']) . ';' . $context['session_var'] . '=' . $context['session_id']);
@@ -929,9 +934,7 @@ class Display_Controller
 			$allowed_all = true;
 		// Allowed to delete replies to their messages?
 		elseif (allowedTo('delete_replies'))
-		{
 			$allowed_all = $topic_info['id_member_started'] == $user_info['id'];
-		}
 		else
 			$allowed_all = false;
 
@@ -999,10 +1002,7 @@ class Display_Controller
 function prepareDisplayContext($reset = false)
 {
 	global $settings, $txt, $modSettings, $scripturl, $options, $user_info;
-
-	$db = database();
-	global $memberContext, $context, $messages_request, $topic, $attachments, $topicinfo;
-
+	global $memberContext, $context, $messages_request, $topic;
 	static $counter = null;
 
 	// If the query returned false, bail.
@@ -1052,6 +1052,11 @@ function prepareDisplayContext($reset = false)
 
 	// Are you allowed to remove at least a single reply?
 	$context['can_remove_post'] |= allowedTo('delete_own') && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 >= time()) && $message['id_member'] == $user_info['id'];
+
+	// Have you liked this post, can you
+	$message['likes'] = !empty($context['likes'][$message['id_msg']]['member']) && isset($context['likes'][$message['id_msg']]['member'][$user_info['id']]);
+	$message['use_likes'] = allowedTo('like_posts') && $message['id_member'] !== $user_info['id'];
+	$message['like_count'] = !empty($context['likes'][$message['id_msg']]['count']) ? $context['likes'][$message['id_msg']]['count'] : 0;
 
 	// If it couldn't load, or the user was a guest.... someday may be done with a guest table.
 	if (!loadMemberContext($message['id_member'], true))
@@ -1111,6 +1116,9 @@ function prepareDisplayContext($reset = false)
 		'can_modify' => (!$context['is_locked'] || allowedTo('moderate_board')) && (allowedTo('modify_any') || (allowedTo('modify_replies') && $context['user']['started']) || (allowedTo('modify_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || !$message['approved'] || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time()))),
 		'can_remove' => allowedTo('delete_any') || (allowedTo('delete_replies') && $context['user']['started']) || (allowedTo('delete_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time())),
 		'can_see_ip' => allowedTo('moderate_forum') || ($message['id_member'] == $user_info['id'] && !empty($user_info['id'])),
+		'can_like' => $message['use_likes'] && !$message['likes'],
+		'can_unlike' => $message['use_likes'] && $message['likes'],
+		'like_counter' =>$message['like_count'],
 	);
 
 	// Is this user the message author?
@@ -1195,10 +1203,12 @@ function loadAttachmentContext($id_msg)
 			}
 
 			if (!empty($attachment['id_thumb']))
+			{
 				$attachmentData[$i]['thumbnail'] = array(
 					'id' => $attachment['id_thumb'],
 					'href' => $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attachment['id_thumb'] . ';image',
 				);
+			}
 			$attachmentData[$i]['thumbnail']['has_thumb'] = !empty($attachment['id_thumb']);
 
 			// If thumbnails are disabled, check the maximum size of the image.

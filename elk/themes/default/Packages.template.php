@@ -678,7 +678,7 @@ function template_servers()
 	if (!empty($context['package_ftp']['error']))
 			echo '
 					<div class="errorbox">
-						<tt>', $context['package_ftp']['error'], '</tt>
+						<span class="tt">', $context['package_ftp']['error'], '</span>
 					</div>';
 
 	echo '
@@ -1030,8 +1030,8 @@ function template_downloaded()
 		<div class="windowbg">
 			<div class="content">
 				<p>', (empty($context['package_server']) ? $txt['package_uploaded_successfully'] : $txt['package_downloaded_successfully']), '</p>
-				<ul class="reset">
-					<li class="reset"><span class="floatleft"><strong>', $context['package']['name'], '</strong></span>
+				<ul>
+					<li><span class="floatleft"><strong>', $context['package']['name'], '</strong></span>
 						<span class="package_server floatright">', $context['package']['list_files']['link'], '</span>
 						<span class="package_server floatright">', $context['package']['install']['link'], '</span>
 					</li>

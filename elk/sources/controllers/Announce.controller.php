@@ -25,8 +25,10 @@ class Announce_Controller
 	/**
 	 * Default (sub)action for ?action=announce
 	 */
-	function action_index()
+	public function action_index()
 	{
+		loadLanguage('Post');
+
 		// default for action=announce: action_selectgroup() function.
 		$this->action_selectgroup();
 	}
@@ -37,9 +39,9 @@ class Announce_Controller
 	 *
 	 * checks the topic announcement permissions and loads the announcement template.
 	 * requires the announce_topic permission.
-	 * uses the ManageMembers template and Post language file.
+	 * uses the Announce template and Post language file.
 	 */
-	function pre_announce()
+	public function pre_dispatch()
 	{
 		global $context, $txt, $topic;
 
@@ -61,11 +63,9 @@ class Announce_Controller
 	 * Lets the user select the membergroups that will receive the topic announcement.
 	 * Accessed by action=announce;sa=selectgroup
 	 */
-	function action_selectgroup()
+	public function action_selectgroup()
 	{
-		global $txt, $context, $topic, $board, $board_info;
-
-		$db = database();
+		global $context, $topic, $board_info;
 
 		$groups = array_merge($board_info['groups'], array(1));
 		foreach ($groups as $id => $group)
@@ -73,13 +73,9 @@ class Announce_Controller
 
 		require_once(SUBSDIR . '/Membergroups.subs.php');
 		require_once(SUBSDIR . '/Topic.subs.php');
+		loadTemplate('Announce');
 
 		$context['groups'] = getGroups($groups);
-
-		// Now get the membergroup names.
-		$groups_info = membergroupsById($groups, 0);
-		foreach ($groups_info as $id_group => $group_info)
-			$context['groups'][$id_group]['name'] = $group_info['group_name'];
 
 		// Get the subject of the topic we're about to announce.
 		$topic_info = getTopicInfo($topic, 'message');
@@ -102,12 +98,10 @@ class Announce_Controller
 	 * calculates a rough estimate of the percentage items sent.
 	 * Accessed by action=announce;sa=send
 	 */
-	function action_send()
+	public function action_send()
 	{
 		global $topic, $board, $board_info, $context, $modSettings;
-		global $language, $scripturl, $txt, $user_info;
-
-		$db = database();
+		global $language, $scripturl;
 
 		checkSession();
 
@@ -115,15 +109,15 @@ class Announce_Controller
 		$groups = array_merge($board_info['groups'], array(1));
 
 		if (isset($_POST['membergroups']))
-			$_POST['who'] = explode(',', $_POST['membergroups']);
+			$who = explode(',', $_POST['membergroups']);
 
 		// Check whether at least one membergroup was selected.
-		if (empty($_POST['who']))
+		if (empty($who))
 			fatal_lang_error('no_membergroup_selected');
 
 		// Make sure all membergroups are integers and can access the board of the announcement.
-		foreach ($_POST['who'] as $id => $mg)
-			$_POST['who'][$id] = in_array((int) $mg, $groups) ? (int) $mg : 0;
+		foreach ($who as $id => $mg)
+			$who[$id] = in_array((int) $mg, $groups) ? (int) $mg : 0;
 
 		require_once(SUBSDIR . '/Topic.subs.php');
 
@@ -138,30 +132,25 @@ class Announce_Controller
 
 		// We need this in order to be able send emails.
 		require_once(SUBSDIR . '/Mail.subs.php');
+		require_once(SUBSDIR . '/Members.subs.php');
 
 		// Select the email addresses for this batch.
-		$request = $db->query('', '
-			SELECT mem.id_member, mem.email_address, mem.lngfile
-			FROM {db_prefix}members AS mem
-			WHERE (mem.id_group IN ({array_int:group_list}) OR mem.id_post_group IN ({array_int:group_list}) OR FIND_IN_SET({raw:additional_group_list}, mem.additional_groups) != 0)' . (!empty($modSettings['allow_disableAnnounce']) ? '
-				AND mem.notify_announcements = {int:notify_announcements}' : '') . '
-				AND mem.is_activated = {int:is_activated}
-				AND mem.id_member > {int:start}
-			ORDER BY mem.id_member
-			LIMIT {int:chunk_size}',
-			array(
-				'group_list' => $_POST['who'],
-				'notify_announcements' => 1,
-				'is_activated' => 1,
-				'start' => $context['start'],
-				'additional_group_list' => implode(', mem.additional_groups) != 0 OR FIND_IN_SET(', $_POST['who']),
-				// @todo Might need an interface?
-				'chunk_size' => empty($modSettings['mail_queue']) ? 50 : 500,
-			)
+		$conditions = array(
+			'activated_status' => 1,
+			'member_greater' => $context['start'],
+			'group_list' => $who,
+			'order_by' => 'id_member',
+			// @todo Might need an interface?
+			'limit' => empty($modSettings['mail_queue']) ? 50 : 500,
 		);
 
+		if (!empty($modSettings['allow_disableAnnounce']))
+			$conditions['notify_announcements'] = 1;
+
+		$data = retrieveMemberData($conditions);
+
 		// All members have received a mail. Go to the next screen.
-		if ($db->num_rows($request) == 0)
+		if (empty($data))
 		{
 			logAction('announce_topic', array('topic' => $topic), 'user');
 			if (!empty($_REQUEST['move']) && allowedTo('move_any'))
@@ -173,8 +162,9 @@ class Announce_Controller
 		}
 
 		$announcements = array();
+
 		// Loop through all members that'll receive an announcement in this batch.
-		while ($row = $db->fetch_assoc($request))
+		foreach ($data as $row)
 		{
 			$cur_language = empty($row['lngfile']) || empty($modSettings['userLanguage']) ? $language : $row['lngfile'];
 
@@ -199,7 +189,6 @@ class Announce_Controller
 			$announcements[$cur_language]['recipients'][$row['id_member']] = $row['email_address'];
 			$context['start'] = $row['id_member'];
 		}
-		$db->free_result($request);
 
 		// For each language send a different mail - low priority...
 		foreach ($announcements as $lang => $mail)
@@ -209,7 +198,7 @@ class Announce_Controller
 
 		$context['move'] = empty($_REQUEST['move']) ? 0 : 1;
 		$context['go_back'] = empty($_REQUEST['goback']) ? 0 : 1;
-		$context['membergroups'] = implode(',', $_POST['who']);
+		$context['membergroups'] = implode(',', $who);
 		$context['sub_template'] = 'announcement_send';
 
 		// Go back to the correct language for the user ;).
