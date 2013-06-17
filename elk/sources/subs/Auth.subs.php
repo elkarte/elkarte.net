@@ -157,7 +157,7 @@ function url_parts($local, $global)
  */
 function adminLogin($type = 'admin')
 {
-	global $context, $scripturl, $txt, $user_info, $user_settings;
+	global $context, $txt, $user_info;
 
 	loadLanguage('Admin');
 	loadTemplate('Login');
@@ -218,8 +218,6 @@ function adminLogin($type = 'admin')
  */
 function adminLogin_outputPostVars($k, $v)
 {
-	$db = database();
-
 	if (!is_array($v))
 		return '
 <input type="hidden" name="' . htmlspecialchars($k) . '" value="' . strtr($v, array('"' => '&quot;', '<' => '&lt;', '>' => '&gt;')) . '" />';
@@ -286,7 +284,7 @@ function construct_query_string($get)
  */
 function findMembers($names, $use_wildcards = false, $buddies_only = false, $max = 500)
 {
-	global $scripturl, $user_info, $modSettings;
+	global $scripturl, $user_info;
 
 	$db = database();
 
@@ -564,17 +562,8 @@ function rebuildModCache()
 	$boards_mod = array();
 	if (!$user_info['is_guest'])
 	{
-		$request = $db->query('', '
-			SELECT id_board
-			FROM {db_prefix}moderators
-			WHERE id_member = {int:current_member}',
-			array(
-				'current_member' => $user_info['id'],
-			)
-		);
-		while ($row = $db->fetch_assoc($request))
-			$boards_mod[] = $row['id_board'];
-		$db->free_result($request);
+		require_once(SUBSDIR . '/Boards.subs.php');
+		$boards_mod = boardsModerated($user_info['id']);
 	}
 
 	$mod_query = empty($boards_mod) ? '0=1' : 'b.id_board IN (' . implode(',', $boards_mod) . ')';
@@ -690,10 +679,6 @@ function deleteOnline($session)
  */
 function isFirstLogin($id_member)
 {
-	$db = database();
-
-	$isFirstLogin = false;
-
 	// First login?
 	require_once(SUBSDIR . '/Members.subs.php');
 	$member = getBasicMemberData($id_member, array('moderation' => true));
@@ -701,7 +686,7 @@ function isFirstLogin($id_member)
 	return !empty($member) && $member['last_login'] == 0;
 }
 
-function findUser($where, $whereparams)
+function findUser($where, $where_params)
 {
 	$db = database();
 

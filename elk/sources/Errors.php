@@ -37,7 +37,7 @@ if (!defined('ELKARTE'))
  */
 function log_error($error_message, $error_type = 'general', $file = null, $line = null)
 {
-	global $txt, $modSettings, $sc, $user_info, $scripturl, $last_error;
+	global $modSettings, $sc, $user_info, $scripturl, $last_error;
 
 	$db = database();
 	static $tried_hook = false;
@@ -128,12 +128,14 @@ function log_error($error_message, $error_type = 'general', $file = null, $line 
  */
 function fatal_error($error, $log = 'general')
 {
-	global $txt, $context, $modSettings;
+	global $txt, $modSettings;
 
 	// We don't have $txt yet, but that's okay...
 	if (empty($txt))
 		die($error);
 
+	if (class_exists('Template_Layers'))
+		Template_Layers::getInstance()->preventReverse();
 	setup_fatal_error_context($log || (!empty($modSettings['enableErrorLogging']) && $modSettings['enableErrorLogging'] == 2) ? log_error($error, $log) : $error, $error);
 }
 

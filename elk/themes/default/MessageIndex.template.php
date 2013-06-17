@@ -19,7 +19,7 @@
  */
 function template_main()
 {
-	global $context, $settings, $options, $scripturl, $modSettings, $txt;
+	global $context, $settings, $options, $scripturl, $txt;
 
 	if (!$context['no_topic_listing'])
 	{
@@ -29,25 +29,7 @@ function template_main()
 	<form action="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], '" method="post" accept-charset="UTF-8" class="clear" name="quickModForm" id="quickModForm">';
 
 		echo '
-		<div class="tborder topic_table" id="messageindex">';
-
-		if (!empty($settings['display_who_viewing']))
-		{
-			echo '
-			<p class="whoisviewing">';
-
-			if ($settings['display_who_viewing'] == 1)
-				echo count($context['view_members']), ' ', count($context['view_members']) === 1 ? $txt['who_member'] : $txt['members'];
-			else
-				echo empty($context['view_members_list']) ? '0 ' . $txt['members'] : implode(', ', $context['view_members_list']) . (empty($context['view_num_hidden']) || $context['can_moderate_forum'] ? '' : ' (+ ' . $context['view_num_hidden'] . ' ' . $txt['hidden'] . ')');
-
-			echo $txt['who_and'], $context['view_num_guests'], ' ', $context['view_num_guests'] == 1 ? $txt['guest'] : $txt['guests'], $txt['who_viewing_board'];
-
-			echo '
-			</p>';
-		}
-
-		echo '
+	<div class="tborder topic_table" id="messageindex">
 		<table class="table_grid">
 			<thead>
 				<tr class="catbg">';
@@ -58,7 +40,7 @@ function template_main()
 			echo '
 					<th scope="col" class="first_th" style="width:4%">&nbsp;</th>
 					<th scope="col" class="lefttext subject">', $context['topics_headers']['subject'], ' / ', $context['topics_headers']['starter'], '</th>
-					<th scope="col" class="stats" style="width:14%">', $context['topics_headers']['replies'], ' / ', $context['topics_headers']['views'], '</th>';
+					<th scope="col" class="stats" style="width:14em">', $context['topics_headers']['replies'], ' / ', $context['topics_headers']['views'], ' / ', $context['topics_headers']['likes'], '</th>';
 
 			// Show a "select all" box for quick moderation?
 			if (empty($context['can_quick_mod']))
@@ -151,7 +133,8 @@ function template_main()
 					<td class="', $color_class, ' stats">
 						', $topic['replies'], ' ', $txt['replies'], '
 						<br />
-						', $topic['views'], ' ', $txt['views'], '
+						', $topic['views'], ' ', $txt['views'], ' / ',
+						$topic['likes'], ' ', $txt['likes'], '
 					</td>
 					<td class="', $alternate_class, ' lastpost">
 						<a href="', $topic['last_post']['href'], '"><img src="', $settings['images_url'], '/icons/last_post.png" alt="', $txt['last_post'], '" title="', $txt['last_post'], '" /></a>
@@ -243,7 +226,7 @@ function template_display_child_boards_above()
 	global $context, $txt, $scripturl, $settings;
 
 	echo '
-	<div id="board_', $context['current_board'], '_childboards" class="boardindex_table">
+	<div id="board_', $context['current_board'], '_childboards" class="childboard_table">
 		<table class="table_list">
 			<tbody class="header">
 				<tr>
@@ -357,22 +340,17 @@ function template_display_child_boards_above()
 
 function template_pages_and_buttons_above()
 {
-	global $modSettings, $context, $txt, $options;
+	global $modSettings, $context, $settings, $txt, $options;
 
 	if ($context['no_topic_listing'])
 		return;
 
-	echo '
-	<div class="pagesection">
-		', !empty($modSettings['topbottomEnable']) ? $context['menu_separator'] . '<a id="pagetop" href="#bot" class="topbottom floatleft">' . $txt['go_down'] . '</a>' : '', '
-		<div class="pagelinks floatleft">', $context['page_index'], '</div>
-		', template_button_strip($context['normal_buttons'], 'right'), '
-	</div>';
+	template_pagesection('normal_buttons', 'right', 'go_down');
 
 	if ((!empty($options['show_board_desc']) && $context['description'] != '') || !empty($context['moderators']))
 	{
 		echo '
-		<div id="description_board" class="generic_list_wrapper">
+		<div id="description_board">
 			<h3 class="floatleft">', $context['name'], '&nbsp;-&nbsp;</h3>
 			<p>';
 
@@ -385,7 +363,26 @@ function template_pages_and_buttons_above()
 			', count($context['moderators']) === 1 ? $txt['moderator'] : $txt['moderators'], ': ', implode(', ', $context['link_moderators']), '.';
 
 		echo '
-			</p>
+			</p>';
+
+		// @todo - Thought the who is suff was better here. Presentation still WIP.
+		if (!empty($settings['display_who_viewing']))
+		{
+			echo '
+			<p class="whoisviewing">';
+
+			if ($settings['display_who_viewing'] == 1)
+				echo count($context['view_members']), ' ', count($context['view_members']) === 1 ? $txt['who_member'] : $txt['members'];
+			else
+				echo empty($context['view_members_list']) ? '0 ' . $txt['members'] : implode(', ', $context['view_members_list']) . (empty($context['view_num_hidden']) || $context['can_moderate_forum'] ? '' : ' (+ ' . $context['view_num_hidden'] . ' ' . $txt['hidden'] . ')');
+
+			echo $txt['who_and'], $context['view_num_guests'], ' ', $context['view_num_guests'] == 1 ? $txt['guest'] : $txt['guests'], $txt['who_viewing_board'];
+
+			echo '
+			</p>';
+		}
+
+		echo'
 		</div>';
 	}
 }
@@ -395,14 +392,9 @@ function template_pages_and_buttons_below()
 	global $modSettings, $context, $txt, $options, $settings;
 
 	if ($context['no_topic_listing'])
-	{
-		echo '
-	<div class="pagesection">
-		', !empty($modSettings['topbottomEnable']) ? $context['menu_separator'] . '<a id="pagebot" href="#top" class="topbottom floatleft">' . $txt['go_up'] . '</a>' : '', '
-			<div class="pagelinks floatleft">', $context['page_index'], '</div>
-		', template_button_strip($context['normal_buttons'], 'right'), '	
-	</div>';
-	}
+		return;
+
+	template_pagesection('normal_buttons', 'right');
 
 	// Show breadcrumbs at the bottom too.
 	theme_linktree();

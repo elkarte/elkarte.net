@@ -20,6 +20,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * News Controller
+ */
 class News_Controller
 {
 	/**
@@ -42,8 +45,6 @@ class News_Controller
 		global $board, $board_info, $context, $scripturl, $boardurl, $txt, $modSettings, $user_info;
 		global $query_this_board, $forum_version, $cdata_override, $settings;
 
-		$db = database();
-
 		// If it's not enabled, die.
 		if (empty($modSettings['xmlnews_enable']))
 			obExit(false);
@@ -59,6 +60,7 @@ class News_Controller
 		$context['optimize_msg'] = array(
 			'highest' => 'm.id_msg <= b.id_last_msg',
 		);
+
 		if (!empty($_REQUEST['c']) && empty($board))
 		{
 			$categories = array_map('intval', explode(',', $_REQUEST['c']));
@@ -173,6 +175,7 @@ class News_Controller
 		// Get the associative array representing the xml.
 		if (!empty($modSettings['cache_enable']) && (!$user_info['is_guest'] || $modSettings['cache_enable'] >= 3))
 			$xml = cache_get_data('xmlfeed-' . $xml_format . ':' . ($user_info['is_guest'] ? '' : $user_info['id'] . '-') . $cachekey, 240);
+
 		if (empty($xml))
 		{
 			$xml = $this->{$subActions[$_GET['sa']][0]}($xml_format);
@@ -387,8 +390,8 @@ class News_Controller
 	 */
 	function action_xmlnews($xml_format)
 	{
-		global $user_info, $scripturl, $modSettings, $board;
-		global $query_this_board, $settings, $context;
+		global $scripturl, $modSettings, $board;
+		global $query_this_board, $context;
 
 		$db = database();
 
@@ -535,8 +538,7 @@ class News_Controller
 	 */
 	function action_xmlrecent($xml_format)
 	{
-		global $user_info, $scripturl, $modSettings, $board;
-		global $query_this_board, $settings, $context;
+		global $scripturl, $modSettings, $board, $query_this_board, $context;
 
 		$db = database();
 
@@ -718,6 +720,7 @@ class News_Controller
 
 		// Make sure the id is a number and not "I like trying to hack the database".
 		$_GET['u'] = (int) $_GET['u'];
+
 		// Load the member's contextual information!
 		if (!loadMemberContext($_GET['u']) || !allowedTo('profile_view_any'))
 			return array();
@@ -781,10 +784,13 @@ class News_Controller
 
 			if ($profile['signature'] != '')
 				$data['signature'] = cdata_parse($profile['signature']);
+
 			if ($profile['blurb'] != '')
 				$data['blurb'] = cdata_parse($profile['blurb']);
+
 			if ($profile['location'] != '')
 				$data['location'] = cdata_parse($profile['location']);
+
 			if ($profile['title'] != '')
 				$data['title'] = cdata_parse($profile['title']);
 
@@ -825,7 +831,7 @@ class News_Controller
  * Called from dumpTags to convert data to xml
  * Finds urls for local sitte and santizes them
  *
- * @param type $val
+ * @param string $val
  * @return type
  */
 function fix_possible_url($val)
@@ -848,8 +854,8 @@ function fix_possible_url($val)
  * Ensures supplied data is properly encpsulated in cdata xml tags
  * Called from action_xmlprofile in News.controller.php
  *
- * @param type $data
- * @param type $ns
+ * @param string $data
+ * @param string $ns
  * @return type
  */
 function cdata_parse($data, $ns = '')
@@ -868,8 +874,10 @@ function cdata_parse($data, $ns = '')
 			Util::strpos($data, '&', $pos),
 			Util::strpos($data, ']', $pos),
 		);
+
 		if ($ns != '')
 			$positions[] = Util::strpos($data, '<', $pos);
+
 		foreach ($positions as $k => $dummy)
 		{
 			if ($dummy === false)
@@ -881,6 +889,7 @@ function cdata_parse($data, $ns = '')
 
 		if ($pos - $old > 0)
 			$cdata .= Util::substr($data, $old, $pos - $old);
+
 		if ($pos >= $n)
 			break;
 
@@ -889,10 +898,12 @@ function cdata_parse($data, $ns = '')
 			$pos2 = Util::strpos($data, '>', $pos);
 			if ($pos2 === false)
 				$pos2 = $n;
+
 			if (Util::substr($data, $pos + 1, 1) == '/')
 				$cdata .= ']]></' . $ns . ':' . Util::substr($data, $pos + 2, $pos2 - $pos - 1) . '<![CDATA[';
 			else
 				$cdata .= ']]><' . $ns . ':' . Util::substr($data, $pos + 1, $pos2 - $pos) . '<![CDATA[';
+
 			$pos = $pos2 + 1;
 		}
 		elseif (Util::substr($data, $pos, 1) == ']')
@@ -903,8 +914,10 @@ function cdata_parse($data, $ns = '')
 		elseif (Util::substr($data, $pos, 1) == '&')
 		{
 			$pos2 = Util::strpos($data, ';', $pos);
+
 			if ($pos2 === false)
 				$pos2 = $n;
+			
 			$ent = Util::substr($data, $pos + 1, $pos2 - $pos - 1);
 
 			if (Util::substr($data, $pos + 1, 1) == '#')
@@ -933,8 +946,6 @@ function cdata_parse($data, $ns = '')
  */
 function dumpTags($data, $i, $tag = null, $xml_format = '')
 {
-	global $modSettings, $context, $scripturl;
-
 	// For every array in the data...
 	foreach ($data as $key => $val)
 	{

@@ -149,6 +149,7 @@ function AdminMain()
 						'basic' => array($txt['mods_cat_features']),
 						'layout' => array($txt['mods_cat_layout']),
 						'karma' => array($txt['karma'], 'enabled' => in_array('k', $context['admin_features'])),
+						'likes' => array($txt['likes'], 'enabled' => in_array('l', $context['admin_features'])),
 						'sig' => array($txt['signature_settings_short']),
 						'profile' => array($txt['custom_profile_shorttitle'], 'enabled' => in_array('cp', $context['admin_features'])),
 					),
@@ -728,7 +729,7 @@ class Admin_Controller
 
 		// we need a little help from our friends
 		require_once(SUBSDIR . '/Membergroups.subs.php');
-		require_once(CONTROLLERDIR . '/Who.controller.php');
+		require_once(SUBSDIR . '/Who.subs.php');
 
 		// You have to be able to do at least one of the below to see this page.
 		isAllowedTo(array('admin_forum', 'manage_permissions', 'moderate_forum', 'manage_membergroups', 'manage_bans', 'send_mail', 'edit_news', 'manage_boards', 'manage_smileys', 'manage_attachments'));
@@ -747,7 +748,7 @@ class Admin_Controller
 			'description' => '',
 		);
 		loadLanguage('Who');
-		prepareCreditsData();
+		$context += prepareCreditsData();
 
 		// This makes it easier to get the latest news with your time format.
 		$context['time_format'] = urlencode($user_info['time_format']);
@@ -904,6 +905,7 @@ class Admin_Controller
 			array('basicSettings', 'area=featuresettings;sa=basic', 'ManageFeatures_Controller'),
 			array('layoutSettings', 'area=featuresettings;sa=layout', 'ManageFeatures_Controller'),
 			array('karmaSettings', 'area=featuresettings;sa=karma', 'ManageFeatures_Controller'),
+			array('likesSettings', 'area=featuresettings;sa=likes', 'ManageFeatures_Controller'),
 			array('signatureSettings', 'area=featuresettings;sa=sig', 'ManageFeatures_Controller'),
 			array('securitySettings', 'area=securitysettings;sa=general', 'ManageSecurity_Controller'),
 			array('spamSettings', 'area=securitysettings;sa=spam', 'ManageSecurity_Controller'),
@@ -1023,7 +1025,7 @@ class Admin_Controller
 						'url' => (substr($item[1], 0, 4) == 'area' ? $scripturl . '?action=admin;' . $item[1] : $item[1]) . ';' . $context['session_var'] . '=' . $context['session_id'] . ((substr($item[1], 0, 4) == 'area' && $section == 'settings' ? '#' . $item[0][0] : '')),
 						'name' => $name,
 						'type' => $section,
-						'help' => shorten_subject(isset($item[2]) ? strip_tags($helptxt[$item[2]]) : (isset($helptxt[$found]) ? strip_tags($helptxt[$found]) : ''), 255),
+						'help' => shorten_text(isset($item[2]) ? strip_tags($helptxt[$item[2]]) : (isset($helptxt[$found]) ? strip_tags($helptxt[$found]) : ''), 255),
 					);
 				}
 			}

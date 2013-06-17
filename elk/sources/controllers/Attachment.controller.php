@@ -23,7 +23,7 @@ class Attachment_Controller
 	 * The default action is to download an attachment.
 	 * This allows ?action=attachment to be forwarded to action_dlattach()
 	 */
-	function action_attachment()
+	public function action_attachment()
 	{
 		// default action to execute
 		$this->action_dlattach();
@@ -36,11 +36,9 @@ class Attachment_Controller
 	 * It is accessed via the query string ?action=dlattach.
 	 * Views to attachments and avatars do not increase hits and are not logged in the "Who's Online" log.
 	 */
-	function action_dlattach()
+	public function action_dlattach()
 	{
-		global $txt, $modSettings, $user_info, $scripturl, $context, $topic;
-
-		$db = database();
+		global $txt, $modSettings, $user_info, $context, $topic;
 
 		// Some defaults that we need.
 		$context['character_set'] = 'UTF-8';
@@ -71,6 +69,7 @@ class Attachment_Controller
 
 			$attachment = getAttachmentFromTopic($id_attach, $topic);
 		}
+
 		if (empty($attachment))
 			fatal_lang_error('no_access', false);
 		list ($id_folder, $real_filename, $file_hash, $file_ext, $attachment_type, $mime_type, $is_approved, $id_member) = $attachment;
@@ -161,13 +160,10 @@ class Attachment_Controller
 		// Different browsers like different standards...
 		if (isBrowser('firefox'))
 			header('Content-Disposition: ' . $disposition . '; filename*=UTF-8\'\'' . rawurlencode(preg_replace_callback('~&#(\d{3,8});~', 'fixchar__callback', $real_filename)));
-
 		elseif (isBrowser('opera'))
 			header('Content-Disposition: ' . $disposition . '; filename="' . preg_replace_callback('~&#(\d{3,8});~', 'fixchar__callback', $real_filename) . '"');
-
 		elseif (isBrowser('ie'))
 			header('Content-Disposition: ' . $disposition . '; filename="' . urlencode(preg_replace_callback('~&#(\d{3,8});~', 'fixchar__callback', $real_filename)) . '"');
-
 		else
 			header('Content-Disposition: ' . $disposition . '; filename="' . $real_filename . '"');
 
@@ -207,6 +203,7 @@ class Attachment_Controller
 					echo $callback(fread($fp, 8192));
 				else
 					echo fread($fp, 8192);
+
 				flush();
 			}
 			fclose($fp);

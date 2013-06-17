@@ -20,6 +20,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Members Controller
+ */
 class Members_Controller
 {
 	/**
@@ -29,7 +32,7 @@ class Members_Controller
 	 * Subactions: sa=add and sa=remove. (@todo refactor subactions)
 	 * Redirects to ?action=profile;u=x.
 	 */
-	function action_buddy()
+	public function action_buddy()
 	{
 		global $user_info;
 
@@ -38,68 +41,25 @@ class Members_Controller
 		isAllowedTo('profile_identity_own');
 		is_not_guest();
 
+		// You have to give a user
 		if (empty($_REQUEST['u']))
 			fatal_lang_error('no_access', false);
-		$_REQUEST['u'] = (int) $_REQUEST['u'];
 
-		// Remove if it's already there...
-		if (in_array($_REQUEST['u'], $user_info['buddies']))
-			$user_info['buddies'] = array_diff($user_info['buddies'], array($_REQUEST['u']));
-		// ...or add if it's not and if it's not you.
-		elseif ($user_info['id'] != $_REQUEST['u'])
-			$user_info['buddies'][] = (int) $_REQUEST['u'];
+		// Always an int
+		$user = (int) $_REQUEST['u'];
+
+		// Remove this user if it's already in your buddies...
+		if (in_array($user, $user_info['buddies']))
+			$user_info['buddies'] = array_diff($user_info['buddies'], array($user));
+		// ...or add if it's not there (and not you).
+		elseif ($user_info['id'] != $user)
+			$user_info['buddies'][] = $user;
 
 		// Update the settings.
 		updateMemberData($user_info['id'], array('buddy_list' => implode(',', $user_info['buddies'])));
 
 		// Redirect back to the profile
-		redirectexit('action=profile;u=' . $_REQUEST['u']);
-	}
-
-	/**
-	 * Outputs each member name on its own line.
-	 * This function is used by javascript to find members matching the request.
-	 * Accessed by action=requestmembers.
-	 */
-	function action_requestmembers()
-	{
-		global $user_info, $txt;
-
-		$db = database();
-
-		checkSession('get');
-
-		$_REQUEST['search'] = Util::htmlspecialchars($_REQUEST['search']) . '*';
-		$_REQUEST['search'] = trim(Util::strtolower($_REQUEST['search']));
-		$_REQUEST['search'] = strtr($_REQUEST['search'], array('%' => '\%', '_' => '\_', '*' => '%', '?' => '_', '&#038;' => '&amp;'));
-
-		if (function_exists('iconv'))
-			header('Content-Type: text/plain; charset=UTF-8');
-
-		$request = $db->query('', '
-			SELECT real_name
-			FROM {db_prefix}members
-			WHERE real_name LIKE {string:search}' . (isset($_REQUEST['buddies']) ? '
-				AND id_member IN ({array_int:buddy_list})' : '') . '
-				AND is_activated IN (1, 11)
-			LIMIT ' . (Util::strlen($_REQUEST['search']) <= 2 ? '100' : '800'),
-			array(
-				'buddy_list' => $user_info['buddies'],
-				'search' => $_REQUEST['search'],
-			)
-		);
-		while ($row = $db->fetch_assoc($request))
-		{
-			$row['real_name'] = strtr($row['real_name'], array('&amp;' => '&#038;', '&lt;' => '&#060;', '&gt;' => '&#062;', '&quot;' => '&#034;'));
-
-			if (preg_match('~&#\d+;~', $row['real_name']) != 0)
-				$row['real_name'] = preg_replace_callback('~&#(\d+);~', 'fixchar__callback', $row['real_name']);
-
-			echo $row['real_name'], "\n";
-		}
-		$db->free_result($request);
-
-		obExit(false);
+		redirectexit('action=profile;u=' . $user);
 	}
 
 	/**
@@ -107,7 +67,7 @@ class Members_Controller
 	 * This function result is used as a popup for searching members.
 	 * @uses sub template find_members of the Members template.
 	 */
-	function action_findmember()
+	public function action_findmember()
 	{
 		global $context, $scripturl, $user_info;
 
@@ -144,7 +104,7 @@ class Members_Controller
 
 			$context['results'] = findMembers(array($_REQUEST['search']), true, $context['buddy_search']);
 			$total_results = count($context['results']);
-
+			$_REQUEST['start'] = (int) $_REQUEST['start'];
 			$context['page_index'] = constructPageIndex($scripturl . '?action=findmember;search=' . $context['last_search'] . ';' . $context['session_var'] . '=' . $context['session_id'] . ';input=' . $context['input_box_name'] . ($context['quote_results'] ? ';quote=1' : '') . ($context['buddy_search'] ? ';buddies' : ''), $_REQUEST['start'], $total_results, 7);
 
 			// Determine the navigation context (especially useful for the wireless template).

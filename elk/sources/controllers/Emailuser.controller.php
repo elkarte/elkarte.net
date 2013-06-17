@@ -57,8 +57,6 @@ class Emailuser_Controller
 	{
 		global $topic, $txt, $context, $scripturl, $modSettings;
 
-		$db = database();
-
 		// Check permissions...
 		isAllowedTo('send_topic');
 
@@ -281,8 +279,6 @@ class Emailuser_Controller
 	{
 		global $txt, $topic, $modSettings, $user_info, $context;
 
-		$db = database();
-
 		$context['robot_no_index'] = true;
 
 		// You can't use this if it's off or you are not allowed to do it.
@@ -290,11 +286,13 @@ class Emailuser_Controller
 
 		// No errors, yet.
 		$report_errors = error_context::context('report', 1);
+
 		// ...or maybe some.
 		$context['report_error'] = array(
 			'errors' => $report_errors->prepareErrors(),
 			'type' => $report_errors->getErrorType() == 0 ? 'minor' : 'serious',
 		);
+
 		// If they're posting, it should be processed by action_reporttm2.
 		if ((isset($_POST[$context['session_var']]) || isset($_POST['save'])) && !$report_errors->hasErrors())
 			$this->action_reporttm2();
@@ -308,7 +306,7 @@ class Emailuser_Controller
 
 		// Check the message's ID - don't want anyone reporting a post they can't even see!
 		require_once(SUBSDIR . '/Topic.subs.php');
-		$message_info = messageInfo($topic, $message_id);
+		$message_info = messageTopicDetails($topic, $message_id);
 		if (empty($message_info ))
 			fatal_lang_error('no_board', false);
 
@@ -418,8 +416,10 @@ class Emailuser_Controller
 			$context['require_verification'] = create_control_verification($verificationOptions, true);
 
 			if (is_array($context['require_verification']))
+			{
 				foreach ($context['require_verification'] as $error)
 					$report_errors->addError($error, 0);
+			}
 		}
 
 		// Any errors?
@@ -427,10 +427,10 @@ class Emailuser_Controller
 			return action_reporttm();
 
 		// Get the basic topic information, and make sure they can see it.
-		$_POST['msg'] = (int) $_POST['msg'];
+		$msg_id = (int) $_POST['msg'];
 
 		$request = $db->query('', '
-			SELECT m.id_topic, m.id_board, m.subject, m.body, m.id_member AS id_poster, m.poster_name, mem.real_name
+			SELECT m.id_msg, m.id_topic, m.id_board, m.subject, m.body, m.id_member AS id_poster, m.poster_name, mem.real_name
 			FROM {db_prefix}messages AS m
 				LEFT JOIN {db_prefix}members AS mem ON (m.id_member = mem.id_member)
 			WHERE m.id_msg = {int:id_msg}
@@ -438,7 +438,7 @@ class Emailuser_Controller
 			LIMIT 1',
 			array(
 				'current_topic' => $topic,
-				'id_msg' => $_POST['msg'],
+				'id_msg' => $msg_id,
 			)
 		);
 		if ($db->num_rows($request) == 0)
@@ -456,8 +456,10 @@ class Emailuser_Controller
 		$result = getBasicMemberData($moderators, array('preferences' => true, 'sort' => 'lngfile'));
 		$mod_to_notify = array();
 		foreach ($result as $row)
+		{
 			if ($row['notify_types'] != 4)
 				$mod_to_notify[] = $row;
+		}
 
 		// Check that moderators do exist!
 		if (empty($mod_to_notify))
@@ -466,90 +468,16 @@ class Emailuser_Controller
 		// If we get here, I believe we should make a record of this, for historical significance, yabber.
 		if (empty($modSettings['disable_log_report']))
 		{
-			$request2 = $db->query('', '
-				SELECT id_report, ignore_all
-				FROM {db_prefix}log_reported
-				WHERE id_msg = {int:id_msg}
-					AND (closed = {int:not_closed} OR ignore_all = {int:ignored})
-				ORDER BY ignore_all DESC',
-				array(
-					'id_msg' => $_POST['msg'],
-					'not_closed' => 0,
-					'ignored' => 1,
-				)
-			);
-			if ($db->num_rows($request2) != 0)
-				list ($id_report, $ignore) = $db->fetch_row($request2);
-			$db->free_result($request2);
+			require_once(SUBSDIR . '/Messages.subs.php');
+			$id_report = recordReport($message, $poster_comment);
 
 			// If we're just going to ignore these, then who gives a monkeys...
-			if (!empty($ignore))
-				redirectexit('topic=' . $topic . '.msg' . $_POST['msg'] . '#msg' . $_POST['msg']);
-
-			// Already reported? My god, we could be dealing with a real rogue here...
-			if (!empty($id_report))
-				$db->query('', '
-					UPDATE {db_prefix}log_reported
-					SET num_reports = num_reports + 1, time_updated = {int:current_time}
-					WHERE id_report = {int:id_report}',
-					array(
-						'current_time' => time(),
-						'id_report' => $id_report,
-					)
-				);
-			// Otherwise, we shall make one!
-			else
-			{
-				if (empty($message['real_name']))
-					$message['real_name'] = $message['poster_name'];
-
-				$db->insert('',
-					'{db_prefix}log_reported',
-					array(
-						'id_msg' => 'int', 'id_topic' => 'int', 'id_board' => 'int', 'id_member' => 'int', 'membername' => 'string',
-						'subject' => 'string', 'body' => 'string', 'time_started' => 'int', 'time_updated' => 'int',
-						'num_reports' => 'int', 'closed' => 'int',
-					),
-					array(
-						$_POST['msg'], $message['id_topic'], $message['id_board'], $message['id_poster'], $message['real_name'],
-						$message['subject'], $message['body'] , time(), time(), 1, 0,
-					),
-					array('id_report')
-				);
-				$id_report = $db->insert_id('{db_prefix}log_reported', 'id_report');
-			}
-
-			// Now just add our report...
-			if ($id_report)
-			{
-				$db->insert('',
-					'{db_prefix}log_reported_comments',
-					array(
-						'id_report' => 'int', 'id_member' => 'int', 'membername' => 'string', 'email_address' => 'string',
-						'member_ip' => 'string', 'comment' => 'string', 'time_sent' => 'int',
-					),
-					array(
-						$id_report, $user_info['id'], $user_info['name'], $user_info['email'],
-						$user_info['ip'], $poster_comment, time(),
-					),
-					array('id_comment')
-				);
-			}
+			if ($id_report === false)
+				redirectexit('topic=' . $topic . '.msg' . $msg_id . '#msg' . $msg_id);
 		}
 
 		// Find out who the real moderators are - for mod preferences.
-		$request2 = $db->query('', '
-			SELECT id_member
-			FROM {db_prefix}moderators
-			WHERE id_board = {int:current_board}',
-			array(
-				'current_board' => $board,
-			)
-		);
-		$real_mods = array();
-		while ($row = $db->fetch_assoc($request2))
-			$real_mods[] = $row['id_member'];
-		$db->free_result($request2);
+		$real_mods = getBoardModerators($board, true);
 
 		// Send every moderator an email.
 		foreach ($mod_to_notify as $row)
@@ -566,7 +494,7 @@ class Emailuser_Controller
 				'TOPICSUBJECT' => $subject,
 				'POSTERNAME' => $poster_name,
 				'REPORTERNAME' => $reporterName,
-				'TOPICLINK' => $scripturl . '?topic=' . $topic . '.msg' . $_POST['msg'] . '#msg' . $_POST['msg'],
+				'TOPICLINK' => $scripturl . '?topic=' . $topic . '.msg' . $msg_id . '#msg' . $msg_id,
 				'REPORTLINK' => !empty($id_report) ? $scripturl . '?action=moderate;area=reports;report=' . $id_report : '',
 				'COMMENT' => $_POST['comment'],
 			);
@@ -582,6 +510,6 @@ class Emailuser_Controller
 		updateSettings(array('last_mod_report_action' => time()));
 
 		// Back to the post we reported!
-		redirectexit('reportsent;topic=' . $topic . '.msg' . $_POST['msg'] . '#msg' . $_POST['msg']);
+		redirectexit('reportsent;topic=' . $topic . '.msg' . $msg_id . '#msg' . $msg_id);
 	}
 }
