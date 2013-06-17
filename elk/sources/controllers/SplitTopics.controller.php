@@ -74,8 +74,6 @@ class SplitTopics_Controller
 	{
 		global $txt, $topic, $context, $modSettings;
 
-		$db = database();
-
 		// Validate "at".
 		if (empty($_GET['at']))
 			fatal_lang_error('numbers_one_to_nine', false);
@@ -84,11 +82,12 @@ class SplitTopics_Controller
 		// We deal with topics here.
 		require_once(SUBSDIR . '/Topic.subs.php');
 		require_once(SUBSDIR . '/Boards.subs.php');
+
 		// Let's load up the boards in case they are useful.
 		$context += getBoardList(array('use_permissions' => true, 'not_redirection' => true));
 
 		// Retrieve message info for the message at the split point.
-		$messageInfo = messageInfo($topic, $splitAt, true);
+		$messageInfo = messageTopicDetails($topic, $splitAt, true);
 		if (empty($messageInfo))
 			fatal_lang_error('cant_find_messages');
 
@@ -131,8 +130,7 @@ class SplitTopics_Controller
 	 */
 	function action_splitExecute()
 	{
-		global $txt, $context, $user_info, $modSettings;
-		global $board, $topic, $language, $scripturl;
+		global $txt, $context, $topic;
 
 		// Check the session to make sure they meant to do this.
 		checkSession();
@@ -152,6 +150,7 @@ class SplitTopics_Controller
 			$context['move_to_board'] = (int) $_SESSION['move_to_board'];
 			$context['reason'] = trim(Util::htmlspecialchars($_SESSION['reason']));
 		}
+
 		$_SESSION['move_to_board'] = $context['move_to_board'];
 		$_SESSION['reason'] = $context['reason'];
 
@@ -201,7 +200,7 @@ class SplitTopics_Controller
 	 */
 	function action_splitSelection()
 	{
-		global $txt, $board, $topic, $context, $user_info;
+		global $txt, $topic, $context;
 
 		// Make sure the session id was passed with post.
 		checkSession();
@@ -247,6 +246,8 @@ class SplitTopics_Controller
 	function action_splitSelectTopics()
 	{
 		global $txt, $scripturl, $topic, $context, $modSettings, $original_msgs, $options;
+
+		$db = database();
 
 		$context['page_title'] = $txt['split'] . ' - ' . $txt['select_split_posts'];
 		$context['destination_board'] = !empty($_POST['move_to_board']) ? (int) $_POST['move_to_board'] : 0;
@@ -399,6 +400,7 @@ class SplitTopics_Controller
 
 		// Build a page list of the not-selected topics...
 		$context['not_selected']['page_index'] = constructPageIndex($scripturl . '?action=splittopics;sa=selectTopics;subname=' . strtr(urlencode($_REQUEST['subname']), array('%' => '%%')) . ';topic=' . $topic . '.%1$d;start2=' . $context['selected']['start'], $context['not_selected']['start'], $context['not_selected']['num_messages'], $context['messages_per_page'], true);
+
 		// ...and one of the selected topics.
 		$context['selected']['page_index'] = constructPageIndex($scripturl . '?action=splittopics;sa=selectTopics;subname=' . strtr(urlencode($_REQUEST['subname']), array('%' => '%%')) . ';topic=' . $topic . '.' . $context['not_selected']['start'] . ';start2=%1$d', $context['selected']['start'], $context['selected']['num_messages'], $context['messages_per_page'], true);
 
@@ -476,15 +478,18 @@ function postSplitRedirect($reason, $subject, $board_info, $new_topic)
 		'icon' => 'moved',
 		'smileys_enabled' => 1,
 	);
+
 	$topicOptions = array(
 		'id' => $topic,
 		'board' => $board,
 		'mark_as_read' => true,
 	);
+
 	$posterOptions = array(
 		'id' => $user_info['id'],
 		'update_post_count' => empty($board_info['count_posts']),
 	);
+
 	createPost($msgOptions, $topicOptions, $posterOptions);
 }
 
@@ -504,7 +509,7 @@ function postSplitRedirect($reason, $subject, $board_info, $new_topic)
  */
 function splitTopic($split1_ID_TOPIC, $splitMessages, $new_subject)
 {
-	global $user_info, $topic, $board, $modSettings, $txt, $context;
+	global $txt;
 
 	$db = database();
 
@@ -553,6 +558,7 @@ function splitTopic($split1_ID_TOPIC, $splitMessages, $new_subject)
 		// Get the right first and last message dependant on approved state...
 		if (empty($split1_first_msg) || $row['myid_first_msg'] < $split1_first_msg)
 			$split1_first_msg = $row['myid_first_msg'];
+
 		if (empty($split1_last_msg) || $row['approved'])
 			$split1_last_msg = $row['myid_last_msg'];
 
@@ -596,6 +602,7 @@ function splitTopic($split1_ID_TOPIC, $splitMessages, $new_subject)
 		// As before get the right first and last message dependant on approved state...
 		if (empty($split2_first_msg) || $row['myid_first_msg'] < $split2_first_msg)
 			$split2_first_msg = $row['myid_first_msg'];
+
 		if (empty($split2_last_msg) || $row['approved'])
 			$split2_last_msg = $row['myid_last_msg'];
 
@@ -659,6 +666,7 @@ function splitTopic($split1_ID_TOPIC, $splitMessages, $new_subject)
 
 	// Move the messages over to the other topic.
 	$new_subject = strtr(Util::htmltrim(Util::htmlspecialchars($new_subject)), array("\r" => '', "\n" => '', "\t" => ''));
+
 	// Check the subject length.
 	if (Util::strlen($new_subject) > 100)
 		$new_subject = Util::substr($new_subject, 0, 100);
@@ -684,79 +692,23 @@ function splitTopic($split1_ID_TOPIC, $splitMessages, $new_subject)
 		updateStats('subject', $split2_ID_TOPIC, $new_subject);
 	}
 
-	// @fixme refactor this section, Topic.subs has the function.
 	// Any associated reported posts better follow...
-	$db->query('', '
-		UPDATE {db_prefix}log_reported
-		SET id_topic = {int:id_topic}
-		WHERE id_msg IN ({array_int:split_msgs})',
-		array(
-			'split_msgs' => $splitMessages,
-			'id_topic' => $split2_ID_TOPIC,
-		)
-	);
-
-	// Mess with the old topic's first, last, and number of messages.
-	$db->query('', '
-		UPDATE {db_prefix}topics
-		SET
-			num_replies = {int:num_replies},
-			id_first_msg = {int:id_first_msg},
-			id_last_msg = {int:id_last_msg},
-			id_member_started = {int:id_member_started},
-			id_member_updated = {int:id_member_updated},
-			unapproved_posts = {int:unapproved_posts}
-		WHERE id_topic = {int:id_topic}',
-		array(
-			'num_replies' => $split1_replies,
-			'id_first_msg' => $split1_first_msg,
-			'id_last_msg' => $split1_last_msg,
-			'id_member_started' => $split1_firstMem,
-			'id_member_updated' => $split1_lastMem,
-			'unapproved_posts' => $split1_unapprovedposts,
-			'id_topic' => $split1_ID_TOPIC,
-		)
-	);
-
-	// Now, put the first/last message back to what they should be.
-	$db->query('', '
-		UPDATE {db_prefix}topics
-		SET
-			id_first_msg = {int:id_first_msg},
-			id_last_msg = {int:id_last_msg}
-		WHERE id_topic = {int:id_topic}',
-		array(
-			'id_first_msg' => $split2_first_msg,
-			'id_last_msg' => $split2_last_msg,
-			'id_topic' => $split2_ID_TOPIC,
-		)
-	);
-
-	// If the new topic isn't approved ensure the first message flags this just in case.
-	if (!$split2_approved)
-		$db->query('', '
-			UPDATE {db_prefix}messages
-			SET approved = {int:approved}
-			WHERE id_msg = {int:id_msg}
-				AND id_topic = {int:id_topic}',
-			array(
-				'approved' => 0,
-				'id_msg' => $split2_first_msg,
-				'id_topic' => $split2_ID_TOPIC,
-			)
-		);
-
-	// The board has more topics now (Or more unapproved ones!).
-	$db->query('', '
-		UPDATE {db_prefix}boards
-		SET ' . ($split2_approved ? '
-			num_topics = num_topics + 1' : '
-			unapproved_topics = unapproved_topics + 1') . '
-		WHERE id_board = {int:id_board}',
-		array(
-			'id_board' => $id_board,
-		)
-	);
+	require_once(SUBSDIR . '/Topic.subs.php');
+	updateSplitTopics(array(
+		'splitMessages' => $splitMessages,
+		'split2_ID_TOPIC' => $split2_ID_TOPIC,
+		'split1_replies' => $split1_replies,
+		'split1_first_msg' => $split1_first_msg,
+		'split1_last_msg' => $split1_last_msg,
+		'split1_firstMem' => $split1_firstMem,
+		'split1_lastMem' => $split1_lastMem,
+		'split1_unapprovedposts' => $split1_unapprovedposts,
+		'split1_ID_TOPIC' => $split1_ID_TOPIC,
+		'split2_first_msg' => $split2_first_msg,
+		'split2_last_msg' => $split2_last_msg,
+		'split2_ID_TOPIC' => $split2_ID_TOPIC,
+		'split2_approved' => $split2_approved,
+	), $id_board);
 
 	require_once(SUBSDIR . '/FollowUps.subs.php');
 	// Let's see if we can create a stronger bridge between the two topics
@@ -867,6 +819,7 @@ function splitAttemptMove($boards, $totopic)
 						updateMemberData($id_member, array('posts' => 'posts + ' . $posts));
 				}
 			}
+
 			// And finally move it!
 			moveTopics($totopic, $boards['destination']['id']);
 		}

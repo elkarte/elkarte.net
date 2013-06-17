@@ -28,7 +28,7 @@ if (!defined('ELKARTE'))
  */
 function AutoTask()
 {
-	global $time_start, $modSettings;
+	global $time_start;
 
 	$db = database();
 
@@ -154,7 +154,7 @@ function AutoTask()
  */
 function scheduled_approval_notification()
 {
-	global $scripturl, $modSettings, $mbname, $txt;
+	global $scripturl, $txt;
 
 	$db = database();
 
@@ -241,19 +241,12 @@ function scheduled_approval_notification()
 	$members = array();
 	if (in_array(2, $addGroups))
 	{
-		$request = $db->query('', '
-			SELECT id_member, id_board
-			FROM {db_prefix}moderators',
-			array(
-			)
-		);
-		while ($row = $db->fetch_assoc($request))
-		{
+		require_once(SUBSDIR . '/Boards.subs.php');
+		$all_mods = allBoardModerators(true);
+		// Make sure they get included in the big loop.
+		$members = array_keys($all_mods);
+		foreach ($all_mods as $row)
 			$mods[$row['id_member']][$row['id_board']] = true;
-			// Make sure they get included in the big loop.
-			$members[] = $row['id_member'];
-		}
-		$db->free_result($request);
 	}
 
 	// Come along one and all... until we reject you ;)
@@ -501,7 +494,7 @@ function scheduled_daily_maintenance()
  */
 function scheduled_auto_optimize()
 {
-	global $modSettings, $db_prefix, $db_type;
+	global $modSettings, $db_prefix;
 
 	$db = database();
 
@@ -613,7 +606,7 @@ function scheduled_daily_digest()
 
 	require_once(SUBSDIR . '/Boards.subs.php');
 	// Just get the board names.
-	
+
 	$boards = fetchBoardsInfo(array('boards' => $boards));
 
 	if (empty($boards))
@@ -680,7 +673,7 @@ function scheduled_daily_digest()
 			{
 				// Convert to markdown markup e.g. text ;)
 				pbe_prepare_text($row['body']);
-				$row['body'] = shorten_text($row['body']);
+				$row['body'] = shorten_text($row['body'], !empty($modSettings['digest_preview_length']) ? $modSettings['digest_preview_length'] : 375, true);
 				$row['body'] = preg_replace("~\n~s","\n  ", $row['body']);
 			}
 
@@ -726,7 +719,7 @@ function scheduled_daily_digest()
 				// Replace the body array with the appropriate preview message
 				$body = $types['reply'][$id]['lines'][$topic['id']]['body_text'];
 				pbe_prepare_text($body);
-				$body = shorten_text($body);
+				$body = shorten_text($body, !empty($modSettings['digest_preview_length']) ? $modSettings['digest_preview_length'] : 375, true);
 				$body = preg_replace("~\n~s","\n  ", $body);
 				$types['reply'][$id]['lines'][$topic['id']]['body'] = $body;
 
@@ -1289,8 +1282,8 @@ function calculateNextTrigger($tasks = array(), $forceUpdate = false)
  * Simply returns a time stamp of the next instance of these time parameters.
  *
  * @param int $regularity
- * @param type $unit
- * @param type $offset
+ * @param string $unit
+ * @param int $offset
  * @return int
  */
 function next_time($regularity, $unit, $offset)
@@ -1299,7 +1292,6 @@ function next_time($regularity, $unit, $offset)
 	if ($regularity == 0)
 		$regularity = 2;
 
-	$curHour = date('H', time());
 	$curMin = date('i', time());
 	$next_time = 9999999999;
 
@@ -1360,7 +1352,7 @@ function next_time($regularity, $unit, $offset)
  */
 function scheduled_fetchFiles()
 {
-	global $txt, $language, $settings, $forum_version, $modSettings;
+	global $txt, $language, $forum_version, $modSettings;
 
 	$db = database();
 
@@ -1430,7 +1422,7 @@ function scheduled_fetchFiles()
  */
 function scheduled_birthdayemails()
 {
-	global $modSettings, $mbname, $txt, $birthdayEmails;
+	global $modSettings, $txt, $txtBirthdayEmails;
 
 	$db = database();
 
@@ -1721,7 +1713,7 @@ function scheduled_weekly_maintenance()
  */
 function scheduled_paid_subscriptions()
 {
-	global $txt, $scripturl, $modSettings, $language;
+	global $scripturl, $modSettings, $language;
 
 	$db = database();
 
@@ -1808,8 +1800,6 @@ function scheduled_paid_subscriptions()
  */
 function scheduled_remove_temp_attachments()
 {
-	global $modSettings;
-
 	// We need to know where this thing is going.
 	require_once(SUBSDIR . '/Attachments.subs.php');
 	$attach_dirs = attachmentPaths();
@@ -1885,7 +1875,7 @@ function scheduled_remove_old_drafts()
 		return true;
 
 	// init
-	$drafts= array();
+	$drafts = array();
 
 	// We need this for language items
 	loadEssentialThemeData();

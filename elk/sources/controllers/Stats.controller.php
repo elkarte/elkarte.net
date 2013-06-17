@@ -20,6 +20,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Statistics Controller
+ */
 class Stats_Controller
 {
 	/**
@@ -32,11 +35,12 @@ class Stats_Controller
 	 */
 	function action_stats()
 	{
-		global $txt, $scripturl, $modSettings, $user_info, $context;
+		global $txt, $scripturl, $modSettings, $context;
 
 		$db = database();
 
 		isAllowedTo('view_stats');
+		
 		// Page disabled - redirect them out
 		if (empty($modSettings['trackStats']))
 			fatal_lang_error('feature_disabled', true);

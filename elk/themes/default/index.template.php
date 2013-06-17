@@ -70,7 +70,7 @@ function template_init()
 	$settings['require_theme_strings'] = false;
 
 	// This is used for the color variants
-	$settings['theme_variants'] = array('white', 'blue', 'red');
+	$settings['theme_variants'] = array('white', 'blue', 'red', 'green');
 
 	// Set the following variable to true is this theme wants to display the avatar of the user that posted the last post on the board index and message index
 	$settings['avatars_on_indexes'] = false;
@@ -82,9 +82,10 @@ function template_init()
 	$settings['page_index_template'] = array(
 		'base_link' => '<span class="pagelink"><a class="navPages" href="{base_link}">%2$s</a> </span>',
 		'previous_page' => '<span class="previous_page">{prev_txt}</span>',
-		'current_page' => '<span class="pagelink"><span class="current_page"><strong>%1$s</strong></span></span>',
+		'current_page' => '<span class="pagelink current_pagelink">%1$s</span>',
 		'next_page' => '<span class="next_page">{next_txt}</span>',
 		'expand_pages' => '<span class="expand_pages" onclick="{onclick_handler}" onmouseover="this.style.cursor=\'pointer\';"><strong> ... </strong></span>',
+		'all' => '<span class="all_pages">{all_txt}</span>',
 	);
 }
 
@@ -118,19 +119,6 @@ function template_html_above()
 			width: ', $settings['forum_width'], ';
 		}
 	</style>';
-
-	// Quick and dirty testing of RTL horrors. Remove before production build.
-	//echo '
-	//<link rel="stylesheet" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
-
-	// RTL languages require an additional stylesheet.
-	if ($context['right_to_left'])
-		echo '
-		<link rel="stylesheet" href="', $settings['theme_url'], '/css/rtl.css?alp21" />';
-
-	if (!empty($context['theme_variant']))
-		echo '
-		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?alp21" />';
 
 	echo '
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -279,51 +267,54 @@ function template_body_above()
 	</div>';
 
 	echo '
-	<div id="header">
+	<header id="header"', empty($context['minmax_preferences']['upshrink']) ? '' : ' style="display: none;"', '>
 		<div class="frame">
 			<h1 class="forumtitle">
 				<a id="top" href="', $scripturl, '">', empty($context['header_logo_url_html_safe']) ? $context['forum_name'] : '<img src="' . $context['header_logo_url_html_safe'] . '" alt="' . $context['forum_name'] . '" />', '</a>
 			</h1>';
 
 	echo '
-			', empty($settings['site_slogan']) ? '<img id="logo" src="' . $settings['images_url'] . (!empty($context['theme_variant']) ? '/'. $context['theme_variant'] . '/logo_elk.png' : '/logo_elk.png' ) . '" alt="Elkarte Community" title="Elkarte Community" />' : '<div id="siteslogan" class="floatright">' . $settings['site_slogan'] . '</div>', '';
+			', empty($settings['site_slogan']) ? '<img id="logo" src="' . $settings['images_url'] . (!empty($context['theme_variant']) ? '/'. $context['theme_variant'] . '/logo_elk.png' : '/logo_elk.png' ) . '" alt="ElkArte Community" title="ElkArte Community" />' : '<div id="siteslogan" class="floatright">' . $settings['site_slogan'] . '</div>', '';
 
 	echo'
 		</div>
-	</div>
-	<div id="wrapper">
+	</header>
+	<div id="wrapper">';
+	// Show the menu here, according to the menu sub template. Moved this. Like it here. :)
+	// Upper section and main content markup simplified. Less divs = happier parrots!
+	template_menu();
+	echo '
 		<div id="upper_section">
-			<div id="inner_section">
-				<div id="inner_wrap"', empty($context['minmax_preferences']['upshrink']) ? '' : ' style="display: none;"', '>
-					<div class="user floatright">';
+			<div id="inner_wrap"', empty($context['minmax_preferences']['upshrink']) ? '' : ' style="display: none;"', '>
+				<div class="user floatright">';
 
 	// Otherwise they're a guest - this time ask them to either register or login - lazy bums...
 	if (!empty($context['show_login_bar']))
 	{
 		echo '
-						<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
-						<form id="guest_form" action="', $scripturl, '?action=login2;quicklogin" method="post" accept-charset="UTF-8" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
-							<input type="text" name="user" size="10" class="input_text" placeholder="', $txt['username'], '" />
-							<input type="password" name="passwrd" size="10" class="input_password" placeholder="', $txt['password'], '" />
-							<select name="cookielength">
-								<option value="60">', $txt['one_hour'], '</option>
-								<option value="1440">', $txt['one_day'], '</option>
-								<option value="10080">', $txt['one_week'], '</option>
-								<option value="43200">', $txt['one_month'], '</option>
-								<option value="-1" selected="selected">', $txt['forever'], '</option>
-							</select>
-							<input type="submit" value="', $txt['login'], '" class="button_submit" />
-							<div>', $txt['quick_login_dec'], '</div>';
+					<script src="', $settings['default_theme_url'], '/scripts/sha1.js"></script>
+					<form id="guest_form" action="', $scripturl, '?action=login2;quicklogin" method="post" accept-charset="UTF-8" ', empty($context['disable_login_hashing']) ? ' onsubmit="hashLoginPassword(this, \'' . $context['session_id'] . '\', \'' . (!empty($context['login_token']) ? $context['login_token'] : '') . '\');"' : '', '>
+						<input type="text" name="user" size="10" class="input_text" placeholder="', $txt['username'], '" />
+						<input type="password" name="passwrd" size="10" class="input_password" placeholder="', $txt['password'], '" />
+						<select name="cookielength">
+							<option value="60">', $txt['one_hour'], '</option>
+							<option value="1440">', $txt['one_day'], '</option>
+							<option value="10080">', $txt['one_week'], '</option>
+							<option value="43200">', $txt['one_month'], '</option>
+							<option value="-1" selected="selected">', $txt['forever'], '</option>
+						</select>
+						<input type="submit" value="', $txt['login'], '" class="button_submit" />
+						<div>', $txt['quick_login_dec'], '</div>';
 
 		if (!empty($modSettings['enableOpenID']))
 			echo '
-							<br /><input type="text" name="openid_identifier" size="25" class="input_text openid_login" />';
+						<br /><input type="text" name="openid_identifier" size="25" class="input_text openid_login" />';
 
 		echo '
-							<input type="hidden" name="hash_passwrd" value="" />
-							<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-							<input type="hidden" name="', $context['login_token_var'], '" value="', $context['login_token'], '" />
-						</form>';
+						<input type="hidden" name="hash_passwrd" value="" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						<input type="hidden" name="', $context['login_token_var'], '" value="', $context['login_token'], '" />
+					</form>';
 	}
 
 	// If the user is logged in, display stuff like their name, new messages, etc.
@@ -331,50 +322,46 @@ function template_body_above()
 	{
 		if (!empty($context['user']['avatar']))
 			echo '
-						<a href="', $scripturl, '?action=profile" class="avatar">', $context['user']['avatar']['image'], '</a>';
+					<a href="', $scripturl, '?action=profile" class="avatar">', $context['user']['avatar']['image'], '</a>';
 		echo '
-						<ul>
-							<li class="greeting">', $txt['hello_member_ndt'], ' <span>', $context['user']['name'], '</span></li>';
+					<ul>
+						<li class="greeting">', $txt['hello_member_ndt'], ' <span>', $context['user']['name'], '</span></li>';
 
 		// Are there any members waiting for approval?
 		if (!empty($context['unapproved_members']))
 			echo '
-							<li>', $context['unapproved_members_text'], '</li>';
+						<li>', $context['unapproved_members_text'], '</li>';
 
 		if (!empty($context['open_mod_reports']) && $context['show_open_reports'])
 			echo '
-							<li><a href="', $scripturl, '?action=moderate;area=reports">', sprintf($txt['mod_reports_waiting'], $context['open_mod_reports']), '</a></li>';
+						<li><a href="', $scripturl, '?action=moderate;area=reports">', sprintf($txt['mod_reports_waiting'], $context['open_mod_reports']), '</a></li>';
 
 		echo '
-						</ul>';
+					</ul>';
 	}
 
 	echo'
-					</div>';
+				</div>';
 	// Show a random news item? (or you could pick one from news_lines...)
 	if (!empty($settings['enable_news']) && !empty($context['random_news_line']))
 		echo '
-					<div class="news">
-						<h2>', $txt['news'], ': </h2>
-						<p>', $context['random_news_line'], '</p>
-					</div>';
-
-	echo '
-					<hr class="clear" />
+				<div class="news">
+					<h2>', $txt['news'], ': </h2>
+					<p>', $context['random_news_line'], '</p>
 				</div>';
 
-	// Show the menu here, according to the menu sub template, followed by the navigation tree.
-	template_menu();
+	echo '
+			</div>';
+
+	// Show the navigation tree.
 	theme_linktree();
 
 	echo '
-			</div>
 		</div>';
 
 	// The main content should go here.
 	echo '
-		<div id="content_section">
-			<div id="main_content_section">';
+		<div id="main_content_section">';
 }
 
 /**
@@ -385,20 +372,19 @@ function template_body_below()
 	global $context, $settings, $scripturl, $txt, $modSettings;
 
 	echo '
-			</div>
 		</div>
 	</div>';
 
 	// Show the XHTML and RSS links, as well as the copyright.
 	// Footer is now full-width by default. Frame inside it will match theme wrapper width automatically.
 	echo '
-	<div id="footer_section">
+	<footer id="footer_section">
 		<div class="frame">';
 
-	// There is now a global "Go to top" link at the right.
+	// There is now a global "Go to top" link at the right. @todo - this needs fixing.
 	echo '
 			<a href="#top" id="bot"><img src="', $settings['images_url'], '/upshrink.png" alt="*" title="', $txt['go_up'], '" /></a>
-			<ul class="reset">
+			<ul>
 				<li class="copyright">', theme_copyright(), '
 				</li>
 				<li><a id="button_xhtml" href="http://validator.w3.org/check?uri=referer" target="_blank" class="new_win" title="', $txt['valid_xhtml'], '"><span>', $txt['xhtml'], '</span></a></li>
@@ -413,7 +399,7 @@ function template_body_below()
 
 	echo '
 		</div>
-	</div>';
+	</footer>';
 }
 
 /**
@@ -421,7 +407,7 @@ function template_body_below()
  */
 function template_html_below()
 {
-	// load in any javascipt that could be defered to the end of the page
+	// load in any javascript that could be deferred to the end of the page
 	template_javascript(true);
 
 	echo '
@@ -440,7 +426,7 @@ function theme_linktree($force_show = false)
 	// If linktree is empty, just return - also allow an override.
 	if (empty($context['linktree']) || (!empty($context['dont_default_linktree']) && !$force_show))
 		return;
-
+	// @todo - Div here is pointless. Prefer to deprecate in favour of plain ul (easy CSS changes).
 	echo '
 				<div class="navigate_section">
 					<ul>';
@@ -453,18 +439,13 @@ function theme_linktree($force_show = false)
 						</li>';
 
 	// Each tree item has a URL and name. Some may have extra_before and extra_after.
+	// Added a linktree class to make targeting dividers easy.
 	foreach ($context['linktree'] as $link_num => $tree)
 	{
 		echo '
-						<li', ($link_num == count($context['linktree']) - 1) ? ' class="last"' : '', '>';
+						<li class="', ($link_num == count($context['linktree']) - 1) ? 'last' : 'linktree', '">';
 
-		// Don't show a separator for the first one.
-		// Better here. Always points to the next level when the linktree breaks to a second line.
-		// Picked a better looking HTML entity, and added support for RTL plus a span for styling.
-		if ($link_num != 0)
-			echo '
-							<span class="dividers">', $context['right_to_left'] ? ' &#9668; ' : ' &#9658; ', '</span>';
-
+		// Dividers moved to pseudo-elements in CSS. @todo- rtl.css
 		// Show something before the link?
 		if (isset($tree['extra_before']))
 			echo $tree['extra_before'];
@@ -496,16 +477,17 @@ function template_menu()
 	global $context, $settings, $txt;
 
 	echo '
-				<div id="main_menu">
-					<ul class="dropmenu topmenu" id="menu_nav">';
+				<nav id="main_menu">
+					<ul class="dropmenu" id="menu_nav">';
 
-	// Note: Menu markup has been cleaned up to remove unnecessary spans and classes.
+	// @todo - WAI-ARIA a11y tweaks should be applied here (and elsewhere, for that matter).
 	foreach ($context['menu_buttons'] as $act => $button)
 	{
 		echo '
 						<li id="button_', $act, '" ', !empty($button['sub_buttons']) ? 'class="subsections"' : '', '>
 							<a class="', $button['sub_buttons'] ? 'submenu' : '', !empty($button['active_button']) ? ' active' : '', '" href="', $button['href'], '" ', isset($button['target']) ? 'target="' . $button['target'] . '"' : '', '>', $button['title'], '</a>';
 
+		// does it have child buttons? (2nd level menus)
 		if (!empty($button['sub_buttons']))
 		{
 			echo '
@@ -553,12 +535,12 @@ function template_menu()
 	// If anyone is terrified of losing 40px out of the menu bar, set your theme to 92% instead of 90%. :P
 	echo '
 						<li id="collapse_button">
-							<img id="upshrink" src="', $settings['images_url'], '/upshrink.png" alt="*" title="', $txt['upshrink_description'], '" style="padding: 4px 9px 3px 9px; display: none;" />
+							<img id="upshrink" src="', $settings['images_url'], '/upshrink.png" alt="*" title="', $txt['upshrink_description'], '" style="display: none;" />
 						</li>';
 
 	echo '
 					</ul>
-				</div>';
+				</nav>';
 
 	// Define the upper_section toggle in JavaScript.
 	// Note that this definition had to be shifted for the js to work with the new markup.
@@ -568,7 +550,7 @@ function template_menu()
 						bToggleEnabled: true,
 						bCurrentlyCollapsed: ', empty($context['minmax_preferences']['upshrink']) ? 'false' : 'true', ',
 						aSwappableContainers: [
-							\'inner_wrap\'
+							\'inner_wrap\',\'header\'
 						],
 						aSwapImages: [
 							{
@@ -625,7 +607,7 @@ function template_button_strip($button_strip, $direction = '', $strip_options = 
 	// No buttons? No button strip either.
 	if (empty($buttons))
 		return;
-
+	// @todo - Div here is pointless. Prefer to deprecate in favour of plain ul (easy CSS changes, but check for js bugz).
 	echo '
 						<div class="buttonlist', !empty($direction) ? ' float' . $direction : '', '"', (empty($buttons) ? ' style="display: none;"' : ''), (!empty($strip_options['id']) ? ' id="' . $strip_options['id'] . '"': ''), '>
 							<ul>',
@@ -634,6 +616,9 @@ function template_button_strip($button_strip, $direction = '', $strip_options = 
 						</div>';
 }
 
+/**
+ * Show a box with an error message.
+ */
 function template_show_error($error_id)
 {
 	global $context;
@@ -671,6 +656,9 @@ function template_show_error($error_id)
 					</div>';
 }
 
+/**
+ * Allows to select a board
+ */
 function template_select_boards($name, $label = '', $extra = '')
 {
 	global $context;
@@ -695,5 +683,42 @@ function template_select_boards($name, $label = '', $extra = '')
 	}
 
 	echo '
-					</select>';
+	</select>';
+}
+
+/**
+ * Another used and abused piece of template that can be found everywhere
+ * @param string $button_strip index of $context to create the button strip
+ * @param string $strip_direction direction of the button strip (see template_button_strip for details)
+ * @param string $go index of $txt used to label the go up/down button (possible values go_up/go_down, other values can be used as well, though it may result in non working buttons)
+ * @param array $options array of optional values, possible values:
+ *                - 'top_button' (boolean) show/hide the go up/down button (@todo rename)
+ *                - 'page_index' (string) index of $context where is located the pages index generated by constructPageIndex
+ *                - 'page_index_markup' (string) markup for the page index, overrides 'page_index' and can be used if the page index code is not in the first level of $context
+ *                - 'extra' (string) used to add html markup at the end of the template
+ */
+function template_pagesection($button_strip = false, $strip_direction = '', $go = 'go_up', $options = array())
+{
+	global $context, $modSettings, $txt;
+
+	if (!isset($options['top_button']))
+		$options['top_button'] = !empty($modSettings['topbottomEnable']);
+	if (!empty($options['page_index_markup']))
+		$pages = '<div class="pagelinks floatleft">' . $options['page_index_markup'] . '</div>';
+	else
+	{
+		if (!isset($options['page_index']))
+			$options['page_index'] = 'page_index';
+		$pages = empty($context[$options['page_index']]) ? '' : '<div class="pagelinks floatleft">' . $context[$options['page_index']] . '</div>';
+	}
+	if (!isset($options['extra']))
+		$options['extra'] = '';
+
+		echo '
+	<div class="pagesection">
+		', $options['top_button'] ? '<a id="page' . ($go != 'go_up' ? 'top' : 'bot') . '" href="#' . ($go == 'go_up' ? 'top' : 'bot') . '" class="topbottom floatleft">' . $txt[$go] . '</a>' : '', $pages, '
+		', !empty($button_strip) && !empty($context[$button_strip]) ? template_button_strip($context[$button_strip], $strip_direction) : '',
+		$options['extra'], '
+	</div>';
+
 }

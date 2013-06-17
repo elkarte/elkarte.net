@@ -23,13 +23,16 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Memberlist Controller
+ */
 class Memberlist_Controller
 {
 	/**
 	 * Sets up the context for showing a listing of registered members.
 	 * For the handlers in this file, it requires the view_mlist permission.
 	 *
-	 * @uses Memberlist template, main sub template.
+	 * @uses Memberlist template, main sub-template.
 	 */
 	function action_index()
 	{
@@ -246,7 +249,6 @@ class Memberlist_Controller
 		// Send the data to the template.
 		$context['start'] = $_REQUEST['start'] + 1;
 		$context['end'] = min($_REQUEST['start'] + $modSettings['defaultMaxMembers'], $context['num_members']);
-
 		$context['can_moderate_forum'] = allowedTo('moderate_forum');
 		$context['page_title'] = sprintf($txt['viewing_members'], $context['start'], $context['end']);
 		$context['linktree'][] = array(
@@ -274,7 +276,6 @@ class Memberlist_Controller
 			$query_parameters['real_name_high'] = $memberlist_cache['index'][$second_offset];
 			$limit -= $first_offset;
 		}
-
 		// Reverse sorting is a bit more complicated...
 		elseif ($use_cache && $_REQUEST['sort'] === 'real_name')
 		{
@@ -315,8 +316,8 @@ class Memberlist_Controller
 
 	/**
 	 * Search for members, or display search results.
-	 * - If variable 'search' is empty displays search dialog box, using the search sub template.
-	 * - Calls printMemberListRows to retrieve the results of the query.
+	 * If variable $_REQUEST['search'] is empty displays search dialog box, using the search sub-template.
+	 * Calls printMemberListRows to retrieve the results of the query.
 	 */
 	function action_mlsearch()
 	{

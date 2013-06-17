@@ -7,16 +7,13 @@
  *
  * @version 1.0 Alpha
  *
- * This file is mainly concerned with minor tasks relating to boards, such as
- * marking them read, collapsing categories, or quick moderation.
- *
  */
 
 if (!defined('ELKARTE'))
 	die('No access...');
 
 /**
- * This class handles a part of the actions to mak boards, topics, or replies, as read/unread.
+ * This class handles a part of the actions to mark boards, topics, or replies, as read/unread.
  */
 class MarkRead_Controller
 {
@@ -125,8 +122,6 @@ class MarkRead_Controller
 	{
 		global $user_info, $modSettings;
 
-		$db = database();
-
 		// Make sure all the topics are integers!
 		$topics = array_map('intval', explode('-', $_REQUEST['topics']));
 
@@ -152,8 +147,6 @@ class MarkRead_Controller
 	public function action_marktopic()
 	{
 		global $board, $topic, $user_info;
-
-		$db = database();
 
 		require_once(SUBSDIR . '/Topic.subs.php');
 		require_once(SUBSDIR . '/Messages.subs.php');
@@ -214,12 +207,14 @@ class MarkRead_Controller
 			foreach ($_REQUEST['c'] as $c)
 				$categories[] = (int) $c;
 		}
+
 		if (isset($_REQUEST['boards']))
 		{
 			$_REQUEST['boards'] = explode(',', $_REQUEST['boards']);
 			foreach ($_REQUEST['boards'] as $b)
 				$boards[] = (int) $b;
 		}
+
 		if (!empty($board))
 			$boards[] = (int) $board;
 
@@ -260,6 +255,7 @@ class MarkRead_Controller
 					array('id_member', 'id_board')
 				);
 			}
+
 			if (empty($board))
 				return '';
 			else

@@ -165,7 +165,7 @@ class Themes_Controller
 
 			// Commit the new settings.
 			updateSettings(array(
-				'theme_allow' => $_POST['options']['theme_allow'],
+				'theme_allow' => !empty($_POST['options']['theme_allow']),
 				'theme_guests' => $_POST['options']['theme_guests'],
 				'knownThemes' => implode(',', $_POST['options']['known_themes']),
 			));
@@ -1348,7 +1348,7 @@ class Themes_Controller
 			mkdir($theme_dir . '/scripts', 0777);
 
 			// Copy over the default non-theme files.
-			$to_copy = array('/index.php', '/index.template.php', '/css/index.css', '/css/rtl.css', '/scripts/theme.js');
+			$to_copy = array('/index.php', '/index.template.php', '/css/index.css', '/css/rtl.css', '/css/admin.css', '/scripts/theme.js');
 			foreach ($to_copy as $file)
 			{
 				copy($settings['default_theme_dir'] . $file, $theme_dir . $file);
@@ -2328,7 +2328,11 @@ function WrapAction()
 
 	// Any special layers?
 	if (isset($settings['catch_action']['layers']))
-		Template_Layers::getInstance()->add($settings['catch_action']['layers']);
+	{
+		$template_layers = Template_Layers::getInstance();
+		foreach ($settings['catch_action']['layers'] as $layer)
+			$template_layers->add($layer);
+	}
 
 	// Just call a function?
 	if (isset($settings['catch_action']['function']))

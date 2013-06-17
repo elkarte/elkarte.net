@@ -18,6 +18,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Move Topic Controller
+ */
 class MoveTopic_Controller
 {
 	/**
@@ -33,10 +36,7 @@ class MoveTopic_Controller
 	 */
 	function action_movetopic()
 	{
-		global $txt, $board, $topic, $user_info, $context, $language, $scripturl, $settings, $modSettings;
-
-		$db = database();
-		global $cat_tree, $boards, $boardList;
+		global $txt, $topic, $user_info, $context, $language, $scripturl, $modSettings;
 
 		if (empty($topic))
 			fatal_lang_error('no_access', false);
@@ -263,6 +263,7 @@ class MoveTopic_Controller
 				'icon' => 'moved',
 				'smileys_enabled' => 1,
 			);
+
 			$topicOptions = array(
 				'board' => $board,
 				'lock_mode' => 1,
@@ -270,6 +271,7 @@ class MoveTopic_Controller
 				'redirect_expires' => $redirect_expires,
 				'redirect_topic' => $redirect_topic,
 			);
+			
 			$posterOptions = array(
 				'id' => $user_info['id'],
 				'update_post_count' => empty($board_info['count_posts']),

@@ -27,7 +27,7 @@ if (!defined('ELKARTE'))
  */
 function reloadSettings()
 {
-	global $modSettings, $txt, $db_character_set, $context, $ent_check;
+	global $modSettings, $db_character_set;
 
 	$db = database();
 
@@ -251,7 +251,7 @@ function loadUserSettings()
 			// @todo can this be cached?
 			// Do a quick query to make sure this isn't a mistake.
 			require_once(SUBSDIR . '/Messages.subs.php');
-			$visitOpt = getMessageInfo($user_settings['id_msg_last_visit'], true);
+			$visitOpt = basicMessageInfo($user_settings['id_msg_last_visit'], true);
 
 			$_SESSION['id_msg_last_visit'] = $user_settings['id_msg_last_visit'];
 
@@ -827,7 +827,7 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 			IFNULL(lo.log_time, 0) AS is_online, IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type,
 			mem.signature, mem.personal_text, mem.location, mem.gender, mem.avatar, mem.id_member, mem.member_name,
 			mem.real_name, mem.email_address, mem.hide_email, mem.date_registered, mem.website_title, mem.website_url,
-			mem.birthdate, mem.member_ip, mem.member_ip2, mem.posts, mem.last_login,
+			mem.birthdate, mem.member_ip, mem.member_ip2, mem.posts, mem.last_login, mem.likes_given, mem.likes_received,
 			mem.karma_good, mem.id_post_group, mem.karma_bad, mem.lngfile, mem.id_group, mem.time_offset, mem.show_online,
 			mg.online_color AS member_group_color, IFNULL(mg.group_name, {string:blank_string}) AS member_group,
 			pg.online_color AS post_group_color, IFNULL(pg.group_name, {string:blank_string}) AS post_group,
@@ -911,25 +911,25 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 	// Are we loading any moderators?  If so, fix their group data...
 	if (!empty($loaded_ids) && !empty($board_info['moderators']) && $set === 'normal' && count($temp_mods = array_intersect($loaded_ids, array_keys($board_info['moderators']))) !== 0)
 	{
-		if (($row = cache_get_data('moderator_group_info', 480)) == null)
+		if (($group_info = cache_get_data('moderator_group_info', 480)) == null)
 		{
 			require_once(SUBSDIR . '/Membergroups.subs.php');
-			$row = membergroupsById(3, 1, true);
+			$group_info = membergroupById(3, true);
 
-			cache_put_data('moderator_group_info', $row, 480);
+			cache_put_data('moderator_group_info', $group_info, 480);
 		}
 
 		foreach ($temp_mods as $id)
 		{
 			// By popular demand, don't show admins or global moderators as moderators.
 			if ($user_profile[$id]['id_group'] != 1 && $user_profile[$id]['id_group'] != 2)
-				$user_profile[$id]['member_group'] = $row['group_name'];
+				$user_profile[$id]['member_group'] = $group_info['group_name'];
 
 			// If the Moderator group has no color or icons, but their group does... don't overwrite.
-			if (!empty($row['icons']))
-				$user_profile[$id]['icons'] = $row['icons'];
-			if (!empty($row['online_color']))
-				$user_profile[$id]['member_group_color'] = $row['online_color'];
+			if (!empty($group_info['icons']))
+				$user_profile[$id]['icons'] = $group_info['icons'];
+			if (!empty($group_info['online_color']))
+				$user_profile[$id]['member_group_color'] = $group_info['online_color'];
 		}
 	}
 
@@ -946,7 +946,7 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 function loadMemberContext($user, $display_custom_fields = false)
 {
 	global $memberContext, $user_profile, $txt, $scripturl, $user_info;
-	global $context, $modSettings, $board_info, $settings;
+	global $context, $modSettings, $settings;
 	static $dataLoaded = array();
 
 	// If this person's data is already loaded, skip it.
@@ -1039,6 +1039,10 @@ function loadMemberContext($user, $display_custom_fields = false)
 				'bad' => $profile['karma_bad'],
 				'allow' => !$user_info['is_guest'] && !empty($modSettings['karmaMode']) && $user_info['id'] != $user && allowedTo('karma_edit') &&
 				($user_info['posts'] >= $modSettings['karmaMinPosts'] || $user_info['is_admin']),
+			),
+			'likes' => array(
+				'given' => $profile['likes_given'],
+				'received' => $profile['likes_received']
 			),
 			'ip' => htmlspecialchars($profile['member_ip']),
 			'ip2' => htmlspecialchars($profile['member_ip2']),
@@ -1471,11 +1475,12 @@ function loadTheme($id_theme = 0, $initialize = true)
 
 		// Custom template layers?
 		if (isset($settings['theme_layers']))
-			foreach(explode(',', $settings['theme_layers']) as $key => $layer)
-				$layers[$layer] = $key * 100;
+			$layers = explode(',', $settings['theme_layers']);
 		else
-			$layers = array('html' => 0, 'body' => 100);
-		Template_Layers::getInstance()->add($layers);
+			$layers = array('html', 'body');
+		$template_layers = Template_Layers::getInstance();
+		foreach ($layers as $layer)
+			$template_layers->addBegin($layer);
 	}
 
 	// Initialize the theme.
@@ -1509,6 +1514,10 @@ function loadTheme($id_theme = 0, $initialize = true)
 		// Do this to keep things easier in the templates.
 		$context['theme_variant'] = '_' . $context['theme_variant'];
 		$context['theme_variant_url'] = $context['theme_variant'] . '/';
+
+		// The most efficient way of writing multi themes is to use a master index.css plus variant.css files.
+		if (!empty($context['theme_variant']))
+			loadCSSFile('index' . $context['theme_variant'] . '.css');
 	}
 
 	// Allow overriding the board wide time/number formats.
@@ -1529,6 +1538,10 @@ function loadTheme($id_theme = 0, $initialize = true)
 	$context['character_set'] = 'UTF-8';
 	$context['right_to_left'] = !empty($txt['lang_rtl']);
 	$context['tabindex'] = 1;
+
+	// RTL languages require an additional stylesheet.
+	if ($context['right_to_left'])
+		loadCSSFile('rtl.css');
 
 	// Compatibility.
 	if (!isset($settings['theme_version']))
@@ -1683,21 +1696,19 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 	if (!is_array($style_sheets))
 		$style_sheets = array($style_sheets);
 
-	// The most efficient way of writing multi themes is to use a master index.css plus variant.css files.
-	if (!empty($context['theme_variant']))
-		$default_sheets = array('index.css', $context['theme_variant'] . '.css');
-	else
-		$default_sheets = array('index.css');
+	if (empty($default_loaded))
+	{
+		loadCSSFile(array('index.css'));
+		$default_loaded = true;
+	}
 
 	// Any specific template style sheets to load?
 	if (!empty($style_sheets))
-		loadCSSFile(
-			array(implode('.css,', $style_sheets) . '.css')
-		);
-	elseif (empty($default_loaded))
 	{
-		loadCSSFile($default_sheets);
-		$default_loaded = true;
+		foreach ($style_sheets as &$sheet)
+			$sheet = stripos('.css', $sheet) !== false ? $sheet : $sheet . '.css';
+
+		loadCSSFile($style_sheets);
 	}
 
 	// No template to load?
@@ -1768,7 +1779,7 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
  */
 function loadSubTemplate($sub_template_name, $fatal = false)
 {
-	global $context, $settings, $options, $txt, $db_show_debug;
+	global $context, $txt, $db_show_debug;
 
 	if ($db_show_debug === true)
 		$context['debug']['sub_templates'][] = $sub_template_name;
@@ -1962,7 +1973,7 @@ function addJavascriptVar($key, $value, $escape = false)
 {
 	global $context;
 
-	if (!empty($key) && !empty($value))
+	if (!empty($key) && isset($value))
 		$context['javascript_vars'][$key] = !empty($escape) ? JavaScriptEscape($value) : $value;
 }
 
@@ -2067,27 +2078,6 @@ function loadLanguage($template_name, $lang = '', $fatal = true, $force_reload =
 		{
 			log_error(sprintf($txt['theme_language_error'], $template_name . '.' . $lang, 'template'));
 			break;
-		}
-
-		// For the sake of backward compatibility
-		if (!empty($txt['emails']))
-		{
-			foreach ($txt['emails'] as $key => $value)
-			{
-				$txt[$key . '_subject'] = $value['subject'];
-				$txt[$key . '_body'] = $value['body'];
-			}
-			$txt['emails'] = array();
-		}
-		if (!empty($birthdayEmails))
-		{
-			foreach ($birthdayEmails as $key => $value)
-			{
-				$txtBirthdayEmails[$key . '_subject'] = $value['subject'];
-				$txtBirthdayEmails[$key . '_body'] = $value['body'];
-				$txtBirthdayEmails[$key . '_author'] = $value['author'];
-			}
-			$birthdayEmails = array();
 		}
 	}
 
@@ -2248,7 +2238,7 @@ function getLanguages($use_cache = true)
  */
 function censorText(&$text, $force = false)
 {
-	global $modSettings, $options, $settings, $txt;
+	global $modSettings, $options, $settings;
 	static $censor_vulgar = null, $censor_proper;
 
 	if ((!empty($options['show_no_censored']) && $settings['allow_no_censored'] && !$force) || empty($modSettings['censor_vulgar']) || trim($text) === '')
@@ -2296,8 +2286,7 @@ function censorText(&$text, $force = false)
  */
 function template_include($filename, $once = false)
 {
-	global $context, $settings, $options, $txt, $scripturl, $modSettings;
-	global $user_info, $boardurl;
+	global $context, $settings, $txt, $scripturl, $modSettings, $boardurl;
 	global $maintenance, $mtitle, $mmessage;
 	static $templates = array();
 
@@ -2347,7 +2336,7 @@ function template_include($filename, $once = false)
 		{
 			$txt['template_parse_error'] = 'Template Parse Error!';
 			$txt['template_parse_error_message'] = 'It seems something has gone sour on the forum with the template system.  This problem should only be temporary, so please come back later and try again.  If you continue to see this message, please contact the administrator.<br /><br />You can also try <a href="javascript:location.reload();">refreshing this page</a>.';
-			$txt['template_parse_error_details'] = 'There was a problem loading the <tt><strong>%1$s</strong></tt> template or language file.  Please check the syntax and try again - remember, single quotes (<tt>\'</tt>) often have to be escaped with a slash (<tt>\\</tt>).  To see more specific error information from PHP, try <a href="' . $boardurl . '%1$s" class="extern">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="' . $scripturl . '?theme=1">use the default theme</a>.';
+			$txt['template_parse_error_details'] = 'There was a problem loading the <span style="font-family: monospace;"><strong>%1$s</strong></span> template or language file.  Please check the syntax and try again - remember, single quotes (<span style="font-family: monospace;">\'</span>) often have to be escaped with a slash (<span style="font-family: monospace;">\\</span>).  To see more specific error information from PHP, try <a href="' . $boardurl . '%1$s" class="extern">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="' . $scripturl . '?theme=1">use the default theme</a>.';
 		}
 
 		// First, let's get the doctype and language information out of the way.
@@ -2395,7 +2384,7 @@ function template_include($filename, $once = false)
 				echo '
 		<hr />
 
-		<div style="margin: 0 20px;"><tt>', strtr(strtr($error, array('<strong>' . BOARDDIR => '<strong>...', '<strong>' . strtr(BOARDDIR, '\\', '/') => '<strong>...')), '\\', '/'), '</tt></div>';
+		<div style="margin: 0 20px;"><span style="font-family: monospace;">', strtr(strtr($error, array('<strong>' . BOARDDIR => '<strong>...', '<strong>' . strtr(BOARDDIR, '\\', '/') => '<strong>...')), '\\', '/'), '</span></div>';
 
 			// I know, I know... this is VERY COMPLICATED.  Still, it's good.
 			if (preg_match('~ <strong>(\d+)</strong><br( /)?' . '>$~i', $error, $match) != 0)

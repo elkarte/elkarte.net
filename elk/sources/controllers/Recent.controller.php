@@ -20,6 +20,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Recent Post Controller
+ */
 class Recent_Controller
 {
 	/**
@@ -285,10 +288,10 @@ class Recent_Controller
 		require_once(SUBSDIR . '/Recent.subs.php');
 
 		$context['showCheckboxes'] = !empty($options['display_quick_mod']) && $options['display_quick_mod'] == 1 && $settings['show_mark_read'];
-
 		$context['showing_all_topics'] = isset($_GET['all']);
 		$context['start'] = (int) $_REQUEST['start'];
 		$context['topics_per_page'] = empty($modSettings['disableCustomPerPage']) && !empty($options['topics_per_page']) ? $options['topics_per_page'] : $modSettings['defaultMaxTopics'];
+
 		if ($_REQUEST['action'] == 'unread')
 			$context['page_title'] = $context['showing_all_topics'] ? $txt['unread_topics_all'] : $txt['unread_topics_visit'];
 		else
@@ -321,6 +324,7 @@ class Recent_Controller
 
 			// The easiest thing is to just get all the boards they can see,
 			// but since we've specified the top of tree we ignore some of them
+			require_once(SUBSDIR . '/Boards.subs.php');
 			addChildBoards($boards);
 
 			if (empty($boards))
@@ -381,6 +385,7 @@ class Recent_Controller
 		else
 		{
 			$see_board = isset($_REQUEST['action']) && $_REQUEST['action'] == 'unreadreplies' ? 'query_see_board' : 'query_wanna_see_board';
+
 			// Don't bother to show deleted posts!
 			$request = $db->query('', '
 				SELECT b.id_board
@@ -471,7 +476,7 @@ class Recent_Controller
 		// This part is the same for each query.
 		$select_clause = '
 					ms.subject AS first_subject, ms.poster_time AS first_poster_time, ms.id_topic, t.id_board, b.name AS bname,
-					t.num_replies, t.num_views, ms.id_member AS id_first_member, ml.id_member AS id_last_member,
+					t.num_replies, t.num_views, t.num_likes, ms.id_member AS id_first_member, ml.id_member AS id_last_member,
 					ml.poster_time AS last_poster_time, IFNULL(mems.real_name, ms.poster_name) AS first_poster_name,
 					IFNULL(meml.real_name, ml.poster_name) AS last_poster_name, ml.subject AS last_subject,
 					ml.icon AS last_icon, ms.icon AS first_icon, t.id_poll, t.is_sticky, t.locked, ml.modified_time AS last_modified_time,
@@ -618,6 +623,7 @@ class Recent_Controller
 			{
 				// Mark the boards as read if there are no unread topics!
 				require_once(SUBSDIR . '/Boards.subs.php');
+
 				// @todo look at this... there are no more unread topics already.
 				// If clearing of log_topics is still needed, perhaps do it separately.
 				markBoardsRead(empty($boards) ? $board : $boards, false, true);
@@ -627,6 +633,7 @@ class Recent_Controller
 					$context['querystring_board_limits'] = '';
 				else
 					$context['querystring_board_limits'] = sprintf($context['querystring_board_limits'], $_REQUEST['start']);
+
 				return;
 			}
 			else
@@ -706,6 +713,7 @@ class Recent_Controller
 				{
 					// Since there are no unread topics, mark the boards as read!
 					require_once(SUBSDIR . '/Boards.subs.php');
+
 					// @todo look at this... there are no more unread topics already.
 					// If clearing of log_topics is still needed, perhaps do it separately.
 					markBoardsRead(empty($boards) ? $board : $boards, false, true);
@@ -971,11 +979,10 @@ class Recent_Controller
 			{
 				// Limit them to 128 characters - do this FIRST because it's a lot of wasted censoring otherwise.
 				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], $row['first_smileys'], $row['id_first_msg']), array('<br />' => '&#10;')));
-				if (Util::strlen($row['first_body']) > 128)
-					$row['first_body'] = Util::substr($row['first_body'], 0, 128) . '...';
+				$row['first_body'] = shorten_text($row['first_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+
 				$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], $row['last_smileys'], $row['id_last_msg']), array('<br />' => '&#10;')));
-				if (Util::strlen($row['last_body']) > 128)
-					$row['last_body'] = Util::substr($row['last_body'], 0, 128) . '...';
+				$row['last_body'] = shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
 
 				// Censor the subject and message preview.
 				censorText($row['first_subject']);
@@ -1017,6 +1024,7 @@ class Recent_Controller
 					$tmppages[] = '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.' . $tmpb . ';topicseen">' . $tmpa . '</a>';
 					$tmpa++;
 				}
+
 				// Show links to all the pages?
 				if (count($tmppages) <= 5)
 					$pages = '&#171; ' . implode(' ', $tmppages);
@@ -1037,6 +1045,7 @@ class Recent_Controller
 				// First icon first... as you'd expect.
 				if (!isset($context['icon_sources'][$row['first_icon']]))
 					$context['icon_sources'][$row['first_icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $row['first_icon'] . '.png') ? 'images_url' : 'default_images_url';
+
 				// Last icon... last... duh.
 				if (!isset($context['icon_sources'][$row['last_icon']]))
 					$context['icon_sources'][$row['last_icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $row['last_icon'] . '.png') ? 'images_url' : 'default_images_url';
@@ -1086,8 +1095,8 @@ class Recent_Controller
 				'is_sticky' => !empty($modSettings['enableStickyTopics']) && !empty($row['is_sticky']),
 				'is_locked' => !empty($row['locked']),
 				'is_poll' => $modSettings['pollMode'] == '1' && $row['id_poll'] > 0,
-				'is_hot' => $row['num_replies'] >= $modSettings['hotTopicPosts'],
-				'is_very_hot' => $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
+				'is_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicPosts'] : $row['num_replies'] >= $modSettings['hotTopicPosts'],
+				'is_very_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicVeryPosts'] : $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
 				'is_posted_in' => false,
 				'icon' => $row['first_icon'],
 				'icon_url' => $settings[$context['icon_sources'][$row['first_icon']]] . '/post/' . $row['first_icon'] . '.png',
@@ -1095,6 +1104,7 @@ class Recent_Controller
 				'pages' => $pages,
 				'replies' => comma_format($row['num_replies']),
 				'views' => comma_format($row['num_views']),
+				'likes' => comma_format($row['num_likes']),
 				'board' => array(
 					'id' => $row['id_board'],
 					'name' => $row['bname'],

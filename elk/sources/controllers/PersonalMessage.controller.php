@@ -22,6 +22,9 @@
 if (!defined('ELKARTE'))
 	die('No access...');
 
+/**
+ * Personal Message Controller
+ */
 class PersonalMessage_Controller
 {
 	/**
@@ -79,12 +82,15 @@ class PersonalMessage_Controller
 		{
 			$context['labels'] = $user_settings['message_labels'] == '' ? array() : explode(',', $user_settings['message_labels']);
 			foreach ($context['labels'] as $id_label => $label_name)
+			{
 				$context['labels'][(int) $id_label] = array(
 					'id' => $id_label,
 					'name' => trim($label_name),
 					'messages' => 0,
 					'unread_messages' => 0,
 				);
+			}
+
 			$context['labels'][-1] = array(
 				'id' => -1,
 				'name' => $txt['pm_msg_label_inbox'],
@@ -196,7 +202,7 @@ class PersonalMessage_Controller
 	function action_messagefolder()
 	{
 		global $txt, $scripturl, $modSettings, $context, $subjects_request;
-		global $messages_request, $user_info, $recipients, $options, $memberContext, $user_settings;
+		global $messages_request, $user_info, $recipients, $options, $user_settings;
 
 		$db = database();
 
@@ -260,17 +266,21 @@ class PersonalMessage_Controller
 
 		// Now, build the link tree!
 		if ($context['current_label_id'] == -1)
+		{
 			$context['linktree'][] = array(
 				'url' => $scripturl . '?action=pm;f=' . $context['folder'],
 				'name' => $pmbox
 			);
+		}
 
 		// Build it further for a label.
 		if ($context['current_label_id'] != -1)
+		{
 			$context['linktree'][] = array(
 				'url' => $scripturl . '?action=pm;f=' . $context['folder'] . ';l=' . $context['current_label_id'],
 				'name' => $txt['pm_current_label'] . ': ' . $context['current_label']
 			);
+		}
 
 		// Figure out how many messages there are.
 		$max_messages = getPMCount(false, null, $labelQuery);
@@ -463,10 +473,12 @@ class PersonalMessage_Controller
 
 			// Keep track of the last message so we know what the head is without another query!
 			if ((empty($pmID) && (empty($options['view_newest_pm_first']) || !isset($lastData))) || empty($lastData) || (!empty($pmID) && $pmID == $row['id_pm']))
+			{
 				$lastData = array(
 					'id' => $row['id_pm'],
 					'head' => $row['id_pm_head'],
 				);
+			}
 		}
 		$db->free_result($request);
 
@@ -563,8 +575,10 @@ class PersonalMessage_Controller
 			if ($context['display_mode'] == 1)
 			{
 				foreach ($posters as $k => $v)
+				{
 					if (!in_array($k, $display_pms))
 						unset($posters[$k]);
+				}
 			}
 
 			// Load any users....
@@ -761,6 +775,7 @@ class PersonalMessage_Controller
 				$form_message = preg_replace('~<br ?/?' . '>~i', "\n", $row_quoted['body']);
 				if (!empty($modSettings['removeNestedQuotes']))
 					$form_message = preg_replace(array('~\n?\[quote.*?\].+?\[/quote\]\n?~is', '~^\n~', '~\[/quote\]~'), '', $form_message);
+
 				if (empty($row_quoted['id_member']))
 					$form_message = '[quote author=&quot;' . $row_quoted['real_name'] . '&quot;]' . "\n" . $form_message . "\n" . '[/quote]';
 				else
@@ -809,10 +824,12 @@ class PersonalMessage_Controller
 			{
 				// Firstly, to reply to all we clearly already have $row_quoted - so have the original member from.
 				if ($row_quoted['id_member'] != $user_info['id'])
+				{
 					$context['recipients']['to'][] = array(
 						'id' => $row_quoted['id_member'],
 						'name' => htmlspecialchars($row_quoted['real_name']),
 					);
+				}
 
 				// Now to get the others.
 				$request = $db->query('', '
@@ -840,15 +857,17 @@ class PersonalMessage_Controller
 				$users = array_map('intval', explode(',', $_REQUEST['u']));
 				$users = array_unique($users);
 
-				require_once(SUBSDIR . '/Members.subs.php');
 				// Get the latest activated member's display name.
+				require_once(SUBSDIR . '/Members.subs.php');
 				$result = getBasicMemberData($users);
 
 				foreach ($result as $row)
+				{
 					$context['recipients']['to'][] = array(
 						'id' => $row['id_member'],
 						'name' => $row['real_name'],
 					);
+				}
 			}
 
 			// Get a literal name list in case the user has JavaScript disabled.
@@ -900,7 +919,6 @@ class PersonalMessage_Controller
 
 		// Store the ID for old compatibility.
 		$context['post_box_name'] = $editorOptions['id'];
-
 		$context['bcc_value'] = '';
 
 		$context['require_verification'] = !$user_info['is_admin'] && !empty($modSettings['pm_posts_verification']) && $user_info['posts'] < $modSettings['pm_posts_verification'];
@@ -927,6 +945,7 @@ class PersonalMessage_Controller
 
 		// validate with loadMemberData()
 		$memberResult = loadMemberData($user_info['id'], false);
+
 		if (!is_array($memberResult))
 			fatal_lang_error('not_a_user', false);
 		list ($memID) = $memberResult;
@@ -942,8 +961,7 @@ class PersonalMessage_Controller
 	 */
 	function action_sendmessage2()
 	{
-		global $txt, $context;
-		global $user_info, $modSettings, $scripturl;
+		global $txt, $context, $user_info, $modSettings;
 
 		$db = database();
 
@@ -982,7 +1000,7 @@ class PersonalMessage_Controller
 		if (!isset($_REQUEST['xml']) && checkSession('post', '', false) != '')
 			$post_errors->addError('session_timeout');
 
-		$_REQUEST['subject'] = isset($_REQUEST['subject']) ? trim($_REQUEST['subject']) : '';
+		$_REQUEST['subject'] = isset($_REQUEST['subject']) ? strtr(Util::htmlspecialchars($_POST['subject']), array("\r" => '', "\n" => '', "\t" => '')) : '';
 		$_REQUEST['to'] = empty($_POST['to']) ? (empty($_GET['to']) ? '' : $_GET['to']) : $_POST['to'];
 		$_REQUEST['bcc'] = empty($_POST['bcc']) ? (empty($_GET['bcc']) ? '' : $_GET['bcc']) : $_POST['bcc'];
 
@@ -1083,6 +1101,7 @@ class PersonalMessage_Controller
 		// Did they make any mistakes?
 		if ($_REQUEST['subject'] == '')
 			$post_errors->addError('no_subject');
+
 		if (!isset($_REQUEST['message']) || $_REQUEST['message'] == '')
 			$post_errors->addError('no_message');
 		elseif (!empty($modSettings['max_messageLength']) && Util::strlen($_REQUEST['message']) > $modSettings['max_messageLength'])
@@ -1225,7 +1244,7 @@ class PersonalMessage_Controller
 	 */
 	function action_messageactions()
 	{
-		global $txt, $context, $user_info, $options;
+		global $context, $user_info, $options;
 
 		$db = database();
 
@@ -1483,7 +1502,6 @@ class PersonalMessage_Controller
 			'url' => $scripturl . '?action=pm;sa=prune',
 			'name' => $txt['pm_prune']
 		);
-
 		$context['sub_template'] = 'prune';
 		$context['page_title'] = $txt['pm_prune'];
 	}
@@ -1506,8 +1524,8 @@ class PersonalMessage_Controller
 		$context['page_title'] = $txt['pm_manage_labels'];
 		$context['sub_template'] = 'labels';
 
-		$the_labels = array();
 		// Add all existing labels to the array to save, slashing them as necessary...
+		$the_labels = array();
 		foreach ($context['labels'] as $label)
 		{
 			if ($label['id'] != -1)
@@ -1648,6 +1666,7 @@ class PersonalMessage_Controller
 							continue;
 
 						$rule_changes[] = $rule['id'];
+
 						// If we're here we have a label which is either changed or gone...
 						if (isset($new_labels[$action['v']]))
 							$context['rules'][$k]['actions'][$k2]['v'] = $new_labels[$action['v']];
@@ -1661,6 +1680,7 @@ class PersonalMessage_Controller
 			if (!empty($rule_changes))
 			{
 				$rule_changes = array_unique($rule_changes);
+
 				// Update/delete as appropriate.
 				foreach ($rule_changes as $k => $id)
 					if (!empty($context['rules'][$id]['actions']))
@@ -1709,9 +1729,7 @@ class PersonalMessage_Controller
 	 */
 	function action_messagesettings()
 	{
-		global $txt, $user_settings, $user_info, $context;
-
-		$db = database();
+		global $txt, $user_info, $context;
 		global $scripturl, $profile_vars, $cur_profile, $user_profile;
 
 		// We want them to submit back to here.
@@ -1756,6 +1774,7 @@ class PersonalMessage_Controller
 
 		// Load up the fields.
 		require_once(CONTROLLERDIR . '/ProfileOptions.controller.php');
+		require_once(SUBSDIR . '/Profile.subs.php');
 		action_pmprefs($user_info['id']);
 	}
 
@@ -1870,6 +1889,7 @@ class PersonalMessage_Controller
 
 			// Prepare the message storage array.
 			$messagesToSend = array();
+
 			// Loop through each admin, and add them to the right language pile...
 			foreach ($admins as $id_admin => $admin_info)
 			{
@@ -1971,6 +1991,7 @@ class PersonalMessage_Controller
 			applyRules(true);
 			redirectexit('action=pm;sa=manrules');
 		}
+
 		// Editing a specific one?
 		if (isset($_GET['add']))
 		{
@@ -1982,6 +2003,7 @@ class PersonalMessage_Controller
 			{
 				$context['rule'] = $context['rules'][$context['rid']];
 				$members = array();
+
 				// Need to get member names!
 				foreach ($context['rule']['criteria'] as $k => $criteria)
 					if ($criteria['t'] == 'mid' && !empty($criteria['v']))
@@ -2182,6 +2204,7 @@ function applyRules($all_messages = false)
 		foreach ($context['rules'] as $rule)
 		{
 			$match = false;
+
 			// Loop through all the criteria hoping to make a match.
 			foreach ($rule['criteria'] as $criterium)
 			{
@@ -2297,7 +2320,7 @@ function loadRules($reload = false)
  */
 function messageIndexBar($area)
 {
-	global $txt, $context, $scripturl, $sc, $modSettings, $settings, $user_info, $options;
+	global $txt, $context, $scripturl, $modSettings, $user_info;
 
 	$pm_areas = array(
 		'folders' => array(
@@ -2413,9 +2436,6 @@ function messageIndexBar($area)
 	}
 
 	require_once(SUBSDIR . '/Menu.subs.php');
-
-	// What page is this, again?
-	$current_page = $scripturl . '?action=pm' . (!empty($_REQUEST['sa']) ? ';sa=' . $_REQUEST['sa'] : '') . (!empty($context['folder']) ? ';f=' . $context['folder'] : '') . (!empty($context['current_label_id']) ? ';l=' . $context['current_label_id'] : '');
 
 	// Set a few options for the menu.
 	$menuOptions = array(
@@ -2591,8 +2611,7 @@ function preparePMContext($type = 'subject', $reset = false)
  */
 function messagePostError($named_recipients, $recipient_ids = array())
 {
-	global $txt, $context, $scripturl, $modSettings;
-	global $user_info;
+	global $txt, $context, $scripturl, $modSettings, $user_info;
 
 	$db = database();
 
@@ -2612,11 +2631,13 @@ function messagePostError($named_recipients, $recipient_ids = array())
 		'to' => array(),
 		'bcc' => array(),
 	);
+
 	if (!empty($recipient_ids['to']) || !empty($recipient_ids['bcc']))
 	{
 		$allRecipients = array_merge($recipient_ids['to'], $recipient_ids['bcc']);
 
 		require_once(SUBSDIR . '/Members.subs.php');
+
 		// Get the latest activated member's display name.
 		$result = getBasicMemberData($allRecipients);
 		foreach ($result as $row)
