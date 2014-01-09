@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -19,148 +20,49 @@
  */
 function template_issueWarning()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	template_load_warning_variables();
 
 	echo '
 	<script><!-- // --><![CDATA[
-		function setWarningBarPos(curEvent, isMove, changeAmount)
-		{
-			barWidth = ', $context['warningBarWidth'], ';
+	var barWidth = ', $context['warningBarWidth'], ',
+		currentLevel = ', $context['member']['warning'], ',
+		minLimit = ', $context['min_allowed'], ',
+		maxLimit = ', $context['max_allowed'], ',
+		color = "black",
+		effectText = "";
 
-			// Are we passing the amount to change it by?
-			if (changeAmount)
-			{
-				if (document.getElementById(\'warning_level\').value == \'SAME\')
-					percent = ', $context['member']['warning'], ' + changeAmount;
-				else
-					percent = parseInt(document.getElementById(\'warning_level\').value) + changeAmount;
-			}
-			// If not then it\'s a mouse thing.
-			else
-			{
-				if (!curEvent)
-					var curEvent = window.event;
-
-				// If it\'s a movement check the button state first!
-				if (isMove)
-				{
-					if (!curEvent.button || curEvent.button != 1)
-						return false
-				}
-
-				// Get the position of the container.
-				contain = document.getElementById(\'warning_progress\');
-				position = 0;
-				while (contain != null)
-				{
-					position += contain.offsetLeft;
-					contain = contain.offsetParent;
-				}
-
-				// Where is the mouse?
-				if (curEvent.pageX)
-				{
-					mouse = curEvent.pageX;
-				}
-				else
-				{
-					mouse = curEvent.clientX;
-					mouse += document.documentElement.scrollLeft != "undefined" ? document.documentElement.scrollLeft : document.body.scrollLeft;
-				}
-
-				// Is this within bounds?
-				if (mouse < position || mouse > position + barWidth)
-					return;
-
-				percent = Math.round(((mouse - position) / barWidth) * 100);
-
-				// Round percent to the nearest 5 - by kinda cheating!
-				percent = Math.round(percent / 5) * 5;
-			}
-
-			// What are the limits?
-			minLimit = ', $context['min_allowed'], ';
-			maxLimit = ', $context['max_allowed'], ';
-
-			percent = Math.max(percent, minLimit);
-			percent = Math.min(percent, maxLimit);
-
-			size = barWidth * (percent/100);
-
-			setInnerHTML(document.getElementById(\'warning_text\'), percent + "%");
-			document.getElementById(\'warning_text\').innerHTML = percent + "%";
-			document.getElementById(\'warning_level\').value = percent;
-			document.getElementById(\'warning_progress\').style.width = size + "px";
-
-			// Get the right color.
-			color = "black"';
+	// Colors for the warning level
+	var colors = {';
 
 	foreach ($context['colors'] as $limit => $color)
-		echo '
-			if (percent >= ', $limit, ')
-				color = "', $color, '";';
+		echo $limit, ' : "', $color, '", ';
 
-	echo '
-			document.getElementById(\'warning_progress\').style.backgroundColor = color;
-			document.getElementById(\'warning_progress\').style.backgroundImage = "none";
+	echo '};
 
-			// Also set the right effect.
-			effectText = "";';
+	// Text to describe the effect of the chosen level
+	var effectTexts = {';
 
 	foreach ($context['level_effects'] as $limit => $text)
-		echo '
-			if (percent >= ', $limit, ')
-				effectText = "', $text, '";';
+		echo $limit, ' : "', $text, '", ';
 
-	echo '
-			setInnerHTML(document.getElementById(\'cur_level_div\'), effectText);
-		}
+	echo '}
 
-		// Disable notification boxes as required.
-		function modifyWarnNotify()
-		{
-			disable = !document.getElementById(\'warn_notify\').checked;
-			document.getElementById(\'warn_sub\').disabled = disable;
-			document.getElementById(\'warn_body\').disabled = disable;
-			document.getElementById(\'warn_temp\').disabled = disable;
-			document.getElementById(\'new_template_link\').style.display = disable ? \'none\' : \'\';
-			document.getElementById(\'preview_button\').style.display = disable ? \'none\' : \'\';
-		}
+	// Warning templates that can be sent to the user
+	var templates = {';
 
-		function changeWarnLevel(amount)
-		{
-			setWarningBarPos(false, false, amount);
-		}
+	foreach ($context['notification_templates'] as $limit => $type)
+		echo $limit, ' :"', strtr($type['body'], array('"' => "'", "\n" => '\\n', "\r" => '')), '", ';
 
-		// Warn template.
-		function populateNotifyTemplate()
-		{
-			index = document.getElementById(\'warn_temp\').value;
-			if (index == -1)
-				return false;
-
-			// Otherwise see what we can do...';
-
-	foreach ($context['notification_templates'] as $k => $type)
-		echo '
-			if (index == ', $k, ')
-				document.getElementById(\'warn_body\').value = "', strtr($type['body'], array('"' => "'", "\n" => '\\n', "\r" => '')), '";';
-
-	echo '
-		}
-
+	echo '};
 	// ]]></script>';
 
 	echo '
 	<form action="', $scripturl, '?action=profile;u=', $context['id_member'], ';area=issuewarning" method="post" class="flow_hidden" accept-charset="UTF-8">
-		<div class="cat_bar">
-			<h3 class="catbg">
-				<img src="', $settings['images_url'], '/icons/profile_hd.png" alt="" class="icon" />
-				', $context['user']['is_owner'] ? $txt['profile_warning_level'] : $txt['profile_issue_warning'], '
-			</h3>
-		</div>';
+		<h3 class="category_header hdicon cat_img_profile">
+			', $context['user']['is_owner'] ? $txt['profile_warning_level'] : $txt['profile_issue_warning'], '
+		</h3>';
 
 	if (!$context['user']['is_owner'])
 		echo '
@@ -233,13 +135,13 @@ function template_issueWarning()
 				<div id="box_preview"', !empty($context['warning_data']['body_preview']) ? '' : ' style="display:none"', '>
 					<dl class="settings">
 						<dt>
-							<strong>', $txt['preview'] , '</strong>
+							<strong>', $txt['preview'], '</strong>
 						</dt>
 						<dd id="body_preview">
 							', !empty($context['warning_data']['body_preview']) ? $context['warning_data']['body_preview'] : '', '
 						</dd>
 					</dl>
-					<hr />
+				<hr />
 				</div>
 				<dl class="settings">
 					<dt>
@@ -258,24 +160,26 @@ function template_issueWarning()
 						<strong><label for="warn_temp">', $txt['profile_warning_notify_body'], ':</label></strong>
 					</dt>
 					<dd>
-						<select name="warn_temp" id="warn_temp" disabled="disabled" onchange="populateNotifyTemplate();" style="font-size: x-small;">
-							<option value="-1">', $txt['profile_warning_notify_template'], '</option>
-							<option value="-1">------------------------------</option>';
+						<div class="padding">
+							<select name="warn_temp" id="warn_temp" disabled="disabled" onchange="populateNotifyTemplate();">
+								<option value="-1">', $txt['profile_warning_notify_template'], '</option>
+								<option value="-1" disabled="disabled">', str_repeat('&#8212;', strlen($txt['profile_warning_notify_template'])), '</option>';
 
 		foreach ($context['notification_templates'] as $id_template => $template)
 			echo '
-							<option value="', $id_template, '">', $template['title'], '</option>';
+								<option value="', $id_template, '">' . (isBrowser('ie8') ? '&#187;' : '&#10148;') . '&nbsp;', $template['title'], '</option>';
 
 		echo '
-						</select>
-						<span class="smalltext" id="new_template_link" style="display: none;">[<a href="', $scripturl, '?action=moderate;area=warnings;sa=templateedit;tid=0" target="_blank" class="new_win">', $txt['profile_warning_new_template'], '</a>]</span><br />
+							</select>
+							<span id="new_template_link" style="display: none;"><a class="linkbutton new_win" href="', $scripturl, '?action=moderate;area=warnings;sa=templateedit;tid=0" target="_blank">', $txt['profile_warning_new_template'], '</a></span>
+						</div>
 						<textarea name="warn_body" id="warn_body" cols="40" rows="8" style="min-width: 50%; max-width: 99%;">', $context['warning_data']['notify_body'], '</textarea>
 					</dd>';
 	}
 
 	echo '
 				</dl>
-				<div class="righttext">';
+				<div class="submitbutton">';
 
 	if (!empty($context['token_check']))
 		echo '
@@ -289,7 +193,7 @@ function template_issueWarning()
 			</div>
 		</div>
 	</form>
-	</br />';
+	<br />';
 
 	// Previous warnings?
 	template_show_list('issued_warnings');
@@ -314,30 +218,30 @@ function template_issueWarning()
 		{
 			$.ajax({
 				type: "POST",
-				url: "' . $scripturl . '?action=xmlhttp;sa=previews;xml",
+				url: "' . $scripturl . '?action=xmlpreview;xml",
 				data: {item: "warning_preview", title: $("#warn_sub").val(), body: $("#warn_body").val(), issuing: true},
-				context: document.body,
-				success: function(request){
-					$("#box_preview").show();
-					$("#body_preview").html($(request).find(\'body\').text());
-					if ($(request).find("error").text() != \'\')
-					{
-						$("#profile_error").show();
-						var errors_html = \'<span>\' + $("#profile_error").find("span").html() + \'</span>\' + \'<ul class="list_errors">\';
-						var errors = $(request).find(\'error\').each(function() {
-							errors_html += \'<li>\' + $(this).text() + \'</li>\';
-						});
-						errors_html += \'</ul>\';
+				context: document.body
+			})
+			.done(function(request) {
+				$("#box_preview").show();
+				$("#body_preview").html($(request).find(\'body\').text());
+				if ($(request).find("error").text() != \'\')
+				{
+					$("#profile_error").show();
+					var errors_html = \'<span>\' + $("#profile_error").find("span").html() + \'</span>\' + \'<ul class="list_errors">\';
+					var errors = $(request).find(\'error\').each(function() {
+						errors_html += \'<li>\' + $(this).text() + \'</li>\';
+					});
+					errors_html += \'</ul>\';
 
-						$("#profile_error").html(errors_html);
-					}
-					else
-					{
-						$("#profile_error").hide();
-						$("#error_list").html(\'\');
-					}
-				return false;
-				},
+					$("#profile_error").html(errors_html);
+				}
+				else
+				{
+					$("#profile_error").hide();
+					$("#error_list").html(\'\');
+				}
+			return false;
 			});
 			return false;
 		}';
@@ -351,21 +255,19 @@ function template_issueWarning()
  */
 function template_deleteAccount()
 {
-	global $context, $settings, $scripturl, $txt, $scripturl;
+	global $context, $scripturl, $txt, $settings;
 
 	// The main containing header.
 	echo '
 		<form action="', $scripturl, '?action=profile;area=deleteaccount;save" method="post" accept-charset="UTF-8" name="creator" id="creator">
-			<div class="title_bar">
-				<h3 class="titlebg">
-					<img src="', $settings['images_url'], '/icons/profile_hd.png" alt="" class="icon" />', $txt['deleteAccount'], '
-				</h3>
-			</div>';
+			<h3 class="category_header hdicon cat_img_profile">
+				', $txt['deleteAccount'], '
+			</h3>';
 
 	// If deleting another account give them a lovely info box.
 	if (!$context['user']['is_owner'])
 		echo '
-			<p class="windowbg2 description">', $txt['deleteAccount_desc'], '</p>';
+			<p class="description">', $txt['deleteAccount_desc'], '</p>';
 
 	echo '
 			<div class="windowbg2">
@@ -374,17 +276,17 @@ function template_deleteAccount()
 	// If they are deleting their account AND the admin needs to approve it - give them another piece of info ;)
 	if ($context['needs_approval'])
 		echo '
-					<div class="errorbox">', $txt['deleteAccount_approval'], '</div>';
+					<div class="noticebox">', $txt['deleteAccount_approval'], '</div>';
 
 	// If the user is deleting their own account warn them first - and require a password!
 	if ($context['user']['is_owner'])
 	{
 		echo '
-					<div class="alert">', $txt['own_profile_confirm'], '</div>
+					<div class="errorbox">', $txt['own_profile_confirm'], '</div>
 					<div>
 						<strong', (isset($context['modify_error']['bad_password']) || isset($context['modify_error']['no_password']) ? ' class="error"' : ''), '>', $txt['current_password'], ': </strong>
 						<input type="password" name="oldpasswrd" size="20" class="input_password" />&nbsp;&nbsp;&nbsp;&nbsp;
-						<input type="submit" value="', $txt['yes'], '" class="button_submit" />';
+						<input type="submit" value="', $txt['delete'], '" class="button_submit submitgo" />';
 
 		if (!empty($context['token_check']))
 			echo '
@@ -400,40 +302,46 @@ function template_deleteAccount()
 	else
 	{
 		echo '
-					<div class="alert">', $txt['deleteAccount_warning'], '</div>';
+					<div class="errorbox">', $txt['deleteAccount_warning'], '</div>
+					<dl class="settings">';
 
 		// Only actually give these options if they are kind of important.
 		if ($context['can_delete_posts'])
 			echo '
-					<div>
-						', $txt['deleteAccount_posts'], ':
-						<select name="remove_type">
+					<dt>
+						<a href="', $scripturl, '?action=quickhelp;help=deleteAccount_posts" onclick="return reqOverlayDiv(this.href);" class="help"><img src="', $settings['images_url'], '/helptopics.png" alt="', $txt['help'], '" class="icon" /></a>
+						<label for="remove_type">', $txt['deleteAccount_posts'], '</label>:
+					</dt>
+					<dd>
+						<select id="remove_type" name="remove_type">
 							<option value="none">', $txt['deleteAccount_none'], '</option>
 							<option value="posts">', $txt['deleteAccount_all_posts'], '</option>
 							<option value="topics">', $txt['deleteAccount_topics'], '</option>
 						</select>
-					</div>';
+					</dd>';
 
 		echo '
-					<div>
-						<label for="deleteAccount"><input type="checkbox" name="deleteAccount" id="deleteAccount" value="1" class="input_check" onclick="if (this.checked) return confirm(\'', $txt['deleteAccount_confirm'], '\');" /> ', $txt['deleteAccount_member'], '.</label>
-					</div>
-					<div>
-						<input type="submit" value="', $txt['delete'], '" class="button_submit" />';
+					<dt>
+						<label for="deleteAccount">', $txt['deleteAccount_member'], '</label>
+					</dt>
+					<dd>
+						<input type="checkbox" name="deleteAccount" id="deleteAccount" value="1" class="input_check" onclick="if (this.checked) return confirm(\'', $txt['deleteAccount_confirm'], '\');" />
+					</dd>
+				</dl>
+				<input type="submit" value="', $txt['delete'], '" class="right_submit" />';
 
 		if (!empty($context['token_check']))
 			echo '
 				<input type="hidden" name="', $context[$context['token_check'] . '_token_var'], '" value="', $context[$context['token_check'] . '_token'], '" />';
 
 		echo '
-						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-						<input type="hidden" name="u" value="', $context['id_member'], '" />
-						<input type="hidden" name="sa" value="', $context['menu_item_selected'], '" />
-					</div>';
+				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+				<input type="hidden" name="u" value="', $context['id_member'], '" />
+				<input type="hidden" name="sa" value="', $context['menu_item_selected'], '" />';
 	}
+
 	echo '
 				</div>
 			</div>
-			<br />
 		</form>';
 }

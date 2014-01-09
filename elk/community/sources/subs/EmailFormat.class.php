@@ -1,31 +1,30 @@
 <?php
-
 /**
+ * class that will reflow/format an email message to make it look like a post again
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
- * Takes an email body and attempts to re-flow/format it for posting.  It will
- * as best it can to undo the 78/80 character email wrap
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Attempts, though an outrageous set of assumptions, to reflow an email message
- * that was previously chopped up by an email client (so it would look good on
+ * Attempts, though an outrageous set of assumptions, to reflow/format an email message
+ * that was previously wrapped by an email client (so it would look good on
  * a 80x24 screen)
  *
  * Removes extra spaces and newlines
  * Fixes some common punctuation errors seen in emails
- * Joins lines back together, where needed, to undo the 80char wrap in email
+ * Joins lines back together, where needed, to undo the 78 - 80 char wrap in email
  *
  * Really this is built on a house of cards and should generally be viewed
  * as an unfortante evil if you want a post to *not* look like its an email.
- * I am simply a victim here.
+ * It's always the innocent bystanders who suffer most.
  *
  * Load class
  * Initiate as
@@ -38,37 +37,37 @@ if (!defined('ELKARTE'))
 class Email_Format
 {
 	/**
-	 * the full message section we will return
+	 * The full message section we will return
 	 */
 	private $_body = null;
 
 	/**
-	 * the full message section broken in to parts
+	 * The full message section broken in to parts
 	 */
 	private $_body_array = array();
 
 	/**
-	 * holds the current quote level we are in
+	 * Holds the current quote level we are in
 	 */
 	private $_in_quote = 0;
 
 	/**
-	 * holds the current code block level we are in
+	 * Holds the current code block level we are in
 	 */
 	private $_in_code = 0;
 
 	/**
-	 * holds the level of bbc list we are in
+	 * Holds the level of bbc list we are in
 	 */
 	private $_in_bbclist = 0;
 
 	/**
-	 * holds the level of plain list we are in
+	 * Holds the level of plain list we are in
 	 */
 	private $_in_plainlist = 0;
 
 	/**
-	 * holds if we are in a plain text list
+	 * Holds if we are in a plain text list
 	 */
 	private $_in_list = 0;
 
@@ -83,7 +82,7 @@ class Email_Format
 	private $_real_name = null;
 
 	/**
-	 * tuning value (fudge) used to decide if a line is short
+	 * Tuning value (fudge) used to decide if a line is short
 	 * change with care, used to help figure out wrapping decisions
 	 */
 	private $_maillist_short_line = null;
@@ -99,9 +98,8 @@ class Email_Format
 	private $_maillist_sig_keys = null;
 
 	/**
-	 * tuning delta value (fudge) to help indicate the last line in a paragraph
+	 * Tuning delta value (fudge) to help indicate the last line in a paragraph
 	 * change with care
-	 *
 	 */
 	private $_para_check = 25;
 
@@ -116,8 +114,9 @@ class Email_Format
 	 * Returns a formated string
 	 *
 	 * @param string $data
-	 * @param string $real_name
 	 * @param boolean $html
+	 * @param string $real_name
+	 * @param string $charset
 	 */
 	public function reflow($data, $html = false, $real_name = '', $charset = 'UTF-8')
 	{
@@ -130,7 +129,7 @@ class Email_Format
 
 		$this->_real_name = $real_name;
 		$this->_prep_data($data);
-		$this->_fix_body($html);
+		$this->_fix_body();
 		$this->_clean_up($charset);
 
 		return $this->_body;
@@ -157,7 +156,7 @@ class Email_Format
 			$this->_body_array[$i]['content'] = $temp[$i];
 			$this->_body_array[$i]['length'] = Util::strlen($temp[$i]);
 
-			// text lists a) 1. etc
+			// Text lists a) 1. etc
 			$this->_body_array[$i]['list_item'] = $this->_in_plainlist($temp[$i]);
 
 			// [quote]
@@ -173,7 +172,7 @@ class Email_Format
 			$this->_body_array[$i]['in_bbclist'] = $this->_in_bbclist;
 		}
 
-		// reset our index values
+		// Reset our index values
 		$this->_in_bbclist = 0;
 		$this->_in_code = 0;
 		$this->_in_quote = 0;
@@ -187,10 +186,8 @@ class Email_Format
 	 * Insets breaks at blank lines, around bbc quote/code/list, text lists,
 	 * signature lines and end of paragraphs ... all assuming it can figure or
 	 * best guess those areas.
-	 *
-	 * @param boolean $html
 	 */
-	private function _fix_body($html)
+	private function _fix_body()
 	{
 		// Go line by line and put in line breaks *only* where (we often erroneously assume) they are needed
 		for ($i = 0, $num = count($this->_body_array); $i < $num; $i++)
@@ -208,7 +205,7 @@ class Email_Format
 					$this->_body_array[$i]['content'] = ' ' . trim($this->_body_array[$i]['content']);
 			}
 
-			// long line in a sig ... but not a link then lets bail out might be a ps or something
+			// Long line in a sig ... but not a link then lets bail out might be a ps or something
 			if ($this->_found_sig && ($this->_body_array[$i]['length'] > $this->_sig_longline) && (substr($this->_body_array[$i]['content'], 0, 4) !== 'www.'))
 				$this->_found_sig = false;
 
@@ -243,6 +240,11 @@ class Email_Format
 			{
 				$this->_body_array[$i]['content'] = "\n" . $this->_body_array[$i]['content'];
 			}
+			// Previous line ended in a break already
+			elseif (isset($this->_body_array[$i - 1]['content']) && substr(trim($this->_body_array[$i - 1]['content']), -4) == '[br]')
+			{
+				$this->_body_array[$i]['content'] = $this->_body_array[$i]['content'];
+			}
 			// OK, we can't seem to think of other obvious reasons this should not be on the same line
 			// and these numbers are quite frankly subjective, but so is how we got here, final "check"
 			else
@@ -266,7 +268,7 @@ class Email_Format
 				elseif ($para_check < 5)
 					$this->_body_array[$i]['content'] = "\n" . $this->_body_array[$i]['content'];
 				// A very short line (but not a empty one) followed by a very long line
-				elseif (isset($this->_body_array[$i - 1]) && !empty($this->_body_array[$i - 1]['content']) && $para_check > $this->_sig_longline && $this->_body_array[$i-1]['length'] < 3)
+				elseif (isset($this->_body_array[$i - 1]) && !empty($this->_body_array[$i - 1]['content']) && $para_check > $this->_sig_longline && $this->_body_array[$i - 1]['length'] < 3)
 					$this->_body_array[$i]['content'] = $this->_body_array[$i]['content'];
 				else
 					$this->_body_array[$i]['content'] = "\n\n" . $this->_body_array[$i]['content'];
@@ -286,12 +288,17 @@ class Email_Format
 	/**
 	 * Repairs common problems either caused by the reflow or just things found
 	 * in emails.
+	 *
+	 * @param string $charset
 	 */
 	private function _clean_up($charset)
 	{
 		// Remove any chitta chatta from either end
 		$tag = '(>([^a-zA-Z0-9_\[\s]){0,3}){1}';
 		$this->_body = preg_replace("~\n" . $tag . '~', "\n", $this->_body);
+
+		// Clean up double breaks found between bbc formatting tags, msoffice loves to do this
+		$this->_body = preg_replace('~\]\s*\[br\]\s*\[br\]\s*\[~s', '][br][', $this->_body);
 
 		// Repair the &nbsp; in its various states and any other chaff
 		$this->_body = strtr($this->_body, array(' &nbsp;' => ' ', '&nbsp; ' => ' ', "\xc2\xa0" => ' ', "\xe2\x80\xa8" => "\n", "\xA0" => ' '));
@@ -333,15 +340,14 @@ class Email_Format
 		$this->_body = htmlspecialchars_decode($this->_body, ENT_QUOTES);
 
 		// Convert other characters like MS "smart" quotes both uf8
-		$this->_body = strtr($this->_body, array("\xe2\x80\x98" => "'", "\xe2\x80\x99" => "'", "\xe2\x80\x9c" => '"', "\xe2\x80\x9d" => '"', "\xe2\x80\x93" => '-', "\xe2\x80\x94" => '--',	"\xe2\x80\xa6" => '...'));
+		$this->_body = strtr($this->_body, array("\xe2\x80\x98" => "'", "\xe2\x80\x99" => "'", "\xe2\x80\x9c" => '"', "\xe2\x80\x9d" => '"', "\xe2\x80\x93" => '-', "\xe2\x80\x94" => '--', "\xe2\x80\xa6" => '...'));
 
-		// and its 1252 variants
+		// And its 1252 variants
 		if ($charset !== 'UTF-8')
 			$this->_body = strtr($this->_body, array(chr(145) => "'", chr(146) => "'", chr(147) => '"', chr(148) => '"', chr(150) => '-', chr(151) => '--', chr(133) => '...'));
 	}
 
 	/**
-	 *
 	 * Checks if a string is the start or end of a bbc [quote] line
 	 * Keeps track of the tag depth
 	 *
@@ -352,7 +358,7 @@ class Email_Format
 		// In a quote?
 		if (preg_match('~\[quote( author=.*)?\]?~', $var))
 		{
-			// make sure it is not a single line quote
+			// Make sure it is not a single line quote
 			if (!preg_match('~\[/quote\]?~', $var))
 				$this->_in_quote++;
 		}
@@ -363,19 +369,20 @@ class Email_Format
 	/**
 	 * Checks if a string is the potentially the start of a signature line
 	 *
-	 * @param string $var
+	 * @param int $i
 	 */
 	private function _in_sig($i)
 	{
 		// Not in a sig yet, the line starts with a sig key as defined by the ACP, and its a short line of text
 		if (!$this->_found_sig && !empty($this->_maillist_sig_keys) && (preg_match('~^(' . $this->_maillist_sig_keys . ')~i', $this->_body_array[$i]['content']) && ($this->_body_array[$i]['length'] < $this->_maillist_short_line)))
-				return true;
+			return true;
 		// The line is simply just their name
 		elseif (($this->_body_array[$i]['content'] === $this->_real_name) && !$this->_found_sig)
-				return true;
+			return true;
 
 		return false;
 	}
+
 	/**
 	 * Checks if a string is the start or end of a bbc [code] tag
 	 * Keeps track of the tag depth
@@ -384,10 +391,10 @@ class Email_Format
 	 */
 	private function _in_code($var)
 	{
-		// in a code block?
+		// In a code block?
 		if (preg_match('~\[code\]?~', $var))
 		{
-			// make sure it is not a single line code
+			// Make sure it is not a single line code
 			if (!preg_match('~\[/code\]?~', $var))
 				$this->_in_code++;
 		}
@@ -416,7 +423,6 @@ class Email_Format
 	 * like 1) 1. a) b.
 	 *
 	 * @param string $var
-	 * @return boolean
 	 */
 	private function _in_plainlist($var)
 	{

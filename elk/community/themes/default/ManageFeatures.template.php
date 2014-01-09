@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -22,13 +23,17 @@ function template_show_custom_profile()
 	// Standard fields.
 	template_show_list('standard_profile_fields');
 
+	// Disable the show on registration box if the profile field is not active
 	echo '
 	<script><!-- // --><![CDATA[
 		var iNumChecks = document.forms.standardProfileFields.length;
+
 		for (var i = 0; i < iNumChecks; i++)
-			if (document.forms.standardProfileFields[i].id.indexOf(\'reg_\') == 0)
+		{
+			if (document.forms.standardProfileFields[i].id.indexOf(\'reg_\') === 0)
 				document.forms.standardProfileFields[i].disabled = document.forms.standardProfileFields[i].disabled || !document.getElementById(\'active_\' + document.forms.standardProfileFields[i].id.substr(4)).checked;
-	// ]]></script><br />';
+		}
+	// ]]></script>';
 
 	// Custom fields.
 	template_show_list('custom_profile_fields');
@@ -54,18 +59,14 @@ function template_edit_profile_field()
 		if (isset($txt['custom_option_' . $_GET['msg']]))
 			echo '
 	<div class="errorbox">',
-		$txt['custom_option_' . $_GET['msg']], '
+			$txt['custom_option_' . $_GET['msg']], '
 	</div>';
 	}
 
 	echo '
 	<div id="admincenter">
 		<form action="', $scripturl, '?action=admin;area=featuresettings;sa=profileedit;fid=', $context['fid'], ';', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="UTF-8">
-			<div id="section_header" class="cat_bar">
-				<h3 class="catbg">
-					', $context['page_title'], '
-				</h3>
-			</div>
+			<h2 class="category_header">', $context['page_title'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<fieldset>
@@ -181,10 +182,8 @@ function template_edit_profile_field()
 								<div>';
 
 	foreach ($context['field']['options'] as $k => $option)
-	{
 		echo '
 								', $k == 0 ? '' : '<br />', '<input type="radio" name="default_select" value="', $k, '"', $context['field']['default_select'] == $option ? ' checked="checked"' : '', ' class="input_radio" /><input type="text" name="select_option[', $k, ']" value="', $option, '" class="input_text" />';
-	}
 
 	echo '
 								<span id="addopt"></span>
@@ -224,7 +223,7 @@ function template_edit_profile_field()
 								<span class="smalltext">', $txt['custom_edit_privacy_desc'], '</span>
 							</dt>
 							<dd>
-								<select name="private" id="private" onchange="updateInputBoxes();" style="width: 100%">
+								<select name="private" id="private" onchange="updateInputBoxes();">
 									<option value="0"', $context['field']['private'] == 0 ? ' selected="selected"' : '', '>', $txt['custom_edit_privacy_all'], '</option>
 									<option value="1"', $context['field']['private'] == 1 ? ' selected="selected"' : '', '>', $txt['custom_edit_privacy_see'], '</option>
 									<option value="2"', $context['field']['private'] == 2 ? ' selected="selected"' : '', '>', $txt['custom_edit_privacy_owner'], '</option>
@@ -247,6 +246,7 @@ function template_edit_profile_field()
 							</dd>
 						</dl>
 					</fieldset>
+					<div class="submitbutton">
 						<input type="submit" name="save" value="', $txt['save'], '" class="button_submit" />';
 
 	if ($context['fid'])
@@ -254,6 +254,7 @@ function template_edit_profile_field()
 						<input type="submit" name="delete" value="', $txt['delete'], '" onclick="return confirm(\'', $txt['custom_edit_delete_sure'], '\');" class="button_submit" />';
 
 	echo '
+					</div>
 				</div>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -263,7 +264,7 @@ function template_edit_profile_field()
 
 	// Get the javascript bits right!
 	echo '
-	<script type="text/javascript"><!-- // --><![CDATA[
+	<script><!-- // --><![CDATA[
 		updateInputBoxes();
 	// ]]></script>';
 }

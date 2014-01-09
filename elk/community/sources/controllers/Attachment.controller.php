@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Attachment display.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,23 +11,25 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * Attachment display.
+ * @version 1.0 Beta
  *
  */
 
-class Attachment_Controller
+/**
+ * Attachment_Controller class.  It downloads an attachment or avatar, and
+ * increments the download count where applicable.
+ */
+class Attachment_Controller extends Action_Controller
 {
 	/**
 	 * The default action is to download an attachment.
 	 * This allows ?action=attachment to be forwarded to action_dlattach()
 	 */
-	public function action_attachment()
+	public function action_index()
 	{
-		// default action to execute
+		// Default action to execute, guess which one
 		$this->action_dlattach();
 	}
 
@@ -63,16 +67,13 @@ class Attachment_Controller
 		// This is just a regular attachment...
 		else
 		{
-			// This checks only the current board for $board/$topic's permissions.
-			// @todo: We must verify that $topic is the attachment's topic, or else the permission check is broken.
 			isAllowedTo('view_attachments');
-
 			$attachment = getAttachmentFromTopic($id_attach, $topic);
 		}
 
 		if (empty($attachment))
 			fatal_lang_error('no_access', false);
-		list ($id_folder, $real_filename, $file_hash, $file_ext, $attachment_type, $mime_type, $is_approved, $id_member) = $attachment;
+		list ($id_folder, $real_filename, $file_hash, $file_ext, $id_attach, $attachment_type, $mime_type, $is_approved, $id_member) = $attachment;
 
 		// If it isn't yet approved, do they have permission to view it?
 		if (!$is_approved && ($id_member == 0 || $user_info['id'] != $id_member) && ($attachment_type == 0 || $attachment_type == 3))
@@ -85,7 +86,9 @@ class Attachment_Controller
 		$filename = getAttachmentFilename($real_filename, $id_attach, $id_folder, false, $file_hash);
 
 		// This is done to clear any output that was made before now.
-		ob_end_clean();
+		while (ob_get_level() > 0)
+			@ob_end_clean();
+
 		if (!empty($modSettings['enableCompressedOutput']) && @filesize($filename) <= 4194304 && in_array($file_ext, array('txt', 'html', 'htm', 'js', 'doc', 'docx', 'rtf', 'css', 'php', 'log', 'xml', 'sql', 'c', 'java')))
 			@ob_start('ob_gzhandler');
 		else
@@ -109,7 +112,7 @@ class Attachment_Controller
 		// If it hasn't been modified since the last time this attachment was retrieved, there's no need to display it again.
 		if (!empty($_SERVER['HTTP_IF_MODIFIED_SINCE']))
 		{
-			list($modified_since) = explode(';', $_SERVER['HTTP_IF_MODIFIED_SINCE']);
+			list ($modified_since) = explode(';', $_SERVER['HTTP_IF_MODIFIED_SINCE']);
 			if (strtotime($modified_since) >= filemtime($filename))
 			{
 				ob_end_clean();
@@ -143,11 +146,9 @@ class Attachment_Controller
 		// Make sure the mime type warrants an inline display.
 		if (isset($_REQUEST['image']) && !empty($mime_type) && strpos($mime_type, 'image/') !== 0)
 			unset($_REQUEST['image']);
-
 		// Does this have a mime type?
 		elseif (!empty($mime_type) && (isset($_REQUEST['image']) || !in_array($file_ext, array('jpg', 'gif', 'jpeg', 'x-ms-bmp', 'png', 'psd', 'tiff', 'iff'))))
 			header('Content-Type: ' . strtr($mime_type, array('image/bmp' => 'image/x-ms-bmp')));
-
 		else
 		{
 			header('Content-Type: ' . (isBrowser('ie') || isBrowser('opera') ? 'application/octetstream' : 'application/octet-stream'));
@@ -173,7 +174,8 @@ class Attachment_Controller
 		else
 			header('Cache-Control: max-age=' . (525600 * 60) . ', private');
 
-		header('Content-Length: ' . filesize($filename));
+		if (empty($modSettings['enableCompressedOutput']) || filesize($filename) > 4194304)
+			header('Content-Length: ' . filesize($filename));
 
 		// Try to buy some time...
 		@set_time_limit(600);
@@ -181,9 +183,10 @@ class Attachment_Controller
 		// Recode line endings for text files, if enabled.
 		if (!empty($modSettings['attachmentRecodeLineEndings']) && !isset($_REQUEST['image']) && in_array($file_ext, array('txt', 'css', 'htm', 'html', 'php', 'xml')))
 		{
-			if (strpos($_SERVER['HTTP_USER_AGENT'], 'Windows') !== false)
+			$req = request();
+			if (strpos($req->user_agent(), 'Windows') !== false)
 				$callback = create_function('$buffer', 'return preg_replace(\'~[\r]?\n~\', "\r\n", $buffer);');
-			elseif (strpos($_SERVER['HTTP_USER_AGENT'], 'Mac') !== false)
+			elseif (strpos($req->user_agent(), 'Mac') !== false)
 				$callback = create_function('$buffer', 'return preg_replace(\'~[\r]?\n~\', "\r", $buffer);');
 			else
 				$callback = create_function('$buffer', 'return preg_replace(\'~[\r]?\n~\', "\n", $buffer);');
@@ -193,7 +196,7 @@ class Attachment_Controller
 		if (filesize($filename) > 4194304)
 		{
 			// Forcibly end any output buffering going on.
-			while (@ob_get_level() > 0)
+			while (ob_get_level() > 0)
 				@ob_end_clean();
 
 			$fp = fopen($filename, 'rb');

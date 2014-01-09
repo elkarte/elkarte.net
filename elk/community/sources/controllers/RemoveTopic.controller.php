@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * The contents of this file handle the deletion of topics, posts, and related
+ * paraphernalia.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,27 +12,34 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * The contents of this file handle the deletion of topics, posts, and related
- * paraphernalia.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Remove Topic Controller
  */
-class RemoveTopic_Controller
+class RemoveTopic_Controller extends Action_Controller
 {
+	/**
+	 * Intended entry point for this class.
+	 *
+	 * @see Action_Controller::action_index()
+	 */
+	public function action_index()
+	{
+		// call the right method
+	}
+
 	/**
 	 * Completely remove an entire topic.
 	 * Redirects to the board when completed.
-	 * Called for ?action=removetopic2
+	 * Accessed by ?action=removetopic2
 	 */
 	function action_removetopic2()
 	{
@@ -39,7 +49,7 @@ class RemoveTopic_Controller
 		checkSession('get');
 
 		// This file needs to be included for sendNotifications().
-		require_once(SUBSDIR . '/Post.subs.php');
+		require_once(SUBSDIR . '/Notification.subs.php');
 
 		// This needs to be included for all the topic db functions
 		require_once(SUBSDIR . '/Topic.subs.php');
@@ -83,7 +93,7 @@ class RemoveTopic_Controller
 	/**
 	 * Remove just a single post.
 	 * On completion redirect to the topic or to the board.
-	 * Called for ?action=deletemsg
+	 * Accessed by ?action=deletemsg
 	 */
 	function action_deletemsg()
 	{
@@ -153,7 +163,7 @@ class RemoveTopic_Controller
 	/**
 	 * Move back a topic or post from the recycle board to its original board.
 	 * Merges back the posts to the original as necessary.
-	 * Called for ?action=restoretopic
+	 * Accessed by ?action=restoretopic
 	 */
 	function action_restoretopic()
 	{
@@ -314,7 +324,7 @@ class RemoveTopic_Controller
 
 		if (!empty($topics_to_restore))
 		{
-			require_once(SUBSDIR . 'Boards.subs.php');
+			require_once(SUBSDIR . '/Boards.subs.php');
 
 			// Lets get the data for these topics.
 			$request = $db->query('', '
@@ -381,7 +391,7 @@ class RemoveTopic_Controller
 
 		// Didn't find some things?
 		if (!empty($unfound_messages))
-			fatal_lang_error('restore_not_found', false, array(implode('<br />', $unfound_messages)));
+			fatal_lang_error('restore_not_found', false, array('<ul style="margin-top: 0px;"><li>' . implode('</li><li>', $unfound_messages) . '</li></ul>'));
 
 		// Just send them to the index if they get here.
 		redirectexit();
@@ -395,13 +405,13 @@ class RemoveTopic_Controller
  * @param integer $from_topic
  * @param integer $target_topic
  */
-function mergePosts($msgs = array(), $from_topic, $target_topic)
+function mergePosts($msgs, $from_topic, $target_topic)
 {
 	global $modSettings;
 
 	$db = database();
 
-	//!!! This really needs to be rewritten to take a load of messages from ANY topic, it's also inefficient.
+	// @todo This really needs to be rewritten to take a load of messages from ANY topic, it's also inefficient.
 
 	// Is it an array?
 	if (!is_array($msgs))
@@ -503,18 +513,11 @@ function mergePosts($msgs = array(), $from_topic, $target_topic)
 	$db->free_result($request);
 
 	// We have a new post count for the board.
-	$db->query('', '
-		UPDATE {db_prefix}boards
-		SET
-			num_posts = num_posts + {int:diff_replies},
-			unapproved_posts = unapproved_posts + {int:diff_unapproved_posts}
-		WHERE id_board = {int:target_board}',
-		array(
-			'diff_replies' => $target_topic_data['num_replies'] - $target_replies, // Lets keep in mind that the first message in a topic counts towards num_replies in a board.
-			'diff_unapproved_posts' => $target_topic_data['unapproved_posts'] - $target_unapproved_posts,
-			'target_board' => $target_board,
-		)
-	);
+	require_once(SUBSDIR . '/Boards.subs.php');
+	incrementBoard($target_board, array(
+		'num_posts' => $target_topic_data['num_replies'] - $target_replies, // Lets keep in mind that the first message in a topic counts towards num_replies in a board.
+		'unapproved_posts' => $target_topic_data['unapproved_posts'] - $target_unapproved_posts,
+	));
 
 	// In some cases we merged the only post in a topic so the topic data is left behind in the topic table.
 	$request = $db->query('', '
@@ -545,6 +548,7 @@ function mergePosts($msgs = array(), $from_topic, $target_topic)
 			'unapproved_posts' => 0,
 			'id_first_msg' => 9999999999,
 		);
+
 		$request = $db->query('', '
 			SELECT MIN(id_msg) AS id_first_msg, MAX(id_msg) AS id_last_msg, COUNT(*) AS message_count, approved, subject
 			FROM {db_prefix}messages
@@ -587,18 +591,10 @@ function mergePosts($msgs = array(), $from_topic, $target_topic)
 		);
 
 		// We have a new post count for the source board.
-		$db->query('', '
-			UPDATE {db_prefix}boards
-			SET
-				num_posts = num_posts + {int:diff_replies},
-				unapproved_posts = unapproved_posts + {int:diff_unapproved_posts}
-			WHERE id_board = {int:from_board}',
-			array(
-				'diff_replies' => $source_topic_data['num_replies'] - $from_replies, // Lets keep in mind that the first message in a topic counts towards num_replies in a board.
-				'diff_unapproved_posts' => $source_topic_data['unapproved_posts'] - $from_unapproved_posts,
-				'from_board' => $from_board,
-			)
-		);
+		incrementBoard($target_board, array(
+			'num_posts' => $source_topic_data['num_replies'] - $from_replies, // Lets keep in mind that the first message in a topic counts towards num_replies in a board.
+			'unapproved_posts' => $source_topic_data['unapproved_posts'] - $from_unapproved_posts,
+		));
 	}
 
 	// Finally get around to updating the destination topic, now all indexes etc on the source are fixed.

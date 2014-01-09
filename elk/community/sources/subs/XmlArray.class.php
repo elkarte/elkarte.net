@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * The Xml_Array class is an xml parser.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * The Xml_Array class is an xml parser.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -546,8 +546,7 @@ class Xml_Array
 	/**
 	 * Return an element as an array
 	 *
-	 * @param type $array
-	 * @return type
+	 * @param array $array
 	 */
 	protected function _array($array)
 	{
@@ -618,7 +617,7 @@ class Xml_Array
 		$trans_tbl = array_flip(get_html_translation_table(HTML_ENTITIES, ENT_QUOTES));
 
 		// Translate all the entities out.
-		$data = strtr(preg_replace('~&#(\d{1,4});~e', "chr('\$1')", $data), $trans_tbl);
+		$data = strtr(preg_replace_callback('~&#(\d{1,4});~', create_function('$m', 'return chr("$m[1]");'), $data), $trans_tbl);
 
 		return $this->trim ? trim($data) : $data;
 	}

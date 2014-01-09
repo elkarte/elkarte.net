@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file has functions in it to do with authentication, user handling, and the like.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has functions in it to do with authentication, user handling, and the like.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -38,9 +38,12 @@ function setLoginCookie($cookie_length, $id, $password = '')
 	// If changing state force them to re-address some permission caching.
 	$_SESSION['mc']['time'] = 0;
 
+	// Let's be sure it is an int to simplify the regexp used to validate the cookie
+	$id = (int) $id;
+
 	// The cookie may already exist, and have been set with different options.
 	$cookie_state = (empty($modSettings['localCookies']) ? 0 : 1) | (empty($modSettings['globalCookies']) ? 0 : 2);
-	if (isset($_COOKIE[$cookiename]) && preg_match('~^a:[34]:\{i:0;(i:\d{1,6}|s:[1-8]:"\d{1,8}");i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~', $_COOKIE[$cookiename]) === 1)
+	if (isset($_COOKIE[$cookiename]) && preg_match('~^a:[34]:\{i:0;i:\d{1,8};i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~', $_COOKIE[$cookiename]) === 1)
 	{
 		$array = @unserialize($_COOKIE[$cookiename]);
 
@@ -170,7 +173,9 @@ function adminLogin($type = 'admin')
 	// They used a wrong password, log it and unset that.
 	if (isset($_POST[$type . '_hash_pass']) || isset($_POST[$type . '_pass']))
 	{
-		$txt['security_wrong'] = sprintf($txt['security_wrong'], isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : $txt['unknown'], $_SERVER['HTTP_USER_AGENT'], $user_info['ip']);
+		// log some info along with it! referer, user agent
+		$req = request();
+		$txt['security_wrong'] = sprintf($txt['security_wrong'], isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : $txt['unknown'], $req->user_agent(), $user_info['ip']);
 		log_error($txt['security_wrong'], 'critical');
 
 		if (isset($_POST[$type . '_hash_pass']))
@@ -220,7 +225,7 @@ function adminLogin_outputPostVars($k, $v)
 {
 	if (!is_array($v))
 		return '
-<input type="hidden" name="' . htmlspecialchars($k) . '" value="' . strtr($v, array('"' => '&quot;', '<' => '&lt;', '>' => '&gt;')) . '" />';
+<input type="hidden" name="' . htmlspecialchars($k, ENT_COMPAT, 'UTF-8') . '" value="' . strtr($v, array('"' => '&quot;', '<' => '&lt;', '>' => '&gt;')) . '" />';
 	else
 	{
 		$ret = '';
@@ -234,8 +239,7 @@ function adminLogin_outputPostVars($k, $v)
 /**
  * Properly urlencodes a string to be used in a query
  *
- * @global type $scripturl
- * @param type $get
+ * @param array $get
  * @return our query string
  */
 function construct_query_string($get)
@@ -323,8 +327,8 @@ function findMembers($names, $use_wildcards = false, $buddies_only = false, $max
 		$email_condition = '';
 
 	// Get the case of the columns right - but only if we need to as things like MySQL will go slow needlessly otherwise.
-	$member_name = $db->db_case_sensitive() ? 'LOWER(member_name)' : 'member_name';
-	$real_name = $db->db_case_sensitive() ? 'LOWER(real_name)' : 'real_name';
+	$member_name = defined('DB_CASE_SENSITIVE') ? 'LOWER(member_name)' : 'member_name';
+	$real_name = defined('DB_CASE_SENSITIVE') ? 'LOWER(real_name)' : 'real_name';
 
 	// Search by username, display name, and email address.
 	$request = $db->query('', '
@@ -373,7 +377,7 @@ function findMembers($names, $use_wildcards = false, $buddies_only = false, $max
  */
 function resetPassword($memID, $username = null)
 {
-	global $modSettings, $language;
+	global $modSettings, $language, $user_info;
 
 	// Language... and a required file.
 	loadLanguage('Login');
@@ -399,7 +403,14 @@ function resetPassword($memID, $username = null)
 	// Do some checks on the username if needed.
 	if ($username !== null)
 	{
-		validateUsername($memID, $user);
+		$errors = Error_Context::context('reset_pwd', 0);
+		validateUsername($memID, $user, 'reset_pwd');
+
+		// If there are "important" errors and you are not an admin: log the first error
+		// Otherwise grab all of them and don't log anything
+		$error_severity = $errors->hasErrors(1) && !$user_info['is_admin'] ? 1 : null;
+		foreach ($errors->prepareErrors($error_severity) as $error)
+			fatal_error($error, $error_severity === null ? false : 'general');
 
 		// Update the database...
 		updateMemberData($memID, array('member_name' => $user, 'passwd' => $newPassword_sha1));
@@ -425,48 +436,37 @@ function resetPassword($memID, $username = null)
  *
  * @param int $memID
  * @param string $username
- * @param boolean $return_error
+ * @param boolean $error_context
  * @param boolean $check_reserved_name
  * @return string Returns null if fine
  */
-function validateUsername($memID, $username, $return_error = false, $check_reserved_name = true)
+function validateUsername($memID, $username, $error_context = 'register', $check_reserved_name = true)
 {
-	global $txt, $user_info;
+	global $txt;
 
-	$errors = array();
+	$errors = Error_Context::context($error_context, 0);
 
 	// Don't use too long a name.
 	if (Util::strlen($username) > 25)
-		$errors[] = array('lang', 'error_long_name');
+		$errors->addError('error_long_name');
 
 	// No name?!  How can you register with no name?
 	if ($username == '')
-		$errors[] = array('lang', 'need_username');
+		$errors->addError('need_username');
 
 	// Only these characters are permitted.
 	if (in_array($username, array('_', '|')) || preg_match('~[<>&"\'=\\\\]~', preg_replace('~&#(?:\\d{1,7}|x[0-9a-fA-F]{1,6});~', '', $username)) != 0 || strpos($username, '[code') !== false || strpos($username, '[/code') !== false)
-		$errors[] = array('lang', 'error_invalid_characters_username');
+		$errors->addError('error_invalid_characters_username');
 
 	if (stristr($username, $txt['guest_title']) !== false)
-		$errors[] = array('lang', 'username_reserved', 'general', array($txt['guest_title']));
+		$errors->addError(array('username_reserved', array($txt['guest_title'])), 1);
 
 	if ($check_reserved_name)
 	{
 		require_once(SUBSDIR . '/Members.subs.php');
 		if (isReservedName($username, $memID, false))
-			$errors[] = array('done', '(' . htmlspecialchars($username) . ') ' . $txt['name_in_use']);
+			$errors->addError(array('name_in_use', array(htmlspecialchars($username, ENT_COMPAT, 'UTF-8'))));
 	}
-
-	if ($return_error)
-		return $errors;
-	elseif (empty($errors))
-		return null;
-
-	loadLanguage('Errors');
-	$error = $errors[0];
-
-	$message = $error[0] == 'lang' ? (empty($error[3]) ? $txt[$error[1]] : vsprintf($txt[$error[1]], $error[3])) : $error[1];
-	fatal_error($message, empty($error[2]) || $user_info['is_admin'] ? false : $error[2]);
 }
 
 /**
@@ -686,7 +686,15 @@ function isFirstLogin($id_member)
 	return !empty($member) && $member['last_login'] == 0;
 }
 
-function findUser($where, $where_params)
+/**
+ * Search for a member by given criterias
+ *
+ * @param string $where
+ * @param string $where_params
+ * @param bool $fatal
+ * @return boolean
+ */
+function findUser($where, $where_params, $fatal = true)
 {
 	$db = database();
 
@@ -701,7 +709,7 @@ function findUser($where, $where_params)
 	);
 
 	// Maybe email?
-	if ($db->num_rows($request) == 0 && empty($_REQUEST['uid']))
+	if ($db->num_rows($request) == 0 && empty($_REQUEST['uid']) && isset($where_params['email_address']))
 	{
 		$db->free_result($request);
 
@@ -714,7 +722,12 @@ function findUser($where, $where_params)
 			))
 		);
 		if ($db->num_rows($request) == 0)
-			fatal_lang_error('no_user_with_email', false);
+		{
+			if ($fatal)
+				fatal_lang_error('no_user_with_email', false);
+			else
+				return false;
+		}
 	}
 
 	$member = $db->fetch_assoc($request);
@@ -724,9 +737,33 @@ function findUser($where, $where_params)
 }
 
 /**
- * Generate a random validation code.
+ * Find users by their email address.
  *
- * @return type
+ * @param string $email
+ * @return int
+ */
+function userByEmail($email)
+{
+	$db = database();
+
+	$request = $db->query('', '
+		SELECT id_member
+		FROM {db_prefix}members
+		WHERE email_address = {string:email_address}
+		LIMIT 1',
+		array(
+			'email_address' => $email,
+		)
+	);
+
+	$return = $db->num_rows($request) != 0;
+	$db->free_result($request);
+
+	return $return;
+}
+
+/**
+ * Generate a random validation code.
  */
 function generateValidationCode()
 {
@@ -751,46 +788,64 @@ function generateValidationCode()
  * name or email.
  *
  * @param string $name
+ * @param bool $is_id if true it treats $name as a member ID and try to load the data for that ID
  *
  * @return mixed, array or false if nothing is found
  */
-function loadExistingMember($name)
+function loadExistingMember($name, $is_id = false)
 {
 	$db = database();
 
-	// Try to find the user, assuming a member_name was passed...
-	$request = $db->query('', '
-		SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt,
-			openid_uri, passwd_flood
-		FROM {db_prefix}members
-		WHERE ' . ($db->db_case_sensitive() ? 'LOWER(member_name) = LOWER({string:user_name})' : 'member_name = {string:user_name}') . '
-		LIMIT 1',
-		array(
-			'user_name' => $db->db_case_sensitive() ? strtolower($name) : $name,
-		)
-	);
-	// Didn't work. Try it as an email address.
-	if ($db->num_rows($request) == 0 && strpos($name, '@') !== false)
+	if ($is_id)
 	{
-		$db->free_result($request);
-
 		$request = $db->query('', '
-			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
-			passwd_flood
+			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt,
+				openid_uri, passwd_flood
 			FROM {db_prefix}members
-			WHERE email_address = {string:user_name}
+			WHERE id_member = {int:id_member}
 			LIMIT 1',
 			array(
-				'user_name' => $name,
+				'id_member' => (int) $name,
 			)
 		);
+	}
+	else
+	{
+		// Try to find the user, assuming a member_name was passed...
+		$request = $db->query('', '
+			SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt,
+				openid_uri, passwd_flood
+			FROM {db_prefix}members
+			WHERE ' . (defined('DB_CASE_SENSITIVE') ? 'LOWER(member_name) = LOWER({string:user_name})' : 'member_name = {string:user_name}') . '
+			LIMIT 1',
+			array(
+				'user_name' => defined('DB_CASE_SENSITIVE') ? strtolower($name) : $name,
+			)
+		);
+		// Didn't work. Try it as an email address.
+		if ($db->num_rows($request) == 0 && strpos($name, '@') !== false)
+		{
+			$db->free_result($request);
+
+			$request = $db->query('', '
+				SELECT passwd, id_member, id_group, lngfile, is_activated, email_address, additional_groups, member_name, password_salt, openid_uri,
+				passwd_flood
+				FROM {db_prefix}members
+				WHERE email_address = {string:user_name}
+				LIMIT 1',
+				array(
+					'user_name' => $name,
+				)
+			);
+		}
 	}
 
 	// Nothing? Ah the horror...
 	if ($db->num_rows($request) == 0)
-		return false;
+		$user_settings = false;
+	else
+		$user_settings = $db->fetch_assoc($request);
 
-	$user_settings = $db->fetch_assoc($request);
 	$db->free_result($request);
 
 	return $user_settings;

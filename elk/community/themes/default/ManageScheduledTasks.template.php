@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -23,10 +24,33 @@ function template_view_scheduled_tasks()
 
 	// We completed some tasks?
 	if (!empty($context['tasks_were_run']))
-		echo '
-	<div id="task_completed" class="infobox">
+	{
+		if (empty($context['scheduled_errors']))
+		{
+			echo '
+	<div id="task_completed" class="successbox">
 		', $txt['scheduled_tasks_were_run'], '
 	</div>';
+		}
+		else
+		{
+			echo '
+	<div id="errors" class="errorbox">
+		', $txt['scheduled_tasks_were_run_errors'], '<br>';
+
+			foreach ($context['scheduled_errors'] as $task => $errors)
+			{
+				echo
+				isset($txt['scheduled_task_' . $task]) ? $txt['scheduled_task_' . $task] : $task, '
+				<ul>
+					<li>', implode('</li><li>', $errors), '</li>
+				</ul>';
+			}
+
+			echo '
+	</div>';
+		}
+	}
 
 	template_show_list('scheduled_tasks');
 }
@@ -42,9 +66,7 @@ function template_edit_scheduled_tasks()
 	echo '
 	<div id="admincenter">
 		<form action="', $scripturl, '?action=admin;area=scheduledtasks;sa=taskedit;save;tid=', $context['task']['id'], '" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['scheduled_task_edit'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['scheduled_task_edit'], '</h2>
 			<div class="information">
 				<em>', sprintf($txt['scheduled_task_time_offset'], $context['server_time']), ' </em>
 			</div>
@@ -66,7 +88,7 @@ function template_edit_scheduled_tasks()
 							<input type="text" name="regularity" id="regularity" value="', empty($context['task']['regularity']) ? 1 : $context['task']['regularity'], '" onchange="if (this.value < 1) this.value = 1;" size="2" maxlength="2" class="input_text" />
 							<select name="unit">
 								<option value="0">', $txt['scheduled_task_edit_pick_unit'], '</option>
-								<option value="0">---------------------</option>
+								<option value="0" disabled="disabled">', str_repeat('&#8212;', strlen($txt['scheduled_task_edit_pick_unit'])), '</option>
 								<option value="m" ', empty($context['task']['unit']) || $context['task']['unit'] == 'm' ? 'selected="selected"' : '', '>', $txt['scheduled_task_reg_unit_m'], '</option>
 								<option value="h" ', $context['task']['unit'] == 'h' ? 'selected="selected"' : '', '>', $txt['scheduled_task_reg_unit_h'], '</option>
 								<option value="d" ', $context['task']['unit'] == 'd' ? 'selected="selected"' : '', '>', $txt['scheduled_task_reg_unit_d'], '</option>
@@ -87,7 +109,7 @@ function template_edit_scheduled_tasks()
 							<input type="checkbox" name="enabled" id="enabled" ', !$context['task']['disabled'] ? 'checked="checked"' : '', ' class="input_check" />
 						</dd>
 					</dl>
-					<div class="righttext">
+					<div class="submitbutton">
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 						<input type="hidden" name="', $context['admin-st_token_var'], '" value="', $context['admin-st_token'], '" />
 						<input type="submit" name="save" value="', $txt['scheduled_tasks_save_changes'], '" class="button_submit" />

@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * This file contains just the functions that turn on and off notifications
+ * to topics or boards.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,23 +12,31 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file contains just the functions that turn on and off notifications
- * to topics or boards.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Notify Controller
  */
-class Notify_Controller
+class Notify_Controller extends Action_Controller
 {
+	/**
+	 * Dispatch to the right action.
+	 *
+	 * @see Action_Controller::action_index()
+	 */
+	public function action_index()
+	{
+		// forward to our respective method.
+		// $this->action_notify();
+	}
+
 	/**
 	 * Turn off/on notification for a particular topic.
 	 * Must be called with a topic specified in the URL.
@@ -38,7 +49,7 @@ class Notify_Controller
 	 */
 	public function action_notify()
 	{
-		global $topic, $scripturl, $txt, $topic, $user_info, $context;
+		global $topic, $scripturl, $txt, $user_info, $context;
 
 		// Make sure they aren't a guest or something - guests can't really receive notifications!
 		is_not_guest();
@@ -64,6 +75,7 @@ class Notify_Controller
 			$context['topic_href'] = $scripturl . '?topic=' . $topic . '.' . $_REQUEST['start'];
 			$context['start'] = $_REQUEST['start'];
 			$context['page_title'] = $txt['notification'];
+			$context['sub_template'] = 'notification_settings';
 
 			return;
 		}
@@ -87,11 +99,40 @@ class Notify_Controller
 	{
 		global $topic, $txt, $scripturl, $context, $user_info;
 
-		is_not_guest('', false);
-		if (!allowedTo('mark_any_notify') || empty($topic) || empty($_GET['sa']))
-			obExit(false);
+		loadTemplate('Xml');
 
-		checkSession('get');
+		Template_Layers::getInstance()->removeAll();
+		$context['sub_template'] = 'generic_xml_buttons';
+
+		if ($user_info['is_guest'])
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_guests']
+			);
+			return;
+		}
+
+		if (!allowedTo('mark_any_notify') || empty($topic) || empty($_GET['sa']))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['cannot_mark_any_notify']
+			);
+			return;
+		}
+
+		if (checkSession('get', '', false))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'url' => $scripturl . '?action=notify;sa=' . ($_GET['sa'] == 'on' ? 'on' : 'off') . ';topic=' . $topic . '.' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'],
+			);
+			return;
+		}
 
 		// Our topic functions are here
 		require_once(SUBSDIR . '/Topic.subs.php');
@@ -99,14 +140,9 @@ class Notify_Controller
 		// Attempt to turn notifications on/off.
 		setTopicNotification($user_info['id'], $topic, $_GET['sa'] == 'on');
 
-		loadTemplate('Xml');
-
-		Template_Layers::getInstance()->removeAll();
-		$context['sub_template'] = 'generic_xml_buttons';
-
 		$context['xml_data'] = array(
 			'text' => $_GET['sa'] == 'on' ? $txt['unnotify'] : $txt['notify'],
-			'url' => $scripturl . '?action=notify;sa=' . ($_GET['sa'] == 'on' ? 'off' : 'on') . ';topic=' . $topic . '.' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'] . ';api' . (isset($_REQUEST['json']) ? ';json' : ''),
+			'url' => $scripturl . '?action=notify;sa=' . ($_GET['sa'] == 'on' ? 'off' : 'on') . ';topic=' . $topic . '.' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'] . ';api',
 			'confirm' => $_GET['sa'] == 'on' ? $txt['notification_disable_topic'] : $txt['notification_enable_topic']
 		);
 	}
@@ -174,23 +210,47 @@ class Notify_Controller
 	{
 		global $scripturl, $txt, $board, $user_info, $context;
 
-		// Permissions are an important part of anything ;).
-		is_not_guest('', false);
-		if (!allowedTo('mark_notify') || empty($board) || empty($_GET['sa']))
-			obExit(false);
-
-		// our board functions are here
-		require_once(SUBSDIR . '/Boards.subs.php');
-
-		checkSession('get');
-
-		// Turn notification on/off for this board.
-		setBoardNotification($user_info['id'], $board, $_GET['sa'] == 'on');
-
 		loadTemplate('Xml');
 
 		Template_Layers::getInstance()->removeAll();
 		$context['sub_template'] = 'generic_xml_buttons';
+
+		// Permissions are an important part of anything ;).
+		if ($user_info['is_guest'])
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_guests']
+			);
+			return;
+		}
+
+		if (!allowedTo('mark_notify') || empty($board) || empty($_GET['sa']))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['cannot_mark_notify'],
+			);
+			return;
+		}
+
+		if (checkSession('get', '', false))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'url' => $scripturl . '?action=notifyboard;sa=' . ($_GET['sa'] == 'on' ? 'on' : 'off') . ';board=' . $board . '.' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'],
+			);
+			return;
+		}
+
+		// our board functions are here
+		require_once(SUBSDIR . '/Boards.subs.php');
+
+		// Turn notification on/off for this board.
+		setBoardNotification($user_info['id'], $board, $_GET['sa'] == 'on');
 
 		$context['xml_data'] = array(
 			'text' => $_GET['sa'] == 'on' ? $txt['unnotify'] : $txt['notify'],
@@ -205,9 +265,9 @@ class Notify_Controller
 	 * The sub-action can be 'on', 'off', or nothing for what to do.
 	 * Requires the mark_any_notify permission.
 	 * Upon successful completion of action will direct user back to topic.
-	 * Accessed via ?action=disregardtopic.
+	 * Accessed via ?action=unwatchtopic.
 	 */
-	public function action_disregardtopic()
+	public function action_unwatchtopic()
 	{
 		global $user_info, $topic, $modSettings;
 
@@ -217,11 +277,11 @@ class Notify_Controller
 		require_once(SUBSDIR . '/Topic.subs.php');
 
 		// Let's do something only if the function is enabled
-		if (!$user_info['is_guest'] && !empty($modSettings['enable_disregard']))
+		if (!$user_info['is_guest'] && !empty($modSettings['enable_unwatch']))
 		{
 			checkSession('get');
 
-			setTopicRegard($user_info['id'], $topic, $_GET['sa'] == 'on');
+			setTopicWatch($user_info['id'], $topic, $_GET['sa'] == 'on');
 		}
 
 		// Back to the topic.
@@ -232,31 +292,54 @@ class Notify_Controller
 	 * Turn off/on unread replies subscription for a topic
 	 * Intended for use in XML or JSON calls
 	 */
-	public function action_disregardtopic_api()
+	public function action_unwatchtopic_api()
 	{
 		global $user_info, $topic, $modSettings, $txt, $context, $scripturl;
-
-		is_not_guest('', false);
-
-		// our topic functions are here
-		require_once(SUBSDIR . '/Topic.subs.php');
-
-		// Let's do something only if the function is enabled
-		if (empty($modSettings['enable_disregard']))
-			obExit(false);
-
-		checkSession('get');
-
-		setTopicRegard($user_info['id'], $topic, $_GET['sa'] == 'on');
 
 		loadTemplate('Xml');
 
 		Template_Layers::getInstance()->removeAll();
 		$context['sub_template'] = 'generic_xml_buttons';
 
+		if ($user_info['is_guest'])
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_guests']
+			);
+			return;
+		}
+
+		// Let's do something only if the function is enabled
+		if (empty($modSettings['enable_unwatch']))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['feature_disabled'],
+			);
+			return;
+		}
+
+		if (checkSession('get', '', false))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'url' => $scripturl . '?action=unwatchtopic;sa=' . ($_GET['sa'] == 'on' ? 'on' : 'off') . ';topic=' . $topic . '.' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'],
+			);
+			return;
+		}
+
+		// our topic functions are here
+		require_once(SUBSDIR . '/Topic.subs.php');
+
+		setTopicWatch($user_info['id'], $topic, $_GET['sa'] == 'on');
+
 		$context['xml_data'] = array(
-			'text' => $_GET['sa'] == 'on' ? $txt['undisregard'] : $txt['disregard'],
-			'url' => $scripturl . '?action=disregardtopic;topic=' . $context['current_topic'] . '.' . $_REQUEST['start'] . ';sa=' . ($_GET['sa'] == 'on' ? 'off' : 'on') . ';' . $context['session_var'] . '=' . $context['session_id'] . ';api' . (isset($_REQUEST['json']) ? ';json' : ''),
+			'text' => $_GET['sa'] == 'on' ? $txt['watch'] : $txt['unwatch'],
+			'url' => $scripturl . '?action=unwatchtopic;topic=' . $context['current_topic'] . '.' . $_REQUEST['start'] . ';sa=' . ($_GET['sa'] == 'on' ? 'off' : 'on') . ';' . $context['session_var'] . '=' . $context['session_id'] . ';api' . (isset($_REQUEST['json']) ? ';json' : ''),
 		);
 	}
 }

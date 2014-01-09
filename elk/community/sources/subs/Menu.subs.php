@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file contains a standard way of displaying side/drop down menus.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,25 +13,33 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file contains a standard way of displaying side/drop down menus.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Create a menu.
  *
- * @param array $menuData
- * @param array $menuOptions = array()
+ * @param string $menuData the menu array
+ * @param array $menuOptions an array of options that can be used to override some default behaviours.
+ *   It can accept the following indexes:
+ *    - action                    => overrides the default action
+ *    - current_area              => overrides the current area
+ *    - extra_url_parameters      => an array or pairs or parameters to be added to the url
+ *    - disable_url_session_check => (boolean) if true the session var/id are omitted from the url
+ *    - base_url                  => an alternative base url
+ *    - menu_type                 => alternative menu types?
+ *    - can_toggle_drop_down      => (boolean) if the menu can "toggle"
+ *    - template_name             => an alternative template to load (instead of Generic)
+ *    - layer_name                => alternative layer name for the menu
  * @return boolean|array
  */
 function createMenu($menuData, $menuOptions = array())
 {
-	global $context, $settings, $options, $txt, $scripturl, $user_info, $options;
+	global $context, $settings, $options, $txt, $scripturl, $user_info;
 
 	// Work out where we should get our images from.
 	$context['menu_image_path'] = file_exists($settings['theme_dir'] . '/images/admin/change_menu.png') ? $settings['images_url'] . '/admin' : $settings['default_images_url'] . '/admin';
@@ -49,6 +59,8 @@ function createMenu($menuData, $menuOptions = array())
 				string $file:		Name of source file required for this area.
 				string $function:	Function to call when area is selected.
 				string $custom_url:	URL to use for this menu item.
+				string $icon:		File name of an icon to use on the menu, if using the sprite class, set as transparent.png
+	 			string $class:		Class name to apply to the icon img, used to apply a sprite icon
 				bool $enabled:		Should this area even be accessible?
 				bool $hidden:		Should this area be visible?
 				string $select:		If set this item will not be displayed - instead the item indexed here shall be.
@@ -58,7 +70,8 @@ function createMenu($menuData, $menuOptions = array())
 				string 0:		Text label for this subsection.
 				array 1:		Array of permissions to check for this subsection.
 				bool 2:			Is this the default subaction - if not set for any will default to first...
-				bool enabled:		Bool to say whether this should be enabled or not.
+				bool enabled:	Bool to say whether this should be enabled or not.
+				array active:	Set the button active for other subsections.
 	*/
 
 	// Every menu gets a unique ID, these are shown in first in, first out order.
@@ -71,13 +84,9 @@ function createMenu($menuData, $menuOptions = array())
 	// What is the general action of this menu (i.e. $scripturl?action=XXXX.
 	$menu_context['current_action'] = isset($menuOptions['action']) ? $menuOptions['action'] : $context['current_action'];
 
-	// Allow extend *any* menu with a single hook
-	if (!empty($menu_context['current_action']))
-		call_integration_hook('integrate_' . $menu_context['current_action'] . '_areas', array(&$menuData));
-
 	// What is the current area selected?
-	if (isset($menuOptions['current_area']) || isset($_GET['area']))
-		$menu_context['current_area'] = isset($menuOptions['current_area']) ? $menuOptions['current_area'] : $_GET['area'];
+	if (isset($menuOptions['current_area']) || isset($_REQUEST['area']))
+		$menu_context['current_area'] = isset($menuOptions['current_area']) ? $menuOptions['current_area'] : $_REQUEST['area'];
 
 	// Build a list of additional parameters that should go in the URL.
 	$menu_context['extra_parameters'] = '';
@@ -90,23 +99,54 @@ function createMenu($menuData, $menuOptions = array())
 		$menu_context['extra_parameters'] .= ';' . $context['session_var'] . '=' . $context['session_id'];
 
 	$include_data = array();
+	// This is necessary only in profile (at least for the core), but we do it always because it's easier
+	$permission_set = !empty($context['user']['is_owner']) ? 'own' : 'any';
 
 	// Now setup the context correctly.
 	foreach ($menuData as $section_id => $section)
 	{
-		// Is this enabled - or has as permission check - which fails?
-		if ((isset($section['enabled']) && $section['enabled'] == false) || (isset($section['permission']) && !allowedTo($section['permission'])))
+		// Is this enabled?
+		if ((isset($section['enabled']) && $section['enabled'] == false))
 			continue;
+		// Has permission check?
+		if (isset($section['permission']))
+		{
+			// The profile menu has slightly different permissions
+			if (is_array($section['permission']) && isset($section['permission']['own'], $section['permission']['any']))
+			{
+				if (empty($area['permission'][$permission_set]) || !allowedTo($section['permission'][$permission_set]))
+					continue;
+			}
+			elseif (!allowedTo($section['permission']))
+				continue;
+		}
 
 		// Now we cycle through the sections to pick the right area.
 		foreach ($section['areas'] as $area_id => $area)
 		{
 			// Can we do this?
-			if ((!isset($area['enabled']) || $area['enabled'] != false) && (empty($area['permission']) || allowedTo($area['permission'])))
+			if (!isset($area['enabled']) || $area['enabled'] != false)
 			{
+				// Has permission check?
+				if (!empty($area['permission']))
+				{
+					// The profile menu has slightly different permissions
+					if (is_array($area['permission']) && isset($area['permission']['own'], $area['permission']['any']))
+					{
+						if (empty($area['permission'][$permission_set]) || !allowedTo($area['permission'][$permission_set]))
+							continue;
+					}
+					elseif (!allowedTo($area['permission']))
+						continue;
+				}
+
 				// Add it to the context... if it has some form of name!
 				if (isset($area['label']) || (isset($txt[$area_id]) && !isset($area['select'])))
 				{
+					// We may want to include a file, let's find out the path
+					if (!empty($area['file']))
+							$area['file'] = (!empty($area['dir']) ? $area['dir'] : (!empty($menuOptions['default_include_dir']) ? $menuOptions['default_include_dir'] : CONTROLLERDIR)) . '/' . $area['file'];
+
 					// If we haven't got an area then the first valid one is our choice.
 					if (!isset($menu_context['current_area']))
 					{
@@ -119,9 +159,16 @@ function createMenu($menuData, $menuOptions = array())
 					{
 						// First time this section?
 						if (!isset($menu_context['sections'][$section_id]))
+						{
+							if (isset($menuOptions['counters'], $section['counter']) && !empty($menuOptions['counters'][$section['counter']]))
+								$section['title'] .= sprintf($settings['menu_numeric_notice'][0], $menuOptions['counters'][$section['counter']]);
+
 							$menu_context['sections'][$section_id]['title'] = $section['title'];
+						}
 
 						$menu_context['sections'][$section_id]['areas'][$area_id] = array('label' => isset($area['label']) ? $area['label'] : $txt[$area_id]);
+						if (isset($menuOptions['counters'], $area['counter']) && !empty($menuOptions['counters'][$area['counter']]))
+							$menu_context['sections'][$section_id]['areas'][$area_id]['label'] .= sprintf($settings['menu_numeric_notice'][1], $menuOptions['counters'][$area['counter']]);
 
 						// We'll need the ID as well...
 						$menu_context['sections'][$section_id]['id'] = $section_id;
@@ -132,7 +179,7 @@ function createMenu($menuData, $menuOptions = array())
 
 						// Does this area have its own icon?
 						if (isset($area['icon']))
-							$menu_context['sections'][$section_id]['areas'][$area_id]['icon'] = '<img ' . (isset($area['class']) ? 'class="' . $area['class'] . '" ' : '') . 'src="' . $context['menu_image_path'] . '/' . $area['icon'] . '" alt="" />&nbsp;&nbsp;';
+							$menu_context['sections'][$section_id]['areas'][$area_id]['icon'] = '<img ' . (isset($area['class']) ? 'class="' . $area['class'] . '" ' : 'style="background: none"') . 'src="' . $context['menu_image_path'] . '/' . $area['icon'] . '" alt="" />&nbsp;&nbsp;';
 						else
 							$menu_context['sections'][$section_id]['areas'][$area_id]['icon'] = '';
 
@@ -149,6 +196,9 @@ function createMenu($menuData, $menuOptions = array())
 										$first_sa = $sa;
 
 									$menu_context['sections'][$section_id]['areas'][$area_id]['subsections'][$sa] = array('label' => $sub[0]);
+									if (isset($menuOptions['counters'], $sub['counter']) && !empty($menuOptions['counters'][$sub['counter']]))
+										$menu_context['sections'][$section_id]['areas'][$area_id]['subsections'][$sa]['label'] .= sprintf($settings['menu_numeric_notice'][2], $menuOptions['counters'][$sub['counter']]);
+
 									// Custom URL?
 									if (isset($sub['url']))
 										$menu_context['sections'][$section_id]['areas'][$area_id]['subsections'][$sa]['url'] = $sub['url'];
@@ -163,6 +213,10 @@ function createMenu($menuData, $menuOptions = array())
 										// Is this the current subsection?
 										if (isset($_REQUEST['sa']) && $_REQUEST['sa'] == $sa)
 											$menu_context['current_subsection'] = $sa;
+
+										elseif (isset($sub['active']) && isset($_REQUEST['sa']) && in_array($_REQUEST['sa'], $sub['active']))
+											$menu_context['current_subsection'] = $sa;
+
 										// Otherwise is it the default?
 										elseif (!isset($menu_context['current_subsection']) && !empty($sub[2]))
 											$menu_context['current_subsection'] = $sa;
@@ -190,6 +244,7 @@ function createMenu($menuData, $menuOptions = array())
 				}
 
 				// Is this the current section?
+				// @todo why $found_section is not initialized outside one of the loops? (Not sure which one lol)
 				if ($menu_context['current_area'] == $area_id && empty($found_section))
 				{
 					// Only do this once?
@@ -197,6 +252,7 @@ function createMenu($menuData, $menuOptions = array())
 
 					// Update the context if required - as we can have areas pretending to be others. ;)
 					$menu_context['current_section'] = $section_id;
+					// @todo 'select' seems useless
 					$menu_context['current_area'] = isset($area['select']) ? $area['select'] : $area_id;
 
 					// This will be the data we return.
@@ -320,6 +376,11 @@ function callMenu($selectedMenu)
 		// 'controller' => 'ManageAttachments_Controller'
 		// 'function' => 'action_avatars'
 		$controller = new $selectedMenu['controller']();
+
+		// always set up the environment
+		if (method_exists($controller, 'pre_dispatch'))
+			$controller->pre_dispatch();
+		// and go!
 		$controller->{$selectedMenu['function']}();
 	}
 	else

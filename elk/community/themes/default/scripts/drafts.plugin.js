@@ -3,7 +3,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  * This file contains javascript associated with the drafts auto function as it
  * relates to an sceditor invocation
@@ -15,7 +15,7 @@
 	function elk_Drafts(options) {
 		// All the passed options and defaults are loaded to the opts object
 		this.opts = $.extend({}, this.defaults, options);
-	};
+	}
 
 	/**
 	 * Make the call to save this draft in the background
@@ -26,11 +26,11 @@
 	 */
 	elk_Drafts.prototype.draftSave = function() {
 		// No change since the last save, or form submitted
-		if (!this.opts._bCheckDraft || smf_formSubmitted)
+		if (!this.opts._bCheckDraft || elk_formSubmitted)
 			return false;
 
 		// Still saving the last one or other?
-		if (this.opts._bInDraftMode)
+		if (this.opts._bInDraftMode === true)
 			this.draftCancel();
 
 		// Get the editor text, either from sceditor or from the quicktext textarea
@@ -47,32 +47,36 @@
 		// Get the form elements that we want to save
 		var aSections = [
 			'topic=' + parseInt(document.forms.postmodify.elements['topic'].value),
-			'id_draft=' + parseInt(document.forms.postmodify.elements['id_draft'].value),
+			'id_draft=' + (('id_draft' in document.forms.postmodify.elements) ? parseInt(document.forms.postmodify.elements['id_draft'].value) : 0),
 			'subject=' + escape(document.forms.postmodify['subject'].value.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
 			'message=' + escape(sPostdata.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
 			'icon=' + escape(document.forms.postmodify['icon'].value.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
 			'save_draft=true',
-			smf_session_var + '=' + smf_session_id
+			elk_session_var + '=' + elk_session_id
 		];
 
 		// Get the locked an/or sticky values if they have been selected or set that is
 		if (this.opts.sType && this.opts.sType === 'post')
 		{
-			var oLock = document.getElementById('check_lock');
-			var oSticky = document.getElementById('check_sticky');
+			var oLock = document.getElementById('check_lock'),
+				oSticky = document.getElementById('check_sticky'),
+				oSmile = document.getElementById('check_smileys');
 
 			if (oLock && oLock.checked)
 				aSections[aSections.length] = 'lock=1';
 
 			if (oSticky && oSticky.checked)
 				aSections[aSections.length] = 'sticky=1';
+
+			if (oSmile && oSmile.checked)
+				aSections[aSections.length] = 'ns=1';
 		}
 
 		// Keep track of source or wysiwyg when using the full editor
 		aSections[aSections.length] = 'message_mode=' + (base.inSourceMode() ? '1' : '0');
 
 		// Send in document for saving and hope for the best
-		sendXMLDocument.call(this, smf_prepareScriptUrl(smf_scripturl) + "action=post2;board=" + this.opts.iBoard + ";xml", aSections.join("&"), this.onDraftDone);
+		sendXMLDocument.call(this, elk_prepareScriptUrl(elk_scripturl) + "action=post2;board=" + this.opts.iBoard + ";xml", aSections.join("&"), this.onDraftDone);
 
 		// Set the flag off so we don't save again (until a keypress indicates they changed the text)
 		this.opts._bCheckDraft = false;
@@ -88,12 +92,12 @@
 	elk_Drafts.prototype.draftPMSave = function ()
 	{
 		// No change since the last PM save, or elk is doing its thing
-		if (!this.opts._bCheckDraft || smf_formSubmitted)
+		if (!this.opts._bCheckDraft || elk_formSubmitted)
 			return false;
 
 		// Still saving the last one or some other?
-		if (this.opts._bInDraftMode)
-			this.draftCancel;
+		if (this.opts._bInDraftMode === true)
+			this.draftCancel();
 
 		// Nothing to save
 		var sPostdata = base.val();
@@ -105,31 +109,27 @@
 		this.opts._bInDraftMode = true;
 
 		// Get the to and bcc values
-		var aTo = this.draftGetRecipient('recipient_to[]');
-		var aBcc = this.draftGetRecipient('recipient_bcc[]');
+		var aTo = this.draftGetRecipient('recipient_to[]'),
+			aBcc = this.draftGetRecipient('recipient_bcc[]');
 
 		// Get the rest of the form elements that we want to save, and load them up
 		var aSections = [
-			'replied_to=' + parseInt(document.forms.postmodify.elements['replied_to'].value),
-			'id_pm_draft=' + parseInt(document.forms.postmodify.elements['id_pm_draft'].value),
-			'subject=' + escape(document.forms.postmodify['subject'].value.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
+			'replied_to=' + parseInt(document.forms.pmFolder.elements['replied_to'].value),
+			'id_pm_draft=' + (('id_pm_draft' in document.forms.pmFolder.elements) ? parseInt(document.forms.pmFolder.elements['id_pm_draft'].value) : 0),
+			'subject=' + escape(document.forms.pmFolder['subject'].value.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
 			'message=' + escape(sPostdata.replace(/&#/g, "&#38;#").php_to8bit()).replace(/\+/g, "%2B"),
 			'recipient_to=' + aTo,
 			'recipient_bcc=' + aBcc,
 			'save_draft=true',
-			smf_session_var + '=' + smf_session_id
+			elk_session_var + '=' + elk_session_id
 		];
-
-		// Saving a copy in the outbox?
-		if (document.getElementById('outbox'))
-			aSections[aSections.length] = 'outbox=' + parseInt(document.getElementById('outbox').value);
 
 		// Account for wysiwyg
 		if (this.opts.sType && this.opts.sType === 'post')
 			aSections[aSections.length] = 'message_mode=' + (base.inSourceMode() ? '1' : '0');
 
 		// Send in (post) the document for saving
-		sendXMLDocument.call(this, smf_prepareScriptUrl(smf_scripturl) + "action=pm;sa=send2;xml", aSections.join("&"), this.onDraftDone);
+		sendXMLDocument.call(this, elk_prepareScriptUrl(elk_scripturl) + "action=pm;sa=send2;xml", aSections.join("&"), this.onDraftDone);
 
 		// Set the flag as updated
 		this.opts._bCheckDraft = false;
@@ -138,10 +138,12 @@
 	/**
 	 * Function to retrieve the to and bcc values from the pseudo arrays
 	 *  - Accounts for either a single or multiple to/bcc recipients
+	 *
+	 * @param {string} sField name of the form elements we are getting
 	 */
 	elk_Drafts.prototype.draftGetRecipient = function (sField)
 	{
-		var oRecipient = document.forms.postmodify.elements[sField],
+		var oRecipient = document.forms.pmFolder.elements[sField],
 			aRecipient = [];
 
 		if (typeof(oRecipient) !== 'undefined')
@@ -175,6 +177,8 @@
 	 * - closes the draft last saved info box from a "manual" save draft click
 	 * - hides the ajax saving icon
 	 * - turns off _bInDraftMode so another save request can fire
+	 *
+	 * @param {xml object} XMLDoc
 	 */
 	elk_Drafts.prototype.onDraftDone = function (XMLDoc) {
 		// If it is not valid then clean up
@@ -187,12 +191,12 @@
 
 		// Update the form to show we finished, if the id is not set, then set it
 		document.getElementById(this.opts.sLastID).value = this.opts._sCurDraftId;
-		this.opts._oCurDraftDiv = document.getElementById(this.opts.sLastNote);
-		setInnerHTML(this.opts._oCurDraftDiv, this.opts._sLastSaved);
+		document.getElementById(this.opts.sLastNote).innerHTML = this.opts._sLastSaved;
 
-		// Hide the saved draft infobox in the event they pressed the save draft button at some point
-		if (this.opts.sType === 'post')
-			document.getElementById('draft_section').style.display = 'none';
+		// Hide the saved draft successbox in the event they pressed the save draft button at some point
+		var draft_section = document.getElementById('draft_section');
+		if (draft_section)
+			draft_section.style.display = 'none';
 
 		// Thank you sir, may I have another
 		this.opts._bInDraftMode = false;
@@ -216,19 +220,13 @@
 		_sCurDraftId: null,
 
 		/**
-		 * The div that holds our draft saved text
-		 * @type {Object}
-		 */
-		_oCurDraftDiv: null,
-
-		/**
 		 * How often we are going to save a draft in the background
 		 * @type {Integer}
 		 */
 		_interval_id: null,
 
 		/**
-		 * The text to place in the _oCurDraftDiv, comes from the xml response
+		 * The text to place in the last saved Div, comes from the xml response
 		 * @type {String}
 		 */
 		_sLastSaved: null,

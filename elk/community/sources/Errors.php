@@ -1,6 +1,10 @@
 <?php
 
 /**
+ * The purpose of this file is... errors. (hard to guess, I guess?)  It takes
+ * care of logging, error messages, error handling, database errors, and
+ * error log administration.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,22 +13,19 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * The purpose of this file is... errors. (hard to guess, I guess?)  It takes
- * care of logging, error messages, error handling, database errors, and
- * error log administration.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Log an error, if the error logging is enabled.
  * filename and line should be __FILE__ and __LINE__, respectively.
+ *
  * Example use:
  *  die(log_error($msg));
  *
@@ -32,8 +33,6 @@ if (!defined('ELKARTE'))
  * @param string $error_type = 'general'
  * @param string $file = null
  * @param int $line = null
- *
- * @return string, the error message
  */
 function log_error($error_message, $error_type = 'general', $file = null, $line = null)
 {
@@ -73,7 +72,7 @@ function log_error($error_message, $error_type = 'general', $file = null, $line 
 	$query_string = empty($_SERVER['QUERY_STRING']) ? (empty($_SERVER['REQUEST_URL']) ? '' : str_replace($scripturl, '', $_SERVER['REQUEST_URL'])) : $_SERVER['QUERY_STRING'];
 
 	// Don't log the session hash in the url twice, it's a waste.
-	$query_string = htmlspecialchars((ELKARTE == 'SSI' ? '' : '?') . preg_replace(array('~;sesc=[^&;]+~', '~' . session_name() . '=' . session_id() . '[&;]~'), array(';sesc', ''), $query_string));
+	$query_string = htmlspecialchars((ELK == 'SSI' ? '' : '?') . preg_replace(array('~;sesc=[^&;]+~', '~' . session_name() . '=' . session_id() . '[&;]~'), array(';sesc', ''), $query_string), ENT_COMPAT, 'UTF-8');
 
 	// Just so we know what board error messages are from.
 	if (isset($_POST['board']) && !isset($_GET['board']))
@@ -98,6 +97,7 @@ function log_error($error_message, $error_type = 'general', $file = null, $line 
 		call_integration_hook('integrate_error_types', array(&$other_error_types));
 		$known_error_types += $other_error_types;
 	}
+
 	// Make sure the category that was specified is a valid one
 	$error_type = in_array($error_type, $known_error_types) && $error_type !== true ? $error_type : 'general';
 
@@ -135,7 +135,7 @@ function fatal_error($error, $log = 'general')
 		die($error);
 
 	if (class_exists('Template_Layers'))
-		Template_Layers::getInstance()->preventReverse();
+		Template_Layers::getInstance()->isError();
 	setup_fatal_error_context($log || (!empty($modSettings['enableErrorLogging']) && $modSettings['enableErrorLogging'] == 2) ? log_error($error, $log) : $error, $error);
 }
 
@@ -149,9 +149,9 @@ function fatal_error($error, $log = 'general')
  *  - uses Errors language file and applies the $sprintf information if specified.
  *  - the information is logged if log is specified.
  *
- * @param $error
- * @param $log = 'general'
- * @param $sprintf = array()
+ * @param string $error
+ * @param string $log defaults to 'general'
+ * @param array $sprintf defaults to empty array()
  */
 function fatal_lang_error($error, $log = 'general', $sprintf = array())
 {
@@ -169,7 +169,11 @@ function fatal_lang_error($error, $log = 'general', $sprintf = array())
 	if (empty($context['theme_loaded']))
 		die($error);
 
+	if (class_exists('Template_Layers'))
+		Template_Layers::getInstance()->isError();
+
 	$reload_lang_file = true;
+
 	// Log the error in the forum's language, but don't waste the time if we aren't logging
 	if ($log || (!empty($modSettings['enableErrorLogging']) && $modSettings['enableErrorLogging'] == 2))
 	{
@@ -209,7 +213,8 @@ function error_handler($error_level, $error_string, $file, $line)
 	if (strpos($file, 'eval()') !== false && !empty($settings['current_include_filename']))
 	{
 		$array = debug_backtrace();
-		for ($i = 0; $i < count($array); $i++)
+		$count = count($array);
+		for ($i = 0; $i < $count; $i++)
 		{
 			if ($array[$i]['function'] != 'loadSubTemplate')
 				continue;
@@ -272,7 +277,7 @@ function error_handler($error_level, $error_string, $file, $line)
  * @uses Errors template, fatal_error sub template, or Wireless template, error sub template.
  *
  * @param string $error_message
- * @param type $error_code
+ * @param mixed $error_code string or int code
  */
 function setup_fatal_error_context($error_message, $error_code)
 {
@@ -285,7 +290,7 @@ function setup_fatal_error_context($error_message, $error_code)
 		return false;
 
 	// Maybe they came from dlattach or similar?
-	if (ELKARTE != 'SSI' && empty($context['theme_loaded']))
+	if (ELK != 'SSI' && empty($context['theme_loaded']))
 		loadTheme();
 
 	// Don't bother indexing errors mate...
@@ -305,7 +310,7 @@ function setup_fatal_error_context($error_message, $error_code)
 	$context['sub_template'] = 'fatal_error';
 
 	// If this is SSI, what do they want us to do?
-	if (ELKARTE == 'SSI')
+	if (ELK == 'SSI')
 	{
 		if (!empty($ssi_on_error_method) && $ssi_on_error_method !== true && is_callable($ssi_on_error_method))
 			$ssi_on_error_method();
@@ -342,8 +347,8 @@ function display_maintenance_message()
 	set_fatal_error_headers();
 
 	if (!empty($maintenance))
-		echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+		echo '<!DOCTYPE html>
+<html>
 	<head>
 		<meta name="robots" content="noindex" />
 		<title>', $mtitle, '</title>
@@ -366,7 +371,7 @@ function display_maintenance_message()
 function display_db_error()
 {
 	global $mbname, $modSettings, $maintenance;
-	global $db_connection, $webmaster_email, $db_last_error, $db_error_send;
+	global $webmaster_email, $db_last_error, $db_error_send;
 
 	$db = database();
 
@@ -390,14 +395,13 @@ function display_db_error()
 			logLastDatabaseError();
 
 		// Language files aren't loaded yet :(.
-		$db_error = $db->last_error($db_connection);
-		$db = database();
+		$db_error = $db->last_error($db->connection());
 		@mail($webmaster_email, $mbname . ': Database Error!', 'There has been a problem with the database!' . ($db_error == '' ? '' : "\n" . $db->db_title() . ' reported:' . "\n" . $db_error) . "\n\n" . 'This is a notice email to let you know that the system could not connect to the database, contact your host if this continues.');
 	}
 
 	// What to do?  Language files haven't and can't be loaded yet...
-	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+	echo '<!DOCTYPE html>
+<html>
 	<head>
 		<meta name="robots" content="noindex" />
 		<title>Connection Problems</title>
@@ -420,11 +424,10 @@ function display_db_error()
 function display_loadavg_error()
 {
 	// If this is a load average problem, display an appropriate message (but we still don't have language files!)
-
 	set_fatal_error_headers();
 
-	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+	echo '<!DOCTYPE html>
+<html>
 	<head>
 		<meta name="robots" content="noindex" />
 		<title>Temporarily Unavailable</title>

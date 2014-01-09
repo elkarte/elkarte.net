@@ -7,51 +7,63 @@
  *
  * This software is a derived product, based on:
  *
- * Simple Machines Forum (SMF)
+ * Simple Machines Forum (elk)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
+/**
+ * depreciated?
+ */
 function template_sendbody()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<message view="', $context['view'], '">', cleanXml($context['message']), '</message>
-</smf>';
+</elk>';
 }
 
+/**
+ * Returns the text of a post in response to a quote request for loading into the current editing text box
+ */
 function template_quotefast()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<quote>', cleanXml($context['quote']['xml']), '</quote>
-</smf>';
+</elk>';
 }
 
+/**
+ * Returns a message text and subject for use in the quick modify screen
+ */
 function template_modifyfast()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<subject><![CDATA[', cleanXml($context['message']['subject']), ']]></subject>
 	<message id="msg_', $context['message']['id'], '"><![CDATA[', cleanXml($context['message']['body']), ']]></message>
-</smf>';
-
+</elk>';
 }
 
+/**
+ * Returns updated message details so the topic display can be updated after a quick edit is completed
+ */
 function template_modifydone()
 {
 	global $context, $txt;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<message id="msg_', $context['message']['id'], '">';
 	if (empty($context['message']['errors']))
 	{
@@ -63,17 +75,21 @@ function template_modifydone()
 	else
 		echo '
 		<error in_subject="', $context['message']['error_in_subject'] ? '1' : '0', '" in_body="', cleanXml($context['message']['error_in_body']) ? '1' : '0', '"><![CDATA[', implode('<br />', $context['message']['errors']), ']]></error>';
+
 	echo '
 	</message>
-</smf>';
+</elk>';
 }
 
+/**
+ * When done modifying a topic title, updates the board listing
+ */
 function template_modifytopicdone()
 {
 	global $context, $txt;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<message id="msg_', $context['message']['id'], '">';
 	if (empty($context['message']['errors']))
 	{
@@ -88,24 +104,29 @@ function template_modifytopicdone()
 		<error in_subject="', $context['message']['error_in_subject'] ? '1' : '0', '"><![CDATA[', cleanXml(implode('<br />', $context['message']['errors'])), ']]></error>';
 	echo '
 	</message>
-</smf>';
+</elk>';
 }
 
+/**
+ * Used to return a post preview
+ */
 function template_post()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<preview>
 		<subject><![CDATA[', $context['preview_subject'], ']]></subject>
 		<body><![CDATA[', $context['preview_message'], ']]></body>
 	</preview>
 	<errors serious="', empty($context['errors']['type']) || $context['errors']['type'] != 'serious' ? '0' : '1', '" topic_locked="', $context['locked'] ? '1' : '0', '">';
+
 	if (!empty($context['post_error']['errors']))
 		foreach ($context['post_error']['errors'] as $key => $message)
 			echo '
 		<error code="', cleanXml($key), '"><![CDATA[', cleanXml($message), ']]></error>';
+
 	echo '
 		<caption name="guestname" class="', isset($context['post_error']['long_name']) || isset($context['post_error']['no_name']) || isset($context['post_error']['bad_name']) ? 'error' : '', '" />
 		<caption name="email" class="', isset($context['post_error']['no_email']) || isset($context['post_error']['bad_email']) ? 'error' : '', '" />
@@ -133,44 +154,51 @@ function template_post()
 	}
 
 	echo '
-</smf>';
+</elk>';
 }
 
-function template_pm()
+/**
+ * Returns a preview, used by personal messages, newsletters, bounce templates, etc
+ */
+function template_generic_preview()
 {
-	global $context;
+	global $context, $txt;
 
-	// @todo something could be removed...otherwise it can be merged again with template_post
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<preview>
-		<subject><![CDATA[', $context['preview_subject'], ']]></subject>
+		<subject><![CDATA[', empty($context['preview_subject']) ? $txt['not_applicable'] : $context['preview_subject'], ']]></subject>
 		<body><![CDATA[', $context['preview_message'], ']]></body>
 	</preview>
 	<errors serious="', empty($context['error_type']) || $context['error_type'] != 'serious' ? '0' : '1', '">';
-	if (!empty($context['post_error']['messages']))
-		foreach ($context['post_error']['messages'] as $message)
-			echo '
-		<error><![CDATA[', cleanXml($message), ']]></error>';
 
+	if (!empty($context['post_error']['errors']))
+		foreach ($context['post_error']['errors'] as $key => $message)
+			echo '
+		<error code="', cleanXml($key), '"><![CDATA[', cleanXml($message), ']]></error>';
+
+	// This is the not so generic section, mainly used by PM preview, can be used by others as well
 	echo '
 		<caption name="to" class="', isset($context['post_error']['no_to']) ? 'error' : '', '" />
 		<caption name="bbc" class="', isset($context['post_error']['no_bbc']) ? 'error' : '', '" />
 		<caption name="subject" class="', isset($context['post_error']['no_subject']) ? 'error' : '', '" />
-		<caption name="question" class="', isset($context['post_error']['no_question']) ? 'error' : '', '" />', isset($context['post_error']['no_message']) || isset($context['post_error']['long_message']) ? '
-		<post_error />' : '', '
+		<caption name="question" class="', isset($context['post_error']['no_question']) ? 'error' : '', '" />',
+		isset($context['post_error']['no_message']) || isset($context['post_error']['long_message']) ? '<post_error />' : '', '
 	</errors>';
 
 	echo '
-</smf>';
+</elk>';
 }
 
+/**
+ * Returns additional statistics when a year/month is expanded
+ */
 function template_stats()
 {
 	global $context, $modSettings;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>';
+<elk>';
 	foreach ($context['yearly'] as $year)
 		foreach ($year['months'] as $month)
 		{
@@ -182,16 +210,19 @@ function template_stats()
 			echo '
 	</month>';
 		}
-		echo '
-</smf>';
+	echo '
+</elk>';
 }
 
+/**
+ * Breaking up is not so hard to do
+ */
 function template_split()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<pageIndex section="not_selected" startFrom="', $context['not_selected']['start'], '"><![CDATA[', $context['not_selected']['page_index'], ']]></pageIndex>
 	<pageIndex section="selected" startFrom="', $context['selected']['start'], '"><![CDATA[', $context['selected']['page_index'], ']]></pageIndex>';
 	foreach ($context['changes'] as $change)
@@ -208,29 +239,19 @@ function template_split()
 		<poster><![CDATA[', cleanXml($change['insert_value']['poster']), ']]></poster>
 	</change>';
 	}
+
 	echo '
-</smf>';
+</elk>';
 }
 
-// This is just to hold off some errors if people are stupid.
-if (!function_exists('template_button_strip'))
-{
-	function template_button_strip($button_strip, $direction = 'top', $strip_options = array())
-	{
-	}
-	function template_menu()
-	{
-	}
-	function theme_linktree()
-	{
-	}
-}
-
+/**
+ * Return search results
+ */
 function template_results()
 {
 	global $context, $txt;
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>';
+<elk>';
 
 	if (empty($context['topics']))
 		echo '
@@ -257,6 +278,7 @@ function template_results()
 					<href>', $topic['category']['href'], '</href>
 				</category>
 				<messages>';
+
 			foreach ($topic['matches'] as $message)
 			{
 				echo '
@@ -275,6 +297,7 @@ function template_results()
 						</author>
 					</message>';
 			}
+
 			echo '
 				</messages>
 			</result>';
@@ -285,15 +308,19 @@ function template_results()
 	}
 
 	echo '
-</smf>';
+</elk>';
 }
 
+/**
+ * Build the jump to box, depreciated?
+ */
 function template_jump_to()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>';
+<elk>';
+
 	foreach ($context['categories'] as $category)
 	{
 		echo '
@@ -302,56 +329,70 @@ function template_jump_to()
 			echo '
 	<item type="board" id="', $board['id'], '" childlevel="', $board['child_level'], '"><![CDATA[', cleanXml($board['name']), ']]></item>';
 	}
+
 	echo '
-</smf>';
+</elk>';
 }
 
+/**
+ * Loads the message icons for changing them via the quick edit
+ */
 function template_message_icons()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>';
+<elk>';
+
 	foreach ($context['icons'] as $icon)
 		echo '
 	<icon value="', $icon['value'], '" url="', $icon['url'], '"><![CDATA[', cleanXml($icon['name']), ']]></icon>';
+
 	echo '
-</smf>';
+</elk>';
 }
 
+/**
+ * Returns if the username is valid or not, used during registration
+ */
 function template_check_username()
 {
 	global $context;
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
-<smf>
+<elk>
 	<username valid="', $context['valid_username'] ? 1 : 0, '">', cleanXml($context['checked_username']), '</username>
-</smf>';
+</elk>';
 }
 
+/**
+ * @todo ... maybe emanuele can explain :D
+ */
 function template_generic_xml_buttons()
 {
 	global $context;
 
+	$tag = empty($context['xml_data']['error']) ? 'button' : 'error';
+
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
 <elk>
-	<buttons>';
-	foreach ($context['xml_data'] as $button)
+	<', $tag, '>';
+
+	foreach ($context['xml_data'] as $key => $val)
 	{
-		echo '
-		<button>';
-		foreach ($button as $key => $val)
+		if ($key != 'error')
 			echo '
 			<', $key, '><![CDATA[', cleanXml($val), ']]></', $key, '>';
-		echo '
-		</button>';
 	}
+
 	echo '
-	</buttons>
+	</', $tag, '>
 </elk>';
 }
 
-// This prints XML in it's most generic form.
+/**
+ * This prints XML in it's most generic form.
+ */
 function template_generic_xml()
 {
 	global $context;
@@ -359,10 +400,17 @@ function template_generic_xml()
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>';
 
 	// Show the data.
-	template_generic_xml_recursive($context['xml_data'], 'smf', '', -1);
+	template_generic_xml_recursive($context['xml_data'], 'elk', '', -1);
 }
 
-// Recursive function for displaying generic XML data.
+/**
+ * Recursive function for displaying generic XML data.
+ *
+ * @param array $xml_data
+ * @param string $parent_ident
+ * @param string $child_ident
+ * @param int $level
+ */
 function template_generic_xml_recursive($xml_data, $parent_ident, $child_ident, $level)
 {
 	// This is simply for neat indentation.
@@ -383,14 +431,17 @@ function template_generic_xml_recursive($xml_data, $parent_ident, $child_ident, 
 			if (!empty($data['attributes']))
 				foreach ($data['attributes'] as $k => $v)
 					echo ' ' . $k . '="' . $v . '"';
+
 			echo '><![CDATA[', cleanXml($data['value']), ']]></', $child_ident, '>';
 		}
-
 	}
 
 	echo "\n", str_repeat("\t", $level), '</', $parent_ident, '>';
 }
 
+/**
+ * Output before webslices content
+ */
 function template_webslice_header_above()
 {
 	global $settings;
@@ -399,21 +450,21 @@ function template_webslice_header_above()
 	<link rel="stylesheet" href="', $settings['default_theme_url'], '/css/wireless.css" />';
 }
 
-function template_webslice_header_below()
-{
-}
-
-// This shows a webslice of the recent posts.
+/**
+ * This shows a webslice of the recent posts.
+ */
 function template_webslice_recent_posts()
 {
 	global $context, $scripturl, $txt;
 
+	// @todo test if this works
 	echo '
 	<div style="width: 100%; height: 100%; border: 1px solid black; padding: 0; margin: 0 0 0 0; font: 100.01%/100% Verdana, Helvetica, sans-serif;">
 		<div style="background: #080436; color: #ffffff; padding: 4px;">
 			', cleanXml($txt['recent_posts']), '
 		</div>';
 
+	// Recent posts bit
 	$alternate = 0;
 	foreach ($context['recent_posts_data'] as $item)
 	{
@@ -429,6 +480,7 @@ function template_webslice_recent_posts()
 	<div style="width: 100%; height: 100%; border: 0; padding: 0; margin: 0 0 0 0; font: 100.01%/100% Verdana, Helvetica, sans-serif;">
 		<div style="font-size: xx-small;" class="righttext">';
 
+	// Send alerts for the logged in user if they have new PMs
 	if ($context['user']['is_guest'])
 		echo '
 			<a href="', $scripturl, '?action=login">', $txt['login'], '</a>';
@@ -443,7 +495,6 @@ function template_webslice_recent_posts()
 /**
  * Returns an xml response to a draft autosave request
  * provides the id of the draft saved and the time it was saved in the response
- *
  */
 function template_xml_draft()
 {
@@ -451,6 +502,6 @@ function template_xml_draft()
 
 	echo '<', '?xml version="1.0" encoding="UTF-8"?', '>
 <drafts>
-	<draft id="', $context['id_draft'], '"><![CDATA[', $txt['draft_saved_on'], ': ', relativeTime($context['draft_saved_on']), ']]></draft>
+	<draft id="', $context['id_draft'], '"><![CDATA[', $txt['draft_saved_on'], ': ', standardTime($context['draft_saved_on']), ']]></draft>
 </drafts>';
 }

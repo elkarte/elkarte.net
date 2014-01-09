@@ -1,21 +1,23 @@
 <?php
 
 /**
+ * This does the job of handling user errors in their many forms
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
-	die('Hacking attempt...');
+if (!defined('ELK'))
+	die('No access...');
 
 /**
  *  This class is an experiment for the job of handling errors.
  */
-class error_context
+class Error_Context
 {
 	/**
 	 * Holds the unique identifier of the error (a name).
@@ -53,7 +55,7 @@ class error_context
 	private $_language_files = array();
 
 	/**
-	 * Multipleton. This is an array of instances of error_context.
+	 * Multiton. This is an array of instances of error_context.
 	 * All callers use an error context ('post', 'attach', or 'default' if none chosen).
 	 *
 	 * @var array of error_context
@@ -66,20 +68,20 @@ class error_context
 	/**
 	 * Create and initialize an instance of the class
 	 *
-	 * @param string error identifier
-	 * @param int the default error severity level
+	 * @param string $id the error identifier
+	 * @param int $default_severity the default error severity level
 	 */
 	private function __construct ($id = 'default', $default_severity = null)
 	{
 		if (!empty($id))
 			$this->_name = $id;
 
-		// initialize severity levels... waiting for details!
-		$this->_severity_levels = array(error_context::MINOR, error_context::SERIOUS);
+		// Initialize severity levels... waiting for details!
+		$this->_severity_levels = array(Error_Context::MINOR, Error_Context::SERIOUS);
 
-		// initialize default severity (not sure this is needed)
+		// Initialize default severity (not sure this is needed)
 		if ($default_severity === null || !in_array($default_severity, $this->_severity_levels))
-			$this->_default_severity = error_context::MINOR;
+			$this->_default_severity = Error_Context::MINOR;
 		else
 			$this->_default_severity = $default_severity;
 
@@ -89,9 +91,9 @@ class error_context
 	/**
 	 * Add an error to the list
 	 *
-	 * @param string error code
-	 * @param mixed error severity
-	 * @param string lang_file
+	 * @param string $error error code
+	 * @param mixed $severity error severity
+	 * @param string $lang_file lang_file
 	 */
 	public function addError($error, $severity = null, $lang_file = null)
 	{
@@ -104,6 +106,7 @@ class error_context
 			else
 				$this->_errors[$severity][$error] = $error;
 		}
+
 		if (!empty($lang_file))
 			$this->_language_files[] = $lang_file;
 	}
@@ -111,7 +114,7 @@ class error_context
 	/**
 	 * Remove an error from the list
 	 *
-	 * @param string error code
+	 * @param string $error error code
 	 */
 	public function removeError($error)
 	{
@@ -119,6 +122,7 @@ class error_context
 		{
 			if (is_array($error))
 				$error = $error[0];
+
 			foreach ($this->_errors as $severity => $errors)
 				if (in_array($error, $errors))
 					unset($this->_errors[$severity][$error]);
@@ -129,7 +133,7 @@ class error_context
 	 * Return an array of errors of a certain severity.
 	 * @todo is it needed at all?
 	 *
-	 * @param string the severity level wanted. If null returns all the errors
+	 * @param string $severity the severity level wanted. If null returns all the errors
 	 */
 	public function getErrors($severity = null)
 	{
@@ -144,7 +148,7 @@ class error_context
 	/**
 	 * Returns if there are errors or not.
 	 *
-	 * @param string the severity level wanted. If null returns all the errors
+	 * @param string $severity the severity level wanted. If null returns all the errors
 	 * @return bool
 	 */
 	public function hasErrors($severity = null)
@@ -160,8 +164,7 @@ class error_context
 	/**
 	 * Check if a particular error exists.
 	 *
-	 * @param string the error
-	 * @return bool
+	 * @param string $errors the error
 	 */
 	public function hasError($errors)
 	{
@@ -171,17 +174,17 @@ class error_context
 		{
 			$errors = is_array($errors) ? $errors : array($errors);
 			foreach ($errors as $error)
+			{
 				foreach ($this->_errors as $current_errors)
 					if (isset($current_errors[$error]))
 						return true;
+			}
 		}
 		return false;
 	}
 
 	/**
 	 * Return the code of the highest error level encountered
-	 *
-	 * @return int
 	 */
 	public function getErrorType()
 	{
@@ -197,21 +200,21 @@ class error_context
 	 * Return an array containing the error strings
 	 * If severity is null the function returns all the errors
 	 *
-	 * @param string the severity level wanted
+	 * @param string $severity the severity level wanted
 	 */
 	public function prepareErrors($severity = null)
 	{
 		global $txt;
 
+		if (empty($this->_errors))
+			return array();
+
 		// Load the default error language and any other language file needed
-		// @todo: we could load these languages only if really necessary...it just needs a coupld of changes
+		// @todo: we could load these languages only if really necessary...it just needs a couple of changes
 		loadLanguage('Errors');
 		if (!empty($this->_language_files))
 			foreach ($this->_language_files as $language)
 				loadLanguage($language);
-
-		if (empty($this->_errors))
-			return array();
 
 		call_integration_hook('integrate_' . $this->_name . '_errors', array(&$this->_errors, &$this->_severity_levels));
 
@@ -228,7 +231,7 @@ class error_context
 		foreach ($errors as $error_val)
 		{
 			if (is_array($error_val))
-				$returns[$error_val[0]] = vsprintf(isset($txt['error_' . $error_val[0]]) ? $txt['error_' . $error_val[0]] : $error_val[0], $error_val[1]);
+				$returns[$error_val[0]] = vsprintf(isset($txt['error_' . $error_val[0]]) ? $txt['error_' . $error_val[0]] : (isset($txt[$error_val[0]]) ? $txt[$error_val[0]] : $error_val[0]), $error_val[1]);
 			else
 				$returns[$error_val] = isset($txt['error_' . $error_val]) ? $txt['error_' . $error_val] : (isset($txt[$error_val]) ? $txt[$error_val] : $error_val);
 		}
@@ -247,25 +250,46 @@ class error_context
 	{
 		if (self::$_contexts === null)
 			self::$_contexts = array();
+
 		if (!array_key_exists($id, self::$_contexts))
-			self::$_contexts[$id] = new error_context($id, $default_severity);
+			self::$_contexts[$id] = new Error_Context($id, $default_severity);
 
 		return self::$_contexts[$id];
 	}
 }
 
 /**
- * Error context for attachments
- *
+ * Class Error context for attachments
  */
 class attachment_error_context
 {
+	/**
+	 * Holds our static instance of the class
+	 * @var object
+	 */
 	private static $_context = null;
+
+	/**
+	 * Holds all of the attachment ids
+	 * @var array
+	 */
 	private $_attachs = null;
+
+	/**
+	 * Holds any errors found
+	 * @var array
+	 */
 	private $_generic_error = null;
 
 	/**
+	 * Holds if the error is generic of specific to an attachment
+	 * @var string
+	 */
+	private $_active_attach = null;
+
+	/**
 	 * Add attachment
+	 * Automatically activate the attachments added
 	 *
 	 * @param string $id
 	 * @param string $name
@@ -273,15 +297,35 @@ class attachment_error_context
 	public function addAttach($id, $name)
 	{
 		if (empty($id) || empty($name))
+		{
+			$this->activate();
 			return false;
+		}
 
 		if (!isset($this->_attachs[$id]))
 			$this->_attachs[$id] = array(
 				'name' => $name,
-				'error' => error_context::context($id, 1),
+				'error' => Error_Context::context($id, 1),
 			);
-		return true;
 
+		$this->activate($id);
+
+		return true;
+	}
+
+	/**
+	 * Sets the active attach (errors are "attached" to that)
+	 *
+	 * @param int $id A valid attachment, if invalid it defaults to 'generic'
+	 */
+	public function activate($id = null)
+	{
+		if (empty($id) || isset($this->_attachs[$id]))
+			$this->_active_attach = 'generic';
+		else
+			$this->_active_attach = $id;
+
+		return $this;
 	}
 
 	/**
@@ -291,20 +335,21 @@ class attachment_error_context
 	 * @param string $attachID = 'generic'
 	 * @param string $lang_file = null
 	 */
-	public function addError($error, $attachID = 'generic', $lang_file = null)
+	public function addError($error, $lang_file = null)
 	{
 		if (empty($error))
 			return;
 
-		if ($attachID == 'generic')
+		if ($this->_active_attach == 'generic')
 		{
-			if (!isset($this->_attachs[$attachID]))
-				$this->_generic_error = error_context::context('attach_generic_error', 1);
-			$this->_generic_error->addError($error, null, $lang_file);
+			if (!isset($this->_attachs[$this->_active_attach]))
+				$this->_generic_error = Error_Context::context('attach_generic_error', 1);
+
+			$this->_generic_error->addError($error, $lang_file);
 			return;
 		}
 
-		$this->_attachs[$attachID]['error']->addError($error, null, $lang_file);
+		$this->_attachs[$this->_active_attach]['error']->addError($error, $lang_file);
 	}
 
 	/**
@@ -341,8 +386,7 @@ class attachment_error_context
 	 * Return an array containing the error strings
 	 * If severity is null the function returns all the errors
 	 *
-	 * @param int = null the severity level wanted
-	 * @return array
+	 * @param int $severity = null the severity level wanted
 	 */
 	public function prepareErrors($severity = null)
 	{
@@ -370,8 +414,6 @@ class attachment_error_context
 
 	/**
 	 * Return the type of the error
-	 *
-	 * @return int
 	 */
 	public function getErrorType()
 	{
@@ -381,8 +423,6 @@ class attachment_error_context
 	/**
 	 * Find and return attachment_error_context instance if it exists,
 	 * or create it if it doesn't exist
-	 *
-	 * @return attachment_error_context
 	 */
 	public static function context()
 	{
@@ -391,5 +431,4 @@ class attachment_error_context
 
 		return self::$_context;
 	}
-
 }

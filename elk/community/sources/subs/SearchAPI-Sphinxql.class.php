@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * Used when an Sphinx search daemon is running and Access is via Sphinx's own
+ * implementation of MySQL network protocol (SphinxQL)
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,34 +14,33 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
- * SearchAPI-Sphinxql.php, used when an Sphinx search daemon is used and you want to access it
- * via Sphinx's own implementation of MySQL network protocol
+ * SearchAPI-Sphinxql.class.php, SphinxQL API, used when an Sphinx search daemon is running
+ * Access is via Sphinx's own implementation of MySQL network protocol (SphinxQL)
  */
 class Sphinxql_Search
 {
 	/**
-	 * This is the last version of ELKARTE that this was tested on, to protect against API changes.
+	 * This is the last version of ElkArte that this was tested on, to protect against API changes.
 	 * @var string
 	 */
-	public $version_compatible = 'ELKARTE 1.0 Alpha';
+	public $version_compatible = 'ElkArte 1.0 Beta';
 
 	/**
-	 * This won't work with versions of ELKARTE less than this.
+	 * This won't work with versions of ElkArte less than this.
 	 * @var string
 	 */
-	public $min_elk_version = 'ELKARTE 1.0 Alpha';
+	public $min_elk_version = 'ElkArte 1.0 Beta';
 
 	/**
 	 * Is it supported?
-	 *
 	 * @var boolean
 	 */
 	public $is_supported = true;
@@ -98,17 +100,14 @@ class Sphinxql_Search
 			break;
 
 			default:
-
 				// All other methods, too bad dunno you.
 				return false;
-			return;
+			break;
 		}
 	}
 
 	/**
 	 * If the settings don't exist we can't continue.
-	 *
-	 * @return type
 	 */
 	public function isValid()
 	{
@@ -139,11 +138,10 @@ class Sphinxql_Search
 	/**
 	 * Do we have to do some work with the words we are searching for to prepare them?
 	 *
-	 * @param mixed $word
-	 * @param mixed $wordsSearch
-	 * @param mixed $wordsExclude
-	 * @param mixed $isExcluded
-	 * @return
+	 * @param array $word
+	 * @param array $wordsSearch
+	 * @param array $wordsExclude
+	 * @param array $isExcluded
 	 */
 	public function prepareIndexes($word, &$wordsSearch, &$wordsExclude, $isExcluded)
 	{
@@ -157,6 +155,12 @@ class Sphinxql_Search
 
 	/**
 	 * This has it's own custom search.
+	 *
+	 * @param array $search_params
+	 * @param array $search_words
+	 * @param array $excluded_words
+	 * @param array $participants
+	 * @param array $search_results
 	 */
 	public function searchQuery($search_params, $search_words, $excluded_words, &$participants, &$search_results)
 	{
@@ -186,14 +190,13 @@ class Sphinxql_Search
 			// Set the limits based on the search parameters.
 			$extra_where = array();
 			if (!empty($search_params['min_msg_id']) || !empty($search_params['max_msg_id']))
-				$extra_where[] = '@id >= ' . $search_params['min_msg_id'] . ' AND @id <=' . (empty($search_params['max_msg_id']) ? (int) $modSettings['maxMsgID'] : $search_params['max_msg_id']);
+				$extra_where[] = '@id >= ' . $search_params['min_msg_id'] . ' AND @id <= ' . (empty($search_params['max_msg_id']) ? (int) $modSettings['maxMsgID'] : $search_params['max_msg_id']);
 			if (!empty($search_params['topic']))
 				$extra_where[] = 'id_topic = ' . (int) $search_params['topic'];
 			if (!empty($search_params['brd']))
 				$extra_where[] = 'id_board IN (' . implode(',', $search_params['brd']) . ')';
 			if (!empty($search_params['memberlist']))
 				$extra_where[] = 'id_member IN (' . implode(',', $search_params['memberlist']) . ')';
-
 			if (!empty($extra_where))
 				$query .= ' AND ' . implode(' AND ', $extra_where);
 
@@ -269,31 +272,31 @@ class Sphinxql_Search
 		$keywords = array('include' => array(), 'exclude' => array());
 
 		// Split our search string and return an empty string if no matches
-		if (!preg_match_all('~ (-?)("[^"]+"|[^" ]+)~', ' ' . $string , $tokens, PREG_SET_ORDER))
+		if (!preg_match_all('~ (-?)("[^"]+"|[^" ]+)~', ' ' . $string, $tokens, PREG_SET_ORDER))
 			return '';
 
 		// First we split our string into included and excluded words and phrases
-		$or_part = FALSE;
+		$or_part = false;
 		foreach ($tokens as $token)
 		{
 			// Strip the quotes off of a phrase
 			if ($token[2][0] == '"')
 			{
 				$token[2] = substr($token[2], 1, -1);
-				$phrase = TRUE;
+				$phrase = true;
 			}
 			else
-				$phrase = FALSE;
+				$phrase = false;
 
 			// Prepare this token
 			$cleanWords = $this->_cleanString($token[2]);
 
-			// Explode the cleanWords again incase the cleaning put more spaces into it
-			$addWords = $phrase ? array('"' . $cleanWords . '"') : preg_split('~ ~u', $cleanWords, NULL, PREG_SPLIT_NO_EMPTY);
+			// Explode the cleanWords again incase the cleaning puts more spaces into it
+			$addWords = $phrase ? array('"' . $cleanWords . '"') : preg_split('~ ~u', $cleanWords, null, PREG_SPLIT_NO_EMPTY);
 
+			// Excluding this word?
 			if ($token[1] == '-')
 				$keywords['exclude'] = array_merge($keywords['exclude'], $addWords);
-
 			// OR'd keywords (we only do this if we have something to OR with)
 			elseif (($token[2] == 'OR' || $token[2] == '|') && count($keywords['include']))
 			{
@@ -301,18 +304,15 @@ class Sphinxql_Search
 				if (!is_array($last))
 					$last = array($last);
 				$keywords['include'][] = $last;
-				$or_part = TRUE;
+				$or_part = true;
 				continue;
 			}
-
 			// AND is implied in a Sphinx Search
 			elseif ($token[2] == 'AND' || $token[2] == '&')
 				continue;
-
 			// If this part of the query ended up being blank, skip it
 			elseif (trim($cleanWords) == '')
 				continue;
-
 			// Must be something they want to search for!
 			else
 			{
@@ -324,7 +324,7 @@ class Sphinxql_Search
 			}
 
 			// Start fresh on this...
-			$or_part = FALSE;
+			$or_part = false;
 		}
 
 		// Let's make sure they're not canceling each other out

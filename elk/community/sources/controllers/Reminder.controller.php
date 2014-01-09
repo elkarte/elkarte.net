@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Handles sending out of password reminders, as well as the answer / question
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,29 +11,26 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * Handle sending out reminders, and checking the secret answer and question.
- * It uses just a few functions to do this.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Reminder Controller
+ * Reminder Controller handles sending out reminders, and checking the secret answer and question.
  */
-class Reminder_Controller
+class Reminder_Controller extends Action_Controller
 {
 	/**
 	 * This is the pre-dispatch function
 	 *
 	 * @uses Profile language files and Reminder template
 	 */
-	function pre_dispatch()
+	public function pre_dispatch()
 	{
 		global $txt, $context;
 
@@ -44,18 +43,23 @@ class Reminder_Controller
 
 	/**
 	 * Default action for reminder.
+	 * @uses reminder sub template
 	 */
-	function action_index()
+	public function action_index()
 	{
-		// nothing to do, the template will ask for an action to pick
+		global $context;
+
+		$context['sub_template'] = 'reminder';
+
+		// Nothing to do, the template will ask for an action to pick
 		createToken('remind');
 	}
 
 	/**
 	 * Pick a reminder type.
-	 * sa=picktype
+	 * Accessed by sa=picktype
 	 */
-	function action_picktype()
+	public function action_picktype()
 	{
 		global $context, $txt, $scripturl, $user_info, $webmaster_email, $language, $modSettings;
 
@@ -83,7 +87,9 @@ class Reminder_Controller
 			fatal_lang_error('username_no_exist', false);
 
 		// Make sure we are not being slammed
-		spamProtection('remind');
+		// Don't call this if you're coming from the "Choose a reminder type" page - otherwise you'll likely get an error
+		if (!isset($_POST['reminder_type']) || !in_array($_POST['reminder_type'], array('email', 'secret')))
+			spamProtection('remind');
 
 		$member = findUser($where, $where_params);
 
@@ -151,7 +157,7 @@ class Reminder_Controller
 	 * Set your new password
 	 * sa=setpassword
 	 */
-	function action_setpassword()
+	public function action_setpassword()
 	{
 		global $txt, $context;
 
@@ -169,6 +175,9 @@ class Reminder_Controller
 			'memID' => (int) $_REQUEST['u']
 		);
 
+		// Some extra js is needed
+		loadJavascriptFile('register.js');
+
 		// Tokens!
 		createToken('remind-sp');
 	}
@@ -177,7 +186,7 @@ class Reminder_Controller
 	 * Handle the password change.
 	 * sa=setpassword2
 	 */
-	function action_setpassword2()
+	public function action_setpassword2()
 	{
 		global $context, $txt;
 
@@ -244,9 +253,9 @@ class Reminder_Controller
 
 	/**
 	 * Verify the answer to the secret question.
-	 * sa=secret2
+	 * Accessed with sa=secret2
 	 */
-	function action_secret2()
+	public function action_secret2()
 	{
 		global $txt, $context;
 
@@ -348,7 +357,9 @@ function secretAnswerInput()
 	$context['remind_user'] = $member['id_member'];
 	$context['remind_type'] = '';
 	$context['secret_question'] = $member['secret_question'];
-
 	$context['sub_template'] = 'ask';
+
+	loadJavascriptFile('register.js');
+
 	createToken('remind-sai');
 }

@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -25,9 +26,7 @@ function template_modify_weights()
 	echo '
 	<div id="admincenter">
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=managesearch;sa=weights" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['search_weights'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['search_weights'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -84,10 +83,10 @@ function template_modify_weights()
 						</dt>
 						<dd class="large_caption">
 							<span id="weighttotal" class="search_weight"><strong>', $context['relative_weights']['total'], '</strong></span>
-							<span class="search_weight"><strong>100%</strong></span>
+							<span class="search_weight"><strong>&nbsp;&nbsp;&nbsp;&nbsp;100%</strong></span>
 						</dd>
 					</dl>
-					<input type="submit" name="save" value="', $txt['search_weights_save'], '" class="button_submit" />
+					<input type="submit" name="save" value="', $txt['search_weights_save'], '" class="right_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-msw_token_var'], '" value="', $context['admin-msw_token'], '" />
 				</div>
@@ -106,17 +105,13 @@ function template_select_search_method()
 
 	echo '
 	<div id="admincenter">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['search_method'], '</h3>
-		</div>
+		<h2 class="category_header">', $txt['search_method'], '</h2>
 		<div class="information">
 			<div class="smalltext" style="font-weight: normal;"><a href="', $scripturl, '?action=quickhelp;help=search_why_use_index" onclick="return reqOverlayDiv(this.href);">', $txt['search_create_index_why'], '</a></div>
 		</div>
 
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=managesearch;sa=method" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['search_method'], '</h3>
-			</div>
+			<h3 class="category_header">', $txt['search_method'], '</h3>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -136,11 +131,12 @@ function template_select_search_method()
 						<dd>
 							', $context['table_info']['index_length'], '
 						</dd>';
+
 	echo '
 					</dl>
-					', $context['double_index'] ? '<div class="noticebox">
+					', $context['double_index'] ? '<div class="warningbox">
 					' . $txt['search_double_index'] . '</div>' : '', '
-					<fieldset class="search_settings floatleft">
+					<fieldset class="search_settings">
 						<legend>', $txt['search_index'], '</legend>
 						<dl>
 							<dt><input type="radio" name="search_index" value=""', empty($modSettings['search_index']) ? ' checked="checked"' : '', ' class="input_radio" />
@@ -151,23 +147,24 @@ function template_select_search_method()
 	{
 		echo '
 							<dt>
-								<input type="radio" name="search_index" value="fulltext"', !empty($modSettings['search_index']) && $modSettings['search_index'] == 'fulltext' ? ' checked="checked"' : '', empty($context['fulltext_index']) ? ' onclick="alert(\'' . $txt['search_method_fulltext_warning'] . '\'); selectRadioByName(this.form.search_index, \'fulltext\');"': '', ' class="input_radio" />
+								<input type="radio" name="search_index" value="fulltext"', !empty($modSettings['search_index']) && $modSettings['search_index'] == 'fulltext' ? ' checked="checked"' : '', empty($context['fulltext_index']) ? ' onclick="alert(\'' . $txt['search_method_fulltext_warning'] . '\'); selectRadioByName(this.form.search_index, \'fulltext\');"' : '', ' class="input_radio" />
 								', $txt['search_method_fulltext_index'], '
 							</dt>
 							<dd>
 
 								<span class="smalltext">';
-	if (empty($context['fulltext_index']) && empty($context['cannot_create_fulltext']))
-		echo '
+		if (empty($context['fulltext_index']) && empty($context['cannot_create_fulltext']))
+			echo '
 									<strong>', $txt['search_index_label'], ':</strong> ', $txt['search_method_no_index_exists'], ' [<a href="', $scripturl, '?action=admin;area=managesearch;sa=createfulltext;', $context['session_var'], '=', $context['session_id'], ';', $context['admin-msm_token_var'], '=', $context['admin-msm_token'], '">', $txt['search_method_fulltext_create'], '</a>]';
-	elseif (empty($context['fulltext_index']) && !empty($context['cannot_create_fulltext']))
-		echo '
+		elseif (empty($context['fulltext_index']) && !empty($context['cannot_create_fulltext']))
+			echo '
 									<strong>', $txt['search_index_label'], ':</strong> ', $txt['search_method_fulltext_cannot_create'];
-	else
-		echo '
+		else
+			echo '
 									<strong>', $txt['search_index_label'], ':</strong> ', $txt['search_method_index_already_exists'], ' [<a href="', $scripturl, '?action=admin;area=managesearch;sa=removefulltext;', $context['session_var'], '=', $context['session_id'], ';', $context['admin-msm_token_var'], '=', $context['admin-msm_token'], '">', $txt['search_method_fulltext_remove'], '</a>]<br />
 									<strong>', $txt['search_index_size'], ':</strong> ', $context['table_info']['fulltext_length'];
-	echo '
+
+		echo '
 									</span>
 							</dd>';
 	}
@@ -190,6 +187,7 @@ function template_select_search_method()
 	else
 		echo '
 									<strong>', $txt['search_index_label'], ':</strong> ', $txt['search_method_no_index_exists'], ' [<a href="', $scripturl, '?action=admin;area=managesearch;sa=createmsgindex">', $txt['search_index_create_custom'], '</a>]';
+
 	echo '
 								</span>
 							</dd>';
@@ -203,11 +201,11 @@ function template_select_search_method()
 		echo '
 							<dt>
 								<input type="radio" name="search_index" value="', $api['setting_index'], '"', !empty($modSettings['search_index']) && $modSettings['search_index'] == $api['setting_index'] ? ' checked="checked"' : '', ' class="input_radio" />
-								', $api['label'] ,'
+								', $api['label'], '
 							</dt>';
 
-	if ($api['desc'])
-		echo '
+		if ($api['desc'])
+			echo '
 							<dd>
 								<span class="smalltext">', $api['desc'], '</span>
 							</dd>';
@@ -216,15 +214,16 @@ function template_select_search_method()
 	echo '
 						</dl>
 					</fieldset>
-					<fieldset class="search_settings floatright">
+					<fieldset class="search_settings">
 					<legend>', $txt['search_method'], '</legend>
 						<input type="checkbox" name="search_force_index" id="search_force_index_check" value="1"', empty($modSettings['search_force_index']) ? '' : ' checked="checked"', ' class="input_check" /><label for="search_force_index_check">', $txt['search_force_index'], '</label><br />
 						<input type="checkbox" name="search_match_words" id="search_match_words_check" value="1"', empty($modSettings['search_match_words']) ? '' : ' checked="checked"', ' class="input_check" /><label for="search_match_words_check">', $txt['search_match_words'], '</label>
 					</fieldset>
-					<br class="clear"/>
-					<input type="submit" name="save" value="', $txt['search_method_save'], '" class="button_submit" />
-					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<input type="hidden" name="', $context['admin-msmpost_token_var'], '" value="', $context['admin-msmpost_token'], '" />
+					<div class="submitbutton">
+						<input type="submit" name="save" value="', $txt['search_method_save'], '" class="button_submit" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						<input type="hidden" name="', $context['admin-msmpost_token_var'], '" value="', $context['admin-msmpost_token'], '" />
+					</div>
 				</div>
 			</div>
 		</form>
@@ -241,9 +240,7 @@ function template_create_index()
 	echo '
 	<div id="admincenter">
 		<form action="', $scripturl, '?action=admin;area=managesearch;sa=createmsgindex;step=1" method="post" accept-charset="UTF-8" name="create_index">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['search_create_index'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['search_create_index'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -258,8 +255,8 @@ function template_create_index()
 							</select>
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
-					<input type="submit" name="save" value="', $txt['search_create_index_start'], '" class="button_submit" />
+					<hr />
+					<input type="submit" name="save" value="', $txt['search_create_index_start'], '" class="right_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 				</div>
 			</div>
@@ -273,23 +270,22 @@ function template_create_index()
 function template_create_index_progress()
 {
 	global $context, $scripturl, $txt;
+
 	echo '
 	<div id="admincenter">
 		<form action="', $scripturl, '?action=admin;area=managesearch;sa=createmsgindex;step=1" name="autoSubmit" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['search_create_index'], '</h3>
-			</div>
+			<h3 class="category_header">', $txt['search_create_index'], '</h3>
 			<div class="windowbg">
 				<div class="content">
-					<div><p>',
-						$txt['search_create_index_not_ready'], '</p>
+					<div>
+						<p>', $txt['search_create_index_not_ready'], '</p>
 						<div class="progress_bar">
 							<div class="full_bar">', $context['percentage'], '%</div>
 							<div class="green_percent" style="width: ', $context['percentage'], '%;">&nbsp;</div>
 						</div>
 					</div>
-					<hr class="hrcolor" />
-					<input type="submit" name="cont" value="', $txt['search_create_index_continue'], '" class="button_submit" />
+					<hr />
+					<input type="submit" name="cont" value="', $txt['search_create_index_continue'], '" class="right_submit" />
 				</div>
 			</div>
 			<input type="hidden" name="step" value="', $context['step'], '" />
@@ -299,21 +295,23 @@ function template_create_index_progress()
 		</form>
 	</div>
 	<script><!-- // --><![CDATA[
-		var countdown = 10;
-		var txt_message = "', $txt['search_create_index_continue'], '";
+		var countdown = 10,
+			txt_message = "', $txt['search_create_index_continue'], '";
+
 		doAutoSubmit();
 	// ]]></script>';
-
 }
 
+/**
+ * Used to show the completion of the search index creation
+ */
 function template_create_index_done()
 {
 	global $scripturl, $txt;
+
 	echo '
 	<div id="admincenter">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['search_create_index'], '</h3>
-		</div>
+		<h2 class="category_header">', $txt['search_create_index'], '</h2>
 		<div class="windowbg">
 			<div class="content">
 				<p>', $txt['search_create_index_done'], '</p>
@@ -331,12 +329,11 @@ function template_create_index_done()
 function template_spider_edit()
 {
 	global $context, $scripturl, $txt;
+
 	echo '
 	<div id="admincenter">
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=sengines;sa=editspiders;sid=', $context['spider']['id'], '" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $context['page_title'], '</h3>
-			</div>
+			<h2 class="category_header">', $context['page_title'], '</h2>
 			<div class="information">
 				', $txt['add_spider_desc'], '
 			</div>
@@ -365,8 +362,8 @@ function template_spider_edit()
 							<textarea name="spider_ip" id="spider_ip" rows="4" cols="20">', $context['spider']['ip_info'], '</textarea>
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
-					<input type="submit" name="save" value="', $context['page_title'], '" class="button_submit" />
+					<hr />
+					<input type="submit" name="save" value="', $context['page_title'], '" class="right_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-ses_token_var'], '" value="', $context['admin-ses_token'], '" />
 				</div>
@@ -389,17 +386,14 @@ function template_show_spider_logs()
 	template_show_list('spider_logs');
 
 	echo '
-		<br class="clear" />
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=sengines;sa=logs" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['spider_logs_delete'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['spider_logs_delete'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<p>
 						', sprintf($txt['spider_stats_delete_older'], '<input type="text" name="older" id="older" value="7" size="3" class="input_text" />'), '
 					</p>
-					<input type="submit" name="delete_entries" value="', $txt['spider_logs_delete_submit'], '" onclick="if (document.getElementById(\'older\').value &lt; 1 &amp;&amp; !confirm(\'' . addcslashes($txt['spider_logs_delete_confirm'], "'") . '\')) return false; return true;" class="button_submit" />
+					<input type="submit" name="delete_entries" value="', $txt['spider_logs_delete_submit'], '" onclick="if (document.getElementById(\'older\').value &lt; 1 &amp;&amp; !confirm(\'' . addcslashes($txt['spider_logs_delete_confirm'], "'") . '\')) return false; return true;" class="right_submit" />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-sl_token_var'], '" value="', $context['admin-sl_token'], '" />
 				</div>
@@ -423,18 +417,16 @@ function template_show_spider_stats()
 
 	echo '
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=sengines;sa=stats" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['spider_logs_delete'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['spider_logs_delete'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<p>
 						', sprintf($txt['spider_stats_delete_older'], '<input type="text" name="older" id="older" value="90" size="3" class="input_text" />'), '
 					</p>
-					<hr class="hrcolor" />
+					<hr />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-ss_token_var'], '" value="', $context['admin-ss_token'], '" />
-					<input type="submit" name="delete_entries" value="', $txt['spider_logs_delete_submit'], '" onclick="if (document.getElementById(\'older\').value &lt; 1 &amp;&amp; !confirm(\'' . addcslashes($txt['spider_logs_delete_confirm'], "'") . '\')) return false; return true;" class="button_submit" />
+					<input type="submit" name="delete_entries" value="', $txt['spider_logs_delete_submit'], '" onclick="if (document.getElementById(\'older\').value &lt; 1 &amp;&amp; !confirm(\'' . addcslashes($txt['spider_logs_delete_confirm'], "'") . '\')) return false; return true;" class="right_submit" />
 					<br />
 				</div>
 			</div>
@@ -452,17 +444,13 @@ function template_manage_sphinx()
 	echo '
 	<div id="admincenter">
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=managesearch;sa=managesphinx;save=1" method="post"  accept-charset="UTF-8" name="create_index">
-			<div class="cat_bar">
-				<h3 class="catbg">',
-					$context['page_title'], '
-				</h3>
-			</div>';
+			<h2 class="category_header">', $context['page_title'], '</h2>';
 
 	// any results to show?
 	if (!empty($context['settings_message']))
 	{
 		echo '
-			<div class="', (empty($context['error_type']) ? 'infobox' : ($context['error_type'] !== 'serious' ? 'noticebox' : 'errorbox')), '" id="errors">
+			<div class="', (empty($context['error_type']) ? 'successbox' : ($context['error_type'] !== 'serious' ? 'warningbox' : 'errorbox')), '" id="errors">
 				<ul>
 					<li>', implode('</li><li>', $context['settings_message']), '</li>
 				</ul>
@@ -471,8 +459,8 @@ function template_manage_sphinx()
 
 	echo '
 			<div class="information">
-				<div class="infobox">',
-					$context['page_description'], '
+				<div class="successbox">
+					', $context['page_description'], '
 				</div>
 			</div>
 
@@ -480,7 +468,7 @@ function template_manage_sphinx()
 				<div class="content">
 					<dl class="settings">
 						<dt>
-							<label for="sphinx_data_path_input"><strong>', $txt['sphinx_index_data_path'],'</strong></label><br />
+							<label for="sphinx_data_path_input"><strong>', $txt['sphinx_index_data_path'], '</strong></label><br />
 							<span class="smalltext">', $txt['sphinx_index_data_path_desc'], '</span>
 						</dt>
 						<dd>
@@ -494,28 +482,28 @@ function template_manage_sphinx()
 							<input type="text" name="sphinx_log_path" id="sphinx_log_path_input" value="', isset($modSettings['sphinx_log_path']) ? $modSettings['sphinx_log_path'] : '/var/sphinx/log', '" size="65" />
 						</dd>
 						<dt>
-							<label for="sphinx_stopword_path_input"><strong>',$txt['sphinx_stop_word_path'],'</strong></label><br />
+							<label for="sphinx_stopword_path_input"><strong>', $txt['sphinx_stop_word_path'], '</strong></label><br />
 							<span class="smalltext">', $txt['sphinx_stop_word_path_desc'], '</span>
 						</dt>
 						<dd>
 							<input type="text" name="sphinx_stopword_path" id="sphinx_stopword_path_input" value="', isset($modSettings['sphinx_stopword_path']) ? $modSettings['sphinx_stopword_path'] : '', '" size="65" />
 						</dd>
 						<dt>
-							<label for="sphinx_indexer_mem_input"><strong>',$txt['sphinx_memory_limit'],'</strong></label><br />
+							<label for="sphinx_indexer_mem_input"><strong>', $txt['sphinx_memory_limit'], '</strong></label><br />
 							<span class="smalltext">', $txt['sphinx_memory_limit_desc'], '</span>
 						</dt>
 						<dd>
 							<input type="text" name="sphinx_indexer_mem" id="sphinx_indexer_mem_input" value="', isset($modSettings['sphinx_indexer_mem']) ? $modSettings['sphinx_indexer_mem'] : '32', '" size="4" /> MB
 						</dd>
 						<dt>
-							<label for="sphinx_searchd_server_input"><strong>', $txt['sphinx_searchd_server'],'</strong></label><br />
+							<label for="sphinx_searchd_server_input"><strong>', $txt['sphinx_searchd_server'], '</strong></label><br />
 							<span class="smalltext">', $txt['sphinx_searchd_server_desc'], '</span>
 						</dt>
 						<dd>
 							<input type="text" name="sphinx_searchd_server" id="sphinx_searchd_server_input" value="', isset($modSettings['sphinx_searchd_server']) ? $modSettings['sphinx_searchd_server'] : 'localhost', '" size="65" />
 						</dd>
 						<dt>
-							<label for="sphinx_searchd_port_input"><strong>',$txt['sphinx_searchd_port'],'</strong></label><br />
+							<label for="sphinx_searchd_port_input"><strong>', $txt['sphinx_searchd_port'], '</strong></label><br />
 							<span class="smalltext">', $txt['sphinx_searchd_port_desc'], '</span>
 						</dt>
 						<dd>
@@ -523,7 +511,7 @@ function template_manage_sphinx()
 						</dd>
 						<dt>
 							<label for="sphinxql_searchd_port_input"><strong>', $txt['sphinx_searchd_qlport'], '</strong></label><br />
-							<span class="smalltext">', $txt['sphinx_searchd_qlport_desc'],'</span>
+							<span class="smalltext">', $txt['sphinx_searchd_qlport_desc'], '</span>
 						</dt>
 						<dd>
 							<input type="text" name="sphinxql_searchd_port" id="sphinxql_searchd_port_input" value="', isset($modSettings['sphinxql_searchd_port']) ? $modSettings['sphinxql_searchd_port'] : '3313', '" size="4" />
@@ -536,12 +524,13 @@ function template_manage_sphinx()
 							<input type="text" name="sphinx_max_results" id="sphinx_max_results_input" value="', isset($modSettings['sphinx_max_results']) ? $modSettings['sphinx_max_results'] : '2000', '" size="4" />
 						</dd>
 					</dl>
-
-					<input type="submit" class="button_submit" name="save" value="', $txt['save'], '"  />
-					<input type="submit" class="button_submit" name="createconfig" value="', $txt['sphinx_create_config'], '" />
-					<input type="submit" class="button_submit" name="checkconnect" value="', $txt['sphinx_test_connection'], '" />
-					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-					<input type="hidden" name="', $context['admin-mssphinx_token_var'], '" value="', $context['admin-mssphinx_token'], '" />
+					<div class="submitbutton">
+						<input type="submit" class="button_submit" name="createconfig" value="', $txt['sphinx_create_config'], '" />
+						<input type="submit" class="button_submit" name="checkconnect" value="', $txt['sphinx_test_connection'], '" />
+						<input type="submit" class="button_submit" name="save" value="', $txt['save'], '"  />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						<input type="hidden" name="', $context['admin-mssphinx_token_var'], '" value="', $context['admin-mssphinx_token'], '" />
+					</div>
 				</div>
 			</div>
 		</form>

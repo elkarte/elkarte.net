@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Handles the moving of topics from board to board
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,20 +11,31 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Move Topic Controller
  */
-class MoveTopic_Controller
+class MoveTopic_Controller extends Action_Controller
 {
+	/**
+	 * Forwards to the action method to handle the action.
+	 *
+	 * @see Action_Controller::action_index()
+	 */
+	public function action_index()
+	{
+		// move a topic, what else?!
+		// $this->action_movetopic();
+	}
+
 	/**
 	 * This function allows to move a topic, making sure to ask the moderator
 	 * to give reason for topic move.
@@ -34,7 +47,7 @@ class MoveTopic_Controller
 	 *
 	 * @uses the MoveTopic template, main sub-template.
 	 */
-	function action_movetopic()
+	public function action_movetopic()
 	{
 		global $txt, $topic, $user_info, $context, $language, $scripturl, $modSettings;
 
@@ -63,14 +76,31 @@ class MoveTopic_Controller
 
 		// Get a list of boards this moderator can move to.
 		require_once(SUBSDIR . '/Boards.subs.php');
-		$context += getBoardList(array('use_permissions' => true, 'not_redirection' => true));
+		$context += getBoardList(array('not_redirection' => true));
 
 		// No boards?
 		if (empty($context['categories']) || $context['num_boards'] == 1)
 			fatal_lang_error('moveto_noboards', false);
 
-		$context['page_title'] = $txt['move_topic'];
+		// Already used the function, let's set the selected board back to the last
+		$last_moved_to = isset($_SESSION['move_to_topic']['move_to']) && $_SESSION['move_to_topic']['move_to'] != $context['current_board'] ? (int) $_SESSION['move_to_topic']['move_to'] : 0;
+		if (!empty($last_moved_to))
+		{
+			foreach ($context['categories'] as $id => $values)
+				if (isset($values['boards'][$last_moved_to]))
+				{
+					$context['categories'][$id]['boards'][$last_moved_to]['selected'] = true;
+					break;
+				}
+		}
 
+		// Set up for the template
+		$context['redirect_topic'] = isset($_SESSION['move_to_topic']['redirect_topic']) ? (int) $_SESSION['move_to_topic']['redirect_topic'] : 0;
+		$context['redirect_expires'] = isset($_SESSION['move_to_topic']['redirect_expires']) ? (int) $_SESSION['move_to_topic']['redirect_expires'] : 0;
+		$context['page_title'] = $txt['move_topic'];
+		$context['sub_template'] = 'move_topic';
+
+		// Breadcrumbs
 		$context['linktree'][] = array(
 			'url' => $scripturl . '?topic=' . $topic . '.0',
 			'name' => $context['subject'],
@@ -92,7 +122,6 @@ class MoveTopic_Controller
 		}
 
 		// We will need this
-		require_once(SUBSDIR . '/Topic.subs.php');
 		moveTopicConcurrence();
 
 		// Register this form and get a sequence number in $context.
@@ -110,12 +139,9 @@ class MoveTopic_Controller
 	 *
 	 * @uses subs/Post.subs.php.
 	 */
-	function action_movetopic2()
+	public function action_movetopic2()
 	{
-		global $txt, $board, $topic, $scripturl, $modSettings, $context;
-		global $board, $language, $user_info;
-
-		$db = database();
+		global $txt, $board, $topic, $scripturl, $modSettings, $context, $language, $user_info;
 
 		if (empty($topic))
 			fatal_lang_error('no_access', false);
@@ -178,7 +204,9 @@ class MoveTopic_Controller
 			fatal_lang_error('no_board');
 
 		// Remember this for later.
-		$_SESSION['move_to_topic'] = $toboard;
+		$_SESSION['move_to_topic'] = array(
+			'move_to' => $toboard
+		);
 
 		// Rename the topic...
 		if (isset($_POST['reset_subject'], $_POST['custom_subject']) && $_POST['custom_subject'] != '')
@@ -192,7 +220,8 @@ class MoveTopic_Controller
 			// If it's still valid move onwards and upwards.
 			if ($custom_subject != '')
 			{
-				if (isset($_POST['enforce_subject']))
+				$all_messages = isset($_POST['enforce_subject']);
+				if ($all_messages)
 				{
 					// Get a response prefix, but in the forum's default language.
 					if (!isset($context['response_prefix']) && !($context['response_prefix'] = cache_get_data('response_prefix')))
@@ -208,26 +237,10 @@ class MoveTopic_Controller
 						cache_put_data('response_prefix', $context['response_prefix'], 600);
 					}
 
-					$db->query('', '
-						UPDATE {db_prefix}messages
-						SET subject = {string:subject}
-						WHERE id_topic = {int:current_topic}',
-						array(
-							'current_topic' => $topic,
-							'subject' => $context['response_prefix'] . $custom_subject,
-						)
-					);
+					topicSubject($topic_info, $custom_subject, $context['response_prefix'], $all_messages);
 				}
-
-				$db->query('', '
-					UPDATE {db_prefix}messages
-					SET subject = {string:custom_subject}
-					WHERE id_msg = {int:id_first_msg}',
-					array(
-						'id_first_msg' => $topic_info['id_first_msg'],
-						'custom_subject' => $custom_subject,
-					)
-				);
+				else
+					topicSubject($topic_info, $custom_subject);
 
 				// Fix the subject cache.
 				updateStats('subject', $topic, $custom_subject);
@@ -251,11 +264,15 @@ class MoveTopic_Controller
 				$txt['movetopic_auto_topic'] => '[iurl]' . $scripturl . '?topic=' . $topic . '.0[/iurl]'
 			));
 
-			// auto remove this MOVED redirection topic in the future?
+			// Auto remove this MOVED redirection topic in the future?
 			$redirect_expires = !empty($_POST['redirect_expires']) ? ((int) ($_POST['redirect_expires'] * 60) + time()) : 0;
 
-			// redirect to the MOVED topic from topic list?
+			// Redirect to the MOVED topic from topic list?
 			$redirect_topic = isset($_POST['redirect_topic']) ? $topic : 0;
+
+			// And remember the last expiry period too.
+			$_SESSION['move_to_topic']['redirect_topic'] = $redirect_topic;
+			$_SESSION['move_to_topic']['redirect_expires'] = (int) $_POST['redirect_expires'];
 
 			$msgOptions = array(
 				'subject' => $txt['moved'] . ': ' . $board_info['subject'],
@@ -271,7 +288,7 @@ class MoveTopic_Controller
 				'redirect_expires' => $redirect_expires,
 				'redirect_topic' => $redirect_topic,
 			);
-			
+
 			$posterOptions = array(
 				'id' => $user_info['id'],
 				'update_post_count' => empty($board_info['count_posts']),
@@ -283,25 +300,7 @@ class MoveTopic_Controller
 
 		if ($board_from['count_posts'] != $board_info['count_posts'])
 		{
-			$request = $db->query('', '
-				SELECT id_member
-				FROM {db_prefix}messages
-				WHERE id_topic = {int:current_topic}
-					AND approved = {int:is_approved}',
-				array(
-					'current_topic' => $topic,
-					'is_approved' => 1,
-				)
-			);
-			$posters = array();
-			while ($row = $db->fetch_assoc($request))
-			{
-				if (!isset($posters[$row['id_member']]))
-					$posters[$row['id_member']] = 0;
-
-				$posters[$row['id_member']]++;
-			}
-			$db->free_result($request);
+			$posters = postersCount($topic);
 
 			foreach ($posters as $id_member => $posts)
 			{
@@ -322,6 +321,7 @@ class MoveTopic_Controller
 			logAction('move', array('topic' => $topic, 'board_from' => $board, 'board_to' => $toboard));
 
 		// Notify people that this topic has been moved?
+		require_once(SUBSDIR . '/Notification.subs.php');
 		sendNotifications($topic, 'move');
 
 		// Why not go back to the original board in case they want to keep moving?

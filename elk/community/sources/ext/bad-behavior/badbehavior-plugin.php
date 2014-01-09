@@ -1,19 +1,20 @@
 <?php
 
 /**
- * @name      ElkArte Forum
- * @copyright ElkArte Forum contributors
- * @license   BSD http://opensource.org/licenses/BSD-3-Clause
- *
- * @version 1.0 Alpha
- *
- * This Plugin file contains all the functions that allow for Elkarte to interface
+ * This Plugin file contains all the functions that allow for ElkArte to interface
  * with Bad Behavior.  Bad Behavior is
  * Copyright (C) 2005,2006,2007,2008,2009,2010,2011,2012 Michael Hampton
  * License: LGPLv3
  *
+ * @name      ElkArte Forum
+ * @copyright ElkArte Forum contributors
+ * @license   BSD http://opensource.org/licenses/BSD-3-Clause
+ *
+ * @version 1.0 Beta
+ *
  */
-if (!defined('ELKARTE'))
+
+if (!defined('ELK'))
 	die('No access...');
 
 define('BB2_CWD', dirname(__FILE__));
@@ -46,7 +47,7 @@ function bb2_db_affected_rows()
 /**
  * Escape a string for database usage
  *
- * @param type $string
+ * @param string $string
  * @return string
  */
 function bb2_db_escape($string)
@@ -59,7 +60,7 @@ function bb2_db_escape($string)
 /**
  * Return the number of rows in a particular query.
  *
- * @param type $result
+ * @param object $result
  * @return int
  */
 function bb2_db_num_rows($result)
@@ -114,7 +115,7 @@ function bb2_db_rows($result)
 	$db = database();
 
 	$temp = array();
-	while($row = $db->fetch_assoc($result))
+	while ($row = $db->fetch_assoc($result))
 		$temp[] = $row;
 	$db->free_result($result);
 
@@ -185,6 +186,7 @@ function bb2_insert($settings, $package, $key)
 
 /**
  * Retrieve whitelist
+ *
  * @todo
  * @return type
  */
@@ -208,7 +210,7 @@ function bb2_read_whitelist()
 	if (empty($whitelist['badbehavior_ip_wl']) && empty($whitelist['badbehavior_useragent_wl']) && empty($whitelist['badbehavior_url_wl']))
 		return false;
 
-	// build up the whitelist array so badbehavior can use it
+	// Build up the whitelist array so badbehavior can use it
 	return array_merge(
 		array('ip' => $whitelist['badbehavior_ip_wl']),
 		array('url' => $whitelist['badbehavior_useragent_wl']),
@@ -267,7 +269,7 @@ function bb2_insert_head()
 {
 	global $bb2_javascript;
 
-	// prepare it so we can use addInlineJavascript by removing the script tags hats its pre wrapped in
+	// Prepare it so we can use addInlineJavascript by removing the script tags hats its pre wrapped in
 	$temp = str_replace('<script type="text/javascript">' . "\n" . '<!--' . "\n", '', $bb2_javascript);
 	$temp = str_replace('// --></script>', '', $temp);
 
@@ -295,7 +297,7 @@ function bb2_insert_stats($force = false)
 		if (($bb2_blocked = cache_get_data('bb2_blocked', 900)) === null)
 		{
 			$bb2_blocked = bb2_db_query('SELECT COUNT(*) FROM {db_prefix}log_badbehavior WHERE `valid` NOT LIKE \'00000000\'');
-			cache_put_data('bb2_blocked', $bb2_blocked , 900);
+			cache_put_data('bb2_blocked', $bb2_blocked, 900);
 		}
 
 		if ($bb2_blocked !== false)

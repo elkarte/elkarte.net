@@ -11,25 +11,20 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
- * Template for the profile side bar - goes before any other profile template.
+ * Template for the profile header - goes before any other profile template.
  */
 function template_profile_above()
 {
-	global $context, $settings;
-
-	echo '
-	<script src="', $settings['default_theme_url'], '/scripts/profile.js"></script>';
+	global $context;
 
 	// Prevent Chrome from auto completing fields when viewing/editing other members profiles
-	if (isBrowser('is_chrome') && !$context['user']['is_owner'])
-		echo '
-	<script><!-- // --><![CDATA[
-		disableAutoComplete();
-	// ]]></script>';
+	if (isBrowser('is_webkit') && !$context['user']['is_owner'])
+		addInlineJavascript('disableAutoComplete();', true);
 
 	// If an error occurred while trying to save previously, give the user a clue!
 	echo '
@@ -38,7 +33,7 @@ function template_profile_above()
 	// If the profile was update successfully, let the user know this.
 	if (!empty($context['profile_updated']))
 		echo '
-					<div class="infobox">
+					<div class="successbox">
 						', $context['profile_updated'], '
 					</div>';
 }
@@ -50,12 +45,16 @@ function template_showDrafts()
 {
 	global $context, $settings, $scripturl, $txt;
 
-	template_pagesection(false, false, 'go_down');
+	echo '
+		<h3 class="category_header">
+			', $txt['drafts'], ' - ', $context['member']['name'], '
+		</h3>',
+	template_pagesection();
 
 	// No drafts? Just show an informative message.
 	if (empty($context['drafts']))
 		echo '
-		<div class="tborder windowbg2 padding centertext">
+		<div class="information centertext">
 			', $txt['draft_none'], '
 		</div>';
 	else
@@ -83,16 +82,14 @@ function template_showDrafts()
 					<div class="list_posts">
 						', $draft['body'], '
 					</div>
-					<div class="floatright">
-						<ul class="quickbuttons">
-							<li>
-								<a href="', $scripturl, '?action=post;', (empty($draft['topic']['id']) ? 'board=' . $draft['board']['id'] : 'topic=' . $draft['topic']['id']), '.0;id_draft=', $draft['id_draft'], '" class="reply_button"><span>', $txt['draft_edit'], '</span></a>
-							</li>
-							<li>
-								<a href="', $scripturl, '?action=profile;u=', $context['member']['id'], ';area=showdrafts;delete=', $draft['id_draft'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['draft_remove'], '?\');" class="remove_button"><span>', $txt['draft_delete'], '</span></a>
-							</li>
-						</ul>
-					</div>
+					<ul class="quickbuttons">
+						<li class="listlevel1">
+							<a href="', $scripturl, '?action=profile;u=', $context['member']['id'], ';area=showdrafts;delete=', $draft['id_draft'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['draft_remove'], '?\');" class="linklevel1 remove_button">', $txt['draft_delete'], '</a>
+						</li>
+						<li class="listlevel1">
+							<a href="', $scripturl, '?action=post;', (empty($draft['topic']['id']) ? 'board=' . $draft['board']['id'] : 'topic=' . $draft['topic']['id']), '.0;id_draft=', $draft['id_draft'], '" class="linklevel1 reply_button">', $txt['draft_edit'], '</a>
+						</li>
+					</ul>
 				</div>
 			</div>';
 		}
@@ -110,8 +107,7 @@ function template_profile_save()
 	global $context, $txt;
 
 	echo '
-
-					<hr class="hrcolor clear" style="width: 100%; height: 1px" />';
+					<hr class="clear" />';
 
 	// Only show the password box if it's actually needed.
 	if ($context['require_password'])
@@ -127,7 +123,13 @@ function template_profile_save()
 					</dl>';
 
 	echo '
-					<div class="righttext">
+					<div class="submitbutton">';
+
+	if (!empty($context['token_check']))
+		echo '
+						<input type="hidden" name="', $context[$context['token_check'] . '_token_var'], '" value="', $context[$context['token_check'] . '_token'], '" />';
+
+	echo '
 						<input type="submit" value="', $txt['change_profile'], '" class="button_submit" />
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 						<input type="hidden" name="u" value="', $context['id_member'], '" />

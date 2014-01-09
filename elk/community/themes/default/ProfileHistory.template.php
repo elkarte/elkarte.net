@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -24,9 +25,7 @@ function template_trackActivity()
 	// The first table shows IP information about the user.
 	echo '
 		<div class="generic_list_wrapper">
-			<div class="title_bar">
-				<h3 class="titlebg"><strong>', $txt['view_ips_by'], ' ', $context['member']['name'], '</strong></h3>
-			</div>';
+			<h3 class="category_header"><strong>', $txt['view_ips_by'], ' ', $context['member']['name'], '</strong></h3>';
 
 	// The last IP the user used.
 	echo '
@@ -85,10 +84,8 @@ function template_trackIP()
 	// This function always defaults to the last IP used by a member but can be set to track any IP.
 	// The first table in the template gives an input box to allow the admin to enter another IP to track.
 	echo '
-	<div class="tborder">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['trackIP'], '</h3>
-		</div>
+	<div>
+		<h3 class="category_header">', $txt['trackIP'], '</h3>
 		<div class="roundframe">
 			<form action="', $context['base_url'], '" method="post" accept-charset="UTF-8">
 				<dl class="settings">
@@ -99,35 +96,32 @@ function template_trackIP()
 						<input type="text" name="searchip" value="', $context['ip'], '" class="input_text" />
 					</dd>
 				</dl>
-				<input type="submit" value="', $txt['trackIP'], '" class="button_submit" />
+				<input type="submit" value="', $txt['trackIP'], '" class="right_submit" />
 			</form>
 		</div>
 	</div>
 	<br />
 	<div class="generic_list_wrapper">';
 
-	// The table inbetween the first and second table shows links to the whois server for every region.
+	// The table in between the first and second table shows links to the whois server for every region.
 	if ($context['single_ip'])
 	{
 		echo '
-			<div class="title_bar">
-				<h3 class="titlebg">', $txt['whois_title'], ' ', $context['ip'], '</h3>
-			</div>
-			<div class="windowbg2">
-				<div class="padding">';
-			foreach ($context['whois_servers'] as $server)
-				echo '
-					<a href="', $server['url'], '" target="_blank" class="new_win"', isset($context['auto_whois_server']) && $context['auto_whois_server']['name'] == $server['name'] ? ' style="font-weight: bold;"' : '', '>', $server['name'], '</a><br />';
+			<h3 class="category_header">', $txt['whois_title'], ' ', $context['ip'], '</h3>
+			<div class="windowbg2">';
+
+		foreach ($context['whois_servers'] as $server)
 			echo '
-				</div>
+					<a href="', $server['url'], '" target="_blank" class="new_win"', isset($context['auto_whois_server']) && $context['auto_whois_server']['name'] == $server['name'] ? ' style="font-weight: bold;"' : '', '>', $server['name'], '</a><br />';
+
+		echo '
 			</div>';
 	}
 
 	// The second table lists all the members who have been logged as using this IP address.
 	echo '
-		<div class="title_bar">
-			<h3 class="titlebg">', $txt['members_from_ip'], ' ', $context['ip'], '</h3>
-		</div>';
+		<h3 class="category_header">', $txt['members_from_ip'], ' ', $context['ip'], '</h3>';
+
 	if (empty($context['ips']))
 		echo '
 		<p class="windowbg2 description"><em>', $txt['no_members_from_ip'], '</em></p>';
@@ -136,9 +130,9 @@ function template_trackIP()
 		echo '
 		<table class="table_grid">
 			<thead>
-				<tr class="catbg">
-					<th class="first_th" scope="col">', $txt['ip_address'], '</th>
-					<th class="last_th" scope="col">', $txt['display_name'], '</th>
+				<tr class="table_head">
+					<th scope="col">', $txt['ip_address'], '</th>
+					<th scope="col">', $txt['display_name'], '</th>
 				</tr>
 			</thead>
 			<tbody>';

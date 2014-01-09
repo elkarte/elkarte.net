@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file contains a couple of functions for the latests posts on forum.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file contains a couple of functions for the latests posts on forum.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -85,7 +85,8 @@ function getLastPosts($latestPostOptions)
 			'subject' => $row['subject'],
 			'short_subject' => shorten_text($row['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24),
 			'preview' => $row['body'],
-			'time' => relativeTime($row['poster_time']),
+			'time' => standardTime($row['poster_time']),
+			'html_time' => htmlTime($row['poster_time']),
 			'timestamp' => forum_time(true, $row['poster_time']),
 			'raw_timestamp' => $row['poster_time'],
 			'href' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . ';topicseen#msg' . $row['id_msg'],
@@ -110,12 +111,25 @@ function cache_getLastPosts($latestPostOptions)
 		'post_retri_eval' => '
 			foreach ($cache_block[\'data\'] as $k => $post)
 			{
-				$cache_block[\'data\'][$k][\'time\'] = relativeTime($post[\'raw_timestamp\']);
-				$cache_block[\'data\'][$k][\'timestamp\'] = forum_time(true, $post[\'raw_timestamp\']);
+				$cache_block[\'data\'][$k] += array(
+					\'time\' => standardTime($post[\'raw_timestamp\']),
+					\'html_time\' => htmlTime($post[\'raw_timestamp\']),
+					\'timestamp\' => $post[\'raw_timestamp\'],
+				);
 			}',
 	);
 }
 
+/**
+ * For a supplied list of message id's, loads the posting details for each.
+ *  - Intended to get all the most recent posts.
+ *  - Tracks the posts made by this user (from the supplied message list) and loads the id's in to the 'own'
+ * 	  or 'any' array.  Reminder The controller needs to check permissions
+ *  - Returns two arrays, one of the posts one of any/own
+ *
+ * @param array $messages
+ * @param int $start
+ */
 function getRecentPosts($messages, $start)
 {
 	global $user_info, $scripturl, $modSettings;
@@ -178,6 +192,7 @@ function getRecentPosts($messages, $start)
 			'start' => $row['num_replies'],
 			'subject' => $row['subject'],
 			'time' => standardTime($row['poster_time']),
+			'html_time' => htmlTime($row['poster_time']),
 			'timestamp' => forum_time(true, $row['poster_time']),
 			'first_poster' => array(
 				'id' => $row['id_first_member'],
@@ -206,4 +221,78 @@ function getRecentPosts($messages, $start)
 
 	return array($posts, $board_ids);
 
+}
+
+/**
+ * Return the earliest message a user can...see?
+ */
+function earliest_msg()
+{
+	global $board, $user_info;
+
+	$db = database();
+
+	if (!empty($board))
+	{
+		$request = $db->query('', '
+			SELECT MIN(id_msg)
+			FROM {db_prefix}log_mark_read
+			WHERE id_member = {int:current_member}
+				AND id_board = {int:current_board}',
+			array(
+				'current_board' => $board,
+				'current_member' => $user_info['id'],
+			)
+		);
+		list ($earliest_msg) = $db->fetch_row($request);
+		$db->free_result($request);
+	}
+	else
+	{
+		$request = $db->query('', '
+			SELECT MIN(lmr.id_msg)
+			FROM {db_prefix}boards AS b
+				LEFT JOIN {db_prefix}log_mark_read AS lmr ON (lmr.id_board = b.id_board AND lmr.id_member = {int:current_member})
+			WHERE {query_see_board}',
+			array(
+				'current_member' => $user_info['id'],
+			)
+		);
+		list ($earliest_msg) = $db->fetch_row($request);
+		$db->free_result($request);
+	}
+
+	// This is needed in case of topics marked unread.
+	if (empty($earliest_msg))
+		$earliest_msg = 0;
+	else
+	{
+		// Using caching, when possible, to ignore the below slow query.
+		if (isset($_SESSION['cached_log_time']) && $_SESSION['cached_log_time'][0] + 45 > time())
+			$earliest_msg2 = $_SESSION['cached_log_time'][1];
+		else
+		{
+			// This query is pretty slow, but it's needed to ensure nothing crucial is ignored.
+			$request = $db->query('', '
+				SELECT MIN(id_msg)
+				FROM {db_prefix}log_topics
+				WHERE id_member = {int:current_member}',
+				array(
+					'current_member' => $user_info['id'],
+				)
+			);
+			list ($earliest_msg2) = $db->fetch_row($request);
+			$db->free_result($request);
+
+			// In theory this could be zero, if the first ever post is unread, so fudge it ;)
+			if ($earliest_msg2 == 0)
+				$earliest_msg2 = -1;
+
+			$_SESSION['cached_log_time'] = array(time(), $earliest_msg2);
+		}
+
+		$earliest_msg = min($earliest_msg2, $earliest_msg);
+	}
+
+	return $earliest_msg;
 }

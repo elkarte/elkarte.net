@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -23,9 +24,7 @@ function template_merge_done()
 
 	echo '
 		<div id="merge_topics">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['merge'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['merge'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<p>', $txt['merge_successful'], '</p>
@@ -40,8 +39,7 @@ function template_merge_done()
 					</ul>
 				</div>
 			</div>
-		</div>
-	<br class="clear" />';
+		</div>';
 }
 
 /**
@@ -49,13 +47,11 @@ function template_merge_done()
  */
 function template_merge()
 {
-	global $context, $txt, $scripturl;
+	global $context, $txt, $scripturl, $settings;
 
 	echo '
 		<div id="merge_topics">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['merge'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['merge'], '</h2>
 			<div class="information">
 				', $txt['merge_desc'], '
 			</div>
@@ -71,7 +67,7 @@ function template_merge()
 
 	if (!empty($context['boards']) && count($context['boards']) > 1)
 	{
-			echo '
+		echo '
 						<dt>
 							<strong>', $txt['target_board'], ':</strong>
 						</dt>
@@ -79,56 +75,55 @@ function template_merge()
 							<form action="' . $scripturl . '?action=mergetopics;from=', $context['origin_topic'] . ';targetboard=' . $context['target_board'], ';board=', $context['current_board'], '.0" method="post" accept-charset="UTF-8">
 								<input type="hidden" name="from" value="' . $context['origin_topic'] . '" />
 								<select name="targetboard" onchange="this.form.submit();">';
-			foreach ($context['boards'] as $board)
-				echo '
-									<option value="', $board['id'], '"', $board['id'] == $context['target_board'] ? ' selected="selected"' : '', '>', $board['category'], ' - ', $board['name'], '</option>';
+
+		foreach ($context['boards'] as $board)
 			echo '
+									<option value="', $board['id'], '"', $board['id'] == $context['target_board'] ? ' selected="selected"' : '', '>', $board['category'], ' - ', $board['name'], '</option>';
+
+		echo '
 								</select>
-								<input type="submit" value="', $txt['go'], '" class="button_submit" />
+								<input type="submit" value="', $txt['go'], '" class="button_submit submitgo" />
 							</form>
 						</dd>';
 	}
 
 	echo '
 					</dl>
-					<hr class="hrcolor" />
+					<hr />
 					<dl class="settings merge_topic">
 						<dt>
 							<strong>', $txt['merge_to_topic_id'], ': </strong>
 						</dt>
 						<dd>
-							<form action="', $scripturl , '?action=mergetopics;sa=options" method="post" accept-charset="UTF-8">
+							<form action="', $scripturl, '?action=mergetopics;sa=options" method="post" accept-charset="UTF-8">
 								<input type="hidden" name="topics[]" value="', $context['origin_topic'], '" />
 								<input type="text" name="topics[]" class="input_text" />
 								<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-								<input type="submit" value="', $txt['merge'], '" class="button_submit" />
+								<input type="submit" value="', $txt['merge'], '" class="button_submit submitgo" />
 							</form>
 						</dd>';
 
-		echo '
+	echo '
 					</dl>
 				</div>
 			</div><br />
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['target_topic'], '</h3>
-			</div>', template_pagesection(false, false, 'go_down'), '
+			<h3 class="category_header">', $txt['target_topic'], '</h3>
+			', template_pagesection(), '
 			<div class="windowbg2">
 				<div class="content">
 					<ul class="merge_topics">';
 
-		$merge_button = create_button('merge.png', 'merge', '');
-
-		foreach ($context['topics'] as $topic)
-			echo '
+	foreach ($context['topics'] as $topic)
+		echo '
 						<li>
-							<a href="', $scripturl, '?action=mergetopics;sa=options;board=', $context['current_board'], '.0;from=', $context['origin_topic'], ';to=', $topic['id'], ';', $context['session_var'], '=', $context['session_id'], '">', $merge_button, '</a>&nbsp;
+							<a href="', $scripturl, '?action=mergetopics;sa=options;board=', $context['current_board'], '.0;from=', $context['origin_topic'], ';to=', $topic['id'], ';', $context['session_var'], '=', $context['session_id'], '"><img src="', $settings['images_url'], '/buttons/merge.png" alt="Merge Topics"  /></a>&nbsp;
 							<a href="', $scripturl, '?topic=', $topic['id'], '.0" target="_blank" class="new_win">', $topic['subject'], '</a> ', $txt['started_by'], ' ', $topic['poster']['link'], '
 						</li>';
 
-		echo '
+	echo '
 					</ul>
 				</div>
-			</div>', template_pagesection(false, false), '
+			</div>', template_pagesection(), '
 		</div>';
 }
 
@@ -142,23 +137,21 @@ function template_merge_extra_options()
 	echo '
 	<div id="merge_topics">
 		<form action="', $scripturl, '?action=mergetopics;sa=execute;" method="post" accept-charset="UTF-8">
-			<div class="title_bar">
-				<h3 class="titlebg">', $txt['merge_topic_list'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['merge_topic_list'], '</h2>
 			<table class="bordercolor table_grid">
 				<thead>
-					<tr class="catbg">
-						<th scope="col" class="first_th centertext" style="width:6em">', $txt['merge_check'], '</th>
+					<tr class="table_head">
+						<th scope="col" style="width:6em">', $txt['merge_check'], '</th>
 						<th scope="col" class="lefttext">', $txt['subject'], '</th>
 						<th scope="col" class="lefttext">', $txt['started_by'], '</th>
 						<th scope="col" class="lefttext">', $txt['last_post'], '</th>
-						<th scope="col" class="last_th centertext" style="width:10em">' . $txt['merge_include_notifications'] . '</th>
+						<th scope="col" style="width:10em">' . $txt['merge_include_notifications'] . '</th>
 					</tr>
 				</thead>
 				<tbody>';
 
-		foreach ($context['topics'] as $topic)
-			echo '
+	foreach ($context['topics'] as $topic)
+		echo '
 					<tr class="windowbg2">
 						<td class="centertext">
 							<input type="checkbox" class="input_check" name="topics[]" value="', $topic['id'], '" checked="checked" />
@@ -179,7 +172,7 @@ function template_merge_extra_options()
 						</td>
 					</tr>';
 
-		echo '
+	echo '
 				</tbody>
 			</table>
 			<br />
@@ -209,11 +202,13 @@ function template_merge_extra_options()
 					<fieldset id="merge_board" class="merge_options">
 						<legend>', $txt['merge_select_target_board'], '</legend>
 						<ul>';
+
 		foreach ($context['boards'] as $board)
 			echo '
 							<li>
 								<input type="radio" name="board" value="' . $board['id'] . '"' . ($board['selected'] ? ' checked="checked"' : '') . ' class="input_radio" /> ' . $board['name'] . '
 							</li>';
+
 		echo '
 						</ul>
 					</fieldset>';
@@ -225,11 +220,13 @@ function template_merge_extra_options()
 					<fieldset id="merge_poll" class="merge_options">
 						<legend>' . $txt['merge_select_poll'] . '</legend>
 						<ul>';
+
 		foreach ($context['polls'] as $poll)
 			echo '
 							<li>
 								<input type="radio" name="poll" value="' . $poll['id'] . '"' . ($poll['selected'] ? ' checked="checked"' : '') . ' class="input_radio" /> ', $poll['question'], ' (', $txt['topic'], ': <a href="', $scripturl, '?topic=', $poll['topic']['id'], '.0" target="_blank" class="new_win">', $poll['topic']['subject'], '</a>)
 							</li>';
+
 		echo '
 							<li>
 								<input type="radio" name="poll" value="-1" class="input_radio" /> (', $txt['merge_no_poll'], ')
@@ -239,7 +236,7 @@ function template_merge_extra_options()
 	}
 
 	echo '
-					<div class="auto_flow">
+					<div class="submitbutton">
 						<input type="submit" value="' . $txt['merge'] . '" class="button_submit" />
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 						<input type="hidden" name="sa" value="execute" />

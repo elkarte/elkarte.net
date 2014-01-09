@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file has all the main functions in it that relate to, well, everything.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,15 +11,13 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has all the main functions in it that relate to, well, everything.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -47,199 +47,28 @@ if (!defined('ELKARTE'))
  */
 function updateStats($type, $parameter1 = null, $parameter2 = null)
 {
-	global $modSettings;
-
-	$db = database();
-
 	switch ($type)
 	{
-	case 'member':
-		$changes = array(
-			'memberlist_updated' => time(),
-		);
-
-		// #1 latest member ID, #2 the real name for a new registration.
-		if (is_numeric($parameter1))
-		{
-			$changes['latestMember'] = $parameter1;
-			$changes['latestRealName'] = $parameter2;
-
-			updateSettings(array('totalMembers' => true), true);
-		}
-
-		// We need to calculate the totals.
-		else
-		{
-			// Update the latest activated member (highest id_member) and count.
-			$result = $db->query('', '
-				SELECT COUNT(*), MAX(id_member)
-				FROM {db_prefix}members
-				WHERE is_activated = {int:is_activated}',
-				array(
-					'is_activated' => 1,
-				)
-			);
-			list ($changes['totalMembers'], $changes['latestMember']) = $db->fetch_row($result);
-			$db->free_result($result);
-
+		case 'member':
 			require_once(SUBSDIR . '/Members.subs.php');
-			// Get the latest activated member's display name.
-			$result = getBasicMemberData((int) $changes['latestMember']);
-			$changes['latestRealName'] = $result['real_name'];
-
-			// Are we using registration approval?
-			if ((!empty($modSettings['registration_method']) && $modSettings['registration_method'] == 2) || !empty($modSettings['approveAccountDeletion']))
-			{
-				// Update the amount of members awaiting approval - ignoring COPPA accounts, as you can't approve them until you get permission.
-				$result = $db->query('', '
-					SELECT COUNT(*)
-					FROM {db_prefix}members
-					WHERE is_activated IN ({array_int:activation_status})',
-					array(
-						'activation_status' => array(3, 4),
-					)
-				);
-				list ($changes['unapprovedMembers']) = $db->fetch_row($result);
-				$db->free_result($result);
-			}
-		}
-
-		updateSettings($changes);
-		break;
-
-	case 'message':
-		if ($parameter1 === true && $parameter2 !== null)
-			updateSettings(array('totalMessages' => true, 'maxMsgID' => $parameter2), true);
-		else
-		{
-			// SUM and MAX on a smaller table is better for InnoDB tables.
-			$result = $db->query('', '
-				SELECT SUM(num_posts + unapproved_posts) AS total_messages, MAX(id_last_msg) AS max_msg_id
-				FROM {db_prefix}boards
-				WHERE redirect = {string:blank_redirect}' . (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0 ? '
-					AND id_board != {int:recycle_board}' : ''),
-				array(
-					'recycle_board' => isset($modSettings['recycle_board']) ? $modSettings['recycle_board'] : 0,
-					'blank_redirect' => '',
-				)
-			);
-			$row = $db->fetch_assoc($result);
-			$db->free_result($result);
-
-			updateSettings(array(
-				'totalMessages' => $row['total_messages'] === null ? 0 : $row['total_messages'],
-				'maxMsgID' => $row['max_msg_id'] === null ? 0 : $row['max_msg_id']
-			));
-		}
-		break;
-
-	case 'subject':
-		// Remove the previous subject (if any).
-		$db->query('', '
-			DELETE FROM {db_prefix}log_search_subjects
-			WHERE id_topic = {int:id_topic}',
-			array(
-				'id_topic' => (int) $parameter1,
-			)
-		);
-
-		// Insert the new subject.
-		if ($parameter2 !== null)
-		{
-			$parameter1 = (int) $parameter1;
-			$parameter2 = text2words($parameter2);
-
-			$inserts = array();
-			foreach ($parameter2 as $word)
-				$inserts[] = array($word, $parameter1);
-
-			if (!empty($inserts))
-				$db->insert('ignore',
-					'{db_prefix}log_search_subjects',
-					array('word' => 'string', 'id_topic' => 'int'),
-					$inserts,
-					array('word', 'id_topic')
-				);
-		}
-		break;
-
-	case 'topic':
-		if ($parameter1 === true)
-			updateSettings(array('totalTopics' => true), true);
-		else
-		{
-			// Get the number of topics - a SUM is better for InnoDB tables.
-			// We also ignore the recycle bin here because there will probably be a bunch of one-post topics there.
-			$result = $db->query('', '
-				SELECT SUM(num_topics + unapproved_topics) AS total_topics
-				FROM {db_prefix}boards' . (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0 ? '
-				WHERE id_board != {int:recycle_board}' : ''),
-				array(
-					'recycle_board' => !empty($modSettings['recycle_board']) ? $modSettings['recycle_board'] : 0,
-				)
-			);
-			$row = $db->fetch_assoc($result);
-			$db->free_result($result);
-
-			updateSettings(array('totalTopics' => $row['total_topics'] === null ? 0 : $row['total_topics']));
-		}
-		break;
-
-	case 'postgroups':
-		// Parameter two is the updated columns: we should check to see if we base groups off any of these.
-		if ($parameter2 !== null && !in_array('posts', $parameter2))
-			return;
-
-		$postgroups = cache_get_data('updateStats:postgroups', 360);
-		if ($postgroups === null || $parameter1 === null)
-		{
-			// Fetch the postgroups!
-			$request = $db->query('', '
-				SELECT id_group, min_posts
-				FROM {db_prefix}membergroups
-				WHERE min_posts != {int:min_posts}',
-				array(
-					'min_posts' => -1,
-				)
-			);
-			$postgroups = array();
-			while ($row = $db->fetch_assoc($request))
-				$postgroups[$row['id_group']] = $row['min_posts'];
-			$db->free_result($request);
-
-			// Sort them this way because if it's done with MySQL it causes a filesort :(.
-			arsort($postgroups);
-
-			cache_put_data('updateStats:postgroups', $postgroups, 360);
-		}
-
-		// Oh great, they've screwed their post groups.
-		if (empty($postgroups))
-			return;
-
-		// Set all membergroups from most posts to least posts.
-		$conditions = '';
-		$lastMin = 0;
-		foreach ($postgroups as $id => $min_posts)
-		{
-			$conditions .= '
-					WHEN posts >= ' . $min_posts . (!empty($lastMin) ? ' AND posts <= ' . $lastMin : '') . ' THEN ' . $id;
-			$lastMin = $min_posts;
-		}
-
-		// A big fat CASE WHEN... END is faster than a zillion UPDATE's ;).
-		$db->query('', '
-			UPDATE {db_prefix}members
-			SET id_post_group = CASE ' . $conditions . '
-					ELSE 0
-				END' . ($parameter1 != null ? '
-			WHERE ' . (is_array($parameter1) ? 'id_member IN ({array_int:members})' : 'id_member = {int:members}') : ''),
-			array(
-				'members' => $parameter1,
-			)
-		);
-		break;
-
+			updateMemberStats($parameter1, $parameter2);
+			break;
+		case 'message':
+			require_once(SUBSDIR . '/Messages.subs.php');
+			updateMessageStats($parameter1, $parameter2);
+			break;
+		case 'subject':
+			require_once(SUBSDIR . '/Messages.subs.php');
+			updateSubjectStats($parameter1, $parameter2);
+			break;
+		case 'topic':
+			require_once(SUBSDIR . '/Topic.subs.php');
+			updateTopicStats($parameter1, $parameter2);
+			break;
+		case 'postgroups':
+			require_once(SUBSDIR . '/Membergroups.subs.php');
+			updatePostGroupStats($parameter1, $parameter2);
+			break;
 		default:
 			trigger_error('updateStats(): Invalid statistic type \'' . $type . '\'', E_USER_NOTICE);
 	}
@@ -286,8 +115,8 @@ function updateMemberData($members, $data)
 
 	// Everything is assumed to be a string unless it's in the below.
 	$knownInts = array(
-		'date_registered', 'posts', 'id_group', 'last_login', 'instant_messages', 'unread_messages',
-		'new_pm', 'pm_prefs', 'gender', 'hide_email', 'show_online', 'pm_email_notify', 'pm_receive_from', 'karma_good', 'karma_bad',
+		'date_registered', 'posts', 'id_group', 'last_login', 'personal_messages', 'unread_messages', 'mentions',
+		'new_pm', 'pm_prefs', 'gender', 'hide_email', 'show_online', 'pm_email_notify', 'receive_from', 'karma_good', 'karma_bad',
 		'notify_announcements', 'notify_send_body', 'notify_regularity', 'notify_types',
 		'id_theme', 'is_activated', 'id_msg_last_visit', 'id_post_group', 'total_time_logged_in', 'warning', 'likes_given', 'likes_received',
 	);
@@ -360,8 +189,8 @@ function updateMemberData($members, $data)
 			$type = 'raw';
 		}
 
-		// Ensure posts, instant_messages, and unread_messages don't overflow or underflow.
-		if (in_array($var, array('posts', 'instant_messages', 'unread_messages')))
+		// Ensure posts, personal_messages, and unread_messages don't overflow or underflow.
+		if (in_array($var, array('posts', 'personal_messages', 'unread_messages')))
 		{
 			if (preg_match('~^' . $var . ' (\+ |- |\+ -)([\d]+)~', $val, $match))
 			{
@@ -410,14 +239,14 @@ function updateMemberData($members, $data)
  * - all of changeArray's indexes and values are assumed to have escaped apostrophes (')!
  * - if a variable is already set to what you want to change it to, that
  *   variable will be skipped over; it would be unnecessary to reset.
- * - When use_update is true, UPDATEs will be used instead of REPLACE.
- * - when use_update is true, the value can be true or false to increment
+ * - When update is true, UPDATEs will be used instead of REPLACE.
+ * - when update is true, the value can be true or false to increment
  *  or decrement it, respectively.
  *
  * @param array $changeArray
  * @param bool $update = false
  * @param bool $debug = false
- * @todo: add debugging features, $debug isn't used 
+ * @todo: add debugging features, $debug isn't used
  */
 function updateSettings($changeArray, $update = false, $debug = false)
 {
@@ -481,6 +310,38 @@ function updateSettings($changeArray, $update = false, $debug = false)
 }
 
 /**
+ * Deletes one setting from the settings table and takes care of $modSettings as well
+ *
+ * @param mixed $toRemove the setting or the settings to be removed
+ */
+function removeSettings($toRemove)
+{
+	global $modSettings;
+
+	$db = database();
+
+	if (empty($toRemove))
+		return;
+
+	$toRemove = is_array($toRemove) ? $toRemove : array($toRemove);
+
+	$db->query('', '
+		DELETE FROM {db_prefix}settings
+		WHERE variable IN ({array_string:setting_name})',
+		array(
+			'setting_name' => $toRemove,
+		)
+	);
+
+	foreach ($toRemove as $setting)
+		if (isset($modSettings[$setting]))
+			unset($modSettings[$setting]);
+
+	// Kill the cache - it needs redoing now, but we won't bother ourselves with that here.
+	cache_put_data('modSettings', null, 90);
+}
+
+/**
  * Constructs a page list.
  *
  * - builds the page list, e.g. 1 ... 6 7 [8] 9 10 ... 15.
@@ -501,7 +362,7 @@ function updateSettings($changeArray, $update = false, $debug = false)
  * @param int $max_value
  * @param int $num_per_page
  * @param bool $flexible_start = false
- * @param bool $show_prevnext = true
+ * @param array $show
  */
 function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flexible_start = false, $show = array())
 {
@@ -573,7 +434,7 @@ function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flex
 
 		// Show the ... after the first page.  (prev page 1 >...< 6 7 [8] 9 10 ... 15 next page)
 		if ($start > $num_per_page * ($PageContiguous + 1))
-			$pageindex .= str_replace('{onclick_handler}', htmlspecialchars('expandPages(this, ' . JavaScriptEscape(($flexible_start ? $base_url : strtr($base_url, array('%' => '%%')) . ';start=%1$d')) . ', ' . $num_per_page . ', ' . ($start - $num_per_page * $PageContiguous) . ', ' . $num_per_page . ');'), $settings['page_index_template']['expand_pages']);
+			$pageindex .= str_replace('{custom}', 'data-baseurl="' . htmlspecialchars(JavaScriptEscape(($flexible_start ? $base_url : strtr($base_url, array('%' => '%%')) . ';start=%1$d')), ENT_COMPAT, 'UTF-8') . '" data-perpage="' . $num_per_page . '" data-firstpage="' . $num_per_page . '" data-lastpage="' . ($start - $num_per_page * $PageContiguous) . '"', $settings['page_index_template']['expand_pages']);
 
 		// Show the pages before the current one. (prev page 1 ... >6 7< [8] 9 10 ... 15 next page)
 		for ($nCont = $PageContiguous; $nCont >= 1; $nCont--)
@@ -600,7 +461,7 @@ function constructPageIndex($base_url, &$start, $max_value, $num_per_page, $flex
 
 		// Show the '...' part near the end. (prev page 1 ... 6 7 [8] 9 10 >...< 15 next page)
 		if ($start + $num_per_page * ($PageContiguous + 1) < $tmpMaxPages)
-			$pageindex .= str_replace('{onclick_handler}', htmlspecialchars('expandPages(this, ' . JavaScriptEscape(($flexible_start ? $base_url : strtr($base_url, array('%' => '%%')) . ';start=%1$d')) . ', ' . ($start + $num_per_page * ($PageContiguous + 1)) . ', ' . $tmpMaxPages . ', ' . $num_per_page . ');'), $settings['page_index_template']['expand_pages']);
+			$pageindex .= str_replace('{custom}', 'data-baseurl="' . htmlspecialchars(JavaScriptEscape(($flexible_start ? $base_url : strtr($base_url, array('%' => '%%')) . ';start=%1$d')), ENT_COMPAT, 'UTF-8') . '" data-perpage="' . $num_per_page . '" data-firstpage="' . ($start + $num_per_page * ($PageContiguous + 1)) . '" data-lastpage="' . $tmpMaxPages . '"', $settings['page_index_template']['expand_pages']);
 
 		// Show the last number in the list. (prev page 1 ... 6 7 [8] 9 10 ... >15<  next page)
 		if ($start + $num_per_page * $PageContiguous < $tmpMaxPages)
@@ -746,71 +607,6 @@ function standardTime($log_time, $show_today = true, $offset_type = false)
 }
 
 /**
- * Calculates the relative time between now and a given timestamp.
- * If relative time is disabled we can just bypass to standardTime();
- * This function is based on ideas from user "Eye" at
- * http://stackoverflow.com/questions/2690504/php-producing-relative-date-time-from-timestamps
- *
- * @param int $date
- * @param bool $show_today = true
- * @param string $offset_type = false
- * @return string
- */
-function relativeTime($timestamp, $show_today = true, $offset_type = false)
-{
-	global $modSettings, $txt;
-
-	// We don't want relative times? Bypass to standardTime();
-	if ($modSettings['todayMod'] < 3)
-	{
-		$past_time = standardTime($timestamp, $show_today, $offset_type);
-		return $past_time;
-	}
-
-    $past_time = time() - $timestamp;
-
-	// Within the first 60 seconds it is just now.
-    if ($past_time < 60)
-        return $txt['rt_now'];
-
-	// Within the first hour?
-    $past_time = floor($past_time/60);
-
-    if ($past_time < 60)
-        return sprintf($past_time > 1 ? $txt['rt_minutes'] : $txt['rt_minute'], $past_time);
-
-	// Some hours but less than a day?
-    $past_time = floor($past_time/60);
-
-    if ($past_time < 24)
-        return sprintf($past_time > 1 ? $txt['rt_hours'] : $txt['rt_hour'], $past_time);
-
-	// Some days ago but less than a week?
-    $past_time = floor($past_time/24);
-
-    if ($past_time < 7)
-        return sprintf($past_time > 1 ? $txt['rt_days'] : $txt['rt_day'], $past_time);
-
-	// Weeks ago but less than a month?
-    if ($past_time < 30)
-    {
-        $past_time = floor($past_time / 7);
-        return sprintf($past_time > 1 ? $txt['rt_weeks'] : $txt['rt_week'], $past_time);
-    }
-
-	// Months ago but less than a year?
-    $past_time = floor($past_time/30);
-
-    if ($past_time < 12)
-       return sprintf($past_time > 1 ? $txt['rt_months'] : $txt['rt_month'], $past_time);
-
-	// Oha, we've passed at least a year?
-    $past_time = date('Y', time()) - date('Y', $timestamp);
-
-    return sprintf($past_time > 1 ? $txt['rt_years'] : $txt['rt_year'], $past_time);
-}
-
-/**
  * Used to render a timestamp to html5 <time> tag format.
  *
  * @param int $timestamp
@@ -818,11 +614,36 @@ function relativeTime($timestamp, $show_today = true, $offset_type = false)
  */
 function htmlTime($timestamp)
 {
-	global $modSettings, $user_info;
+	if (empty($timestamp))
+		return '';
 
-	$time = date('Y-m-d H:i', $timestamp + ($user_info['time_offset'] + $modSettings['time_offset']) * 3600);
+	$timestamp = forum_time(true, $timestamp);
+	$time = date('Y-m-d H:i', $timestamp);
+	$stdtime = standardTime($timestamp);
 
-	return $time;
+	// @todo maybe htmlspecialchars on the title attribute?
+	return '<time title="' . $stdtime . '" datetime="' . $time . '" data-timestamp="' . $timestamp . '">' . $stdtime . '</time>';
+}
+
+/**
+ * Gets the current time with offset.
+ *
+ * - always applies the offset in the time_offset setting.
+ *
+ * @param bool $use_user_offset = true if use_user_offset is true, applies the user's offset as well
+ * @param int $timestamp = null
+ * @return int seconds since the unix epoch
+ */
+function forum_time($use_user_offset = true, $timestamp = null)
+{
+	global $user_info, $modSettings;
+
+	if ($timestamp === null)
+		$timestamp = time();
+	elseif ($timestamp == 0)
+		return 0;
+
+	return $timestamp + ($modSettings['time_offset'] + ($use_user_offset ? $user_info['time_offset'] : 0)) * 3600;
 }
 
 /**
@@ -863,10 +684,12 @@ function shorten_text($text, $len = 384, $cutword = false, $buffer = 12)
 	// If its to long, cut it down to size
 	if (Util::strlen($text) > $len)
 	{
+		$text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+
 		if ($cutword)
 		{
 			// Look for len - buffer characters and cut on first word boundary after
-			preg_match('~(.{' . ($len - $buffer) . '}.*?)\b~s', $text, $matches);
+			preg_match('~(.{' . ($len - $buffer) . '}.*?)\b~su', $text, $matches);
 
 			// Always one clown in the audience who likes long words or not using the spacebar
 			if (Util::strlen($matches[1]) > $len + $buffer)
@@ -876,30 +699,11 @@ function shorten_text($text, $len = 384, $cutword = false, $buffer = 12)
 		}
 		else
 			$text = Util::substr($text, 0, $len) . '...';
+
+		$text = Util::htmlspecialchars($text);
 	}
 
 	return $text;
-}
-
-/**
- * Gets the current time with offset.
- *
- * - always applies the offset in the time_offset setting.
- *
- * @param bool $use_user_offset = true if use_user_offset is true, applies the user's offset as well
- * @param int $timestamp = null
- * @return int seconds since the unix epoch
- */
-function forum_time($use_user_offset = true, $timestamp = null)
-{
-	global $user_info, $modSettings;
-
-	if ($timestamp === null)
-		$timestamp = time();
-	elseif ($timestamp == 0)
-		return 0;
-
-	return $timestamp + ($modSettings['time_offset'] + ($use_user_offset ? $user_info['time_offset'] : 0)) * 3600;
 }
 
 /**
@@ -966,7 +770,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 	$message = sanitizeMSCutPaste($message);
 
 	// If the load average is too high, don't parse the BBC.
-	if (!empty($context['load_average']) && !empty($modSettings['bbc']) && $context['load_average'] >= $modSettings['bbc'])
+	if (!empty($modSettings['bbc']) && $modSettings['current_load'] >= $modSettings['bbc'])
 	{
 		$context['disabled_parse_bbc'] = true;
 		return $message;
@@ -990,7 +794,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 		$bbc_codes = array();
 	}
 
-	// Allow mods access before entering the main parse_bbc loop
+	// Allow addons access before entering the main parse_bbc loop
 	call_integration_hook('integrate_pre_parsebbc', array(&$message, &$smileys, &$cache_id, &$parse_tags));
 
 	// Sift out the bbc for a performance improvement.
@@ -1022,75 +826,79 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				- unparsed_equals_content: [tag=...]unparsed content[/tag]
 
 			parameters: an optional array of parameters, for the form
-			  [tag abc=123]content[/tag].  The array is an associative array
-			  where the keys are the parameter names, and the values are an
-			  array which may contain the following:
-				- match: a regular expression to validate and match the value.
-				- quoted: true if the value should be quoted.
-				- validate: callback to evaluate on the data, which is $data.
-				- value: a string in which to replace $1 with the data.
-				  either it or validate may be used, not both.
-				- optional: true if the parameter is optional.
+				[tag abc=123]content[/tag].  The array is an associative array
+				where the keys are the parameter names, and the values are an
+				array which may contain the following:
+					- match: a regular expression to validate and match the value.
+					- quoted: true if the value should be quoted.
+					- validate: callback to evaluate on the data, which is $data.
+					- value: a string in which to replace $1 with the data.
+					  either it or validate may be used, not both.
+					- optional: true if the parameter is optional.
 
 			test: a regular expression to test immediately after the tag's
-			  '=', ' ' or ']'.  Typically, should have a \] at the end.
-			  Optional.
+				'=', ' ' or ']'.  Typically, should have a \] at the end.
+				Optional.
 
 			content: only available for unparsed_content, closed,
-			  unparsed_commas_content, and unparsed_equals_content.
-			  $1 is replaced with the content of the tag.  Parameters
-			  are replaced in the form {param}.  For unparsed_commas_content,
-			  $2, $3, ..., $n are replaced.
+				unparsed_commas_content, and unparsed_equals_content.
+				$1 is replaced with the content of the tag.  Parameters
+				are replaced in the form {param}.  For unparsed_commas_content,
+				$2, $3, ..., $n are replaced.
 
 			before: only when content is not used, to go before any
-			  content.  For unparsed_equals, $1 is replaced with the value.
-			  For unparsed_commas, $1, $2, ..., $n are replaced.
+				content.  For unparsed_equals, $1 is replaced with the value.
+				For unparsed_commas, $1, $2, ..., $n are replaced.
 
 			after: similar to before in every way, except that it is used
-			  when the tag is closed.
+				when the tag is closed.
 
 			disabled_content: used in place of content when the tag is
-			  disabled.  For closed, default is '', otherwise it is '$1' if
-			  block_level is false, '<div>$1</div>' elsewise.
+				disabled.  For closed, default is '', otherwise it is '$1' if
+				block_level is false, '<div>$1</div>' elsewise.
 
 			disabled_before: used in place of before when disabled.  Defaults
-			  to '<div>' if block_level, '' if not.
+				to '<div>' if block_level, '' if not.
 
 			disabled_after: used in place of after when disabled.  Defaults
-			  to '</div>' if block_level, '' if not.
+				to '</div>' if block_level, '' if not.
 
 			block_level: set to true the tag is a "block level" tag, similar
-			  to HTML.  Block level tags cannot be nested inside tags that are
-			  not block level, and will not be implicitly closed as easily.
-			  One break following a block level tag may also be removed.
+				to HTML.  Block level tags cannot be nested inside tags that are
+				not block level, and will not be implicitly closed as easily.
+				One break following a block level tag may also be removed.
 
 			trim: if set, and 'inside' whitespace after the begin tag will be
-			  removed.  If set to 'outside', whitespace after the end tag will
-			  meet the same fate.
+				removed.  If set to 'outside', whitespace after the end tag will
+				meet the same fate.
 
 			validate: except when type is missing or 'closed', a callback to
-			  validate the data as $data.  Depending on the tag's type, $data
-			  may be a string or an array of strings (corresponding to the
-			  replacement.)
+				validate the data as $data.  Depending on the tag's type, $data
+				may be a string or an array of strings (corresponding to the
+				replacement.)
 
 			quoted: when type is 'unparsed_equals' or 'parsed_equals' only,
-			  may be not set, 'optional', or 'required' corresponding to if
-			  the content may be quoted.  This allows the parser to read
-			  [tag="abc]def[esdf]"] properly.
+				may be not set, 'optional', or 'required' corresponding to if
+				the content may be quoted.  This allows the parser to read
+				[tag="abc]def[esdf]"] properly.
 
 			require_parents: an array of tag names, or not set.  If set, the
-			  enclosing tag *must* be one of the listed tags, or parsing won't
-			  occur.
+				enclosing tag *must* be one of the listed tags, or parsing won't
+				occur.
 
 			require_children: similar to require_parents, if set children
-			  won't be parsed if they are not in the list.
+				won't be parsed if they are not in the list.
 
 			disallow_children: similar to, but very different from,
-			  require_children, if it is set the listed tags will not be
-			  parsed inside the tag.
+				require_children, if it is set the listed tags will not be
+				parsed inside the tag.
+
+			disallow_parents: similar to, but very different from,
+				require_parents, if it is set the listed tags will not be
+				parsed inside the tag.
 
 			parsed_tags_allowed: an array restricting what BBC can be in the
-			  parsed_equals parameter, if desired.
+				parsed_equals parameter, if desired.
 		*/
 
 		$codes = array(
@@ -1154,32 +962,12 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			array(
 				'tag' => 'code',
 				'type' => 'unparsed_content',
-				'content' => '<div class="codeheader">' . $txt['code'] . ': <a href="javascript:void(0);" onclick="return smfSelectText(this);" class="codeoperation">' . $txt['code_select'] . '</a></div><pre class="bbc_code">$1</pre>',
-				// @todo Maybe this can be simplified?
+				'content' => '<div class="codeheader">' . $txt['code'] . ': <a href="javascript:void(0);" onclick="return elkSelectText(this);" class="codeoperation">' . $txt['code_select'] . '</a></div><pre class="bbc_code prettyprint">$1</pre>',
 				'validate' => isset($disabled['code']) ? null : create_function('&$tag, &$data, $disabled', '
 					global $context;
 
 					if (!isset($disabled[\'code\']))
 					{
-						$php_parts = preg_split(\'~(&lt;\?php|\?&gt;)~\', $data, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-						for ($php_i = 0, $php_n = count($php_parts); $php_i < $php_n; $php_i++)
-						{
-							// Do PHP code coloring?
-							if ($php_parts[$php_i] != \'&lt;?php\')
-								continue;
-
-							$php_string = \'\';
-							while ($php_i + 1 < count($php_parts) && $php_parts[$php_i] != \'?&gt;\')
-							{
-								$php_string .= $php_parts[$php_i];
-								$php_parts[$php_i++] = \'\';
-							}
-							$php_parts[$php_i] = highlight_php_code($php_string . $php_parts[$php_i]);
-						}
-
-						// Fix the PHP code stuff...
-						$data = str_replace("<pre style=\"display: inline;\">\t</pre>", "\t", implode(\'\', $php_parts));
 						$data = str_replace("\t", "<span style=\"white-space: pre;\">\t</span>", $data);
 
 						// Recent Opera bug requiring temporary fix. &nsbp; is needed before </code> to avoid broken selection.
@@ -1191,32 +979,12 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			array(
 				'tag' => 'code',
 				'type' => 'unparsed_equals_content',
-				'content' => '<div class="codeheader">' . $txt['code'] . ': ($2) <a href="#" onclick="return smfSelectText(this);" class="codeoperation">' . $txt['code_select'] . '</a></div><pre class="bbc_code">$1</pre>',
-				// @todo Maybe this can be simplified?
+				'content' => '<div class="codeheader">' . $txt['code'] . ': ($2) <a href="#" onclick="return elkSelectText(this);" class="codeoperation">' . $txt['code_select'] . '</a></div><pre class="bbc_code prettyprint">$1</pre>',
 				'validate' => isset($disabled['code']) ? null : create_function('&$tag, &$data, $disabled', '
 					global $context;
 
 					if (!isset($disabled[\'code\']))
 					{
-						$php_parts = preg_split(\'~(&lt;\?php|\?&gt;)~\', $data[0], -1, PREG_SPLIT_DELIM_CAPTURE);
-
-						for ($php_i = 0, $php_n = count($php_parts); $php_i < $php_n; $php_i++)
-						{
-							// Do PHP code coloring?
-							if ($php_parts[$php_i] != \'&lt;?php\')
-								continue;
-
-							$php_string = \'\';
-							while ($php_i + 1 < count($php_parts) && $php_parts[$php_i] != \'?&gt;\')
-							{
-								$php_string .= $php_parts[$php_i];
-								$php_parts[$php_i++] = \'\';
-							}
-							$php_parts[$php_i] = highlight_php_code($php_string . $php_parts[$php_i]);
-						}
-
-						// Fix the PHP code stuff...
-						$data[0] = str_replace("<pre style=\"display: inline;\">\t</pre>", "\t", implode(\'\', $php_parts));
 						$data[0] = str_replace("\t", "<span style=\"white-space: pre;\">\t</span>", $data[0]);
 
 						// Recent Opera bug requiring temporary fix. &nsbp; is needed before </code> to avoid broken selection.
@@ -1236,7 +1004,6 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'tag' => 'email',
 				'type' => 'unparsed_content',
 				'content' => '<a href="mailto:$1" class="bbc_email">$1</a>',
-				// @todo Should this respect guest_hideContacts?
 				'validate' => create_function('&$tag, &$data, $disabled', '$data = strtr($data, array(\'<br />\' => \'\'));'),
 			),
 			array(
@@ -1244,7 +1011,6 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'type' => 'unparsed_equals',
 				'before' => '<a href="mailto:$1" class="bbc_email">',
 				'after' => '</a>',
-				// @todo Should this respect guest_hideContacts?
 				'disallow_children' => array('email', 'ftp', 'url', 'iurl'),
 				'disabled_after' => ' ($1)',
 			),
@@ -1252,7 +1018,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'tag' => 'flash',
 				'type' => 'unparsed_commas_content',
 				'test' => '\d+,\d+\]',
-				'content' => (isBrowser('ie') ? '<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" style="width: $2px; height: $3px;"><param name="movie" value="$1" /><param name="play" value="true" /><param name="loop" value="true" /><param name="quality" value="high" /><param name="AllowScriptAccess" value="never" /><embed src="$1" width="$2" height="$3" play="true" loop="true" quality="high" AllowScriptAccess="never" /><noembed><a href="$1" target="_blank" class="new_win">$1</a></noembed></object>' : '<embed type="application/x-shockwave-flash" src="$1" width="$2" height="$3" play="true" loop="true" quality="high" AllowScriptAccess="never" /><noembed><a href="$1" target="_blank" class="new_win">$1</a></noembed>'),
+				'content' => (isBrowser('ie') ? '<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" style="width: $2px; height: $3px;"><param name="movie" value="$1" /><param name="play" value="true" /><param name="loop" value="true" /><param name="quality" value="high" /><param name="wmode" value="transparent"><param name="AllowScriptAccess" value="never" /><embed src="$1" width="$2" height="$3" play="true" loop="true" quality="high" wmode="transparent" AllowScriptAccess="never" /><noembed><a href="$1" target="_blank" class="new_win">$1</a></noembed></object>' : '<embed type="application/x-shockwave-flash" src="$1" width="$2" height="$3" play="true" loop="true" quality="high" wmode="transparent" AllowScriptAccess="never" /><noembed><a href="$1" target="_blank" class="new_win">$1</a></noembed>'),
 				'validate' => create_function('&$tag, &$data, $disabled', '
 					if (isset($disabled[\'url\']))
 						$tag[\'content\'] = \'$1\';
@@ -1260,6 +1026,15 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 						$data[0] = \'http://\' . $data[0];
 				'),
 				'disabled_content' => '<a href="$1" target="_blank" class="new_win">$1</a>',
+			),
+			array(
+				'tag' => 'footnote',
+				'before' => '<sup class="bbc_footnotes">%fn%',
+				'after' => '%fn%</sup>',
+				'disallow_parents' => array('footnote', 'code', 'anchor', 'url', 'iurl'),
+				'disallow_before' => '',
+				'disallow_after' => '',
+				'block_level' => true,
 			),
 			array(
 				'tag' => 'font',
@@ -1293,9 +1068,9 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			array(
 				'tag' => 'glow',
 				'type' => 'unparsed_commas',
-				'test' => '[#0-9a-zA-Z\-]{3,12},([012]\d{1,2}|\d{1,2})(,[^]]+)?\]',
-				'before' => isBrowser('ie') ? '<table style="border-collapse: collapse; border-spacing: 0;display: inline; vertical-align: middle; font: inherit;"><tr><td style="filter: Glow(color=$1, strength=$2); font: inherit;">' : '<span style="text-shadow: $1 1px 1px 1px">',
-				'after' => isBrowser('ie') ? '</td></tr></table> ' : '</span>',
+				'test' => '[#0-9a-zA-Z\-]',
+				'before' => '<span style="text-shadow: $1 0 0 4px">',
+				'after' => '</span>',
 			),
 			array(
 				'tag' => 'green',
@@ -1415,12 +1190,21 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			array(
 				'tag' => 'me',
 				'type' => 'unparsed_equals',
-				'before' => '<div class="meaction">* $1 ',
+				'before' => '<div class="meaction">&nbsp;$1 ',
 				'after' => '</div>',
 				'quoted' => 'optional',
 				'block_level' => true,
 				'disabled_before' => '/me ',
 				'disabled_after' => '<br />',
+			),
+			array(
+				'tag' => 'member',
+				'type' => 'unparsed_equals',
+				'test' => '[\d*]',
+				'before' => '<span class="bbc_mention"><a href="' . $scripturl . '?action=profile;u=$1">@',
+				'after' => '</a></span>',
+				'disabled_before' => '@',
+				'disabled_after' => '',
 			),
 			array(
 				'tag' => 'move',
@@ -1460,8 +1244,8 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			),
 			array(
 				'tag' => 'quote',
-				'before' => '<div class="quoteheader"><div class="topslice_quote">' . $txt['quote'] . '</div></div><blockquote>',
-				'after' => '</blockquote><div class="quotefooter"><div class="botslice_quote"></div></div>',
+				'before' => '<div class="quoteheader">' . $txt['quote'] . '</div><blockquote>',
+				'after' => '</blockquote>',
 				'block_level' => true,
 			),
 			array(
@@ -1469,15 +1253,15 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'parameters' => array(
 					'author' => array('match' => '(.{1,192}?)', 'quoted' => true),
 				),
-				'before' => '<div class="quoteheader"><div class="topslice_quote">' . $txt['quote_from'] . ': {author}</div></div><blockquote>',
-				'after' => '</blockquote><div class="quotefooter"><div class="botslice_quote"></div></div>',
+				'before' => '<div class="quoteheader">' . $txt['quote_from'] . ': {author}</div><blockquote>',
+				'after' => '</blockquote>',
 				'block_level' => true,
 			),
 			array(
 				'tag' => 'quote',
 				'type' => 'parsed_equals',
-				'before' => '<div class="quoteheader"><div class="topslice_quote">' . $txt['quote_from'] . ': $1</div></div><blockquote>',
-				'after' => '</blockquote><div class="quotefooter"><div class="botslice_quote"></div></div>',
+				'before' => '<div class="quoteheader">' . $txt['quote_from'] . ': $1</div><blockquote>',
+				'after' => '</blockquote>',
 				'quoted' => 'optional',
 				// Don't allow everything to be embedded with the author name.
 				'parsed_tags_allowed' => array('url', 'iurl', 'ftp'),
@@ -1488,10 +1272,10 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'parameters' => array(
 					'author' => array('match' => '([^<>]{1,192}?)'),
 					'link' => array('match' => '(?:board=\d+;)?((?:topic|threadid)=[\dmsg#\./]{1,40}(?:;start=[\dmsg#\./]{1,40})?|action=profile;u=\d+)'),
-					'date' => array('match' => '(\d+)', 'validate' => 'relativeTime'),
+					'date' => array('match' => '(\d+)', 'validate' => 'standardTime'),
 				),
-				'before' => '<div class="quoteheader"><div class="topslice_quote"><a href="' . $scripturl . '?{link}">' . $txt['quote_from'] . ': {author} ' . $txt['search_on'] . ' {date}</a></div></div><blockquote>',
-				'after' => '</blockquote><div class="quotefooter"><div class="botslice_quote"></div></div>',
+				'before' => '<div class="quoteheader"><a href="' . $scripturl . '?{link}">' . $txt['quote_from'] . ': {author} ' . ($modSettings['todayMod'] == 3 ? ' - ' : $txt['search_on']) . ' {date}</a></div><blockquote>',
+				'after' => '</blockquote>',
 				'block_level' => true,
 			),
 			array(
@@ -1499,8 +1283,8 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'parameters' => array(
 					'author' => array('match' => '(.{1,192}?)'),
 				),
-				'before' => '<div class="quoteheader"><div class="topslice_quote">' . $txt['quote_from'] . ': {author}</div></div><blockquote>',
-				'after' => '</blockquote><div class="quotefooter"><div class="botslice_quote"></div></div>',
+				'before' => '<div class="quoteheader">' . $txt['quote_from'] . ': {author}</div><blockquote>',
+				'after' => '</blockquote>',
 				'block_level' => true,
 			),
 			array(
@@ -1529,19 +1313,9 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'tag' => 'shadow',
 				'type' => 'unparsed_commas',
 				'test' => '[#0-9a-zA-Z\-]{3,12},(left|right|top|bottom|[0123]\d{0,2})\]',
-				'before' => isBrowser('ie') ? '<span style="display: inline-block; filter: Shadow(color=$1, direction=$2); height: 1.2em;">' : '<span style="text-shadow: $1 $2">',
+				'before' => '<span style="text-shadow: $1 $2">',
 				'after' => '</span>',
-				'validate' => isBrowser('ie') ? create_function('&$tag, &$data, $disabled', '
-					if ($data[1] == \'left\')
-						$data[1] = 270;
-					elseif ($data[1] == \'right\')
-						$data[1] = 90;
-					elseif ($data[1] == \'top\')
-						$data[1] = 0;
-					elseif ($data[1] == \'bottom\')
-						$data[1] = 180;
-					else
-						$data[1] = (int) $data[1];') : create_function('&$tag, &$data, $disabled', '
+				'validate' => create_function('&$tag, &$data, $disabled', '
 					if ($data[1] == \'top\' || (is_numeric($data[1]) && $data[1] < 50))
 						$data[1] = \'0 -2px 1px\';
 					elseif ($data[1] == \'right\' || (is_numeric($data[1]) && $data[1] < 100))
@@ -1559,6 +1333,9 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'test' => '([1-9][\d]?p[xt]|small(?:er)?|large[r]?|x[x]?-(?:small|large)|medium|(0\.[1-9]|[1-9](\.[\d][\d]?)?)?em)\]',
 				'before' => '<span style="font-size: $1;" class="bbc_size">',
 				'after' => '</span>',
+				'disallow_parents' => array('size'),
+				'disallow_before' => '<span>',
+				'disallow_after' => '</span>',
 			),
 			array(
 				'tag' => 'size',
@@ -1570,6 +1347,15 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 					$sizes = array(1 => 0.7, 2 => 1.0, 3 => 1.35, 4 => 1.45, 5 => 2.0, 6 => 2.65, 7 => 3.95);
 					$data = $sizes[$data] . \'em\';'
 				),
+				'disallow_parents' => array('size'),
+				'disallow_before' => '<span>',
+				'disallow_after' => '</span>',
+			),
+			array(
+				'tag' => 'spoiler',
+				'before' => '<span class="spoilerheader">' . $txt['spoiler'] . '</span><div class="spoiler"><div class="bbc_spoiler" style="display: none;">',
+				'after' => '</div></div>',
+				'block_level' => true,
 			),
 			array(
 				'tag' => 'sub',
@@ -1659,7 +1445,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			),
 		);
 
-		// Let mods add new BBC without hassle.
+		// Let addons add new BBC without hassle.
 		call_integration_hook('integrate_bbc_codes', array(&$codes));
 
 		// This is mainly for the bbc manager, so it's easy to add tags above.  Custom BBC should be added above this line.
@@ -1810,6 +1596,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 							$imgtag = preg_replace('~action(?:=|%3d)(?!dlattach)~i', 'action-', $imgtag);
 
 						// Check if the image is larger than allowed.
+						// @todo - We should seriously look at deprecating some of this in favour of CSS resizing.
 						if (!empty($modSettings['max_image_width']) && !empty($modSettings['max_image_height']))
 						{
 							// For images, we'll want this.
@@ -2056,6 +1843,14 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 			// If this is in the list of disallowed child tags, don't parse it.
 			elseif (isset($inside['disallow_children']) && in_array($possible['tag'], $inside['disallow_children']))
 				continue;
+			// Not allowed in this parent, replace the tags or show it like regular text
+			elseif (isset($possible['disallow_parents']) && ($inside !== null && in_array($inside['tag'], $possible['disallow_parents'])))
+			{
+				if (!isset($possible['disallow_before'], $possible['disallow_after']))
+					continue;
+				$possible['before'] = isset($possible['disallow_before']) ? $tag['disallow_before'] : $possible['before'];
+				$possible['after'] = isset($possible['disallow_after']) ? $tag['disallow_after'] : $possible['after'];
+			}
 
 			$pos1 = $pos + 1 + $pt_strlen + 1;
 
@@ -2071,6 +1866,11 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 						$quote_alt = !$quote_alt;
 				}
 				// Add a class to the quote to style alternating blockquotes
+				// @todo - Frankly it makes little sense to allow alternate blockquote styling without also catering for alternate quoteheader styling.
+				// @todo - I do remember coding that some time back, but it seems to have gotten lost somewhere in the SMF 2.1 and/or Elk processes.
+				// @todo - Come to think of it, it may be better to append a second class rather than alter the standard one.
+				// @todo - Example: class="bbc_quote" and class="bbc_quote alt_quote".
+				// @todo - This would mean simpler CSS for themes (like default) which do not use the alternate styling, but would still allow it for themes that want it.
 				$possible['before'] = strtr($possible['before'], array('<blockquote>' => '<blockquote class="bbc_' . ($quote_alt ? 'alternate' : 'standard') . '_quote">'));
 			}
 
@@ -2134,7 +1934,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 		}
 
 		// Item codes are complicated buggers... they are implicit [li]s and can make [list]s!
-		if ($smileys !== false && $tag === null && isset($itemcodes[$message[$pos + 1]]) && $message[$pos + 2] == ']' && !isset($disabled['list']) && !isset($disabled['li']))
+		if ($smileys !== false && $tag === null && isset($message[$pos + 2]) && isset($itemcodes[$message[$pos + 1]]) && $message[$pos + 2] === ']' && !isset($disabled['list']) && !isset($disabled['li']))
 		{
 			if ($message[$pos + 1] == '0' && !in_array($message[$pos - 1], array(';', ' ', "\t", "\n", '>')))
 				continue;
@@ -2452,13 +2252,41 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 	else
 		$message = strtr($message, array("\n" => ''));
 
-	if ($message[0] === ' ')
+	if (isset($message[0]) && $message[0] === ' ')
 		$message = '&nbsp;' . substr($message, 1);
 
 	// Cleanup whitespace.
 	$message = strtr($message, array('  ' => ' &nbsp;', "\r" => '', "\n" => '<br />', '<br /> ' => '<br />&nbsp;', '&#13;' => "\n"));
 
-	// Allow mods access to what parse_bbc created
+	// Finish footnotes if we have any.
+	if (strpos($message, '<sup class="bbc_footnotes">') !== false)
+	{
+		global $fn_num, $fn_content, $fn_count;
+		static $fn_total;
+
+		// @todo temporary until we have nesting
+		$message = str_replace(array('[footnote]', '[/footnote]'), '', $message);
+
+		$fn_num = 0;
+		$fn_content = array();
+		$fn_count = isset($fn_total) ? $fn_total : 0;
+
+		// Replace our footnote text with a [1] link, save the text for use at the end of the message
+		$message = preg_replace_callback('~(%fn%(.*?)%fn%)~is', create_function('$m', '
+			global $fn_num, $fn_content, $fn_count;
+
+			$fn_num++;
+			$fn_content[] = "<div class=\"target\" id=\"fn$fn_num" . "_" . "$fn_count\"><sup>$fn_num&nbsp;</sup>$m[2]<a class=\"footnote_return\" href=\"#ref$fn_num" . "_" . "$fn_count\">&crarr;</a></div>";
+			return "<a class=\"target\" href=\"#fn$fn_num" . "_" . "$fn_count\" id=\"ref$fn_num" . "_" . "$fn_count\">[$fn_num]</a>";'), $message);
+
+		$fn_total += $fn_num;
+
+		// If we have footnotes, add them in at the end of the message
+		if (!empty($fn_num))
+			$message .= '<div class="bbc_footnotes">' . implode('', $fn_content) . '</div>';
+	}
+
+	// Allow addons access to what parse_bbc created
 	call_integration_hook('integrate_post_parsebbc', array(&$message, &$smileys, &$cache_id, &$parse_tags));
 
 	// Cache the output if it took some time...
@@ -2489,14 +2317,14 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
  * Caches the smileys from the database or array in memory.
  * Doesn't return anything, but rather modifies message directly.
  *
- * @param string &$message
+ * @param string $message
  */
 function parsesmileys(&$message)
 {
-	global $modSettings, $txt, $user_info;
+	global $modSettings, $txt, $user_info ;
+	static $smileyPregSearch = null, $smileyPregReplacements = array();
 
 	$db = database();
-	static $smileyPregSearch = null, $smileyPregReplacements = array();
 
 	// No smiley set at all?!
 	if ($user_info['smiley_set'] == 'none' || trim($message) == '')
@@ -2508,9 +2336,9 @@ function parsesmileys(&$message)
 		// Use the default smileys if it is disabled. (better for "portability" of smileys.)
 		if (empty($modSettings['smiley_enable']))
 		{
-			$smileysfrom = array('>:D', ':D', '::)', '>:(', ':))', ':)', ';)', ';D', ':(', ':o', '8)', ':P', '???', ':-[', ':-X', ':-*', ':\'(', ':-\\', '^-^', 'O0', 'C:-)', '0:)');
+			$smileysfrom = array('>:D', ':D', '::)', '>:(', ':))', ':)', ';)', ';D', ':(', ':o', '8)', ':P', '???', ':-[', ':-X', ':-*', ':\'(', ':-\\', '^-^', 'O0', 'C:-)', 'O:)');
 			$smileysto = array('evil.gif', 'cheesy.gif', 'rolleyes.gif', 'angry.gif', 'laugh.gif', 'smiley.gif', 'wink.gif', 'grin.gif', 'sad.gif', 'shocked.gif', 'cool.gif', 'tongue.gif', 'huh.gif', 'embarrassed.gif', 'lipsrsealed.gif', 'kiss.gif', 'cry.gif', 'undecided.gif', 'azn.gif', 'afro.gif', 'police.gif', 'angel.gif');
-			$smileysdescs = array('', $txt['icon_cheesy'], $txt['icon_rolleyes'], $txt['icon_angry'], '', $txt['icon_smiley'], $txt['icon_wink'], $txt['icon_grin'], $txt['icon_sad'], $txt['icon_shocked'], $txt['icon_cool'], $txt['icon_tongue'], $txt['icon_huh'], $txt['icon_embarrassed'], $txt['icon_lips'], $txt['icon_kiss'], $txt['icon_cry'], $txt['icon_undecided'], '', '', '', '');
+			$smileysdescs = array('', $txt['icon_cheesy'], $txt['icon_rolleyes'], $txt['icon_angry'], $txt['icon_laugh'], $txt['icon_smiley'], $txt['icon_wink'], $txt['icon_grin'], $txt['icon_sad'], $txt['icon_shocked'], $txt['icon_cool'], $txt['icon_tongue'], $txt['icon_huh'], $txt['icon_embarrassed'], $txt['icon_lips'], $txt['icon_kiss'], $txt['icon_cry'], $txt['icon_undecided'], '', '', '', $txt['icon_angel']);
 		}
 		else
 		{
@@ -2519,7 +2347,8 @@ function parsesmileys(&$message)
 			{
 				$result = $db->query('', '
 					SELECT code, filename, description
-					FROM {db_prefix}smileys',
+					FROM {db_prefix}smileys
+					ORDER BY LENGTH(code) DESC',
 					array(
 					)
 				);
@@ -2563,11 +2392,29 @@ function parsesmileys(&$message)
 			}
 		}
 
-		$smileyPregSearch = '~(?<=[>:\?\.\s' . $non_breaking_space . '[\]()*\\\;]|^)(' . implode('|', $searchParts) . ')(?=[^[:alpha:]0-9]|$)~eu';
+		$smileyPregSearch = '~(?<=[>:\?\.\s' . $non_breaking_space . '[\]()*\\\;]|^)(' . implode('|', $searchParts) . ')(?=[^[:alpha:]0-9]|$)~';
 	}
 
 	// Replace away!
-	$message = preg_replace($smileyPregSearch, '$smileyPregReplacements[\'$1\']', $message);
+	// @todo When support changes to PHP 5.3+, this can be changed this to "use" keyword and simpifly this.
+	$callback = pregReplaceCurry('smileyPregReplaceCallback', 2);
+	$message = preg_replace_callback($smileyPregSearch, $callback($smileyPregReplacements), $message);
+}
+
+/**
+ * Smiley Replacment Callback.
+ *
+ * Our callback that does the actual smiley replacments.
+ *
+ * Original code from: http://php.net/manual/en/function.preg-replace-callback.php#88013
+ * This is needed until ELK supports PHP 5.3+ and we can change to "use"
+ *
+ * @param string $replacements
+ * @param string $matches
+ */
+function smileyPregReplaceCallback($replacements, $matches)
+{
+	return $replacements[$matches[1]];
 }
 
 /**
@@ -2624,9 +2471,9 @@ function redirectexit($setLocation = '', $refresh = false)
 	if (!empty($modSettings['queryless_urls']) && (empty($context['server']['is_cgi']) || ini_get('cgi.fix_pathinfo') == 1 || @get_cfg_var('cgi.fix_pathinfo') == 1) && (!empty($context['server']['is_apache']) || !empty($context['server']['is_lighttpd']) || !empty($context['server']['is_litespeed'])))
 	{
 		if (defined('SID') && SID != '')
-			$setLocation = preg_replace('/^' . preg_quote($scripturl, '/') . '\?(?:' . SID . '(?:;|&|&amp;))((?:board|topic)=[^#]+?)(#[^"]*?)?$/e', "\$scripturl . '/' . strtr('\$1', '&;=', '//,') . '.html?' . SID . '\$2'", $setLocation);
+			$setLocation = preg_replace_callback('~^' . preg_quote($scripturl, '/') . '\?(?:' . SID . '(?:;|&|&amp;))((?:board|topic)=[^#]+?)(#[^"]*?)?$~', create_function('$m', 'global $scripturl; return $scripturl . "/" . strtr("$m[1]", \'&;=\', \'//,\') . ".html?" . SID . (isset($m[2]) ? $m[2] : "");'), $setLocation);
 		else
-			$setLocation = preg_replace('/^' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+?)(#[^"]*?)?$/e', "\$scripturl . '/' . strtr('\$1', '&;=', '//,') . '.html\$2'", $setLocation);
+			$setLocation = preg_replace_callback('~^' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+?)(#[^"]*?)?$~', create_function('$m', 'global $scripturl; return $scripturl . "/" . strtr("$m[1]", \'&;=\', \'//,\') . ".html" . (isset($m[2]) ? $m[2] : "");'), $setLocation);
 	}
 
 	// Maybe integrations want to change where we are heading?
@@ -2646,7 +2493,10 @@ function redirectexit($setLocation = '', $refresh = false)
 }
 
 /**
- * Ends execution.  Takes care of template loading and remembering the previous URL.
+ * Ends execution.
+ * Takes care of template loading and remembering the previous URL.
+ * Calls ob_start() with ob_sessrewrite to fix URLs if necessary.
+ *
  * @param bool $header = null
  * @param bool $do_footer = null
  * @param bool $from_index = false
@@ -2717,10 +2567,6 @@ function obExit($header = null, $do_footer = null, $from_index = false, $from_fa
 		// Show the footer.
 		loadSubTemplate(isset($context['sub_template']) ? $context['sub_template'] : 'main');
 
-		// Anything special to put out?
-		if (!empty($context['insert_after_template']) && !isset($_REQUEST['xml']))
-			echo $context['insert_after_template'];
-
 		// Just so we don't get caught in an endless loop of errors from the footer...
 		if (!$footer_done)
 		{
@@ -2733,23 +2579,15 @@ function obExit($header = null, $do_footer = null, $from_index = false, $from_fa
 		}
 	}
 
+	// Need user agent
+	$req = request();
+
 	// Remember this URL in case someone doesn't like sending HTTP_REFERER.
 	if (strpos($_SERVER['REQUEST_URL'], 'action=dlattach') === false && strpos($_SERVER['REQUEST_URL'], 'action=viewadminfile') === false)
 		$_SESSION['old_url'] = $_SERVER['REQUEST_URL'];
 
 	// For session check verification.... don't switch browsers...
-	$_SESSION['USER_AGENT'] = empty($_SERVER['HTTP_USER_AGENT']) ? '' : $_SERVER['HTTP_USER_AGENT'];
-
-	if (!empty($settings['strict_doctype']))
-	{
-		// The theme author wants to use the STRICT doctype (only God knows why).
-		$temp = ob_get_contents();
-		ob_clean();
-
-		echo strtr($temp, array(
-			'var smf_iso_case_folding' => 'var target_blank = \'_blank\'; var smf_iso_case_folding',
-			'target="_blank"' => 'onclick="this.target=target_blank"'));
-	}
+	$_SESSION['USER_AGENT'] = $req->user_agent();
 
 	// Hand off the output to the portal, etc. we're integrated with.
 	call_integration_hook('integrate_exit', array($do_footer));
@@ -2762,7 +2600,7 @@ function obExit($header = null, $do_footer = null, $from_index = false, $from_fa
 /**
  * Sets the class of the current topic based on is_very_hot, veryhot, hot, etc
  *
- * @param array &$topic_context
+ * @param array $topic_context
  */
 function determineTopicClass(&$topic_context)
 {
@@ -2783,6 +2621,7 @@ function determineTopicClass(&$topic_context)
 		$topic_context['class'] .= '_sticky';
 
 	// This is so old themes will still work.
+	// @deprecated will be removed from 1.1 do not rely on it
 	$topic_context['extended_class'] = &$topic_context['class'];
 }
 
@@ -2792,7 +2631,7 @@ function determineTopicClass(&$topic_context)
  */
 function setupThemeContext($forceload = false)
 {
-	global $modSettings, $user_info, $scripturl, $context, $settings, $options, $txt, $maintenance;
+	global $modSettings, $user_info, $scripturl, $context, $settings, $options, $txt;
 	global $user_settings;
 
 	static $loaded = false;
@@ -2804,7 +2643,6 @@ function setupThemeContext($forceload = false)
 
 	$loaded = true;
 
-	$context['in_maintenance'] = !empty($maintenance);
 	$context['current_time'] = standardTime(time(), false);
 	$context['current_action'] = isset($_GET['action']) ? $_GET['action'] : '';
 	$context['show_quick_login'] = !empty($modSettings['enableVBStyleLogin']) && $user_info['is_guest'];
@@ -2819,13 +2657,18 @@ function setupThemeContext($forceload = false)
 		// Clean it up for presentation ;).
 		$context['news_lines'][$i] = parse_bbc(stripslashes(trim($context['news_lines'][$i])), true, 'news' . $i);
 	}
+
 	if (!empty($context['news_lines']))
 		$context['random_news_line'] = $context['news_lines'][mt_rand(0, count($context['news_lines']) - 1)];
+
+	if (!empty($settings['enable_news']) && !empty($context['random_news_line']))
+		loadJavascriptFile ('fader.js');
 
 	if (!$user_info['is_guest'])
 	{
 		$context['user']['messages'] = &$user_info['messages'];
 		$context['user']['unread_messages'] = &$user_info['unread_messages'];
+		$context['user']['mentions'] = &$user_info['mentions'];
 
 		// Personal message popup...
 		if ($user_info['unread_messages'] > (isset($_SESSION['unread_messages']) ? $_SESSION['unread_messages'] : 0))
@@ -2837,7 +2680,7 @@ function setupThemeContext($forceload = false)
 		if (allowedTo('moderate_forum'))
 		{
 			$context['unapproved_members'] = (!empty($modSettings['registration_method']) && $modSettings['registration_method'] == 2) || !empty($modSettings['approveAccountDeletion']) ? $modSettings['unapprovedMembers'] : 0;
-			$context['unapproved_members_text'] = $context['unapproved_members'] == 1 ? sprintf($txt['approve_one_member_waiting'],  $scripturl . '?action=admin;area=viewmembers;sa=browse;type=approve') : sprintf($txt['approve_many_members_waiting'],  $scripturl . '?action=admin;area=viewmembers;sa=browse;type=approve', $context['unapproved_members']);
+			$context['unapproved_members_text'] = $context['unapproved_members'] == 1 ? sprintf($txt['approve_one_member_waiting'], $scripturl . '?action=admin;area=viewmembers;sa=browse;type=approve') : sprintf($txt['approve_many_members_waiting'], $scripturl . '?action=admin;area=viewmembers;sa=browse;type=approve', $context['unapproved_members']);
 		}
 		$context['show_open_reports'] = empty($user_settings['mod_prefs']) || $user_settings['mod_prefs'][0] == 1;
 
@@ -2847,7 +2690,7 @@ function setupThemeContext($forceload = false)
 		if ($user_info['avatar']['url'] == '' && !empty($user_info['avatar']['id_attach']))
 			$context['user']['avatar']['href'] = $user_info['avatar']['custom_dir'] ? $modSettings['custom_avatar_url'] . '/' . $user_info['avatar']['filename'] : $scripturl . '?action=dlattach;attach=' . $user_info['avatar']['id_attach'] . ';type=avatar';
 		// Full URL?
-		elseif (substr($user_info['avatar']['url'], 0, 7) == 'http://')
+		elseif (substr($user_info['avatar']['url'], 0, 7) == 'http://' || substr($user_info['avatar']['url'], 0, 8) == 'https://')
 		{
 			$context['user']['avatar']['href'] = $user_info['avatar']['url'];
 
@@ -2862,7 +2705,7 @@ function setupThemeContext($forceload = false)
 		}
 		// Gravatars URL.
 		elseif ($user_info['avatar']['url'] === 'gravatar')
-			$context['user']['avatar']['href'] = 'http://www.gravatar.com/avatar/' . md5(strtolower($user_settings['email_address'])) . 'd=' . $modSettings['avatar_max_height_external'] . (!empty($modSettings['gravatar_rating']) ? ('&amp;r=' . $modSettings['gravatar_rating']) : '');
+			$context['user']['avatar']['href'] = '//www.gravatar.com/avatar/' . md5(strtolower($user_settings['email_address'])) . 'd=' . $modSettings['avatar_max_height_external'] . (!empty($modSettings['gravatar_rating']) ? ('&amp;r=' . $modSettings['gravatar_rating']) : '');
 		// Otherwise we assume it's server stored?
 		elseif ($user_info['avatar']['url'] != '')
 			$context['user']['avatar']['href'] = $modSettings['avatar_url'] . '/' . htmlspecialchars($user_info['avatar']['url']);
@@ -2881,6 +2724,7 @@ function setupThemeContext($forceload = false)
 	{
 		$context['user']['messages'] = 0;
 		$context['user']['unread_messages'] = 0;
+		$context['user']['mentions'] = 0;
 		$context['user']['avatar'] = array();
 		$context['user']['total_time_logged_in'] = array('days' => 0, 'hours' => 0, 'minutes' => 0);
 		$context['user']['popup_messages'] = false;
@@ -2914,20 +2758,19 @@ function setupThemeContext($forceload = false)
 			new smc_Popup({
 				heading: ' . JavaScriptEscape($txt['show_personal_messages_heading']) . ',
 				content: ' . JavaScriptEscape(sprintf($txt['show_personal_messages'], $context['user']['unread_messages'], $scripturl . '?action=pm')) . ',
-				icon: smf_images_url + \'/im_sm_newmsg.png\'
+				icon: elk_images_url + \'/im_sm_newmsg.png\'
 			});
-		});');
+		});', true);
 
 	// Resize avatars the fancy, but non-GD requiring way.
 	if ($modSettings['avatar_action_too_large'] == 'option_js_resize' && (!empty($modSettings['avatar_max_width_external']) || !empty($modSettings['avatar_max_height_external'])))
 	{
 		// @todo Move this over to script.js?
 		addInlineJavascript('
-		var smf_avatarMaxWidth = ' . (int) $modSettings['avatar_max_width_external'] . ';
-		var smf_avatarMaxHeight = ' . (int) $modSettings['avatar_max_height_external'] . ';' . (!isBrowser('ie') ? '
-		window.addEventListener("load", smf_avatarResize, false);' : '
-		var window_oldAvatarOnload = window.onload;
-		window.onload = smf_avatarResize;'));
+		var elk_avatarMaxWidth = ' . (int) $modSettings['avatar_max_width_external'] . ',
+			elk_avatarMaxHeight = ' . (int) $modSettings['avatar_max_height_external'] . ';' . (!isBrowser('is_ie8') ? '
+		window.addEventListener("load", elk_avatarResize, false);' : '
+		window.attachEvent("load", elk_avatarResize);'), true);
 	}
 
 	// This looks weird, but it's because BoardIndex.controller.php references the variable.
@@ -2946,7 +2789,7 @@ function setupThemeContext($forceload = false)
 	$context['common_stats']['boardindex_total_posts'] = sprintf($txt['boardindex_total_posts'], $context['common_stats']['total_posts'], $context['common_stats']['total_topics'], $context['common_stats']['total_members']);
 
 	if (empty($settings['theme_version']))
-		addJavascriptVar('smf_scripturl', $scripturl);
+		addJavascriptVar(array('elk_scripturl' => $scripturl));
 
 	if (!isset($context['page_title']))
 		$context['page_title'] = '';
@@ -3032,7 +2875,9 @@ function template_rawdata()
  */
 function template_header()
 {
-	global $txt, $modSettings, $context, $settings, $user_info;
+	global $context, $settings;
+
+	doSecurityChecks();
 
 	setupThemeContext();
 
@@ -3057,88 +2902,8 @@ function template_header()
 	else
 		header('Content-Type: text/html; charset=UTF-8');
 
-	$checked_securityFiles = false;
-	$showed_banned = false;
 	foreach (Template_Layers::getInstance()->prepareContext() as $layer)
-	{
 		loadSubTemplate($layer . '_above', 'ignore');
-
-		// May seem contrived, but this is done in case the body and main layer aren't there...
-		if (in_array($layer, array('body', 'main')) && allowedTo('admin_forum') && !$user_info['is_guest'] && !$checked_securityFiles)
-		{
-			$checked_securityFiles = true;
-			// @todo add a hook here
-			$securityFiles = array('install.php', 'webinstall.php', 'upgrade.php', 'convert.php', 'repair_paths.php', 'repair_settings.php', 'Settings.php~', 'Settings_bak.php~');
-			foreach ($securityFiles as $i => $securityFile)
-			{
-				if (!file_exists(BOARDDIR . '/' . $securityFile))
-					unset($securityFiles[$i]);
-			}
-
-			// We are already checking so many files...just few more doesn't make any difference! :P
-			require_once(SUBSDIR . '/Attachments.subs.php');
-			$path = getAttachmentPath();
-			secureDirectory($path, true);
-			secureDirectory(CACHEDIR);
-
-			// If agreement is enabled, at least the english version shall exists
-			if ($modSettings['requireAgreement'])
-				$agreement = !file_exists(BOARDDIR . '/agreement.txt');
-
-			if (!empty($securityFiles) || (!empty($modSettings['cache_enable']) && !is_writable(CACHEDIR)) || !empty($agreement))
-			{
-				echo '
-		<div class="errorbox">
-			<p class="alert">!!</p>
-			<h3>', empty($securityFiles) ? $txt['generic_warning'] : $txt['security_risk'], '</h3>
-			<p>';
-
-				foreach ($securityFiles as $securityFile)
-				{
-					echo '
-				', $txt['not_removed'], '<strong>', $securityFile, '</strong>!<br />';
-
-					if ($securityFile == 'Settings.php~' || $securityFile == 'Settings_bak.php~')
-						echo '
-				', sprintf($txt['not_removed_extra'], $securityFile, substr($securityFile, 0, -1)), '<br />';
-				}
-
-				if (!empty($modSettings['cache_enable']) && !is_writable(CACHEDIR))
-					echo '
-				<strong>', $txt['cache_writable'], '</strong><br />';
-
-				if (!empty($agreement))
-					echo '
-				<strong>', $txt['agreement_missing'], '</strong><br />';
-
-				echo '
-			</p>
-		</div>';
-			}
-		}
-		// If the user is banned from posting inform them of it.
-		elseif (in_array($layer, array('main', 'body')) && isset($_SESSION['ban']['cannot_post']) && !$showed_banned)
-		{
-			$showed_banned = true;
-			echo '
-				<div class="windowbg alert" style="margin: 2ex; padding: 2ex; border: 2px dashed red;">
-					', sprintf($txt['you_are_post_banned'], $user_info['is_guest'] ? $txt['guest_title'] : $user_info['name']);
-
-			if (!empty($_SESSION['ban']['cannot_post']['reason']))
-				echo '
-					<div style="padding-left: 4ex; padding-top: 1ex;">', $_SESSION['ban']['cannot_post']['reason'], '</div>';
-
-			if (!empty($_SESSION['ban']['expire_time']))
-				echo '
-					<div>', sprintf($txt['your_ban_expires'], standardTime($_SESSION['ban']['expire_time'], false)), '</div>';
-			else
-				echo '
-					<div>', $txt['your_ban_expires_never'], '</div>';
-
-			echo '
-				</div>';
-		}
-	}
 
 	if (isset($settings['use_default_images']) && $settings['use_default_images'] == 'defaults' && isset($settings['default_template']))
 	{
@@ -3160,6 +2925,7 @@ function theme_copyright()
 		return;
 
 	// Put in the version...
+	// @todo - No necessity for inline CSS in the copyright, and better without it.
 	$forum_copyright = sprintf($forum_copyright, ucfirst(strtolower($forum_version)));
 
 	echo '
@@ -3193,15 +2959,16 @@ function template_footer()
 
 /**
  * Output the Javascript files
- * 	- tabbing in this function is to make the HTML source look proper
+ *  - tabbing in this function is to make the HTML source look proper
  *  - if defered is set function will output all JS (source & inline) set to load at page end
  *  - if the admin option to combine files is set, will use Combiner.class
  *
  * @param bool $do_defered = false
+ *
  */
 function template_javascript($do_defered = false)
 {
-	global $context, $modSettings, $settings;
+	global $context, $modSettings, $settings, $boardurl;
 
 	// First up, load jquery
 	if (isset($modSettings['jquery_source']) && !$do_defered)
@@ -3210,17 +2977,26 @@ function template_javascript($do_defered = false)
 		{
 			case 'cdn':
 				echo '
-	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" id="jquery"></script>';
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js" id="jquery"></script>',
+	(!empty($modSettings['jquery_include_ui']) ? '
+	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js" id="jqueryui"></script>' : '');
 				break;
 			case 'local':
 				echo '
-	<script type="text/javascript" src="', $settings['default_theme_url'], '/scripts/jquery-1.9.1.min.js" id="jquery"></script>';
+	<script src="', $settings['default_theme_url'], '/scripts/jquery-1.10.2.min.js" id="jquery"></script>',
+	(!empty($modSettings['jquery_include_ui']) ? '
+	<script src="' . $settings['default_theme_url'] . '/scripts/jqueryui-1.10.3.min.js" id="jqueryui"></script>' : '');
 				break;
 			case 'auto':
 				echo '
-	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" id="jquery"></script>
-	<script type="text/javascript"><!-- // --><![CDATA[
-		window.jQuery || document.write(\'<script src="', $settings['default_theme_url'], '/scripts/jquery-1.9.1.min.js"><\/script>\');
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js" id="jquery"></script>',
+	(!empty($modSettings['jquery_include_ui']) ? '
+	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js" id="jqueryui"></script>' : '');
+				echo '
+	<script><!-- // --><![CDATA[
+		window.jQuery || document.write(\'<script src="', $settings['default_theme_url'], '/scripts/jquery-1.10.2.min.js"><\/script>\');',
+		(!empty($modSettings['jquery_include_ui']) ? '
+		window.jQuery.ui || document.write(\'<script src="' . $settings['default_theme_url'] . '/scripts/jqueryui-1.10.3.min.js"><\/script>\')' : ''), '
 	// ]]></script>';
 				break;
 		}
@@ -3229,19 +3005,19 @@ function template_javascript($do_defered = false)
 	// Use this hook to work with Javascript files and vars pre output
 	call_integration_hook('pre_javascript_output');
 
-	// Combine and minify javascript to save bandwidth and requests?
+	// Combine and minify javascript source files to save bandwidth and requests
 	if (!empty($context['javascript_files']))
 	{
 		if (!empty($modSettings['minify_css_js']))
 		{
 			require_once(SOURCEDIR . '/Combine.class.php');
-			$combiner = new Site_Combiner;
+			$combiner = new Site_Combiner(CACHEDIR, $boardurl . '/cache');
 			$combine_name = $combiner->site_js_combine($context['javascript_files'], $do_defered);
-
-			if (!empty($combine_name))
-				echo '
-	<script type="text/javascript" src="', $combine_name, '" id="jscombined', $do_defered ? 'bottom' : 'top', '"></script>';
 		}
+
+		if (!empty($combine_name))
+			echo '
+	<script src="', $combine_name, '" id="jscombined', $do_defered ? 'bottom' : 'top', '"></script>';
 		else
 		{
 			// While we have Javascript files to place in the template
@@ -3249,54 +3025,48 @@ function template_javascript($do_defered = false)
 			{
 				if ((!$do_defered && empty($js_file['options']['defer'])) || ($do_defered && !empty($js_file['options']['defer'])))
 					echo '
-	<script type="text/javascript" src="', $js_file['filename'], '" id="', $id, '"', !empty($js_file['options']['async']) ? ' async="async"' : '', '></script>';
-
-				// If we are loading JQuery and we are set to 'auto' load, put in our remote success or load local check
-				if ($id === 'jquery' && (!isset($modSettings['jquery_source']) || $modSettings['jquery_source'] === 'auto'))
-					// @todo: $loadjquery isn't used anywhere, probably a bug..
-					$loadjquery = true;
+	<script src="', $js_file['filename'], '" id="', $id, '"', !empty($js_file['options']['async']) ? ' async="async"' : '', '></script>';
 			}
 		}
 	}
 
-	// Output the declared Javascript variables.
+	// Build the declared Javascript variables script
+	$js_vars = array();
 	if (!empty($context['javascript_vars']) && !$do_defered)
 	{
-		echo '
-	<script type="text/javascript"><!-- // --><![CDATA[';
+		foreach ($context['javascript_vars'] as $var => $value)
+			$js_vars[] = $var . ' = ' . $value;
 
-		foreach ($context['javascript_vars'] as $key => $value)
-			echo '
-		var ', $key, ' = ', $value, ';';
-
-		echo '
-	// ]]></script>';
+		// nNewlines and tabs are here to make it look nice in the page source view, stripped if minimized though
+		$context['javascript_inline']['standard'][] = 'var ' . implode(",\n\t\t\t", $js_vars) . ';';
 	}
 
 	// Inline JavaScript - Actually useful some times!
 	if (!empty($context['javascript_inline']))
 	{
+		// Defered output waits until we are defering !
 		if (!empty($context['javascript_inline']['defer']) && $do_defered)
 		{
+			// Combine them all in to one output
+			$context['javascript_inline']['defer'] = array_map('trim', $context['javascript_inline']['defer']);
+			$inline_defered_code = implode("\n\t\t", $context['javascript_inline']['defer']);
+
+			// Output the defered script
 			echo '
-	<script type="text/javascript"><!-- // --><![CDATA[';
-
-			foreach ($context['javascript_inline']['defer'] as $js_code)
-				echo $js_code;
-
-			echo'
+	<script><!-- // --><![CDATA[
+		', $inline_defered_code, '
 	// ]]></script>';
 		}
 
+		// Standard output, and our javascript vars, get output when we are not on a defered call
 		if (!empty($context['javascript_inline']['standard']) && !$do_defered)
 		{
+			$context['javascript_inline']['standard'] = array_map('trim', $context['javascript_inline']['standard']);
+
+			// And output the js vars and standard scripts to the page
 			echo '
-	<script type="text/javascript"><!-- // --><![CDATA[';
-
-			foreach ($context['javascript_inline']['standard'] as $js_code)
-				echo $js_code;
-
-			echo'
+	<script><!-- // --><![CDATA[
+		', implode("\n\t\t", $context['javascript_inline']['standard']), '
 	// ]]></script>';
 		}
 	}
@@ -3308,7 +3078,7 @@ function template_javascript($do_defered = false)
  */
 function template_css()
 {
-	global $context, $modSettings;
+	global $context, $modSettings, $boardurl;
 
 	// Use this hook to work with CSS files pre output
 	call_integration_hook('pre_css_output');
@@ -3319,18 +3089,125 @@ function template_css()
 		if (!empty($modSettings['minify_css_js']))
 		{
 			require_once(SOURCEDIR . '/Combine.class.php');
-			$combiner = new Site_Combiner;
+			$combiner = new Site_Combiner(CACHEDIR, $boardurl . '/cache');
 			$combine_name = $combiner->site_css_combine($context['css_files']);
-			if (!empty($combine_name))
-				echo '
-	<link rel="stylesheet" type="text/css" href="', $combine_name, '" id="csscombined" />';
 		}
+
+		if (!empty($combine_name))
+			echo '
+	<link rel="stylesheet" href="', $combine_name, '" id="csscombined" />';
 		else
 		{
 			foreach ($context['css_files'] as $id => $file)
 				echo '
-	<link rel="stylesheet" type="text/css" href="', $file['filename'], '" id="', $id,'" />';
+	<link rel="stylesheet" href="', $file['filename'], '" id="', $id,'" />';
 		}
+	}
+}
+
+/**
+ * I know this is becoming annoying, though this template
+ * *shall* be present for security reasons, so better it stays here
+ *
+ * @todo rework it and merge into some other kind of general warning-box (e.g. modtask at index.template)
+ */
+function template_admin_warning_above()
+{
+	global $context, $user_info, $scripturl, $txt;
+
+	if (!empty($context['security_controls']['query']))
+	{
+		echo '
+	<div class="errorbox">
+		<p class="alert">!!</p>
+		<h3>', $context['user']['is_admin'] ? $txt['query_command_denied'] : $txt['query_command_denied_guests'], '</h3>
+		<ul>';
+
+		foreach ($context['security_controls']['query'] as $error)
+		{
+			echo '
+			<li><pre>', $context['user']['is_admin'] ? $error : sprintf($txt['query_command_denied_guests_msg'], $error), '</pre></li>';
+		}
+		echo '
+		</ul>
+	</div>';
+	}
+
+	if (!empty($context['security_controls']['files']))
+	{
+		echo '
+	<div class="errorbox">
+		<p class="alert">!!</p>
+		<h3>', empty($context['security_controls']['files']['to_remove']) ? $txt['generic_warning'] : $txt['security_risk'], '</h3>
+		<p>';
+
+		if (!empty($context['security_controls']['files']['to_remove']))
+		{
+			foreach ($context['security_controls']['files']['to_remove'] as $securityFile)
+			{
+				echo '
+			', sprintf($txt['not_removed'], '<strong>' . $securityFile . '</strong>'), '!<br />';
+
+				if ($securityFile == 'Settings.php~' || $securityFile == 'Settings_bak.php~')
+					echo '
+			', sprintf($txt['not_removed_extra'], $securityFile, substr($securityFile, 0, -1)), '<br />';
+			}
+		}
+
+		if (!empty($context['security_controls']['files']['theme_dir']))
+			echo $context['security_controls']['files']['theme_dir'] . '<br />';
+
+		if (!empty($context['security_controls']['files']['cache']))
+			echo '
+			<strong>', $txt['cache_writable'], '</strong><br />';
+
+		if (!empty($context['security_controls']['files']['agreement']))
+			echo '
+			<strong>', $txt['agreement_missing'], '</strong><br />';
+
+		echo '
+		</p>
+	</div>';
+	}
+
+	// Any special notices to remind the admin about?
+	if (!empty($context['security_controls']['admin_session']) || !empty($context['security_controls']['maintenance']))
+	{
+		echo '
+			<div class="warningbox">';
+
+		if (!empty($context['security_controls']['admin_session']))
+			echo
+				sprintf($txt['admin_session_active'], ($scripturl . '?action=admin;area=adminlogoff;redir;' . $context['session_var'] . '=' . $context['session_id'])) . '<br>';
+
+		if (!empty($context['security_controls']['maintenance']))
+			echo
+				sprintf($txt['admin_maintenance_active'], ($scripturl . '?action=admin;area=serversettings;' . $context['session_var'] . '=' . $context['session_id']));
+
+		echo '
+			</div>';
+	}
+
+	// If the user is banned from posting inform them of it.
+	if (isset($_SESSION['ban']['cannot_post']))
+	{
+		echo '
+			<div class="windowbg ban_cannot_post">
+				', sprintf($txt['you_are_post_banned'], $user_info['is_guest'] ? $txt['guest_title'] : $user_info['name']);
+
+		if (!empty($_SESSION['ban']['cannot_post']['reason']))
+			echo '
+				<div style="padding-left: 4ex; padding-top: 1ex;">', $_SESSION['ban']['cannot_post']['reason'], '</div>';
+
+		if (!empty($_SESSION['ban']['expire_time']))
+			echo '
+				<div>', sprintf($txt['your_ban_expires'], standardTime($_SESSION['ban']['expire_time'], false)), '</div>';
+		else
+			echo '
+				<div>', $txt['your_ban_expires_never'], '</div>';
+
+		echo '
+			</div>';
 	}
 }
 
@@ -3351,34 +3228,16 @@ function getAttachmentFilename($filename, $attachment_id, $dir = null, $new = fa
 {
 	global $modSettings;
 
-	$db = database();
-
 	// Just make up a nice hash...
 	if ($new)
 		return sha1(md5($filename . time()) . mt_rand());
 
-	// Grab the file hash if it wasn't added.
-	// @todo: Locate all places that don't call a hash and fix that.
-	if ($file_hash === '')
-	{
-		$request = $db->query('', '
-			SELECT file_hash
-			FROM {db_prefix}attachments
-			WHERE id_attach = {int:id_attach}',
-			array(
-				'id_attach' => $attachment_id,
-		));
-
-		if ($db->num_rows($request) === 0)
-			return false;
-
-		list ($file_hash) = $db->fetch_row($request);
-		$db->free_result($request);
-	}
-
 	// In case of files from the old system, do a legacy call.
 	if (empty($file_hash))
+	{
+		require_once(SUBSDIR . '/Attachments.subs.php');
 		return getLegacyAttachmentFilename($filename, $attachment_id, $dir, $new);
+	}
 
 	// Are we using multiple directories?
 	if (!empty($modSettings['currentAttachmentUploadDir']))
@@ -3390,50 +3249,7 @@ function getAttachmentFilename($filename, $attachment_id, $dir = null, $new = fa
 	else
 		$path = $modSettings['attachmentUploadDir'];
 
-	return $path . '/' . $attachment_id . '_' . $file_hash;
-}
-
-/**
- * Older attachments may still use this function.
- *
- * @param $filename
- * @param $attachment_id
- * @param $dir
- * @param $new
- */
-function getLegacyAttachmentFilename($filename, $attachment_id, $dir = null, $new = false)
-{
-	global $modSettings;
-
-	$clean_name = $filename;
-
-	// Sorry, no spaces, dots, or anything else but letters allowed.
-	$clean_name = preg_replace(array('/\s/', '/[^\w_\.\-]/'), array('_', ''), $clean_name);
-
-	$enc_name = $attachment_id . '_' . strtr($clean_name, '.', '_') . md5($clean_name);
-	$clean_name = preg_replace('~\.[\.]+~', '.', $clean_name);
-
-	if ($attachment_id == false || ($new && empty($modSettings['attachmentEncryptFilenames'])))
-		return $clean_name;
-	elseif ($new)
-		return $enc_name;
-
-	// Are we using multiple directories?
-	if (!empty($modSettings['currentAttachmentUploadDir']))
-	{
-		if (!is_array($modSettings['attachmentUploadDir']))
-			$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
-		$path = $modSettings['attachmentUploadDir'][$dir];
-	}
-	else
-		$path = $modSettings['attachmentUploadDir'];
-
-	if (file_exists($path . '/' . $enc_name))
-		$filename = $path . '/' . $enc_name;
-	else
-		$filename = $path . '/' . $clean_name;
-
-	return $filename;
+	return $path . '/' . $attachment_id . '_' . $file_hash . '.elk';
 }
 
 /**
@@ -3606,6 +3422,8 @@ function text2words($text, $max_chars = 20, $encrypt = false)
  * @param boolean $custom = ''
  * @param boolean $force_use = false
  * @return string
+ *
+ * @deprecated: this will be removed at some point, do not rely on this function
  */
 function create_button($name, $alt, $label = '', $custom = '', $force_use = false)
 {
@@ -3644,37 +3462,72 @@ function setupMenuContext()
 
 	$cacheTime = $modSettings['lastActive'] * 60;
 
+	// Update the Moderation menu items with action item totals
+	if ($context['allow_moderation_center'])
+	{
+		// Get the numbers for the menu ...
+		require_once(SUBSDIR . '/Moderation.subs.php');
+		$menu_count = loadModeratorMenuCounts();
+	}
+
+	$menu_count['unread_messages'] = $context['user']['unread_messages'];
+	$menu_count['mentions'] = $context['user']['mentions'];
+
 	// All the buttons we can possible want and then some, try pulling the final list of buttons from cache first.
 	if (($menu_buttons = cache_get_data('menu_buttons-' . implode('_', $user_info['groups']) . '-' . $user_info['language'], $cacheTime)) === null || time() - $cacheTime <= $modSettings['settings_updated'])
 	{
+		// Start things up: this is what we know by default
+		require_once(SUBSDIR . '/Menu.subs.php');
 		$buttons = array(
 			'home' => array(
-				'title' => $txt['home'],
+				'title' => $txt['community'],
 				'href' => $scripturl,
 				'show' => true,
 				'sub_buttons' => array(
+					'help' => array(
+						'title' => $txt['help'],
+						'href' => $scripturl . '?action=help',
+						'show' => true,
+					),
+					'search' => array(
+						'title' => $txt['search'],
+						'href' => $scripturl . '?action=search',
+						'show' => $context['allow_search'],
+					),
+					'calendar' => array(
+						'title' => $txt['calendar'],
+						'href' => $scripturl . '?action=calendar',
+						'show' => $context['allow_calendar'],
+					),
+					'memberlist' => array(
+						'title' => $txt['members_title'],
+						'href' => $scripturl . '?action=memberlist',
+						'show' => $context['allow_memberlist'],
+					),
+					'recent' => array(
+						'title' => $txt['recent_posts'],
+						'href' => $scripturl . '?action=recent',
+						'show' => true,
+					),
 				),
-				'is_last' => $context['right_to_left'],
-			),
-			'help' => array(
-				'title' => $txt['help'],
-				'href' => $scripturl . '?action=help',
+			)
+		);
+
+			// Will change title correctly if user is either a mod or an admin.
+			// Button highlighting works properly too (see current action stuffz).
+		if ($context['allow_admin'])
+		{
+			$buttons['admin'] = array(
+				'title' => $context['current_action'] !== 'moderate' ? $txt['admin'] : $txt['moderate'],
+				'counter' => 'grand_total',
+				'href' => $scripturl . '?action=admin',
 				'show' => true,
 				'sub_buttons' => array(
-				),
-			),
-			'search' => array(
-				'title' => $txt['search'],
-				'href' => $scripturl . '?action=search',
-				'show' => $context['allow_search'],
-				'sub_buttons' => array(
-				),
-			),
-			'admin' => array(
-				'title' => $txt['admin'],
-				'href' => $scripturl . '?action=admin',
-				'show' => $context['allow_admin'],
-				'sub_buttons' => array(
+					'admin_center' => array(
+						'title' => $txt['admin_center'],
+						'href' => $scripturl . '?action=admin',
+						'show' => $context['allow_admin'],
+					),
 					'featuresettings' => array(
 						'title' => $txt['modSettings_title'],
 						'href' => $scripturl . '?action=admin;area=featuresettings',
@@ -3685,54 +3538,100 @@ function setupMenuContext()
 						'href' => $scripturl . '?action=admin;area=packages',
 						'show' => allowedTo('admin_forum'),
 					),
+					'permissions' => array(
+						'title' => $txt['edit_permissions'],
+						'href' => $scripturl . '?action=admin;area=permissions',
+						'show' => allowedTo('manage_permissions'),
+					),
 					'errorlog' => array(
 						'title' => $txt['errlog'],
 						'href' => $scripturl . '?action=admin;area=logs;sa=errorlog;desc',
 						'show' => allowedTo('admin_forum') && !empty($modSettings['enableErrorLogging']),
 					),
-					'permissions' => array(
-						'title' => $txt['edit_permissions'],
-						'href' => $scripturl . '?action=admin;area=permissions',
-						'show' => allowedTo('manage_permissions'),
-						'is_last' => true,
+					'moderate_sub' => array(
+						'title' => $txt['moderate'],
+						'counter' => 'grand_total',
+						'href' => $scripturl . '?action=moderate',
+						'show' => $context['allow_moderation_center'],
+						'sub_buttons' => array(
+							'reports' => array(
+								'title' => $txt['mc_reported_posts'],
+								'counter' => 'reports',
+								'href' => $scripturl . '?action=moderate;area=reports',
+								'show' => !empty($user_info['mod_cache']) && $user_info['mod_cache']['bq'] != '0=1',
+							),
+							'modlog' => array(
+								'title' => $txt['modlog_view'],
+								'href' => $scripturl . '?action=moderate;area=modlog',
+								'show' => !empty($modSettings['modlog_enabled']) && !empty($user_info['mod_cache']) && $user_info['mod_cache']['bq'] != '0=1',
+							),
+							'attachments' => array(
+								'title' => $txt['mc_unapproved_attachments'],
+								'counter' => 'attachments',
+								'href' => $scripturl . '?action=moderate;area=attachmod;sa=attachments',
+								'show' => $modSettings['postmod_active'] && !empty($user_info['mod_cache']['ap']),
+							),
+							'poststopics' => array(
+								'title' => $txt['mc_unapproved_poststopics'],
+								'counter' => 'postmod',
+								'href' => $scripturl . '?action=moderate;area=postmod;sa=posts',
+								'show' => $modSettings['postmod_active'] && !empty($user_info['mod_cache']['ap']),
+							),
+							'postbyemail' => array(
+								'title' => $txt['mc_emailerror'],
+								'counter' => 'emailmod',
+								'href' => $scripturl . '?action=admin;area=maillist;sa=emaillist',
+								'show' => !empty($modSettings['maillist_enabled']) && allowedTo('approve_emails'),
+							),
+						),
 					),
 				),
-			),
-			'moderate' => array(
+			);
+		}
+		else
+		{
+			$buttons['admin'] = array(
 				'title' => $txt['moderate'],
+				'counter' => 'grand_total',
 				'href' => $scripturl . '?action=moderate',
 				'show' => $context['allow_moderation_center'],
 				'sub_buttons' => array(
+					'reports' => array(
+						'title' => $txt['mc_reported_posts'],
+						'counter' => 'reports',
+						'href' => $scripturl . '?action=moderate;area=reports',
+						'show' => !empty($user_info['mod_cache']) && $user_info['mod_cache']['bq'] != '0=1',
+					),
 					'modlog' => array(
 						'title' => $txt['modlog_view'],
 						'href' => $scripturl . '?action=moderate;area=modlog',
 						'show' => !empty($modSettings['modlog_enabled']) && !empty($user_info['mod_cache']) && $user_info['mod_cache']['bq'] != '0=1',
 					),
+					'attachments' => array(
+						'title' => $txt['mc_unapproved_attachments'],
+						'counter' => 'attachments',
+						'href' => $scripturl . '?action=moderate;area=attachmod;sa=attachments',
+						'show' => $modSettings['postmod_active'] && !empty($user_info['mod_cache']['ap']),
+					),
 					'poststopics' => array(
 						'title' => $txt['mc_unapproved_poststopics'],
+						'counter' => 'postmod',
 						'href' => $scripturl . '?action=moderate;area=postmod;sa=posts',
 						'show' => $modSettings['postmod_active'] && !empty($user_info['mod_cache']['ap']),
 					),
 					'postbyemail' => array(
 						'title' => $txt['mc_emailerror'],
+						'counter' => 'emailmod',
 						'href' => $scripturl . '?action=admin;area=maillist;sa=emaillist',
 						'show' => !empty($modSettings['maillist_enabled']) && allowedTo('approve_emails'),
 					),
-					'attachments' => array(
-						'title' => $txt['mc_unapproved_attachments'],
-						'href' => $scripturl . '?action=moderate;area=attachmod;sa=attachments',
-						'show' => $modSettings['postmod_active'] && !empty($user_info['mod_cache']['ap']),
-					),
-					'reports' => array(
-						'title' => $txt['mc_reported_posts'],
-						'href' => $scripturl . '?action=moderate;area=reports',
-						'show' => !empty($user_info['mod_cache']) && $user_info['mod_cache']['bq'] != '0=1',
-						'is_last' => true,
-					),
 				),
-			),
+			);
+		}
+
+		$buttons += array(
 			'profile' => array(
-				'title' => $txt['profile'],
+				'title' => (!empty($user_info['avatar']['image']) ? $user_info['avatar']['image'] . ' ' : '') . (!empty($modSettings['displayMemberNames']) ? $user_info['name'] : $txt['account_short']),
 				'href' => $scripturl . '?action=profile',
 				'show' => $context['allow_edit_profile'],
 				'sub_buttons' => array(
@@ -3745,17 +3644,25 @@ function setupMenuContext()
 						'title' => $txt['forumprofile'],
 						'href' => $scripturl . '?action=profile;area=forumprofile',
 						'show' => allowedTo(array('profile_extra_any', 'profile_extra_own')),
-						'is_last' => true,
 					),
 					'theme' => array(
 						'title' => $txt['theme'],
 						'href' => $scripturl . '?action=profile;area=theme',
 						'show' => allowedTo(array('profile_extra_any', 'profile_extra_own', 'profile_extra_any')),
 					),
+					// The old "logout" is meh. Not a real word. "Log out" is better.
+					'logout' => array(
+						'title' => $txt['logout'],
+						'href' => $scripturl . '?action=logout;' . $context['session_var'] . '=' . $context['session_id'],
+						'show' => !$user_info['is_guest'],
+					),
 				),
 			),
+			// @todo - Will look at doing something here, to provide instant access to inbox when using click menus.
+			// @todo - A small pop-up anchor seems like the obvious way to handle it. ;)
 			'pm' => array(
 				'title' => $txt['pm_short'],
+				'counter' => 'unread_messages',
 				'href' => $scripturl . '?action=pm',
 				'show' => $context['allow_pm'],
 				'sub_buttons' => array(
@@ -3768,77 +3675,57 @@ function setupMenuContext()
 						'title' => $txt['pm_menu_send'],
 						'href' => $scripturl . '?action=pm;sa=send',
 						'show' => allowedTo('pm_send'),
-						'is_last' => true,
 					),
 				),
 			),
-			'calendar' => array(
-				'title' => $txt['calendar'],
-				'href' => $scripturl . '?action=calendar',
-				'show' => $context['allow_calendar'],
-				'sub_buttons' => array(
-					'view' => array(
-						'title' => $txt['calendar_menu'],
-						'href' => $scripturl . '?action=calendar',
-						'show' => allowedTo('calendar_post'),
-					),
-					'post' => array(
-						'title' => $txt['calendar_post_event'],
-						'href' => $scripturl . '?action=calendar;sa=post',
-						'show' => allowedTo('calendar_post'),
-						'is_last' => true,
-					),
-				),
+
+			'mention' => array(
+				'title' => $txt['mention'],
+				'counter' => 'mentions',
+				'href' => $scripturl . '?action=mentions',
+				'show' => !$user_info['is_guest'] && !empty($modSettings['mentions_enabled']),
 			),
-			'memberlist' => array(
-				'title' => $txt['members_title'],
-				'href' => $scripturl . '?action=memberlist',
-				'show' => $context['allow_memberlist'],
-				'sub_buttons' => array(
-					'mlist_view' => array(
-						'title' => $txt['mlist_menu_view'],
-						'href' => $scripturl . '?action=memberlist',
-						'show' => true,
-					),
-					'mlist_search' => array(
-						'title' => $txt['mlist_search'],
-						'href' => $scripturl . '?action=memberlist;sa=search',
-						'show' => true,
-						'is_last' => true,
-					),
-				),
+
+			// The old language string made no sense, and was too long.
+			// "New posts" is better, because there are probably a pile
+			// of old unread posts, and they wont be reached from this button.
+			'unread' => array(
+				'title' => $txt['view_unread_category'],
+				'href' => $scripturl . '?action=unread',
+				'show' => !$user_info['is_guest'],
 			),
+
+			// The old language string made no sense, and was too long.
+			// "New replies" is better, because there are "updated topics"
+			// that the user has never posted in and doesn't care about.
+			'unreadreplies' => array(
+				'title' => $txt['view_replies_category'],
+				'href' => $scripturl . '?action=unreadreplies',
+				'show' => !$user_info['is_guest'],
+			),
+
+			// "Log out" would be better here.
+			// "Login" is not a word, and sort of runs together into a bleh.
 			'login' => array(
 				'title' => $txt['login'],
 				'href' => $scripturl . '?action=login',
 				'show' => $user_info['is_guest'],
-				'sub_buttons' => array(
-				),
 			),
+
 			'register' => array(
 				'title' => $txt['register'],
 				'href' => $scripturl . '?action=register',
 				'show' => $user_info['is_guest'] && $context['can_register'],
-				'sub_buttons' => array(
-				),
-				'is_last' => !$context['right_to_left'],
-			),
-			'logout' => array(
-				'title' => $txt['logout'],
-				'href' => $scripturl . '?action=logout;%1$s=%2$s',
-				'show' => !$user_info['is_guest'],
-				'sub_buttons' => array(
-				),
-				'is_last' => !$context['right_to_left'],
 			),
 		);
 
 		// Allow editing menu buttons easily.
-		call_integration_hook('integrate_menu_buttons', array(&$buttons));
+		call_integration_hook('integrate_menu_buttons', array(&$buttons, &$menu_count));
 
 		// Now we put the buttons in the context so the theme can use them.
 		$menu_buttons = array();
 		foreach ($buttons as $act => $button)
+		{
 			if (!empty($button['show']))
 			{
 				$button['active_button'] = false;
@@ -3847,45 +3734,56 @@ function setupMenuContext()
 				if (isset($button['action_hook']))
 					$needs_action_hook = true;
 
-				// Make sure the last button truely is the last button.
-				if (!empty($button['is_last']))
+				if (isset($button['counter']) && !empty($menu_count[$button['counter']]))
 				{
-                    // @todo: $last_button not initialized, probably a bug..
-					if (isset($last_button))
-						unset($menu_buttons[$last_button]['is_last']);
-					$last_button = $act;
+					$button['alttitle'] = $button['title'] . ' [' . $menu_count[$button['counter']] . ']';
+					if (!empty($settings['menu_numeric_notice'][0]))
+						$button['title'] .= sprintf($settings['menu_numeric_notice'][0], $menu_count[$button['counter']]);
 				}
 
 				// Go through the sub buttons if there are any.
-				if (!empty($button['sub_buttons']))
+				if (isset($button['sub_buttons']))
+				{
 					foreach ($button['sub_buttons'] as $key => $subbutton)
 					{
 						if (empty($subbutton['show']))
 							unset($button['sub_buttons'][$key]);
-
-						// 2nd level sub buttons next...
-						if (!empty($subbutton['sub_buttons']))
+						elseif (isset($subbutton['counter']) && !empty($menu_count[$subbutton['counter']]))
 						{
-							foreach ($subbutton['sub_buttons'] as $key2 => $sub_button2)
+							$button['sub_buttons'][$key]['alttitle'] = $subbutton['title'] . ' [' . $menu_count[$subbutton['counter']] . ']';
+							if (!empty($settings['menu_numeric_notice'][1]))
+								$button['sub_buttons'][$key]['title'] .= sprintf($settings['menu_numeric_notice'][1], $menu_count[$subbutton['counter']]);
+
+							// 2nd level sub buttons next...
+							if (isset($subbutton['sub_buttons']))
 							{
-								if (empty($sub_button2['show']))
-									unset($button['sub_buttons'][$key]['sub_buttons'][$key2]);
+								foreach ($subbutton['sub_buttons'] as $key2 => $subbutton2)
+								{
+									$button['sub_buttons'][$key]['sub_buttons'][$key2] = $subbutton2;
+									if (empty($subbutton2['show']))
+										unset($button['sub_buttons'][$key]['sub_buttons'][$key2]);
+									elseif (isset($subbutton2['counter']) && !empty($menu_count[$subbutton2['counter']]))
+									{
+										$button['sub_buttons'][$key]['sub_buttons'][$key2]['alttitle'] = $subbutton2['title'] . ' [' . $menu_count[$subbutton2['counter']] . ']';
+										if (!empty($settings['menu_numeric_notice'][2]))
+											$button['sub_buttons'][$key]['sub_buttons'][$key2]['title'] .= sprintf($settings['menu_numeric_notice'][2], $menu_count[$subbutton2['counter']]);
+										unset($menu_count[$subbutton2['counter']]);
+									}
+								}
 							}
 						}
 					}
+				}
 
 				$menu_buttons[$act] = $button;
 			}
+		}
 
 		if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
 			cache_put_data('menu_buttons-' . implode('_', $user_info['groups']) . '-' . $user_info['language'], $menu_buttons, $cacheTime);
 	}
 
 	$context['menu_buttons'] = $menu_buttons;
-
-	// Logging out requires the session id in the url.
-	if (isset($context['menu_buttons']['logout']))
-		$context['menu_buttons']['logout']['href'] = sprintf($context['menu_buttons']['logout']['href'], $context['session_var'], $context['session_id']);
 
 	// Figure out which action we are doing so we can set the active tab.
 	// Default to home.
@@ -3895,6 +3793,8 @@ function setupMenuContext()
 		$current_action = $context['current_action'];
 	elseif ($context['current_action'] == 'search2')
 		$current_action = 'search';
+	elseif ($context['current_action'] == 'profile')
+		$current_action = 'pm';
 	elseif ($context['current_action'] == 'theme')
 		$current_action = isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'pick' ? 'profile' : 'admin';
 	elseif ($context['current_action'] == 'register2')
@@ -3903,6 +3803,8 @@ function setupMenuContext()
 		$current_action = 'login';
 	elseif ($context['current_action'] == 'groups' && $context['allow_moderation_center'])
 		$current_action = 'moderate';
+	elseif ($context['current_action'] == 'moderate' && $context['allow_admin'])
+		$current_action = 'admin';
 
 	// Not all actions are simple.
 	if (!empty($needs_action_hook))
@@ -3910,56 +3812,6 @@ function setupMenuContext()
 
 	if (isset($context['menu_buttons'][$current_action]))
 		$context['menu_buttons'][$current_action]['active_button'] = true;
-
-	// No need for accurate text if we are in xml mode
-	if (isset($_REQUEST['xml']))
-		return;
-
-	// Update the PM menu item if they have unread messages
-	if (!$user_info['is_guest'] && $context['user']['unread_messages'] > 0 && isset($context['menu_buttons']['pm']))
-	{
-		$context['menu_buttons']['pm']['alttitle'] = $context['menu_buttons']['pm']['title'] . ' [' . $context['user']['unread_messages'] . ']';
-		if (!empty($settings['menu_numeric_notice']))
-			$context['menu_buttons']['pm']['title'] .= sprintf($settings['menu_numeric_notice'], $context['user']['unread_messages']);
-	}
-
-	// Update the Moderation menu items with action item totals
-	if ($context['allow_moderation_center'])
-	{
-		// Get the numbers for the menu ...
-		require_once(SUBSDIR . '/Moderation.subs.php');
-		$mod_count = loadModeratorMenuCounts();
-
-		if (!empty($mod_count['total']))
-		{
-			$context['menu_buttons']['moderate']['alttitle'] = $context['menu_buttons']['moderate']['title'] . ' [' . $mod_count['total'] . ']';
-			$context['menu_buttons']['moderate']['title'] .= !empty($mod_count['total']) ? sprintf($settings['menu_numeric_notice'], $mod_count['total']) : '';
-
-			if (!empty($mod_count['postmod']))
-			{
-				$context['menu_buttons']['moderate']['sub_buttons']['poststopics']['alttitle'] = $context['menu_buttons']['moderate']['sub_buttons']['poststopics']['title'] . ' [' . $mod_count['postmod'] . ']';
-				$context['menu_buttons']['moderate']['sub_buttons']['poststopics']['title'] .= sprintf($settings['menu_numeric_notice'], $mod_count['postmod']);
-			}
-
-			if (!empty($mod_count['emailmod']))
-			{
-				$context['menu_buttons']['moderate']['sub_buttons']['postbyemail']['alttitle'] = $context['menu_buttons']['moderate']['sub_buttons']['postbyemail']['title'] . ' [' . $mod_count['emailmod'] . ']';
-				$context['menu_buttons']['moderate']['sub_buttons']['postbyemail']['title'] .= sprintf($settings['menu_numeric_notice'], $mod_count['emailmod']);
-			}
-
-			if (!empty($mod_count['attachments']))
-			{
-				$context['menu_buttons']['moderate']['sub_buttons']['attachments']['alttitle'] = $context['menu_buttons']['moderate']['sub_buttons']['attachments']['title'] . ' [' . $mod_count['attachments'] . ']';
-				$context['menu_buttons']['moderate']['sub_buttons']['attachments']['title'] .= sprintf($settings['menu_numeric_notice'], $mod_count['attachments']);
-			}
-
-			if (!empty($mod_count['reports']))
-			{
-				$context['menu_buttons']['moderate']['sub_buttons']['reports']['alttitle'] = $context['menu_buttons']['moderate']['sub_buttons']['reports']['title'] . ' [' . $mod_count['reports'] . ']';
-				$context['menu_buttons']['moderate']['sub_buttons']['reports']['title'] .= sprintf($settings['menu_numeric_notice'], $mod_count['reports']);
-			}
-		}
-	}
 }
 
 /**
@@ -3969,15 +3821,9 @@ function elk_seed_generator()
 {
 	global $modSettings;
 
-	// Never existed?
-	if (empty($modSettings['rand_seed']))
-	{
-		$modSettings['rand_seed'] = microtime() * 1000000;
-		updateSettings(array('rand_seed' => $modSettings['rand_seed']));
-	}
-
 	// Change the seed.
-	updateSettings(array('rand_seed' => mt_rand()));
+	if (mt_rand(1, 250) == 69 || empty($modSettings['rand_seed']))
+		updateSettings(array('rand_seed' => mt_rand()));
 }
 
 /**
@@ -3993,6 +3839,16 @@ function call_integration_hook($hook, $parameters = array())
 {
 	global $modSettings, $settings, $db_show_debug, $context;
 
+	static $path_replacements = array(
+		'BOARDDIR' => BOARDDIR,
+		'SOURCEDIR' => SOURCEDIR,
+		'EXTDIR' => EXTDIR,
+		'LANGUAGEDIR' => LANGUAGEDIR,
+		'ADMINDIR' => ADMINDIR,
+		'CONTROLLERDIR' => CONTROLLERDIR,
+		'SUBSDIR' => SUBSDIR,
+	);
+
 	if ($db_show_debug === true)
 		$context['debug']['hooks'][] = $hook;
 
@@ -4000,40 +3856,41 @@ function call_integration_hook($hook, $parameters = array())
 	if (empty($modSettings[$hook]))
 		return $results;
 
+	if (!empty($settings['theme_dir']))
+		$path_replacements['$themedir'] = $settings['theme_dir'];
+
 	$functions = explode(',', $modSettings[$hook]);
 	// Loop through each function.
 	foreach ($functions as $function)
 	{
 		$function = trim($function);
+		// OOP static method
 		if (strpos($function, '::') !== false)
 		{
 			$call = explode('::', $function);
 			if (strpos($call[1], ':') !== false)
 			{
-				list($func, $file) = explode(':', $call[1]);
-				if (empty($settings['theme_dir']))
-					$absPath = strtr(trim($file), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR));
-				else
-					$absPath = strtr(trim($file), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR, '$themedir' => $settings['theme_dir']));
-				if (file_exists($absPath))
-					require_once($absPath);
+				list ($func, $file) = explode(':', $call[1]);
 				$call = array($call[0], $func);
 			}
 		}
+		// Normal plain function
 		else
 		{
 			$call = $function;
 			if (strpos($function, ':') !== false)
 			{
-				list($func, $file) = explode(':', $function);
-				if (empty($settings['theme_dir']))
-					$absPath = strtr(trim($file), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR));
-				else
-					$absPath = strtr(trim($file), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR, '$themedir' => $settings['theme_dir']));
-				if (file_exists($absPath))
-					require_once($absPath);
+				list ($func, $file) = explode(':', $function);
 				$call = $func;
 			}
+		}
+
+		if (!empty($file))
+		{
+			$absPath = strtr(trim($file), $path_replacements);
+
+			if (file_exists($absPath))
+				require_once($absPath);
 		}
 
 		// Is it valid?
@@ -4042,6 +3899,45 @@ function call_integration_hook($hook, $parameters = array())
 	}
 
 	return $results;
+}
+
+/**
+ * Includes files for hooks that only do that (i.e. integrate_pre_include)
+ *
+ * @param string $hook
+ */
+function call_integration_include_hook($hook)
+{
+	global $modSettings, $settings, $db_show_debug, $context;
+
+	static $path_replacements = array(
+		'BOARDDIR' => BOARDDIR,
+		'SOURCEDIR' => SOURCEDIR,
+		'EXTDIR' => EXTDIR,
+		'LANGUAGEDIR' => LANGUAGEDIR,
+		'ADMINDIR' => ADMINDIR,
+		'CONTROLLERDIR' => CONTROLLERDIR,
+		'SUBSDIR' => SUBSDIR,
+	);
+
+	if ($db_show_debug === true)
+		$context['debug']['hooks'][] = $hook;
+
+	// Any file to include?
+	if (!empty($modSettings[$hook]))
+	{
+		if (!empty($settings['theme_dir']))
+			$path_replacements['$themedir'] = $settings['theme_dir'];
+
+		$pre_includes = explode(',', $modSettings[$hook]);
+		foreach ($pre_includes as $include)
+		{
+			$include = strtr(trim($include), $path_replacements);
+
+			if (file_exists($include))
+				require_once($include);
+		}
+	}
 }
 
 /**
@@ -4072,7 +3968,7 @@ function add_integration_function($hook, $function, $file = '', $permanent = tru
 				'variable' => $hook,
 			)
 		);
-		list($current_functions) = $db->fetch_row($request);
+		list ($current_functions) = $db->fetch_row($request);
 		$db->free_result($request);
 
 		if (!empty($current_functions))
@@ -4126,7 +4022,7 @@ function remove_integration_function($hook, $function, $file = '')
 			'variable' => $hook,
 		)
 	);
-	list($current_functions) = $db->fetch_row($request);
+	list ($current_functions) = $db->fetch_row($request);
 	$db->free_result($request);
 
 	if (!empty($current_functions))
@@ -4312,4 +4208,168 @@ function prepareSearchEngines()
 	}
 
 	return $engines;
+}
+
+/**
+ * This function receives a request handle and attempts to retrieve
+ * the next result.
+ * It is used by the controller callbacks from the template, such as
+ * posts in topic display page, posts search results page, or personal
+ * messages.
+ *
+ * @param object $messages_request holds a query result
+ * @param bool $reset
+ */
+function currentContext($messages_request, $reset = false)
+{
+	// Can't work with a database without a database :P
+	$db = database();
+
+	// Start from the beginning...
+	if ($reset)
+		return $db->data_seek($messages_request, 0);
+
+	// If the query has already returned false, get out of here
+	if ($messages_request == false)
+		return false;
+
+	// Attempt to get the next message.
+	$message = $db->fetch_assoc($messages_request);
+	if (!$message)
+	{
+		$db->free_result($messages_request);
+		return false;
+	}
+
+	return $message;
+}
+
+/**
+ * Preg Replacment Curry.
+ *
+ * This allows for delayed argument binding (currying) and bringing in the replacement variables
+ * for preg replacments.
+ *
+ * Original code from: http://php.net/manual/en/function.preg-replace-callback.php#88013
+ * This is needed until ELK only supports PHP 5.3+ and we change to "use" keyword
+ *
+ * @param string $func
+ * @param int $arity
+ */
+function pregReplaceCurry($func, $arity)
+{
+	return create_function('', "
+		\$args = func_get_args();
+
+		if (count(\$args) >= $arity)
+			return call_user_func_array('$func', \$args);
+
+		\$args = var_export(\$args, 1);
+
+		return create_function('','
+			\$a = func_get_args();
+			\$z = ' . \$args . ';
+			\$a = array_merge(\$z,\$a);
+
+			return call_user_func_array(\'$func\', \$a);
+		');
+	");
+}
+
+/**
+ * Helper function to insert an array in to an existing array
+ * Intended for addon use to allow such things as
+ *  - adding in a new menu item to an existing menu array
+ *
+ * @param array $input the array we will insert to
+ * @param string $key the key in the array that we are looking to find for the insert action
+ * @param array $insert the actual data to insert before or after the key
+ * @param string $where adding before or after
+ * @param bool $assoc if the array is a assoc array with named keys or a basic index array
+ * @param bool $strict search for identical elements, this means it will also check the types of the needle.
+ */
+function elk_array_insert($input, $key, $insert, $where = 'before', $assoc = true, $strict = false)
+{
+	// Search for key names or values
+	if ($assoc)
+		$position = array_search($key, array_keys($input), $strict);
+	else
+		$position = array_search($key, $input, $strict);
+
+	// If the key is not found, just insert it at the end
+	if ($position === false)
+	{
+		$input = array_merge($input, $insert);
+		return;
+	}
+
+	if ($where === 'after')
+		$position += 1;
+
+	// Insert as first
+	if ($position === 0)
+		$input = array_merge($insert, $input);
+	else
+		$input = array_merge(array_slice($input, 0, $position), $insert, array_slice($input, $position));
+
+	return $input;
+}
+
+/**
+ * From time to time it may be necessary to fire a scheduled tast ASAP
+ * this function set the scheduled task to be called before any other one
+ *
+ * @param string $task the name of a scheduled task
+ */
+function scheduleTaskImmediate($task)
+{
+	global $modSettings;
+
+	if (!isset($modSettings['scheduleTaskImmediate']))
+		$scheduleTaskImmediate = array();
+	else
+		$scheduleTaskImmediate = unserialize($modSettings['scheduleTaskImmediate']);
+
+	if (!isset($scheduleTaskImmediate[$task]))
+	{
+		$scheduleTaskImmediate[$task] = 0;
+		updateSettings(array('scheduleTaskImmediate' => serialize($scheduleTaskImmediate)));
+
+		require_once(SUBSDIR . '/ScheduledTasks.subs.php');
+
+		// Ensure the task is on
+		toggleTaskStatusByName($task, true);
+
+		// Before trying to run it **NOW** :P
+		calculateNextTrigger($task, true);
+	}
+}
+
+/**
+ * For diligent people: remove scheduleTaskImmediate when done, otherwise
+ * a maximum of 10 executions is allowed
+ *
+ * @param string $task the name of a scheduled task
+ * @param bool $calculateNextTrigger if recalculate the next task to execute
+ */
+function removeScheduleTaskImmediate($task, $calculateNextTrigger = true)
+{
+	global $modSettings;
+
+	if (!isset($modSettings['scheduleTaskImmediate']))
+		return;
+	else
+		$scheduleTaskImmediate = unserialize($modSettings['scheduleTaskImmediate']);
+
+	if (isset($scheduleTaskImmediate[$task]))
+	{
+		unset($scheduleTaskImmediate[$task]);
+		updateSettings(array('scheduleTaskImmediate' => serialize($scheduleTaskImmediate)));
+
+		if ($calculateNextTrigger)
+		{
+			require_once(SUBSDIR . '/ScheduledTasks.subs.php');
+			calculateNextTrigger($task);
+		}
+	}
 }

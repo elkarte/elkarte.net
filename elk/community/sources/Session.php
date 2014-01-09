@@ -1,25 +1,25 @@
 <?php
 
 /**
+ * Implementation of PHP's session API.
+ * What it does:
+ *  - it handles the session data in the database (more scalable.)
+ *  - it uses the databaseSession_lifetime setting for garbage collection.
+ *  - the custom session handler is set by loadSession().
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
  * This file contains code covered by:
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- *  Implementation of PHP's session API.
- * 	What it does:
- * 	- it handles the session data in the database (more scalable.)
- * 	- it uses the databaseSession_lifetime setting for garbage collection.
- * 	- the custom session handler is set by loadSession().
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -27,7 +27,7 @@ if (!defined('ELKARTE'))
  */
 function loadSession()
 {
-	global $HTTP_SESSION_VARS, $modSettings, $boardurl, $sc;
+	global $modSettings, $boardurl, $sc;
 
 	// Attempt to change a few PHP settings.
 	@ini_set('session.use_cookies', true);
@@ -56,7 +56,7 @@ function loadSession()
 		// This is here to stop people from using bad junky PHPSESSIDs.
 		if (isset($_REQUEST[session_name()]) && preg_match('~^[A-Za-z0-9,-]{16,64}$~', $_REQUEST[session_name()]) == 0 && !isset($_COOKIE[session_name()]))
 		{
-			$session_id = md5(md5('smf_sess_' . time()) . mt_rand());
+			$session_id = md5(md5('elk_sess_' . time()) . mt_rand());
 			$_REQUEST[session_name()] = $session_id;
 			$_GET[session_name()] = $session_id;
 			$_POST[session_name()] = $session_id;
@@ -65,6 +65,7 @@ function loadSession()
 		// Use database sessions? (they don't work in 4.1.x!)
 		if (!empty($modSettings['databaseSession_enable']))
 		{
+			@ini_set('session.serialize_handler', 'php');
 			session_set_save_handler('sessionOpen', 'sessionClose', 'sessionRead', 'sessionWrite', 'sessionDestroy', 'sessionGC');
 			@ini_set('session.gc_probability', '1');
 		}
@@ -95,6 +96,7 @@ function loadSession()
 		$_SESSION['session_value'] = md5(session_id() . mt_rand());
 		$_SESSION['session_var'] = substr(preg_replace('~^\d+~', '', sha1(mt_rand() . session_id() . mt_rand())), 0, rand(7, 12));
 	}
+
 	$sc = $_SESSION['session_value'];
 }
 

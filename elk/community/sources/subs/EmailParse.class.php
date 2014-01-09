@@ -1,16 +1,17 @@
 <?php
 
 /**
+ * Class to parse and email in to its header and body parts for use in posting
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
- * Take an email and parse the headers and body section in to an associative array
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -40,52 +41,52 @@ if (!defined('ELKARTE'))
  * - $email_message->attachments // Any attachments with key = filename
  *
  * Optional functions
- *  - $email_message->load_address(); // returns array with to/from/cc addresses
- *  - $email_message->load_key(); // returns the security key is found, also sets
- *			message_key_id, message_type and message_id
- *  - $email_message->load_spam(); // returns boolean on if spam headers are set
- *  - $email_message->load_ip(); // set ip origin of the email if available
- *  - $email_message->load_returnpath(); // load the message return path
+ *  - $email_message->load_address(); // Returns array with to/from/cc addresses
+ *  - $email_message->load_key(); // Returns the security key is found, also sets
+ *      message_key_id, message_type and message_id
+ *  - $email_message->load_spam(); // Returns boolean on if spam headers are set
+ *  - $email_message->load_ip(); // Set ip origin of the email if available
+ *  - $email_message->load_returnpath(); // Load the message return path
  */
 class Email_Parse
 {
 	/**
-	 * the full message section (headers, body, etc) we are working on
+	 * The full message section (headers, body, etc) we are working on
 	 */
 	public $raw_message = null;
 
 	/**
-	 * attachments found after the message
+	 * Attachments found after the message
 	 */
 	public $attachments = array();
 
 	/**
-	 * attachments that we designated as inline with the text
+	 * Attachments that we designated as inline with the text
 	 */
 	public $inline_files = array();
 
 	/**
-	 * parsed and decoded message body, may be plain text or html
+	 * Parsed and decoded message body, may be plain text or html
 	 */
 	public $body = null;
 
 	/**
-	 * parsed and decoded message body, only plain text version
+	 * Parsed and decoded message body, only plain text version
 	 */
 	public $plain_body = null;
 
 	/**
-	 * all of the parsed message headers
+	 * All of the parsed message headers
 	 */
 	public $headers = array();
 
 	/**
-	 * full security key
+	 * Full security key
 	 */
 	public $message_key_id = null;
 
 	/**
-	 * message type of the key p, m or t
+	 * Message type of the key p, m or t
 	 */
 	public $message_type = null;
 
@@ -100,47 +101,49 @@ class Email_Parse
 	public $spam_found = false;
 
 	/**
-	 * message id of the key
+	 * Message id of the key
 	 */
 	public $message_id = null;
 
 	/**
-	 * if the file was converted to utf8
+	 * If the file was converted to utf8
 	 */
 	public $_converted_utf8 = false;
 
 	/**
-	 * holds the current email address, to, from, cc
+	 * Holds the current email address, to, from, cc
 	 */
 	private $_email_address = null;
 
 	/**
-	 * holds the current email name
+	 * Holds the current email name
 	 */
 	private $_email_name = null;
 
 	/**
-	 * holds each boundary section of the message
+	 * Holds each boundary section of the message
 	 */
 	private $_boundary_section = array();
 
 	/**
-	 * the total number of boundary sections
+	 * The total number of boundary sections
 	 */
 	private $_boundary_section_count = null;
 
 	/**
-	 * the message header block
+	 * The message header block
 	 */
 	private $_header_block = null;
 
 	/**
 	 * Loads an email message from stdin, file or from a supplied string
 	 *
-	 * @param type $data
+	 * @param string $data optional
+	 * @param string $location optional, used for debug
 	 */
 	public function read_data($data = '', $location = '')
 	{
+		// Supplied a string of data, use it
 		if ($data)
 			$this->raw_message = $data;
 		elseif (!defined('STDIN'))
@@ -152,13 +155,13 @@ class Email_Parse
 			// Read in the file from the failed log table
 			if (isset($_POST['item']))
 				$this->raw_message = $this->_query_load_email($_POST['item']);
-			// @todo debugging file used for testing
-			elseif (file_exists($location . '/elk-test.eml'))
+			// Debugging file used for testing
+			elseif (file_exists($location . '/elk-test.eml') && isAllowedTo('admin_forum'))
 				$this->raw_message = file_get_contents($location . '/elk-test.eml');
 		}
 		else
 		{
-			// load file data from a cron task or straight from the pipe
+			// Load file data from a cron task or straight from the pipe
 			if (isset($_POST['item']))
 				$this->raw_message = $this->_query_load_email($_POST['item']);
 			else
@@ -188,7 +191,7 @@ class Email_Parse
 				'id' => $id
 			)
 		);
-		list($message) = $db->fetch_row($request);
+		list ($message) = $db->fetch_row($request);
 		$db->free_result($request);
 
 		return $message;
@@ -205,6 +208,7 @@ class Email_Parse
 	 *
 	 * @param boolean $html - flag to determine if we are saving html or not
 	 * @param string $data - full header+message string
+	 * @param string $location - optional, used for debug
 	 */
 	public function read_email($html = false, $data = '', $location = '')
 	{
@@ -224,7 +228,7 @@ class Email_Parse
 	 * Separate the email message headers from the message body
 	 *
 	 * The header is separated from the body by
-	 * 	(1) an empty line or
+	 *  (1) the first empty line or
 	 *  (2) a line that does not start with a tab, a field name followed by a colon or a space
 	 */
 	private function _split_headers()
@@ -236,8 +240,8 @@ class Email_Parse
 		if (!preg_match('~^[\w-]+:[ ].*?\r?\n~i', $this->raw_message))
 			return;
 
-		// The header block ends base on condition (1) or (2)
-		if (!preg_match('~^(.*?)\r?\n(?!(\t|[\w-]+:|\r?\n|[ ]))(.*)~s', $this->raw_message, $match))
+		// The header block ends based on condition (1) or (2)
+		if (!preg_match('~^(.*?)\r?\n(?:\r?\n|(?!(\t|[\w-]+:|[ ])))(.*)~s', $this->raw_message, $match))
 			return;
 
 		$this->_header_block = $match[1];
@@ -360,7 +364,6 @@ class Email_Parse
 	 * Based on the the message content type, determine how to best proceed
 	 *
 	 * @param boolean $html
-	 * @return type
 	 */
 	private function _parse_body($html = false)
 	{
@@ -370,6 +373,7 @@ class Email_Parse
 			// The text/plain content type is the generic subtype for plain text. It is the default specified by RFC 822.
 			case 'text/plain':
 				$this->body = $this->_decode_string($this->body, $this->headers['content-transfer-encoding'], $this->headers['x-parameters']['content-type']['charset']);
+				$this->plain_body = $this->body;
 				break;
 			// The text/html content type is an Internet Media Type as well as a MIME content type.
 			case 'text/html':
@@ -392,7 +396,7 @@ class Email_Parse
 			case 'text/richtext':
 				break;
 			// The following are considered multi part messages, as such they *should* contain several sections each
-			// representing the same message in various ways such as plain text (all ways), html section, and
+			// representing the same message in various ways such as plain text (manditory), html section, and
 			// encoded section such as quoted printable as well as attachments both as files and inline
 			//
 			// multipart/alternative - the same information is presented in different body parts in different forms.
@@ -523,7 +527,7 @@ class Email_Parse
 				}
 				break;
 			default:
-				// deal with all the rest (e.g. image/xxx) the standard way
+				// deal with all the rest (e.g. image/xyx) the standard way
 				$this->body = $this->_decode_string($this->body, $this->headers['content-transfer-encoding'], $this->headers['x-parameters']['content-type']['charset']);
 				break;
 		}
@@ -534,7 +538,7 @@ class Email_Parse
 	 * as its own email object
 	 *
 	 * @param string $boundary
-	 * @param boolean $html, flag to indicate html content
+	 * @param boolean $html - flag to indicate html content
 	 */
 	private function _boundary_split($boundary, $html)
 	{
@@ -560,14 +564,14 @@ class Email_Parse
 
 	/**
 	 * Converts a header string to ascii/UTF8
-     *
+	 *
 	 * Headers, mostly subject and names may be encoded as quoted printable or base64
 	 * to allow for non ascii characters in those fields. This encoding is separate
 	 * from the message body encoding and must be determined since this encoding is
 	 * not directly specified by the headers themselves
 	 *
 	 * @param string $val
-	 * @param bool strict
+	 * @param bool $strict
 	 * @return string
 	 */
 	private function _decode_header($val, $strict = false)
@@ -633,7 +637,7 @@ class Email_Parse
 
 	/**
 	 * Checks the body text to see if it may need to be further decoded
-     *
+	 *
 	 * Sadly whats in the body text is not always what the header claims, or the
 	 * header is just wrong.  Copy/paste in to email from other apps etc.
 	 * This does an extra check for quoted printable DNA and if found decodes the
@@ -647,13 +651,13 @@ class Email_Parse
 		// The encoding tag can be missing in the headers or just wrong
 		if (preg_match('~(?:=C2|=A0|=D2|=D4|=96){1}~s', $val))
 		{
-			// remove /r/n to be just /n
+			// Remove /r/n to be just /n
 			$val = preg_replace('~(=0D=0A)~', "\n", $val);
 
 			// utf8 non breaking space which does not decode right
 			$val = preg_replace('~(=C2=A0)~', ' ', $val);
 
-			// smart quotes they will decode to black diamonds or other, but if
+			// Smart quotes they will decode to black diamonds or other, but if
 			// UTF-8 these may be valid non smart quotes
 			if ($this->headers['x-parameters']['content-type']['charset'] !== 'UTF-8')
 			{
@@ -713,7 +717,7 @@ class Email_Parse
 			$this->headers['subject'] = '';
 
 		// Change it to a readable form ...
-		$this->subject = htmlspecialchars($this->_decode_header($this->headers['subject']));
+		$this->subject = htmlspecialchars($this->_decode_header($this->headers['subject']), ENT_COMPAT, 'UTF-8');
 
 		return $this->subject;
 	}
@@ -724,7 +728,7 @@ class Email_Parse
 	 * If the key is still not found will search the entire input stream
 	 * returns the found key or false.  If found will also save it in the in-reply-to header
 	 *
-	 * @parm string $key optional
+	 * @param string $key optional
 	 * @return string of key of false on failure
 	 */
 	public function load_key($key = '')
@@ -843,7 +847,7 @@ class Email_Parse
 	/**
 	 * Finds the message sending ip and returns it
 	 * - will look in various header fields where the ip may reside
-	 * - returns false if it cant find a valid IP4
+	 * - returns false if it can't find a valid IP4
 	 *
 	 * @return string or boolean on fail
 	 */
@@ -911,7 +915,7 @@ class Email_Parse
 
 	/**
 	 * Take an email address and parse out the email address and email name
-	 * @param type $val
+	 * @param string $val
 	 */
 	private function _parse_address($val)
 	{
@@ -953,10 +957,9 @@ class Email_Parse
 	 * Decodes base64 or quoted-printable strings
 	 * Converts from one character set to utf-8
 	 *
-	 * @param type $string
-	 * @param type $encoding
-	 * @param type $charset
-	 * @return type
+	 * @param string $string
+	 * @param string $encoding
+	 * @param string $charset
 	 */
 	private function _decode_string($string, $encoding, $charset = '')
 	{
@@ -978,7 +981,6 @@ class Email_Parse
 	 * @param string $string
 	 * @param string $from
 	 * @param string $to
-	 * @return type
 	 */
 	private function _charset_convert($string, $from, $to)
 	{

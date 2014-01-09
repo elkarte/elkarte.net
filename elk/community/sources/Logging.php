@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file concerns itself with logging, whether in the database or files.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,15 +11,13 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file concerns itself with logging, whether in the database or files.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -36,6 +36,7 @@ function writeLog($force = false)
 	{
 		// Take the opposite approach!
 		$force = true;
+
 		// Don't update for every page - this isn't wholly accurate but who cares.
 		if ($topic)
 		{
@@ -58,7 +59,8 @@ function writeLog($force = false)
 
 	if (!empty($modSettings['who_enabled']))
 	{
-		$serialized = $_GET + array('USER_AGENT' => $_SERVER['HTTP_USER_AGENT']);
+		$req = request();
+		$serialized = $_GET + array('USER_AGENT' => $req->user_agent());
 
 		// In the case of a dlattach action, session_var may not be set.
 		if (!isset($context['session_var']))
@@ -143,14 +145,17 @@ function writeLog($force = false)
 		$_SESSION['timeOnlineUpdated'] = time();
 
 	// Set their login time, if not already done within the last minute.
-	if (ELKARTE != 'SSI' && !empty($user_info['last_login']) && $user_info['last_login'] < time() - 60)
+	if (ELK != 'SSI' && !empty($user_info['last_login']) && $user_info['last_login'] < time() - 60)
 	{
+		// We log IPs the request came with, around here
+		$req = request();
+
 		// Don't count longer than 15 minutes.
 		if (time() - $_SESSION['timeOnlineUpdated'] > 60 * 15)
 			$_SESSION['timeOnlineUpdated'] = time();
 
 		$user_settings['total_time_logged_in'] += time() - $_SESSION['timeOnlineUpdated'];
-		updateMemberData($user_info['id'], array('last_login' => time(), 'member_ip' => $user_info['ip'], 'member_ip2' => $_SERVER['BAN_CHECK_IP'], 'total_time_logged_in' => $user_settings['total_time_logged_in']));
+		updateMemberData($user_info['id'], array('last_login' => time(), 'member_ip' => $user_info['ip'], 'member_ip2' => $req->ban_ip(), 'total_time_logged_in' => $user_settings['total_time_logged_in']));
 
 		if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
 			cache_put_data('user_settings-' . $user_info['id'], $user_settings, 60);
@@ -170,7 +175,7 @@ function logLastDatabaseError()
 	// Make a note of the last modified time in case someone does this before us
 	$last_db_error_change = @filemtime(BOARDDIR . '/db_last_error.php');
 
-	// save the old file before we do anything
+	// Save the old file before we do anything
 	$file = BOARDDIR . '/db_last_error.php';
 	$dberror_backup_fail = !@is_writable(BOARDDIR . '/db_last_error_bak.php') || !@copy($file, BOARDDIR . '/db_last_error_bak.php');
 	$dberror_backup_fail = !$dberror_backup_fail ? (!file_exists(BOARDDIR . '/db_last_error_bak.php') || filesize(BOARDDIR . '/db_last_error_bak.php') === 0) : $dberror_backup_fail;
@@ -179,10 +184,10 @@ function logLastDatabaseError()
 	if (filemtime(BOARDDIR . '/db_last_error.php') === $last_db_error_change)
 	{
 		// Write the change
-		$write_db_change =  '<' . '?' . "php\n" . '$db_last_error = ' . time() . ';';
+		$write_db_change = '<' . '?' . "php\n" . '$db_last_error = ' . time() . ';';
 		$written_bytes = file_put_contents(BOARDDIR . '/db_last_error.php', $write_db_change, LOCK_EX);
 
-		// survey says ...
+		// Survey says ...
 		if ($written_bytes !== strlen($write_db_change) && !$dberror_backup_fail)
 		{
 			// Oops. maybe we have no more disk space left, or some other troubles, troubles...
@@ -191,7 +196,7 @@ function logLastDatabaseError()
 		}
 		else
 		{
-			@touch(BOARDDIR . '/' . 'Settings.php');
+			@touch(BOARDDIR . '/Settings.php');
 			return true;
 		}
 	}
@@ -245,21 +250,21 @@ function displayDebug()
 	ob_clean();
 
 	echo preg_replace('~</body>\s*</html>~', '', $temp), '
-<div class="smalltext" style="text-align: left; margin: 1ex;">
+<div id="debug_logging_wrapper">
+<div id="debug_logging" class="smalltext">
 	', $txt['debug_browser'], $context['browser_body_id'], ' <em>(', implode('</em>, <em>', array_reverse(array_keys($context['browser'], true))), ')</em><br />
 	', $txt['debug_templates'], count($context['debug']['templates']), ': <em>', implode('</em>, <em>', $context['debug']['templates']), '</em>.<br />
 	', $txt['debug_subtemplates'], count($context['debug']['sub_templates']), ': <em>', implode('</em>, <em>', $context['debug']['sub_templates']), '</em>.<br />
 	', $txt['debug_language_files'], count($context['debug']['language_files']), ': <em>', implode('</em>, <em>', $context['debug']['language_files']), '</em>.<br />
 	', $txt['debug_stylesheets'], count($context['debug']['sheets']), ': <em>', implode('</em>, <em>', $context['debug']['sheets']), '</em>.<br />
+	', $txt['debug_javascript'] . (!empty($context['debug']['javascript']) ? count($context['debug']['javascript']) . ': <em>' . implode('</em>, <em>', $context['debug']['javascript']) . '</em>.<br />' : '') . '
 	', $txt['debug_hooks'], empty($context['debug']['hooks']) ? 0 : count($context['debug']['hooks']) . ' (<a href="javascript:void(0);" onclick="document.getElementById(\'debug_hooks\').style.display = \'inline\'; this.style.display = \'none\'; return false;">', $txt['debug_show'], '</a><span id="debug_hooks" style="display: none;"><em>' . implode('</em>, <em>', $context['debug']['hooks']), '</em></span>)', '<br />
 	', $txt['debug_files_included'], count($files), ' - ', round($total_size / 1024), $txt['debug_kb'], ' (<a href="javascript:void(0);" onclick="document.getElementById(\'debug_include_info\').style.display = \'inline\'; this.style.display = \'none\'; return false;">', $txt['debug_show'], '</a><span id="debug_include_info" style="display: none;"><em>', implode('</em>, <em>', $files), '</em></span>)<br />';
 
 	// What tokens are active?
 	if (isset($_SESSION['token']))
 	{
-		$token_list = array();
-		foreach ($_SESSION['token'] as $key => $data)
-			$token_list[] = $key;
+		$token_list = array_keys($_SESSION['token']);
 
 		echo $txt['debug_tokens'] . '<em>' . implode(',</em> <em>', $token_list), '</em>.<br />';
 	}
@@ -288,6 +293,7 @@ function displayDebug()
 		foreach ($db_cache as $q => $qq)
 		{
 			$is_select = strpos(trim($qq['q']), 'SELECT') === 0 || preg_match('~^INSERT(?: IGNORE)? INTO \w+(?:\s+\([^)]+\))?\s+SELECT .+$~s', trim($qq['q'])) != 0;
+
 			// Temporary tables created in earlier queries are not explainable.
 			if ($is_select)
 			{
@@ -307,7 +313,7 @@ function displayDebug()
 				$qq['f'] = preg_replace('~^' . preg_quote(BOARDDIR, '~') . '~', '...', $qq['f']);
 
 			echo '
-	<strong>', $is_select ? '<a href="' . $scripturl . '?action=viewquery;qq=' . ($q + 1) . '#qq' . $q . '" target="_blank" class="new_win" style="text-decoration: none;">' : '', nl2br(str_replace("\t", '&nbsp;&nbsp;&nbsp;', htmlspecialchars(ltrim($qq['q'], "\n\r")))) . ($is_select ? '</a></strong>' : '</strong>') . '<br />
+	<strong>', $is_select ? '<a href="' . $scripturl . '?action=viewquery;qq=' . ($q + 1) . '#qq' . $q . '" target="_blank" class="new_win" style="text-decoration: none;">' : '', nl2br(str_replace("\t", '&nbsp;&nbsp;&nbsp;', htmlspecialchars(ltrim($qq['q'], "\n\r"), ENT_COMPAT, 'UTF-8'))) . ($is_select ? '</a></strong>' : '</strong>') . '<br />
 	&nbsp;&nbsp;&nbsp;';
 			if (!empty($qq['f']) && !empty($qq['l']))
 				echo sprintf($txt['debug_query_in_line'], $qq['f'], $qq['l']);
@@ -322,7 +328,7 @@ function displayDebug()
 
 	echo '
 	<a href="' . $scripturl . '?action=viewquery;sa=hide">', $txt['debug_' . (empty($_SESSION['view_queries']) ? 'show' : 'hide') . '_queries'], '</a>
-</div></body></html>';
+</div></div></body></html>';
 }
 
 /**
@@ -506,6 +512,7 @@ function logActions($logs)
 		{
 			if (!is_numeric($log['extra']['board_to']))
 				trigger_error('logActions(): data\'s board_to is not a number', E_USER_NOTICE);
+
 			if (empty($board_id))
 			{
 				$board_id = empty($log['extra']['board_to']) ? 0 : (int) $log['extra']['board_to'];

@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Handles Post Moderation approvals and unapprovals
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,50 +11,55 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file's job is to handle things related to post moderation.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Post Moderation Controller
+ * PostModeration Controller handles post moderation actions. (approvals, unapprovals)
  */
-class PostModeration_Controller
+class PostModeration_Controller extends Action_Controller
 {
 	/**
-	 * This is a handling function for all things post moderation.
+	 * This is the entry point for all things post moderation.
+	 *
+	 * @uses ModerationCenter template
+	 * @uses ModerationCenter language file
+	 * @see Action_Controller::action_index()
 	 */
-	function action_postmoderation()
+	public function action_index()
 	{
 		// @todo We'll shift these later bud.
 		loadLanguage('ModerationCenter');
 		loadTemplate('ModerationCenter');
 
+		require_once(SUBSDIR . '/Action.class.php');
+
 		// Allowed sub-actions, you know the drill by now!
-		$subactions = array(
-			'approve' => 'action_approve',
-			'attachments' => 'action_unapproved_attachments',
-			'replies' => 'action_unapproved',
-			'topics' => 'action_unapproved',
+		$subActions = array(
+			'approve' =>  array($this, 'action_approve'),
+			'attachments' =>  array($this, 'action_unapproved_attachments'),
+			'replies' =>  array($this, 'action_unapproved'),
+			'topics' =>  array($this, 'action_unapproved'),
 		);
 
 		// Pick something valid...
-		if (!isset($_REQUEST['sa']) || !isset($subactions[$_REQUEST['sa']]))
-			$_REQUEST['sa'] = 'replies';
+		$subAction = !isset($_REQUEST['sa']) || !isset($subActions[$_REQUEST['sa']]) ? 'replies' : $_REQUEST['sa'];
 
-		$this->{$subactions[$_REQUEST['sa']]}();
+		$action = new Action();
+		$action->initialize($subActions, 'replies');
+		$action->dispatch($subAction);
 	}
 
 	/**
-	 * View all unapproved posts.
+	 * View all unapproved posts or topics
 	 */
-	function action_unapproved()
+	public function action_unapproved()
 	{
 		global $txt, $scripturl, $context, $user_info;
 
@@ -60,6 +67,7 @@ class PostModeration_Controller
 
 		$context['current_view'] = isset($_GET['sa']) && $_GET['sa'] == 'topics' ? 'topics' : 'replies';
 		$context['page_title'] = $txt['mc_unapproved_posts'];
+		$context['header_title'] = $txt['mc_' . ($context['current_view'] == 'topics' ? 'topics' : 'posts')];
 
 		// Work out what boards we can work in!
 		$approve_boards = !empty($user_info['mod_cache']['ap']) ? $user_info['mod_cache']['ap'] : boardsAllowedTo('approve_posts');
@@ -116,6 +124,8 @@ class PostModeration_Controller
 		if (!empty($toAction) && isset($curAction))
 		{
 			checkSession('request');
+
+			require_once(SUBSDIR . '/Topic.subs.php');
 
 			// Handy shortcut.
 			$any_array = $curAction == 'approve' ? $approve_boards : $delete_any_boards;
@@ -178,9 +188,9 @@ class PostModeration_Controller
 			if (!empty($toAction))
 			{
 				if ($curAction == 'approve')
-					approveMessages ($toAction, $details, $context['current_view']);
+					approveMessages($toAction, $details, $context['current_view']);
 				else
-					removeMessages ($toAction, $details, $context['current_view']);
+					removeMessages($toAction, $details, $context['current_view']);
 
 				cache_put_data('num_menu_errors', null, 900);
 			}
@@ -204,9 +214,8 @@ class PostModeration_Controller
 		);
 
 		// Update the tabs with the correct number of actions to account for brd filtering
-		$context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['posts']['label'] = $context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['posts']['label'] . ' (' . $context['total_unapproved_posts'] . ')';
-		$context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['topics']['label'] = $context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['topics']['label']. ' (' . $context['total_unapproved_topics'] . ')';
-		$context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['reports']['subsections']['open']['label'] = $context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['reports']['subsections']['open']['label']. ' (' . $context['total_unapproved_topics'] . ')';
+		$context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['posts']['label'] = $context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['posts']['label'] . ' [' . $context['total_unapproved_posts'] . ']';
+		$context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['topics']['label'] = $context['menu_data_' . $context['moderation_menu_id']]['sections']['posts']['areas']['postmod']['subsections']['topics']['label']. ' [' . $context['total_unapproved_topics'] . ']';
 
 		// If we are filtering some boards out then make sure to send that along with the links.
 		if (isset($_REQUEST['brd']))
@@ -258,6 +267,8 @@ class PostModeration_Controller
 				'subject' => $row['subject'],
 				'body' => parse_bbc($row['body'], $row['smileys_enabled'], $row['id_msg']),
 				'time' => standardTime($row['poster_time']),
+				'html_time' => htmlTime($row['poster_time']),
+				'timestamp' => forum_time(true, $row['poster_time']),
 				'poster' => array(
 					'id' => $row['id_member'],
 					'name' => $row['poster_name'],
@@ -288,11 +299,9 @@ class PostModeration_Controller
 	/**
 	 * View all unapproved attachments.
 	 */
-	function action_unapproved_attachments()
+	public function action_unapproved_attachments()
 	{
 		global $txt, $scripturl, $context, $user_info, $modSettings;
-
-		$db = database();
 
 		$context['page_title'] = $txt['mc_unapproved_attachments'];
 
@@ -330,7 +339,7 @@ class PostModeration_Controller
 			checkSession('request');
 
 			// This will be handy.
-			require_once(SUBSDIR . '/Attachments.subs.php');
+			require_once(SUBSDIR . '/ManageAttachments.subs.php');
 
 			// Confirm the attachments are eligible for changing!
 			$attachments = validateAttachments($attachments, $approve_query);
@@ -347,8 +356,8 @@ class PostModeration_Controller
 			}
 		}
 
-		require_once(SUBSDIR . '/List.subs.php');
-		require_once(SUBSDIR . '/Attachments.subs.php');
+		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/ManageAttachments.subs.php');
 
 		$listOptions = array(
 			'id' => 'mc_unapproved_attach',
@@ -443,8 +452,7 @@ class PostModeration_Controller
 				'action' => array(
 					'header' => array(
 						'value' => '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" checked="checked" />',
-						'style' => 'width: 4%;',
-						'class' => 'centertext',
+						'style' => 'width: 4%;text-align: center',
 					),
 					'data' => array(
 						'sprintf' => array(
@@ -472,11 +480,11 @@ class PostModeration_Controller
 					'value' => '
 						<select name="do" onchange="if (this.value != 0 &amp;&amp; confirm(\'' . $txt['mc_unapproved_sure'] . '\')) submit();">
 							<option value="0">' . $txt['with_selected'] . ':</option>
-							<option value="0">-------------------</option>
-							<option value="approve">&nbsp;--&nbsp;' . $txt['approve'] . '</option>
-							<option value="delete">&nbsp;--&nbsp;' . $txt['delete'] . '</option>
+							<option value="0" disabled="disabled">' . str_repeat('&#8212;', strlen($txt['approve'])) . '</option>
+							<option value="approve">' . (isBrowser('ie8') ? '&#187;' : '&#10148;') . '&nbsp;' . $txt['approve'] . '</option>
+							<option value="delete">' . (isBrowser('ie8') ? '&#187;' : '&#10148;') . '&nbsp;' . $txt['delete'] . '</option>
 						</select>
-						<noscript><input type="submit" name="ml_go" value="' . $txt['go'] . '" class="button_submit" /></noscript>',
+						<noscript><input type="submit" name="ml_go" value="' . $txt['go'] . '" class="right_submit" /></noscript>',
 					'class' => 'floatright',
 				),
 			),
@@ -496,9 +504,9 @@ class PostModeration_Controller
 	}
 
 	/**
- 	 * Approve a post, just the one.
- 	 */
-	function action_approve()
+	 * Approve a post, just the one.
+	 */
+	public function action_approve()
 	{
 		global $user_info, $topic, $board;
 
@@ -507,11 +515,11 @@ class PostModeration_Controller
 		$current_msg = (int) $_REQUEST['msg'];
 
 		require_once(SUBSDIR . '/Post.subs.php');
-		require_once(SUBSDIR . '/Topic.subs.php');
+		require_once(SUBSDIR . '/Messages.subs.php');
 
 		isAllowedTo('approve_posts');
 
-		$message_info = messageTopicDetails($topic, $current_msg);
+		$message_info = basicMessageInfo($current_msg, false, true);
 
 		// If it's the first in a topic then the whole topic gets approved!
 		if ($message_info['id_first_msg'] == $current_msg)
@@ -532,121 +540,5 @@ class PostModeration_Controller
 		cache_put_data('num_menu_errors', null, 900);
 
 		redirectexit('topic=' . $topic . '.msg' . $current_msg. '#msg' . $current_msg);
-	}
-}
-
-/**
- * Approve a batch of posts (or topics in their own right)
- *
- * @param array $messages
- * @param array $messageDetails
- * @param (string) $current_view = replies
- */
-function approveMessages($messages, $messageDetails, $current_view = 'replies')
-{
-	require_once(SUBSDIR . '/Post.subs.php');
-	if ($current_view == 'topics')
-	{
-		approveTopics($messages);
-
-		// and tell the world about it
-		foreach ($messages as $topic)
-			logAction('approve_topic', array('topic' => $topic, 'subject' => $messageDetails[$topic]['subject'], 'member' => $messageDetails[$topic]['member'], 'board' => $messageDetails[$topic]['board']));
-	}
-	else
-	{
-		approvePosts($messages);
-
-		// and tell the world about it again
-		foreach ($messages as $post)
-			logAction('approve', array('topic' => $messageDetails[$post]['topic'], 'subject' => $messageDetails[$post]['subject'], 'member' => $messageDetails[$post]['member'], 'board' => $messageDetails[$post]['board']));
-	}
-}
-
-/**
- * This is a helper function - basically approve everything!
- */
-function approveAllData()
-{
-	$db = database();
-
-	// Start with messages and topics.
-	$request = $db->query('', '
-		SELECT id_msg
-		FROM {db_prefix}messages
-		WHERE approved = {int:not_approved}',
-		array(
-			'not_approved' => 0,
-		)
-	);
-	$msgs = array();
-	while ($row = $db->fetch_row($request))
-		$msgs[] = $row[0];
-	$db->free_result($request);
-
-	if (!empty($msgs))
-	{
-		require_once(SUBSDIR . '/Post.subs.php');
-		approvePosts($msgs);
-		cache_put_data('num_menu_errors', null, 900);
-	}
-
-	// Now do attachments
-	$request = $db->query('', '
-		SELECT id_attach
-		FROM {db_prefix}attachments
-		WHERE approved = {int:not_approved}',
-		array(
-			'not_approved' => 0,
-		)
-	);
-	$attaches = array();
-	while ($row = $db->fetch_row($request))
-		$attaches[] = $row[0];
-	$db->free_result($request);
-
-	if (!empty($attaches))
-	{
-		require_once(SUBSDIR . '/Attachments.subs.php');
-		approveAttachments($attaches);
-		cache_put_data('num_menu_errors', null, 900);
-	}
-}
-
-/**
- * Remove a batch of messages (or topics)
- *
- * @param array $messages
- * @param array $messageDetails
- * @param string $current_view = replies
- */
-function removeMessages($messages, $messageDetails, $current_view = 'replies')
-{
-	global $modSettings;
-
-	// @todo something's not right, removeMessage() does check permissions,
-	// removeTopics() doesn't
-	if ($current_view == 'topics')
-	{
-		require_once(SUBSDIR . '/Topic.subs.php');
-		removeTopics($messages);
-
-		// and tell the world about it
-		foreach ($messages as $topic)
-		{
-			// Note, only log topic ID in native form if it's not gone forever.
-			logAction('remove', array(
-				(empty($modSettings['recycle_enable']) || $modSettings['recycle_board'] != $messageDetails[$topic]['board'] ? 'topic' : 'old_topic_id') => $topic, 'subject' => $messageDetails[$topic]['subject'], 'member' => $messageDetails[$topic]['member'], 'board' => $messageDetails[$topic]['board']));
-		}
-	}
-	else
-	{
-		require_once(SUBSDIR . '/Messages.subs.php');
-		foreach ($messages as $post)
-		{
-			removeMessage($post);
-			logAction('delete', array(
-				(empty($modSettings['recycle_enable']) || $modSettings['recycle_board'] != $messageDetails[$post]['board'] ? 'topic' : 'old_topic_id') => $messageDetails[$post]['topic'], 'subject' => $messageDetails[$post]['subject'], 'member' => $messageDetails[$post]['member'], 'board' => $messageDetails[$post]['board']));
-		}
 	}
 }

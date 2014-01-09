@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * This file currently only contains one function to collect the data needed to
+ * show a list of boards for the board index and the message index.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,22 +14,19 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file currently only contains one function to collect the data needed to
- * show a list of boards for the board index and the message index.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Fetches a list of boards and (optional) categories including
  * statistical information, child boards and moderators.
- * 	- Used by both the board index (main data) and the message index (child
+ *  - Used by both the board index (main data) and the message index (child
  * boards).
- * 	- Depending on the include_categories setting returns an associative
+ *  - Depending on the include_categories setting returns an associative
  * array with categories->boards->child_boards or an associative array
  * with boards->child_boards.
  *
@@ -61,7 +61,7 @@ function getBoardIndex($boardIndexOptions)
 			c.can_collapse, IFNULL(cc.id_member, 0) AS is_collapsed,' : '')) . '
 			IFNULL(mem.id_member, 0) AS id_member, mem.avatar, m.id_msg,
 			IFNULL(mods_mem.id_member, 0) AS id_moderator, mods_mem.real_name AS mod_real_name' . (!empty($settings['avatars_on_indexes']) ? ',
-			IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type' : '') . '
+			IFNULL(a.id_attach, 0) AS id_attach, a.filename, a.attachment_type, mem.email_address' : '') . '
 		FROM {db_prefix}boards AS b' . ($boardIndexOptions['include_categories'] ? '
 			LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)' : '') . '
 			LEFT JOIN {db_prefix}messages AS m ON (m.id_msg = b.id_last_msg)
@@ -70,10 +70,11 @@ function getBoardIndex($boardIndexOptions)
 			LEFT JOIN {db_prefix}collapsed_categories AS cc ON (cc.id_cat = c.id_cat AND cc.id_member = {int:current_member})' : '')) . '
 			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board)
 			LEFT JOIN {db_prefix}members AS mods_mem ON (mods_mem.id_member = mods.id_member)' . (!empty($settings['avatars_on_indexes']) ? '
-			LEFT JOIN {db_prefix}attachments AS a ON (a.id_member = m.id_member)' : '') . '
+			LEFT JOIN {db_prefix}attachments AS a ON (a.id_member = m.id_member AND a.id_member != 0)' : '') . '
 		WHERE {query_see_board}' . (empty($boardIndexOptions['countChildPosts']) ? (empty($boardIndexOptions['base_level']) ? '' : '
 			AND b.child_level >= {int:child_level}') : '
-			AND b.child_level BETWEEN ' . $boardIndexOptions['base_level'] . ' AND ' . ($boardIndexOptions['base_level'] + 1)),
+			AND b.child_level BETWEEN ' . $boardIndexOptions['base_level'] . ' AND ' . ($boardIndexOptions['base_level'] + 1)) . '
+		ORDER BY board_order',
 		array(
 			'current_member' => $user_info['id'],
 			'child_level' => $boardIndexOptions['base_level'],
@@ -205,6 +206,7 @@ function getBoardIndex($boardIndexOptions)
 		// Child of a child... just add it on...
 		elseif (!empty($boardIndexOptions['countChildPosts']))
 		{
+			// @todo why this is not initialized outside the loop?
 			if (!isset($parent_map))
 				$parent_map = array();
 
@@ -236,30 +238,13 @@ function getBoardIndex($boardIndexOptions)
 		else
 			continue;
 
-		if (!empty($settings['avatars_on_indexes']))
-		{
-			// Allow themers to show the latest poster's avatar along with the board
-			if (!empty($row_board['avatar']))
-			{
-				if ($modSettings['avatar_action_too_large'] == 'option_html_resize' || $modSettings['avatar_action_too_large'] == 'option_js_resize')
-				{
-					$avatar_width = !empty($modSettings['avatar_max_width_external']) ? ' width:' . $modSettings['avatar_max_width_external'] . 'px;' : '';
-					$avatar_height = !empty($modSettings['avatar_max_height_external']) ? ' height:' . $modSettings['avatar_max_height_external'] . 'px;' : '';
-				}
-				else
-				{
-					$avatar_width = '';
-					$avatar_height = '';
-				}
-			}
-		}
-
 		// Prepare the subject, and make sure it's not too long.
 		censorText($row_board['subject']);
 		$row_board['short_subject'] = shorten_text($row_board['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24);
 		$this_last_post = array(
 			'id' => $row_board['id_msg'],
-			'time' => $row_board['poster_time'] > 0 ? ('<time datetime="' . htmlTime($row_board['poster_time']) . '">' . relativeTime($row_board['poster_time']) . '</time>') : $txt['not_applicable'],
+			'time' => $row_board['poster_time'] > 0 ? standardTime($row_board['poster_time']) : $txt['not_applicable'],
+			'html_time' => $row_board['poster_time'] > 0 ? htmlTime($row_board['poster_time']) : $txt['not_applicable'],
 			'timestamp' => forum_time(true, $row_board['poster_time']),
 			'subject' => $row_board['short_subject'],
 			'member' => array(
@@ -274,12 +259,7 @@ function getBoardIndex($boardIndexOptions)
 		);
 
 		if (!empty($settings['avatars_on_indexes']))
-			$this_last_post['member']['avatar'] = array(
-				'name' => $row_board['avatar'],
-				'image' => $row_board['avatar'] == '' ? ($row_board['id_attach'] > 0 ? '<img class="avatar" src="' . (empty($row_board['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $row_board['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $row_board['filename']) . '" alt="" />' : '') : (stristr($row_board['avatar'], 'http://') ? '<img class="avatar" src="' . $row_board['avatar'] . '" style="' . $avatar_width . $avatar_height . '" alt="" />' : '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . htmlspecialchars($row_board['avatar']) . '" alt="" />'),
-				'href' => $row_board['avatar'] == '' ? ($row_board['id_attach'] > 0 ? (empty($row_board['attachment_type']) ? $scripturl . '?action=dlattach;attach=' . $row_board['id_attach'] . ';type=avatar' : $modSettings['custom_avatar_url'] . '/' . $row_board['filename']) : '') : (stristr($row_board['avatar'], 'http://') ? $row_board['avatar'] : $modSettings['avatar_url'] . '/' . $row_board['avatar']),
-				'url' => $row_board['avatar'] == '' ? '' : (stristr($row_board['avatar'], 'http://') ? $row_board['avatar'] : $modSettings['avatar_url'] . '/' . $row_board['avatar'])
-			);
+			$this_last_post['member']['avatar'] = determineAvatar($row_board);
 
 		// Provide the href and link.
 		if ($row_board['subject'] != '')
@@ -290,7 +270,7 @@ function getBoardIndex($boardIndexOptions)
 			time, timestamp (a number that represents the time.), id (of the post), topic (topic id.),
 			link, href, subject, start (where they should go for the first unread post.),
 			and member. (which has id, name, link, href, username in it.) */
-			$this_last_post['last_post_message'] = sprintf($txt['last_post_message'], $this_last_post['member']['link'], $this_last_post['link'], $this_last_post['time']);
+			$this_last_post['last_post_message'] = sprintf($txt['last_post_message'], $this_last_post['member']['link'], $this_last_post['link'], $this_last_post['html_time']);
 		}
 		else
 		{
@@ -317,7 +297,9 @@ function getBoardIndex($boardIndexOptions)
 		// Determine a global most recent topic.
 		if (!empty($boardIndexOptions['set_latest_post']) && !empty($row_board['poster_time']) && $row_board['poster_time'] > $latest_post['timestamp'] && !$ignoreThisBoard)
 			$latest_post = array(
-				'timestamp' => $row_board['poster_time'],
+				'time' => standardTime($row_board['poster_time']),
+				'html_time' => htmlTime($row_board['poster_time']),
+				'timestamp' => forum_time(true, $row_board['poster_time']),
 				'ref' => &$this_category[$isChild ? $row_board['id_parent'] : $row_board['id_board']]['last_post'],
 			);
 	}

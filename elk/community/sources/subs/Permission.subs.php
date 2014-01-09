@@ -1,14 +1,16 @@
 <?php
 
 /**
+ * Functions to support the permissions controller
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -202,11 +204,14 @@ function updateChildPermissions($parents, $profile = null)
 	}
 }
 
+/**
+ * Class to initialize inline permissions sub-form and save its settings
+ */
 class InlinePermissions_Form
 {
 	/**
 	 * Save the permissions of a form containing inline permissions.
- 	 *
+	 *
 	 * @param array $permissions
 	 */
 	static function save_inline_permissions($permissions)
@@ -367,7 +372,6 @@ class InlinePermissions_Form
 		}
 	}
 }
-
 
 /**
  * Show a collapsible box to set a specific permission.

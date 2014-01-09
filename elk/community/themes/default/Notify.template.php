@@ -11,22 +11,21 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
  * Interface to allow notification enable/disable.
  */
-function template_main()
+function template_notification_settings()
 {
 	global $context, $settings, $txt, $scripturl;
 
 	echo '
-		<div class="cat_bar">
-			<h3 class="catbg">
-				<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $txt['notify'], '
-			</h3>
-		</div>
+		<h3 class="category_header">
+			<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $txt['notify'], '
+		</h3>
 		<div class="roundframe centertext">
 			<p>', $context['notification_set'] ? $txt['notify_deactivate'] : $txt['notify_request'], '</p>
 			<p>
@@ -43,11 +42,9 @@ function template_notify_board()
 	global $context, $settings, $txt, $scripturl;
 
 	echo '
-		<div class="cat_bar">
-			<h3 class="catbg">
-				<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $txt['notify'], '
-			</h3>
-		</div>
+		<h3 class="category_header">
+			<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $txt['notify'], '
+		</h3>
 		<div class="roundframe centertext">
 			<p>', $context['notification_set'] ? $txt['notifyboard_turnoff'] : $txt['notifyboard_turnon'], '</p>
 			<p>

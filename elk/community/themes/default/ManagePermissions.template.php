@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -32,88 +33,31 @@ function template_permission_index()
 	<div id="admin_form_wrapper">
 		<form action="', $scripturl, '?action=admin;area=permissions;sa=quick" method="post" accept-charset="UTF-8" name="permissionForm" id="permissionForm">';
 
-		if (!empty($context['profile']))
-			echo '
-			<div class="title_bar">
-				<h3 class="titlebg">', $txt['permissions_for_profile'], ': &quot;', $context['profile']['name'], '&quot;</h3>
-			</div>';
-		else
-			echo '
-			<div class="title_bar">
-				<h3 class="titlebg">', $txt['permissions_title'], '</h3>
-			</div>';
-
+	if (!empty($context['profile']))
 		echo '
-			<table class="table_grid">
-				<thead>
-					<tr class="catbg">
-						<th class="first_th">', $txt['membergroups_name'], '</th>
-						<th class="centertext" style="width:10%">', $txt['membergroups_members_top'], '</th>';
-
-			if (empty($modSettings['permission_enable_deny']))
-				echo '
-						<th class="centertext" style="width:16%">', $txt['membergroups_permissions'], '</th>';
-			else
-				echo '
-						<th class="centertext" style="width:8%">', $txt['permissions_allowed'], '</th>
-						<th class="centertext" style="width:8%">', $txt['permissions_denied'], '</th>';
-
-			echo '
-						<th class="centertext" style="width:10%;vertical-align:middle">', $context['can_modify'] ? $txt['permissions_modify'] : $txt['permissions_view'], '</th>
-						<th class="last_th centertext" style="width:4%;vertical-align:middle">
-							', $context['can_modify'] ? '<input type="checkbox" class="input_check" onclick="invertAll(this, this.form, \'group\');" />' : '', '
-						</th>
-					</tr>
-				</thead>
-				<tbody>';
-
-	$alternate = false;
-	foreach ($context['groups'] as $group)
-	{
-		$alternate = !$alternate;
+			<h3 class="category_header">', $txt['permissions_for_profile'], ': &quot;', $context['profile']['name'], '&quot;</h3>';
+	else
 		echo '
-					<tr class="windowbg', $alternate ? '2' : '', '">
-						<td>
-							', !empty($group['help']) ? ' <a class="help" href="' . $scripturl . '?action=quickhelp;help=' . $group['help'] . '" onclick="return reqOverlayDiv(this.href);"><img class="icon" src="' . $settings['images_url'] . '/helptopics.png" alt="' . $txt['help'] . '" /></a>' : '<img class="icon" src="' . $settings['images_url'] . '/blank.png" alt="' . $txt['help'] . '" />', '&nbsp;<span>', $group['name'], '</span>';
+			<h3 class="category_header">', $txt['permissions_title'], '</h3>';
 
-		if (!empty($group['children']))
-			echo '
-							<br />
-							<span class="smalltext">', $txt['permissions_includes_inherited'], ': &quot;', implode('&quot;, &quot;', $group['children']), '&quot;</span>';
+	template_show_list('regular_membergroups_list');
 
-		echo '
-						</td>
-						<td class="centertext">', $group['can_search'] ? $group['link'] : $group['num_members'], '</td>';
-
-		if (empty($modSettings['permission_enable_deny']))
-			echo '
-						<td class="centertext" style="width:16%">', $group['num_permissions']['allowed'], '</td>';
-		else
-			echo '
-						<td class="centertext" style="width:8%', $group['id'] == 1 ? ';font-style:italic"' : '"', '>', $group['num_permissions']['allowed'], '</td>
-						<td class="centertext" style="width:8%', $group['id'] == 1 || $group['id'] == -1 ? ';font-style:italic"' : (!empty($group['num_permissions']['denied']) ? ';color: red"' : '"'), '>', $group['num_permissions']['denied'], '</td>';
-
-		echo '
-						<td class="centertext">', $group['allow_modify'] ? '<a href="' . $scripturl . '?action=admin;area=permissions;sa=modify;group=' . $group['id'] . (empty($context['profile']) ? '' : ';pid=' . $context['profile']['id']) . '">' . ($context['can_modify'] ? $txt['permissions_modify'] : $txt['permissions_view']). '</a>' : '', '</td>
-						<td class="centertext">', $group['allow_modify'] && $context['can_modify'] ? '<input type="checkbox" name="group[]" value="' . $group['id'] . '" class="input_check" />' : '', '</td>
-					</tr>';
-	}
+	if (!empty($context['post_count_membergroups_list']))
+		template_show_list('post_count_membergroups_list');
 
 	echo '
-				</tbody>
-			</table>
 			<br />';
 
 	// Advanced stuff...
 	if ($context['can_modify'])
 	{
 		echo '
-			<div class="cat_bar">
-				<h3 class="catbg">
-					<img id="permissions_panel_toggle" class="panel_toggle" style="display: none;" src="', $settings['images_url'], '/', empty($context['admin_preferences']['app']) ? 'collapse' : 'expand', '.png"  alt="*" />
-					<a href="#" id="permissions_panel_link">', $txt['permissions_advanced_options'], '</a>
-				</h3>
-			</div>
+			<h3 class="category_header">
+				<span id="category_toggle">&nbsp;
+					<span id="upshrink_ic" class="', empty($context['admin_preferences']['app']) ? 'collapse' : 'expand', '" style="display: none;" title="', $txt['hide'], '"></span>
+				</span>
+				<a href="#" id="permissions_panel_link">', $txt['permissions_advanced_options'], '</a>
+			</h3>
 			<div id="permissions_panel_advanced" class="windowbg">
 				<div class="content">
 					<fieldset>
@@ -137,12 +81,9 @@ function template_permission_index()
 							<dd>
 								<select name="copy_from">
 									<option value="empty">(', $txt['permissions_select_membergroup'], ')</option>';
-		foreach ($context['groups'] as $group)
-		{
-			if ($group['id'] != 1)
-				echo '
-									<option value="', $group['id'], '">', $group['name'], '</option>';
-		}
+		foreach ($context['groups'] as $group_id => $group_name)
+			echo '
+									<option value="', $group_id, '">', $group_name, '</option>';
 
 		echo '
 								</select>
@@ -151,15 +92,18 @@ function template_permission_index()
 								<select name="add_remove">
 									<option value="add">', $txt['permissions_add'], '...</option>
 									<option value="clear">', $txt['permissions_remove'], '...</option>';
+
 		if (!empty($modSettings['permission_enable_deny']))
 			echo '
 									<option value="deny">', $txt['permissions_deny'], '...</option>';
+
 		echo '
 								</select>
 							</dt>
 							<dd style="overflow:auto;">
 								<select name="permissions">
 									<option value="">(', $txt['permissions_select_permission'], ')</option>';
+
 		foreach ($context['permissions'] as $permissionType)
 		{
 			if ($permissionType['id'] == 'membergroup' && !empty($context['profile']))
@@ -190,31 +134,32 @@ function template_permission_index()
 				}
 			}
 		}
+
 		echo '
 								</select>
 							</dd>
 						</dl>
 					</fieldset>
-					<input type="submit" value="', $txt['permissions_set_permissions'], '" onclick="return checkSubmit();" class="button_submit" />
+					<input type="submit" value="', $txt['permissions_set_permissions'], '" onclick="return checkSubmit();" class="right_submit" />
 				</div>
 			</div>';
 
 		// Javascript for the advanced stuff.
 		echo '
 	<script><!-- // --><![CDATA[
-		var oPermissionsPanelToggle = new smc_Toggle({
+		var oPermissionsPanelToggle = new elk_Toggle({
 			bToggleEnabled: true,
-			bCurrentlyCollapsed: ', empty($context['admin_preferences']['app']) ? 'true' : 'false', ',
+			bCurrentlyCollapsed: ', empty($context['admin_preferences']['app']) ? 'false' : 'true', ',
 			aSwappableContainers: [
 				\'permissions_panel_advanced\'
 			],
-			aSwapImages: [
+			aSwapClasses: [
 				{
-					sId: \'permissions_panel_toggle\',
-					srcExpanded: smf_images_url + \'/collapse.png\',
-					altExpanded: ', JavaScriptEscape($txt['upshrink_description']), ',
-					srcCollapsed: smf_images_url + \'/expand.png\',
-					altCollapsed: ', JavaScriptEscape($txt['upshrink_description']), '
+					sId: \'upshrink_ic\',
+					classExpanded: \'collapse\',
+					titleExpanded: ', JavaScriptEscape($txt['hide']), ',
+					classCollapsed: \'expand\',
+					titleCollapsed: ', JavaScriptEscape($txt['show']), '
 				}
 			],
 			aSwapLinks: [
@@ -227,8 +172,8 @@ function template_permission_index()
 			oThemeOptions: {
 				bUseThemeSettings: ', $context['user']['is_guest'] ? 'false' : 'true', ',
 				sOptionName: \'admin_preferences\',
-				sSessionVar: smf_session_var,
-				sSessionId: smf_session_id,
+				sSessionVar: elk_session_var,
+				sSessionId: elk_session_id,
 				sThemeId: \'1\',
 				sAdditionalVars: \';admin_key=app\'
 			}
@@ -238,17 +183,19 @@ function template_permission_index()
 
 		function checkSubmit()
 		{
-			if ((document.forms.permissionForm.predefined.value != "" && (document.forms.permissionForm.copy_from.value != "empty" || document.forms.permissionForm.permissions.value != "")) || (document.forms.permissionForm.copy_from.value != "empty" && document.forms.permissionForm.permissions.value != ""))
+			if ((document.forms.permissionForm.predefined.value !== "" && (document.forms.permissionForm.copy_from.value !== "empty" || document.forms.permissionForm.permissions.value !== "")) || (document.forms.permissionForm.copy_from.value !== "empty" && document.forms.permissionForm.permissions.value !== ""))
 			{
 				alert("', $txt['permissions_only_one_option'], '");
 				return false;
 			}
-			if (document.forms.permissionForm.predefined.value == "" && document.forms.permissionForm.copy_from.value == "" && document.forms.permissionForm.permissions.value == "")
+
+			if (document.forms.permissionForm.predefined.value === "" && document.forms.permissionForm.copy_from.value === "" && document.forms.permissionForm.permissions.value === "")
 			{
 				alert("', $txt['permissions_no_action'], '");
 				return false;
 			}
-			if (document.forms.permissionForm.permissions.value != "" && document.forms.permissionForm.add_remove.value == "deny")
+
+			if (document.forms.permissionForm.permissions.value !== "" && document.forms.permissionForm.add_remove.value === "deny")
 				return confirm("', $txt['permissions_deny_dangerous'], '");
 
 			return true;
@@ -272,6 +219,9 @@ function template_permission_index()
 	</div>';
 }
 
+/**
+ * Template for setting permissions by board
+ */
 function template_by_board()
 {
 	global $context, $scripturl, $txt;
@@ -279,34 +229,26 @@ function template_by_board()
 	echo '
 	<div id="admincenter">
 		<form id="admin_form_wrapper" action="', $scripturl, '?action=admin;area=permissions;sa=board" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['permissions_boards'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['permissions_boards'], '</h2>
 			<div class="information">
 				', $txt['permissions_boards_desc'], '
 			</div>
 
-			<div class="title_bar">
-				<h3 id="board_permissions" class="titlebg flow_hidden">
-					<span class="perm_name floatleft">', $txt['board_name'], '</span>
-					<span class="perm_profile floatleft">', $txt['permission_profile'], '</span>';
+			<h3 id="board_permissions" class="category_header flow_hidden">
+				<span class="perm_name floatleft">', $txt['board_name'], '</span>
+				<span class="perm_profile floatleft">', $txt['permission_profile'], '</span>';
 
 	if (!$context['edit_all'])
 		echo '
-					<span class="floatright">
-						<a class="button_link" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>
-					</span>';
+				<a class="edit_all_board_profiles floatright" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>';
 
 	echo '
-				</h3>
-			</div>';
+			</h3>';
 
 	foreach ($context['categories'] as $category)
 	{
 		echo '
-			<div class="title_bar">
-				<h3 class="titlebg"><strong>', $category['name'], '</strong></h3>
-			</div>';
+			<h3 class="category_header"><strong>', $category['name'], '</strong></h3>';
 
 		if (!empty($category['boards']))
 			echo '
@@ -314,15 +256,10 @@ function template_by_board()
 				<div class="content">
 					<ul class="perm_boards flow_hidden">';
 
-		$alternate = false;
-
 		foreach ($category['boards'] as $board)
 		{
-			$alternate = !$alternate;
-
 			echo '
-
-						<li class="flow_hidden' ,' windowbg', $alternate ? '' : '2','">
+						<li class="flow_hidden windowbg">
 							<span class="perm_board floatleft">
 								<a href="', $scripturl, '?action=admin;area=manageboards;sa=board;boardid=', $board['id'], ';rid=permissions;', $context['session_var'], '=', $context['session_id'], '">', str_repeat('-', $board['child_level']), ' ', $board['name'], '</a>
 							</span>
@@ -338,14 +275,16 @@ function template_by_board()
 									<option value="', $id, '" ', $id == $board['profile'] ? 'selected="selected"' : '', '>', $profile['name'], '</option>';
 
 				echo '
-								</select>';
+								</select>
+							</span>';
 			}
 			else
 				echo '
-								<a href="', $scripturl, '?action=admin;area=permissions;sa=index;pid=', $board['profile'], ';', $context['session_var'], '=', $context['session_id'], '"> [', $board['profile_name'], ']</a>';
+								<a id="edit_board_', $board['id'], '" href="', $scripturl, '?action=admin;area=permissions;sa=index;pid=', $board['profile'], ';', $context['session_var'], '=', $context['session_id'], '"> [', $board['profile_name'], ']</a>
+							</span>
+							<a class="edit_board" style="display: none" data-boardid="', $board['id'], '" data-boardprofile="', $board['profile'], '" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '"></a>';
 
 			echo '
-							</span>
 						</li>';
 		}
 
@@ -361,10 +300,13 @@ function template_by_board()
 
 	if ($context['edit_all'])
 		echo '
-				<input type="submit" name="save_changes" value="', $txt['save'], '" class="button_submit" />';
+				<input type="submit" name="save_changes" value="', $txt['save'], '" class="right_submit" />';
 	else
 		echo '
-				<a class="button_link" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>';
+				<a class="edit_all_board_profiles linkbutton_right" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>
+				<script><!-- // --><![CDATA[
+					initEditProfileBoards();
+				// ]]></script>';
 
 	echo '
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -374,7 +316,9 @@ function template_by_board()
 	</div>';
 }
 
-// Edit permission profiles (predefined).
+/**
+ * Edit permission profiles (predefined).
+ */
 function template_edit_profiles()
 {
 	global $context, $scripturl, $txt;
@@ -382,16 +326,13 @@ function template_edit_profiles()
 	echo '
 	<div id="admin_form_wrapper">
 		<form action="', $scripturl, '?action=admin;area=permissions;sa=profiles" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['permissions_profile_edit'], '</h3>
-			</div>
-
+			<h2 class="category_header">', $txt['permissions_profile_edit'], '</h2>
 			<table class="table_grid">
 				<thead>
-					<tr class="catbg">
-						<th class="first_th">', $txt['permissions_profile_name'], '</th>
-						<th', !empty($context['show_rename_boxes']) ? ' class="last_th"' : '', '>', $txt['permissions_profile_used_by'], '</th>
-						<th class="last_th" style="width:5%', !empty($context['show_rename_boxes']) ? ';display:none"' : '"', ' >', $txt['delete'], '</th>
+					<tr class="table_head">
+						<th>', $txt['permissions_profile_name'], '</th>
+						<th>', $txt['permissions_profile_used_by'], '</th>
+						<th style="width:5%', !empty($context['show_rename_boxes']) ? ';display:none"' : '"', ' >', $txt['delete'], '</th>
 					</tr>
 				</thead>
 				<tbody>';
@@ -425,7 +366,7 @@ function template_edit_profiles()
 	echo '
 				</tbody>
 			</table>
-			<div class="flow_auto righttext padding">
+			<div class="submitbutton">
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 				<input type="hidden" name="', $context['admin-mpp_token_var'], '" value="', $context['admin-mpp_token'], '" />';
 
@@ -439,9 +380,7 @@ function template_edit_profiles()
 		</form>
 		<br />
 		<form action="', $scripturl, '?action=admin;area=permissions;sa=profiles" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['permissions_profile_new'], '</h3>
-			</div>
+			<h3 class="category_header">', $txt['permissions_profile_new'], '</h3>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -465,19 +404,22 @@ function template_edit_profiles()
 							</select>
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
+					<hr />
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					<input type="hidden" name="', $context['admin-mpp_token_var'], '" value="', $context['admin-mpp_token'], '" />
-					<input type="submit" name="create" value="', $txt['permissions_profile_new_create'], '" class="button_submit" />
+					<input type="submit" name="create" value="', $txt['permissions_profile_new_create'], '" class="right_submit" />
 				</div>
 			</div>
 		</form>
 	</div>';
 }
 
+/**
+ * Template for modifying group permissions
+ */
 function template_modify_group()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings;
 
 	// Cannot be edited?
 	if (!$context['profile']['can_modify'])
@@ -491,11 +433,11 @@ function template_modify_group()
 	{
 		echo '
 		<script><!-- // --><![CDATA[
-			window.smf_usedDeny = false;
+			window.elk_usedDeny = false;
 
 			function warnAboutDeny()
 			{
-				if (window.smf_usedDeny)
+				if (window.elk_usedDeny)
 					return confirm("', $txt['permissions_deny_dangerous'], '");
 				else
 					return true;
@@ -509,35 +451,25 @@ function template_modify_group()
 
 	if (!empty($modSettings['permission_enable_deny']) && $context['group']['id'] != -1)
 		echo '
-			<div class="simplebox">
+			<div class="information">
 				', $txt['permissions_option_desc'], '
 			</div>';
 
 	echo '
-			<div class="cat_bar">
-				<h3 class="catbg">';
+			<h3 class="category_header">';
 	if ($context['permission_type'] == 'board')
 		echo '
 				', $txt['permissions_local_for'], ' &quot;', $context['group']['name'], '&quot; ', $txt['permissions_on'], ' &quot;', $context['profile']['name'], '&quot;';
 	else
 		echo '
 				', $context['permission_type'] == 'membergroup' ? $txt['permissions_general'] : $txt['permissions_board'], ' - &quot;', $context['group']['name'], '&quot;';
+
 	echo '
-				</h3>
-			</div>
-			<div class="windowbg">
-				<div class="content">
-					', $txt['permissions_change_view'], ': ', ($context['view_type'] == 'simple' ? '<img src="' . $settings['images_url'] . '/selected.png" alt="*" />' : ''), '<a href="', $scripturl, '?action=admin;area=permissions;sa=modify;group=', $context['group']['id'], ($context['permission_type'] == 'board' ? ';pid=' . $context['profile']['id'] : ''), ';view=simple">', $txt['permissions_view_simple'], '</a> |
-					', ($context['view_type'] == 'classic' ? '<img src="' . $settings['images_url'] . '/selected.png" alt="*" />' : ''), '<a href="', $scripturl, '?action=admin;area=permissions;sa=modify;group=', $context['group']['id'], ($context['permission_type'] == 'board' ? ';pid=' . $context['profile']['id'] : ''), ';view=classic">', $txt['permissions_view_classic'], '</a>
-				</div>
-			</div>
+			</h3>
 			<div class="flow_hidden">';
 
 	// Draw out the main bits.
-	if ($context['view_type'] == 'simple')
-		template_modify_group_simple($context['permission_type']);
-	else
-		template_modify_group_classic($context['permission_type']);
+	template_modify_group_classic($context['permission_type']);
 
 	echo '
 			</div>';
@@ -547,18 +479,13 @@ function template_modify_group()
 	{
 		echo '
 			<br />
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['permissions_board'], '</h3>
-			</div>
+			<h3 class="category_header">', $txt['permissions_board'], '</h3>
 			<div class="information">
 				', $txt['permissions_board_desc'], '
 			</div>
 			<div class="flow_hidden">';
 
-		if ($context['view_type'] == 'simple')
-			template_modify_group_simple('board');
-		else
-			template_modify_group_classic('board');
+		template_modify_group_classic('board');
 
 		echo '
 			</div>';
@@ -566,9 +493,7 @@ function template_modify_group()
 
 	if ($context['profile']['can_modify'])
 		echo '
-			<div class="padding">
-				<input type="submit" value="', $txt['permissions_commit'], '" class="button_submit" />
-			</div>';
+			<input type="submit" value="', $txt['permissions_commit'], '" class="right_submit" />';
 
 	echo '
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -577,289 +502,11 @@ function template_modify_group()
 	</div>';
 }
 
-// A javascript enabled clean permissions view.
-function template_modify_group_simple($type)
-{
-	global $context, $settings, $scripturl, $txt, $modSettings;
-
-	// Simple only has one column so we only need bother ourself with that one.
-	$permission_data = &$context['permissions'][$type]['columns'][0];
-
-	// Short cut for disabling fields we can't change.
-	$disable_field = $context['profile']['can_modify'] ? '' : 'disabled="disabled" ';
-
-	echo '
-			<table class="table_grid">
-				<thead>
-					<tr class="catbg">
-						<th class="first_th lefttext" colspan="2" style="width:100%"></th>';
-				if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-					echo '
-						<th></th>
-						<th></th>
-						<th class="last_th centertext">&nbsp;</th>';
-				else
-					echo '
-						<th class="centertext">', $txt['permissions_option_on'], '</th>
-						<th class="centertext">', $txt['permissions_option_off'], '</th>
-						<th class="last_th centertext">', $txt['permissions_option_deny'], '</th>';
-
-				echo '
-					</tr>
-				</thead>
-				<tbody>';
-
-	foreach ($permission_data as $id_group => $permissionGroup)
-	{
-		if (empty($permissionGroup['permissions']))
-			continue;
-
-		// Are we likely to have something in this group to display or is it all hidden?
-		$has_display_content = false;
-		if (!$permissionGroup['hidden'])
-		{
-			// Before we go any further check we are going to have some data to print otherwise we just have a silly heading.
-			foreach ($permissionGroup['permissions'] as $permission)
-				if (!$permission['hidden'])
-					$has_display_content = true;
-
-			if ($has_display_content)
-			{
-				echo '
-					<tr class="windowbg">
-						<td class="lefttext" colspan="2" style="width:100%">
-							<a href="#" onclick="return toggleBreakdown(\'', $id_group, '\');">
-								<img src="', $settings['images_url'], '/selected_open.png" id="group_toggle_img_', $id_group, '" alt="*" />&nbsp;<strong>', $permissionGroup['name'], '</strong>
-							</a>
-						</td>';
-
-				if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-					echo '
-						<td colspan="3" style="width:10px">
-							<div id="group_select_div_', $id_group, '">
-								<input type="checkbox" id="group_select_', $id_group, '" name="group_select_', $id_group, '" class="input_check" onclick="determineGroupState(\'', $id_group, '\', this.checked ? \'on\' : \'off\');" style="display: none;" ', $disable_field, '/>
-							</div>
-						</td>';
-				else
-					echo '
-						<td class="centertext">
-							<div id="group_select_div_on_', $id_group, '">
-								<input type="radio" id="group_select_on_', $id_group, '" name="group_select_', $id_group, '" value="on" onclick="determineGroupState(\'', $id_group, '\', \'on\');" style="display: none;" ', $disable_field, ' class="input_radio" />
-							</div>
-						</td>
-						<td class="centertext">
-							<div id="group_select_div_off_', $id_group, '">
-								<input type="radio" id="group_select_off_', $id_group, '" name="group_select_', $id_group, '" value="off" onclick="determineGroupState(\'', $id_group, '\', \'off\');" style="display: none;" ', $disable_field, ' class="input_radio" />
-							</div>
-						</td>
-						<td class="centertext">
-							<div id="group_select_div_deny_', $id_group, '">
-								<input type="radio" id="group_select_deny_', $id_group, '" name="group_select_', $id_group, '" value="deny" onclick="determineGroupState(\'', $id_group, '\', \'deny\');" style="display: none;" ', $disable_field, ' class="input_radio" />
-							</div>
-						</td>';
-
-				echo '
-					</tr>';
-			}
-		}
-
-		$alternate = false;
-		foreach ($permissionGroup['permissions'] as $permission)
-		{
-			// If it's hidden keep the last value.
-			if ($permission['hidden'] || $permissionGroup['hidden'])
-			{
-				echo '
-					<tr style="display: none;">
-						<td>
-							<input type="hidden" name="perm[', $type, '][', $permission['id'], ']" value="', $permission['select'] == 'denied' && !empty($modSettings['permission_enable_deny']) ? 'deny' : $permission['select'], '" />
-						</td>
-					</tr>';
-			}
-			else
-			{
-				echo '
-					<tr id="perm_div_', $id_group, '_', $permission['id'], '" class="', $alternate ? 'windowbg' : 'windowbg2', '">
-						<td style="width:10px;vertical-align:top;padding-right:1ex;">
-							', $permission['help_index'] ? '<a href="' . $scripturl . '?action=quickhelp;help=' . $permission['help_index'] . '" onclick="return reqOverlayDiv(this.href);" class="help"><img src="' . $settings['images_url'] . '/helptopics.png" alt="' . $txt['help'] . '" /></a>' : '', '
-						</td>
-						<td class="lefttext" style="width:100%;vertical-align:top;padding-bottom:2px">', $permission['name'], '</td>';
-
-				if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-					echo '
-						<td colspan="3" style="vertical-align: top;padding-bottom: 2px">
-							<input type="checkbox" id="select_', $permission['id'], '" name="perm[', $type, '][', $permission['id'], ']"', $permission['select'] == 'on' ? ' checked="checked"' : '', ' onclick="determineGroupState(\'', $id_group, '\');" value="on" class="input_check" ', $disable_field, '/>
-						</td>';
-				else
-					echo '
-						<td style="width: 10px; vertical-align:top; padding-bottom: 2px">
-							<input type="radio" id="select_on_', $permission['id'], '" name="perm[', $type, '][', $permission['id'], ']"', $permission['select'] == 'on' ? ' checked="checked"' : '', ' value="on" onclick="determineGroupState(\'', $id_group, '\');" class="input_radio" ', $disable_field, '/>
-						</td>
-						<td style="width: 10px; vertical-align:top; padding-bottom: 2px">
-							<input type="radio" id="select_off_', $permission['id'], '" name="perm[', $type, '][', $permission['id'], ']"', $permission['select'] == 'off' ? ' checked="checked"' : '', ' value="off" onclick="determineGroupState(\'', $id_group, '\');" class="input_radio" ', $disable_field, '/>
-						</td>
-						<td style="width: 10px; vertical-align:top; padding-bottom: 2px">
-							<input type="radio" id="select_deny_', $permission['id'], '" name="perm[', $type, '][', $permission['id'], ']"', $permission['select'] == 'denied' ? ' checked="checked"' : '', ' value="deny" onclick="window.smf_usedDeny = true; determineGroupState(\'', $id_group, '\');" class="input_radio" ', $disable_field, '/>
-						</td>';
-
-				echo '
-					</tr>';
-			}
-			$alternate = !$alternate;
-		}
-
-		if (!$permissionGroup['hidden'] && $has_display_content)
-			echo '
-					<tr id="group_hr_div_', $id_group, '" class="windowbg2 perm_groups">
-						<td colspan="5" style="width:100%"></td>
-					</tr>';
-	}
-
-	echo '
-				</tbody>
-			</table>
-	<script><!-- // --><![CDATA[';
-
-	if ($context['profile']['can_modify'] && empty($context['simple_javascript_displayed']))
-	{
-		// Only show this once.
-		$context['simple_javascript_displayed'] = true;
-
-		// This function decides what to do when ANYTHING is touched!
-		echo '
-		var groupPermissions = new Array();
-		function determineGroupState(id_group, forceState)
-		{
-			if (typeof(forceState) != "undefined")
-				thisState = forceState;
-
-			// Cycle through this groups elements.
-			var curState = false, thisState;
-			for (var i = 0; i < groupPermissions[id_group].length; i++)
-			{';
-
-		if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-			echo '
-				if (typeof(forceState) != "undefined")
-				{
-					document.getElementById(\'select_\' + groupPermissions[id_group][i]).checked = forceState == \'on\' ? 1 : 0;
-				}
-
-				thisState = document.getElementById(\'select_\' + groupPermissions[id_group][i]).checked ? \'on\' : \'off\';';
-		else
-			echo '
-				if (typeof(forceState) != "undefined")
-				{
-					document.getElementById(\'select_on_\' + groupPermissions[id_group][i]).checked = forceState == \'on\' ? 1 : 0;
-					document.getElementById(\'select_off_\' + groupPermissions[id_group][i]).checked = forceState == \'off\' ? 1 : 0;
-					document.getElementById(\'select_deny_\' + groupPermissions[id_group][i]).checked = forceState == \'deny\' ? 1 : 0;
-				}
-
-				if (document.getElementById(\'select_on_\' + groupPermissions[id_group][i]).checked)
-					thisState = \'on\';
-				else if (document.getElementById(\'select_off_\' + groupPermissions[id_group][i]).checked)
-					thisState = \'off\';
-				else
-					thisState = \'deny\';';
-
-		echo '
-				// Unless this is the first element, or it\'s the same state as the last we\'re buggered.
-				if (curState == false || thisState == curState)
-				{
-					curState = thisState;
-				}
-				else
-				{
-					curState = \'fudged\';
-					i = 999;
-				}
-			}
-
-			// First check the right master is selected!';
-		if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-			echo '
-			document.getElementById("group_select_" + id_group).checked = curState == \'on\' ? 1 : 0;';
-		else
-			echo '
-			document.getElementById("group_select_on_" + id_group).checked = curState == \'on\' ? 1 : 0;
-			document.getElementById("group_select_off_" + id_group).checked = curState == \'off\' ? 1 : 0;
-			document.getElementById("group_select_deny_" + id_group).checked = curState == \'deny\' ? 1 : 0;';
-
-		// Force the display?
-		echo '
-			if (curState != \'fudged\')
-				toggleBreakdown(id_group, "none");';
-		echo '
-		}';
-	}
-
-	// Some more javascript to be displayed as long as we are editing.
-	if ($context['profile']['can_modify'])
-	{
-		foreach ($permission_data as $id_group => $permissionGroup)
-		{
-			if (empty($permissionGroup['permissions']))
-				continue;
-
-			// As before...
-			$has_display_content = false;
-			if (!$permissionGroup['hidden'])
-			{
-				// Make sure we can show it.
-				foreach ($permissionGroup['permissions'] as $permission)
-					if (!$permission['hidden'])
-						$has_display_content = true;
-
-				// Make all the group indicators visible on JS only.
-				if ($has_display_content)
-				{
-					if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
-						echo '
-			document.getElementById("group_select_div_', $id_group, '").parentNode.className = "lockedbg";
-			document.getElementById("group_select_', $id_group, '").style.display = "";';
-					else
-						echo '
-			document.getElementById("group_select_div_on_', $id_group, '").parentNode.className = "lockedbg";
-			document.getElementById("group_select_div_off_', $id_group, '").parentNode.className = "lockedbg";
-			document.getElementById("group_select_div_deny_', $id_group, '").parentNode.className = "lockedbg";
-			document.getElementById("group_select_on_', $id_group, '").style.display = "";
-			document.getElementById("group_select_off_', $id_group, '").style.display = "";
-			document.getElementById("group_select_deny_', $id_group, '").style.display = "";';
-				}
-
-				$perm_ids = array();
-				$count = 0;
-				foreach ($permissionGroup['permissions'] as $permission)
-				{
-					if (!$permission['hidden'])
-					{
-						// Need this for knowing what can be tweaked.
-						$perm_ids[] = "'$permission[id]'";
-					}
-				}
-
-				// Declare this groups permissions into an array.
-				if (!empty($perm_ids))
-					echo '
-			groupPermissions[\'', $id_group, '\'] = new Array(', count($perm_ids), ');';
-
-				foreach ($perm_ids as $count => $id)
-					echo '
-			groupPermissions[\'', $id_group, '\'][', $count, '] = ', $id, ';';
-
-				// Show the group as required.
-				if ($has_display_content)
-					echo '
-			determineGroupState(\'', $id_group, '\');';
-			}
-		}
-	}
-
-	echo '
-		// ]]></script>';
-}
-
-// The classic way of looking at permissions.
+/**
+ * The classic way of looking at permissions.
+ *
+ * @param string $type
+ */
 function template_modify_group_classic($type)
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -893,7 +540,7 @@ function template_modify_group_classic($type)
 				if ($has_display_content)
 				{
 					echo '
-							<tr class="catbg">
+							<tr class="table_head">
 								<th class="lefttext" colspan="2" style="width:100%">
 									<strong class="smalltext">', $permissionGroup['name'], '</strong>
 								</th>';
@@ -903,9 +550,10 @@ function template_modify_group_classic($type)
 								<th></th><th></th><th></th>';
 					else
 						echo '
-								<th class="centertext"><div>', $txt['permissions_option_on'], '</div></th>
-								<th class="centertext"><div>', $txt['permissions_option_off'], '</div></th>
-								<th class="centertext"><div>', $txt['permissions_option_deny'], '</div></th>';
+								<th><div>', $txt['permissions_option_on'], '</div></th>
+								<th><div>', $txt['permissions_option_off'], '</div></th>
+								<th><div>', $txt['permissions_option_deny'], '</div></th>';
+
 					echo '
 							</tr>';
 				}
@@ -934,6 +582,7 @@ function template_modify_group_classic($type)
 					else
 						echo '
 									<input type="hidden" name="perm[', $permission_type['id'], '][', $permission['id'], ']" value="', $permission['select'] == 'denied' && !empty($modSettings['permission_enable_deny']) ? 'deny' : $permission['select'], '" />';
+
 					echo '
 								</td>
 							</tr>';
@@ -1000,7 +649,7 @@ function template_modify_group_classic($type)
 									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['any']['id'], ']"', $permission['any']['select'] == 'off' ? ' checked="checked"' : '', ' value="off" class="input_radio" ', $disable_field, '/>
 								</td>
 								<td>
-									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['any']['id'], ']"', $permission['any']['select']== 'denied' ? ' checked="checked"' : '', ' value="deny" id="', $permission['any']['id'], '_deny" onclick="window.smf_usedDeny = true;" class="input_radio" ', $disable_field, '/>
+									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['any']['id'], ']"', $permission['any']['select'] == 'denied' ? ' checked="checked"' : '', ' value="deny" id="', $permission['any']['id'], '_deny" onclick="window.elk_usedDeny = true;" class="input_radio" ', $disable_field, '/>
 								</td>';
 
 						echo '
@@ -1025,7 +674,7 @@ function template_modify_group_classic($type)
 									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['id'], ']"', $permission['select'] == 'off' ? ' checked="checked"' : '', ' value="off" class="input_radio" ', $disable_field, '/>
 								</td>
 								<td>
-									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['id'], ']"', $permission['select'] == 'denied' ? ' checked="checked"' : '', ' value="deny" onclick="window.smf_usedDeny = true;" class="input_radio" ', $disable_field, '/>
+									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['id'], ']"', $permission['select'] == 'denied' ? ' checked="checked"' : '', ' value="deny" onclick="window.elk_usedDeny = true;" class="input_radio" ', $disable_field, '/>
 								</td>';
 
 						echo '
@@ -1041,29 +690,31 @@ function template_modify_group_classic($type)
 								<td colspan="5" style="width:100%"><!--separator--></td>
 							</tr>';
 		}
-	echo '
+		echo '
 						</table>';
 	}
 	echo '
-				<br class="clear" />
 				</div>
 			</div>';
 }
 
+/**
+ * Show a collapsible box to set a specific permission.
+ */
 function template_inline_permissions()
 {
 	global $context, $txt, $modSettings;
 
 	echo '
 		<fieldset id="', $context['current_permission'], '">
-			<legend><a href="javascript:void(0);" onclick="document.getElementById(\'', $context['current_permission'], '\').style.display = \'none\';document.getElementById(\'', $context['current_permission'], '_groups_link\').style.display = \'block\'; return false;">', $txt['avatar_select_permission'], '</a></legend>';
+			<legend>', $txt['avatar_select_permission'], '</legend>';
 
 	if (empty($modSettings['permission_enable_deny']))
 		echo '
 			<ul class="permission_groups">';
 	else
 		echo '
-			<div class="simplebox">', $txt['permissions_option_desc'], '</div>
+			<div class="information">', $txt['permissions_option_desc'], '</div>
 			<dl class="settings">
 				<dt>
 					<span class="perms"><strong>', $txt['permissions_option_on'], '</strong></span>
@@ -1111,17 +762,12 @@ function template_inline_permissions()
 			</dl>';
 
 	echo '
-		</fieldset>
-
-		<a href="javascript:void(0);" onclick="document.getElementById(\'', $context['current_permission'], '\').style.display = \'block\'; document.getElementById(\'', $context['current_permission'], '_groups_link\').style.display = \'none\'; return false;" id="', $context['current_permission'], '_groups_link" style="display: none;">[ ', $txt['avatar_select_permission'], ' ]</a>
-
-		<script><!-- // --><![CDATA[
-			document.getElementById("', $context['current_permission'], '").style.display = "none";
-			document.getElementById("', $context['current_permission'], '_groups_link").style.display = "";
-		// ]]></script>';
+		</fieldset>';
 }
 
-// Edit post moderation permissions.
+/**
+ * Edit post moderation permissions.
+ */
 function template_postmod_permissions()
 {
 	global $context, $settings, $scripturl, $txt, $modSettings;
@@ -1129,9 +775,7 @@ function template_postmod_permissions()
 	echo '
 	<div id="admin_form_wrapper">
 		<form action="', $scripturl, '?action=admin;area=permissions;sa=postmod;', $context['session_var'], '=', $context['session_id'], '" method="post" name="postmodForm" id="postmodForm" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['permissions_post_moderation'], '</h3>
-			</div>';
+			<h2 class="category_header">', $txt['permissions_post_moderation'], '</h2>';
 
 	// Got advanced permissions - if so warn!
 	if (!empty($modSettings['permission_enable_deny']))
@@ -1139,7 +783,7 @@ function template_postmod_permissions()
 				<div class="information">', $txt['permissions_post_moderation_deny_note'], '</div>';
 
 	echo '
-				<div class="righttext padding">
+				<div class="submitbutton">
 					', $txt['permissions_post_moderation_select'], ':
 					<select name="pid" onchange="document.forms.postmodForm.submit();">';
 
@@ -1151,11 +795,11 @@ function template_postmod_permissions()
 	echo '
 					</select>
 					<input type="submit" value="', $txt['go'], '" class="button_submit" />
-			</div>
-			<table class="table_grid">
+				</div>
+				<table class="table_grid">
 				<thead>
-					<tr class="catbg">
-						<th class="first_th"></th>
+					<tr class="table_head">
+						<th></th>
 						<th class="centertext" colspan="3">
 							', $txt['permissions_post_moderation_new_topics'], '
 						</th>
@@ -1165,26 +809,26 @@ function template_postmod_permissions()
 						<th class="centertext" colspan="3">
 							', $txt['permissions_post_moderation_replies_any'], '
 						</th>
-						<th class="last_th centertext" colspan="3">
+						<th class="centertext" colspan="3">
 							', $txt['permissions_post_moderation_attachments'], '
 						</th>
 					</tr>
-					<tr class="titlebg">
+					<tr class="secondary_header">
 						<th style="width:30%">
 							', $txt['permissions_post_moderation_group'], '
 						</th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
-						<th class="centertext"><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_moderate.png" alt="', $txt['permissions_post_moderation_moderate'], '" title="', $txt['permissions_post_moderation_moderate'], '" /></th>
+						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_deny.png" alt="', $txt['permissions_post_moderation_disallow'], '" title="', $txt['permissions_post_moderation_disallow'], '" /></th>
 					</tr>
 				</thead>
 				<tbody>';
@@ -1195,11 +839,12 @@ function template_postmod_permissions()
 					<tr>
 						<td style="width:40%" class="windowbg">
 							<span ', ($group['color'] ? 'style="color: ' . $group['color'] . '"' : ''), '>', $group['name'], '</span>';
-			if (!empty($group['children']))
-				echo '
+
+		if (!empty($group['children']))
+			echo '
 							<br /><span class="smalltext">', $txt['permissions_includes_inherited'], ': &quot;', implode('&quot;, &quot;', $group['children']), '&quot;</span>';
 
-			echo '
+		echo '
 						</td>
 						<td class="windowbg2 centertext"><input type="radio" name="new_topic[', $group['id'], ']" value="allow" ', $group['new_topic'] == 'allow' ? 'checked="checked"' : '', ' class="input_radio" /></td>
 						<td class="windowbg2 centertext"><input type="radio" name="new_topic[', $group['id'], ']" value="moderate" ', $group['new_topic'] == 'moderate' ? 'checked="checked"' : '', ' class="input_radio" /></td>
@@ -1219,7 +864,7 @@ function template_postmod_permissions()
 	echo '
 				</tbody>
 			</table>
-			<div class="righttext padding">
+			<div class="submitbutton">
 				<input type="submit" name="save_changes" value="', $txt['permissions_commit'], '" class="button_submit" />
 				<input type="hidden" name="', $context['admin-mppm_token_var'], '" value="', $context['admin-mppm_token'], '" />
 			</div>

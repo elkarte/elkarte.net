@@ -11,11 +11,22 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
-// The main calendar - January, for example.
-function template_main()
+/**
+ * Start the calendar
+ */
+function template_Calendar_init()
+{
+	loadTemplate('GenericHelpers');
+}
+
+/**
+ * The main calendar - January, for example.
+ */
+function template_show_calendar()
 {
 	global $context, $txt, $scripturl, $modSettings;
 
@@ -32,7 +43,9 @@ function template_main()
 	// Show some controls to allow easy calendar navigation.
 	echo '
 				<form id="calendar_navigation" action="', $scripturl, '?action=calendar" method="post" accept-charset="UTF-8">';
-					template_button_strip($context['calendar_buttons'], 'right');
+
+	template_button_strip($context['calendar_buttons'], 'right');
+
 	echo '
 					<select name="month">';
 
@@ -40,6 +53,7 @@ function template_main()
 	foreach ($txt['months'] as $number => $month)
 		echo '
 						<option value="', $number, '"', $number == $context['current_month'] ? ' selected="selected"' : '', '>', $month, '</option>';
+
 	echo '
 					</select>
 					<select name="year">';
@@ -48,24 +62,25 @@ function template_main()
 	for ($year = $modSettings['cal_minyear']; $year <= $modSettings['cal_maxyear']; $year++)
 		echo '
 						<option value="', $year, '"', $year == $context['current_year'] ? ' selected="selected"' : '', '>', $year, '</option>';
-	echo '
-					</select>
-					<input type="submit" class="button_submit" value="', $txt['view'], '" />';
 
 	echo '
+					</select>
+					<input type="submit" class="button_submit" value="', $txt['view'], '" />
 				</form>
 			</div>
 		</div>';
 }
 
-// Template for posting a calendar event.
+/**
+ * Template for posting a calendar event.
+ */
 function template_event_post()
 {
 	global $context, $txt, $scripturl, $modSettings;
 
 	// Start the javascript for drop down boxes...
 	echo '
-		<form action="', $scripturl, '?action=calendar;sa=post" method="post" name="postevent" accept-charset="UTF-8" onsubmit="submitonce(this);smc_saveEntities(\'postevent\', [\'evtitle\']);" style="margin: 0;">';
+		<form action="', $scripturl, '?action=calendar;sa=post" method="post" name="postevent" accept-charset="UTF-8" onsubmit="submitonce(this);smc_saveEntities(\'postevent\', [\'evtitle\']);">';
 
 	if (!empty($context['event']['new']))
 		echo '
@@ -74,11 +89,7 @@ function template_event_post()
 	// Start the main table.
 	echo '
 		<div id="post_event">
-			<div class="cat_bar">
-				<h3 class="catbg">
-					', $context['page_title'], '
-				</h3>
-			</div>';
+			<h2 class="category_header">', $context['page_title'], '</h2>';
 
 	if (!empty($context['post_error']['messages']))
 	{
@@ -100,7 +111,7 @@ function template_event_post()
 				<fieldset id="event_main">
 					<legend><span', isset($context['post_error']['no_event']) ? ' class="error"' : '', '>', $txt['calendar_event_title'], '</span></legend>
 					<input type="text" name="evtitle" maxlength="255" size="70" value="', $context['event']['title'], '" class="input_text" />
-					<div class="smalltext" style="white-space: nowrap;">
+					<div class="smalltext nowrap">
 						<input type="hidden" name="calendar" value="1" />', $txt['calendar_year'], '
 						<select name="year" id="year" onchange="generateDays();">';
 
@@ -164,7 +175,7 @@ function template_event_post()
 		echo '
 							<li>
 								', $txt['calendar_link_event'], '
-								<input type="checkbox" style="vertical-align: middle;" class="input_check" name="link_to_board" checked="checked" onclick="toggleLinked(this.form);" />
+								<input type="checkbox" class="input_check" name="link_to_board" checked="checked" onclick="toggleLinked(this.form);" />
 							</li>
 							<li>
 								', template_select_boards('board', $txt['calendar_post_in'], 'onchange="this.form.submit();"'), '
@@ -178,11 +189,12 @@ function template_event_post()
 				</fieldset>';
 
 	echo '
-				<input type="submit" value="', empty($context['event']['new']) ? $txt['save'] : $txt['post'], '" class="button_submit" />';
+				<input type="submit" value="', empty($context['event']['new']) ? $txt['save'] : $txt['post'], '" class="right_submit" />';
+
 	// Delete button?
 	if (empty($context['event']['new']))
 		echo '
-				<input type="submit" name="deleteevent" value="', $txt['event_delete'], '" onclick="return confirm(\'', $txt['calendar_confirm_delete'], '\');" class="button_submit" />';
+				<input type="submit" name="deleteevent" value="', $txt['event_delete'], '" onclick="return confirm(\'', $txt['calendar_confirm_delete'], '\');" class="right_submit" />';
 
 	echo '
 				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -193,7 +205,11 @@ function template_event_post()
 		</form>';
 }
 
-// Display a monthly calendar grid.
+/**
+ * Display a monthly calendar grid.
+ *
+ * @param string $grid_name
+ */
 function template_show_month_grid($grid_name)
 {
 	global $context, $settings, $txt, $scripturl, $modSettings;
@@ -206,16 +222,15 @@ function template_show_month_grid($grid_name)
 	if (empty($calendar_data['disable_title']))
 	{
 		echo '
-			<div class="cat_bar">
-				<h3 class="catbg">';
+				<h2 class="category_header">';
 
 		if (empty($calendar_data['previous_calendar']['disabled']) && $calendar_data['show_next_prev'])
 			echo '
-					<a href="', $calendar_data['previous_calendar']['href'], '" class="floatleft">&#171;</a>';
+					<a href="', $calendar_data['previous_calendar']['href'], '" class="previous_month">&#171;</a>';
 
 		if (empty($calendar_data['next_calendar']['disabled']) && $calendar_data['show_next_prev'])
 			echo '
-					<a href="', $calendar_data['next_calendar']['href'], '" class="floatright">&#187;</a>';
+					<a href="', $calendar_data['next_calendar']['href'], '" class="next_month">&#187;</a>';
 
 		if ($calendar_data['show_next_prev'])
 			echo '
@@ -225,8 +240,7 @@ function template_show_month_grid($grid_name)
 					<a href="', $scripturl, '?action=calendar;year=', $calendar_data['current_year'], ';month=', $calendar_data['current_month'], '">', $txt['months_titles'][$calendar_data['current_month']], ' ', $calendar_data['current_year'], '</a>';
 
 		echo '
-				</h3>
-			</div>';
+				</h2>';
 	}
 
 	echo '
@@ -236,23 +250,22 @@ function template_show_month_grid($grid_name)
 	if (empty($calendar_data['disable_day_titles']))
 	{
 		echo '
-					<tr class="titlebg2">';
+					<tr class="table_head">';
 
 		if (!empty($calendar_data['show_week_links']))
 			echo '
 						<th>&nbsp;</th>';
 
 		foreach ($calendar_data['week_days'] as $day)
-		{
 			echo '
-						<th class="days" scope="col">', !empty($calendar_data['short_day_titles']) ? (Util::substr($txt['days'][$day], 0, 1)) : $txt['days'][$day], '</th>';
-		}
+						<th scope="col" class="days">', !empty($calendar_data['short_day_titles']) ? (Util::substr($txt['days'][$day], 0, 1)) : $txt['days'][$day], '</th>';
+
 		echo '
 					</tr>';
 	}
 
-	/* Each week in weeks contains the following:
-		days (a list of days), number (week # in the year.) */
+	// Each week in weeks contains the following:
+	// days (a list of days), number (week # in the year.)
 	foreach ($calendar_data['weeks'] as $week)
 	{
 		echo '
@@ -264,9 +277,9 @@ function template_show_month_grid($grid_name)
 							<a href="', $scripturl, '?action=calendar;viewweek;year=', $calendar_data['current_year'], ';month=', $calendar_data['current_month'], ';day=', $week['days'][0]['day'], '">&#187;</a>
 						</td>';
 
-		/* Every day has the following:
-			day (# in month), is_today (is this day *today*?), is_first_day (first day of the week?),
-			holidays, events, birthdays. (last three are lists.) */
+		// Every day has the following:
+		// day (# in month), is_today (is this day *today*?), is_first_day (first day of the week?),
+		// holidays, events, birthdays. (last three are lists.)
 		foreach ($week['days'] as $day)
 		{
 			// If this is today, make it a different color and show a border.
@@ -300,14 +313,14 @@ function template_show_month_grid($grid_name)
 							<div>
 								<span class="birthday">', $txt['birthdays'], '</span>';
 
-					/* Each of the birthdays has:
-						id, name (person), age (if they have one set?), and is_last. (last in list?) */
+					// Each of the birthdays has:
+					// id, name (person), age (if they have one set?), and is_last. (last in list?)
 					$use_js_hide = empty($context['show_all_birthdays']) && count($day['birthdays']) > 15;
 					$count = 0;
 					foreach ($day['birthdays'] as $member)
 					{
 						echo '
-									<a href="', $scripturl, '?action=profile;u=', $member['id'], '"><span class="fix_rtl_names">', $member['name'], '</span>', isset($member['age']) ? ' (' . $member['age'] . ')' : '', '</a>', $member['is_last'] || ($count == 10 && $use_js_hide)? '' : ', ';
+									<a href="', $scripturl, '?action=profile;u=', $member['id'], '"><span class="fix_rtl_names">', $member['name'], '</span>', isset($member['age']) ? ' (' . $member['age'] . ')' : '', '</a>', $member['is_last'] || ($count == 10 && $use_js_hide) ? '' : ', ';
 
 						// Stop at ten?
 						if ($count == 10 && $use_js_hide)
@@ -315,6 +328,7 @@ function template_show_month_grid($grid_name)
 
 						$count++;
 					}
+
 					if ($use_js_hide)
 						echo '
 								</span>';
@@ -330,8 +344,8 @@ function template_show_month_grid($grid_name)
 							<div class="lefttext">
 								<span class="event">', $txt['events'], '</span><br />';
 
-					/* The events are made up of:
-						title, href, is_last, can_edit (are they allowed to?), and modify_href. */
+					// The events are made up of:
+					// title, href, is_last, can_edit (are they allowed to?), and modify_href.
 					foreach ($day['events'] as $event)
 					{
 						// If they can edit the event, show an icon they can click on....
@@ -342,7 +356,6 @@ function template_show_month_grid($grid_name)
 						if ($event['can_export'])
 							echo '
 								<a class="modify_event" href="', $event['export_href'], '"><img src="' . $settings['images_url'] . '/icons/calendar_export.png" alt=">" title="' . $txt['save'] . '"/></a>';
-
 
 						echo '
 								', $event['link'], $event['is_last'] ? '' : '<br />';
@@ -365,7 +378,11 @@ function template_show_month_grid($grid_name)
 				</table>';
 }
 
-// Or show a weekly one?
+/**
+ * Or show a weekly one?
+ *
+ * @param string $grid_name
+ */
 function template_show_week_grid($grid_name)
 {
 	global $context, $settings, $txt, $scripturl, $modSettings;
@@ -374,26 +391,25 @@ function template_show_week_grid($grid_name)
 		return false;
 
 	$calendar_data = &$context['calendar_grid_' . $grid_name];
+	$done_title = false;
 
 	// Loop through each month (At least one) and print out each day.
 	foreach ($calendar_data['months'] as $month_data)
 	{
 		echo '
-			<div class="cat_bar">
-				<h3 class="catbg weekly">';
+				<h2 class="category_header">';
 
 		if (empty($calendar_data['previous_calendar']['disabled']) && $calendar_data['show_next_prev'] && empty($done_title))
 			echo '
-					<span class="floatleft"><a href="', $calendar_data['previous_week']['href'], '">&#171;</a></span>';
+					<span class="previous_month"><a href="', $calendar_data['previous_week']['href'], '">&#171;</a></span>';
 
 		if (empty($calendar_data['next_calendar']['disabled']) && $calendar_data['show_next_prev'] && empty($done_title))
 			echo '
-					<span class="floatright"><a href="', $calendar_data['next_week']['href'], '">&#187;</a></span>';
+					<span class="next_month"><a href="', $calendar_data['next_week']['href'], '">&#187;</a></span>';
 
 		echo '
 					<a href="', $scripturl, '?action=calendar;month=', $month_data['current_month'], ';year=', $month_data['current_year'], '">', $txt['months_titles'][$month_data['current_month']], ' ', $month_data['current_year'], '</a>', empty($done_title) && !empty($calendar_data['week_number']) ? (' - ' . $txt['calendar_week'] . ' ' . $calendar_data['week_number']) : '', '
-				</h3>
-			</div>';
+				</h2>';
 
 		$done_title = true;
 
@@ -430,11 +446,12 @@ function template_show_week_grid($grid_name)
 							<div class="smalltext">
 								<span class="birthday">', $txt['birthdays'], '</span>';
 
-				/* Each of the birthdays has:
-					id, name (person), age (if they have one set?), and is_last. (last in list?) */
+				// Each of the birthdays has:
+				// id, name (person), age (if they have one set?), and is_last. (last in list?)
 				foreach ($day['birthdays'] as $member)
 					echo '
 								<a href="', $scripturl, '?action=profile;u=', $member['id'], '"><span class="fix_rtl_names">', $member['name'], '</span>', isset($member['age']) ? ' (' . $member['age'] . ')' : '', '</a>', $member['is_last'] ? '' : ', ';
+
 				echo '
 							</div>';
 			}
@@ -446,8 +463,8 @@ function template_show_week_grid($grid_name)
 							<div class="smalltext">
 								<span class="event">', $txt['events'], '</span>';
 
-				/* The events are made up of:
-					title, href, is_last, can_edit (are they allowed to?), and modify_href. */
+				// The events are made up of:
+				// title, href, is_last, can_edit (are they allowed to?), and modify_href.
 				foreach ($day['events'] as $event)
 				{
 					// If they can edit the event, show a star they can click on....

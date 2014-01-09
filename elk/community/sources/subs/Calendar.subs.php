@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file contains several functions for retrieving and manipulating calendar events, birthdays and holidays.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file contains several functions for retrieving and manipulating calendar events, birthdays and holidays.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -97,9 +97,10 @@ function getBirthdayRange($low_date, $high_date)
  * @param string $low_date
  * @param string $high_date
  * @param bool $use_permissions = true
+ * @param int $limit
  * @return array contextual information if use_permissions is true, and an array of the data needed to build that otherwise
  */
-function getEventRange($low_date, $high_date, $use_permissions = true)
+function getEventRange($low_date, $high_date, $use_permissions = true, $limit = null)
 {
 	global $scripturl, $modSettings, $user_info, $context;
 
@@ -120,11 +121,13 @@ function getEventRange($low_date, $high_date, $use_permissions = true)
 			LEFT JOIN {db_prefix}topics AS t ON (t.id_topic = cal.id_topic)
 		WHERE cal.start_date <= {date:high_date}
 			AND cal.end_date >= {date:low_date}' . ($use_permissions ? '
-			AND (cal.id_board = {int:no_board_link} OR {query_wanna_see_board})' : ''),
+			AND (cal.id_board = {int:no_board_link} OR {query_wanna_see_board})' : '') . (!empty($limit) ? '
+		LIMIT {int:limit}' : ''),
 		array(
 			'high_date' => $high_date,
 			'low_date' => $low_date,
 			'no_board_link' => 0,
+			'limit' => $limit,
 		)
 	);
 	$events = array();
@@ -160,6 +163,7 @@ function getEventRange($low_date, $high_date, $use_permissions = true)
 					'end_date' => $row['end_date'],
 					'is_last' => false,
 					'id_board' => $row['id_board'],
+					'id_topic' => $row['id_topic'],
 					'href' => $row['id_board'] == 0 ? '' : $scripturl . '?topic=' . $row['id_topic'] . '.0',
 					'link' => $row['id_board'] == 0 ? $row['title'] : '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.0">' . $row['title'] . '</a>',
 					'can_edit' => allowedTo('calendar_edit_any') || ($row['id_member'] == $user_info['id'] && allowedTo('calendar_edit_own')),
@@ -176,6 +180,7 @@ function getEventRange($low_date, $high_date, $use_permissions = true)
 					'end_date' => $row['end_date'],
 					'is_last' => false,
 					'id_board' => $row['id_board'],
+					'id_topic' => $row['id_topic'],
 					'href' => $row['id_topic'] == 0 ? '' : $scripturl . '?topic=' . $row['id_topic'] . '.0',
 					'link' => $row['id_topic'] == 0 ? $row['title'] : '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.0">' . $row['title'] . '</a>',
 					'can_edit' => false,
@@ -340,7 +345,6 @@ function getCalendarGrid($month, $year, $calendarOptions)
 			'month' => $month == 12 ? 1 : $month + 1,
 			'disabled' => $modSettings['cal_maxyear'] < ($month == 12 ? $year + 1 : $year),
 		),
-		// @todo Better tweaks?
 		'size' => isset($calendarOptions['size']) ? $calendarOptions['size'] : 'large',
 	);
 
@@ -848,22 +852,22 @@ function insertEvent(&$eventOptions)
 
 	// Make sure the start date is in ISO order.
 	if (($num_results = sscanf($eventOptions['start_date'], '%d-%d-%d', $year, $month, $day)) !== 3)
-		trigger_error('modifyEvent(): invalid start date format given', E_USER_ERROR);
+		trigger_error('insertEvent(): invalid start date format given', E_USER_ERROR);
 
 	// Set the end date (if not yet given)
 	if (!isset($eventOptions['end_date']))
 		$eventOptions['end_date'] = strftime('%Y-%m-%d', mktime(0, 0, 0, $month, $day, $year) + $eventOptions['span'] * 86400);
 
 	// If no topic and board are given, they are not linked to a topic.
-	$eventOptions['board'] = isset($eventOptions['board']) ? (int) $eventOptions['board'] : 0;
-	$eventOptions['topic'] = isset($eventOptions['topic']) ? (int) $eventOptions['topic'] : 0;
+	$eventOptions['id_board'] = isset($eventOptions['id_board']) ? (int) $eventOptions['id_board'] : 0;
+	$eventOptions['id_topic'] = isset($eventOptions['id_topic']) ? (int) $eventOptions['id_topic'] : 0;
 
 	$event_columns = array(
 		'id_board' => 'int', 'id_topic' => 'int', 'title' => 'string-60', 'id_member' => 'int',
 		'start_date' => 'date', 'end_date' => 'date',
 	);
 	$event_parameters = array(
-		$eventOptions['board'], $eventOptions['topic'], $eventOptions['title'], $eventOptions['member'],
+		$eventOptions['id_board'], $eventOptions['id_topic'], $eventOptions['title'], $eventOptions['member'],
 		$eventOptions['start_date'], $eventOptions['end_date'],
 	);
 
@@ -913,35 +917,31 @@ function modifyEvent($event_id, &$eventOptions)
 		$eventOptions['end_date'] = strftime('%Y-%m-%d', mktime(0, 0, 0, $month, $day, $year) + $eventOptions['span'] * 86400);
 
 	$event_columns = array(
-		'start_date' => '{date:start_date}',
-		'end_date' => '{date:end_date}',
-		'title' => 'SUBSTRING({string:title}, 1, 60)',
-		'id_board' => '{int:id_board}',
-		'id_topic' => '{int:id_topic}'
-	);
-	$event_parameters = array(
-		'start_date' => $eventOptions['start_date'],
-		'end_date' => $eventOptions['end_date'],
-		'title' => $eventOptions['title'],
-		'id_board' => isset($eventOptions['board']) ? (int) $eventOptions['board'] : 0,
-		'id_topic' => isset($eventOptions['topic']) ? (int) $eventOptions['topic'] : 0,
+		'start_date' => 'start_date = {date:start_date}',
+		'end_date' => 'end_date = {date:end_date}',
+		'title' => 'title = SUBSTRING({string:title}, 1, 60)',
+		'id_board' => 'id_board = {int:id_board}',
+		'id_topic' => 'id_topic = {int:id_topic}'
 	);
 
-	// This is to prevent hooks to modify the id of the event
-	$real_event_id = $event_id;
-	call_integration_hook('integrate_modify_event', array($event_id, &$eventOptions, &$event_columns, &$event_parameters));
+	call_integration_hook('integrate_modify_event', array($event_id, &$eventOptions, &$event_columns));
+
+	$eventOptions['id_event'] = $event_id;
+
+	$to_update = array();
+	foreach ($event_columns as $key => $value)
+		if (isset($eventOptions[$key]))
+			$to_update[] = $value;
+
+	if (empty($to_update))
+		return;
 
 	$db->query('', '
 		UPDATE {db_prefix}calendar
 		SET
-			' . implode(', ', $event_columns) . '
+			' . implode(', ', $to_update) . '
 		WHERE id_event = {int:id_event}',
-		array_merge(
-			$event_parameters,
-			array(
-				'id_event' => $real_event_id
-			)
-		)
+		$eventOptions
 	);
 
 	updateSettings(array(
@@ -990,10 +990,10 @@ function getEventProperties($event_id, $calendar_only = false)
 		SELECT
 			c.id_event, c.id_board, c.id_topic, MONTH(c.start_date) AS month,
 			DAYOFMONTH(c.start_date) AS day, YEAR(c.start_date) AS year,
-			(TO_DAYS(c.end_date) - TO_DAYS(c.start_date)) AS span, c.id_member, c.title' . ($simple ? '' : ',
+			(TO_DAYS(c.end_date) - TO_DAYS(c.start_date)) AS span, c.id_member, c.title' . ($calendar_only ? '' : ',
 			t.id_first_msg, t.id_member_started,
 			mb.real_name, m.modified_time') . '
-		FROM {db_prefix}calendar AS c' . ($simple ? '' : '
+		FROM {db_prefix}calendar AS c' . ($calendar_only ? '' : '
 			LEFT JOIN {db_prefix}topics AS t ON (t.id_topic = c.id_topic)
 			LEFT JOIN {db_prefix}members AS mb ON (mb.id_member = t.id_member_started)
 			LEFT JOIN {db_prefix}messages AS m ON (m.id_msg  = t.id_first_msg)') . '
@@ -1041,6 +1041,11 @@ function getEventProperties($event_id, $calendar_only = false)
 	return $return_value;
 }
 
+/**
+ * Fetch and event that may be linked to a topic
+ *
+ * @param int $id_topic
+ */
 function eventInfoForTopic($id_topic)
 {
 	$db = database();
@@ -1060,9 +1065,7 @@ function eventInfoForTopic($id_topic)
 	);
 
 	while ($row = $db->fetch_assoc($request))
-	{
 		$events[] = $row;
-	}
 	$db->free_result($request);
 
 	return $events;
@@ -1112,7 +1115,7 @@ function list_getNumHolidays()
 		array(
 		)
 	);
-	list($num_items) = $db->fetch_row($request);
+	list ($num_items) = $db->fetch_row($request);
 	$db->free_result($request);
 
 	return (int) $num_items;
@@ -1171,7 +1174,7 @@ function editHoliday($holiday, $date, $title)
  * Insert a new holiday
  *
  * @param int $date
- * @param type $title
+ * @param string $title
  */
 function insert_holiday($date, $title)
 {

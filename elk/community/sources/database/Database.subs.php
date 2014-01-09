@@ -1,14 +1,14 @@
 <?php
 
 /**
+ * This file has all the main functions in it that set up the database connection
+ * and initializes the appropriate adapters.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
- *
- * This file has all the main functions in it that set up the database connection
- * and initializes the appropriate adapters.
+ * @version 1.0 Beta
  *
  */
 
@@ -21,14 +21,12 @@
  * @param string $db_passwd
  * @param string $db_prefix
  * @param array $db_options
+ * @param string $db_type
  * @return null
  */
 function elk_db_initiate($db_server, $db_name, $db_user, $db_passwd, $db_prefix, $db_options = array(), $db_type = 'mysql')
 {
-	global $mysql_set_mode;
-
 	require_once(SOURCEDIR . '/database/Db.php');
-	require_once(SOURCEDIR . '/database/Db-' . $db_type . '.subs.php');
 	require_once(SOURCEDIR . '/database/Db-' . $db_type . '.class.php');
 
 	// quick 'n dirty initialization of the right database class.
@@ -45,7 +43,7 @@ function elk_db_initiate($db_server, $db_name, $db_user, $db_passwd, $db_prefix,
  *
  * @param string $type = 'extra'
  */
-function db_extend ($type = 'extra')
+function db_extend($type = 'extra')
 {
 	// this can be removed.
 }

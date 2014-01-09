@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file has a single job - database backup.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,15 +11,13 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has a single job - database backup.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -26,12 +26,11 @@ if (!defined('ELKARTE'))
  * It uses gzip compression if compress is set in the URL/post data.
  * It may possibly time out, and mess up badly if you were relying on it. :P
  * The data dumped depends on whether "struct" and "data" are passed.
- * It is called from ManageMaintenance.php.
+ * It is called from ManageMaintenance.controller.php.
  */
 function DumpDatabase2()
 {
-	global $db_name, $scripturl, $modSettings;
-	global $db_prefix, $db_show_debug;
+	global $db_name, $scripturl, $modSettings, $db_prefix, $db_show_debug;
 
 	// We'll need a db to dump :P
 	$database = database();
@@ -215,8 +214,7 @@ function DumpDatabase2()
 /**
  * Dummy/helper function, it simply returns the string passed as argument
  *
- * @param $string, string to uncompress
- * @return the string passed
+ * @param string $string - string to uncompress
  */
 function un_compressed($string = '')
 {

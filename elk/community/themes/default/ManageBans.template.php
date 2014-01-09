@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -24,11 +25,9 @@ function template_ban_edit()
 	echo '
 	<div id="manage_bans">
 		<form id="admin_form_wrapper" action="', $context['form_url'], '" method="post" accept-charset="', $context['character_set'], '" onsubmit="return confirmBan(this);">
-			<div class="cat_bar">
-				<h3 class="catbg">
-					', $context['ban']['is_new'] ? $txt['ban_add_new'] : $txt['ban_edit'] . ' \'' . $context['ban']['name'] . '\'', '
-				</h3>
-			</div>';
+			<h2 class="category_header">
+				', $context['ban']['is_new'] ? $txt['ban_add_new'] : $txt['ban_edit'] . ' \'' . $context['ban']['name'] . '\'', '
+			</h2>';
 
 	if ($context['ban']['is_new'])
 		echo '
@@ -94,7 +93,7 @@ function template_ban_edit()
 		echo '
 				<fieldset>
 					<legend>
-						', $txt['ban_triggers'], '
+						<input type="checkbox" onclick="invertAll(this, this.form, \'ban_suggestion\');" class="input_check"> ', $txt['ban_triggers'], '
 					</legend>
 					<dl class="settings">
 						<dt>
@@ -124,7 +123,7 @@ function template_ban_edit()
 							<input type="text" name="email" value="', $context['ban_suggestions']['email'], '" size="44" onfocus="document.getElementById(\'email_check\').checked = true;" class="input_text" />
 						</dd>
 						<dt>
-							<input type="checkbox" name="ban_suggestions[]" id="user_check" value="user" class="input_check" ', !empty($context['ban_suggestions']['user']) ||  isset($context['ban']['from_user']) ? 'checked="checked" ' : '', '/>
+							<input type="checkbox" name="ban_suggestions[]" id="user_check" value="user" class="input_check" ', !empty($context['ban_suggestions']['user']) || isset($context['ban']['from_user']) ? 'checked="checked" ' : '', '/>
 							<label for="user_check">', $txt['ban_on_username'], '</label>:
 						</dt>
 						<dd>
@@ -146,10 +145,10 @@ function template_ban_edit()
 					foreach ($ban_ips as $ip)
 						echo '
 						<dt>
-							<input type="checkbox" id="suggestions_', $key ,'_', $count, '" name="ban_suggestions[', $key ,'][]" ', !empty($context['ban_suggestions']['saved_triggers'][$key]) && in_array($ip, $context['ban_suggestions']['saved_triggers'][$key]) ? 'checked="checked" ' : '', 'value="', $ip, '" class="input_check" />
+							<input type="checkbox" id="suggestions_', $key, '_', $count, '" name="ban_suggestions[', $key, '][]" ', !empty($context['ban_suggestions']['saved_triggers'][$key]) && in_array($ip, $context['ban_suggestions']['saved_triggers'][$key]) ? 'checked="checked" ' : '', 'value="', $ip, '" class="input_check" />
 						</dt>
 						<dd>
-							<label for="suggestions_', $key ,'_', $count++, '">', $ip, '</label>
+							<label for="suggestions_', $key, '_', $count++, '">', $ip, '</label>
 						</dd>';
 
 					echo '
@@ -163,12 +162,14 @@ function template_ban_edit()
 	}
 
 	echo '
-				<input type="submit" name="', $context['ban']['is_new'] ? 'add_ban' : 'modify_ban', '" value="', $context['ban']['is_new'] ? $txt['ban_add'] : $txt['ban_modify'], '" class="button_submit" />
-				<input type="hidden" name="old_expire" value="', $context['ban']['expiration']['days'], '" />
-				<input type="hidden" name="bg" value="', $context['ban']['id'], '" />', isset($context['ban']['from_user']) ? '
-				<input type="hidden" name="u" value="' . $context['ban_suggestions']['member']['id'] . '" />' : '', '
-				<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-				<input type="hidden" name="', $context['admin-bet_token_var'], '" value="', $context['admin-bet_token'], '" />
+				<div class="submitbutton">
+					<input type="submit" name="', $context['ban']['is_new'] ? 'add_ban' : 'modify_ban', '" value="', $context['ban']['is_new'] ? $txt['ban_add'] : $txt['ban_modify'], '" class="button_submit" />
+					<input type="hidden" name="old_expire" value="', $context['ban']['expiration']['days'], '" />
+					<input type="hidden" name="bg" value="', $context['ban']['id'], '" />', isset($context['ban']['from_user']) ? '
+					<input type="hidden" name="u" value="' . $context['ban_suggestions']['member']['id'] . '" />' : '', '
+					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+					<input type="hidden" name="', $context['admin-bet_token_var'], '" value="', $context['admin-bet_token'], '" />
+				</div>
 			</div>
 		</form>';
 
@@ -176,6 +177,7 @@ function template_ban_edit()
 	{
 		echo '
 		<br />';
+
 		template_show_list('ban_items');
 	}
 
@@ -194,10 +196,10 @@ function template_ban_edit()
 	// Auto suggest only needed for adding new bans, not editing
 	if ($context['ban']['is_new'] && empty($_REQUEST['u']))
 		echo '
-			var oAddMemberSuggest = new smc_AutoSuggest({
+		var oAddMemberSuggest = new smc_AutoSuggest({
 			sSelf: \'oAddMemberSuggest\',
-			sSessionId: smf_session_id,
-			sSessionVar: smf_session_var,
+			sSessionId: elk_session_id,
+			sSessionVar: elk_session_var,
 			sSuggestId: \'user\',
 			sControlId: \'user\',
 			sSearchType: \'member\',
@@ -210,12 +212,13 @@ function template_ban_edit()
 			document.getElementById(\'user_check\').checked = true;
 			return true;
 		}
+
 		oAddMemberSuggest.registerCallback(\'onBeforeUpdate\', \'onUpdateName\');';
 
 	echo '
 		function confirmBan(aForm)
 		{
-			if (aForm.ban_name.value == \'\')
+			if (aForm.ban_name.value === \'\')
 			{
 				alert(\'', $txt['ban_name_empty'], '\');
 				return false;
@@ -226,7 +229,8 @@ function template_ban_edit()
 				alert(\'', $txt['ban_restriction_empty'], '\');
 				return false;
 			}
-		}// ]]></script>';
+		}
+	// ]]></script>';
 }
 
 /**
@@ -234,21 +238,19 @@ function template_ban_edit()
  */
 function template_ban_edit_trigger()
 {
-	global $context, $settings, $txt, $modSettings;
+	global $context, $txt, $modSettings;
 
 	echo '
 	<div id="manage_bans">
 		<form id="admin_form_wrapper" action="', $context['form_url'], '" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">
-					', $context['ban_trigger']['is_new'] ? $txt['ban_add_trigger'] : $txt['ban_edit_trigger_title'], '
-				</h3>
-			</div>
+			<h2 class="category_header">
+				', $context['ban_trigger']['is_new'] ? $txt['ban_add_trigger'] : $txt['ban_edit_trigger_title'], '
+			</h2>
 			<div class="windowbg">
 				<div class="content">
 					<fieldset>
 						<legend>
-							', $txt['ban_triggers'], '
+							<input type="checkbox" onclick="invertAll(this, this.form, \'ban_suggestion\');" class="input_check"> ', $txt['ban_triggers'], '
 						</legend>
 						<dl class="settings">
 							<dt>
@@ -259,17 +261,17 @@ function template_ban_edit_trigger()
 								<input type="text" name="main_ip" value="', $context['ban_trigger']['ip']['value'], '" size="44" onfocus="document.getElementById(\'main_ip_check\').checked = true;" class="input_text" />
 							</dd>';
 
-				if (empty($modSettings['disableHostnameLookup']))
-					echo '
-								<dt>
-									<input type="checkbox" name="ban_suggestions[]" id="hostname_check" value="hostname" class="input_check" ', $context['ban_trigger']['hostname']['selected'] ? 'checked="checked" ' : '', '/>
-									<label for="hostname_check">', $txt['ban_on_hostname'], '</label>
-								</dt>
-								<dd>
-									<input type="text" name="hostname" value="', $context['ban_trigger']['hostname']['value'], '" size="44" onfocus="document.getElementById(\'hostname_check\').checked = true;" class="input_text" />
-								</dd>';
+	if (empty($modSettings['disableHostnameLookup']))
+		echo '
+							<dt>
+								<input type="checkbox" name="ban_suggestions[]" id="hostname_check" value="hostname" class="input_check" ', $context['ban_trigger']['hostname']['selected'] ? 'checked="checked" ' : '', '/>
+								<label for="hostname_check">', $txt['ban_on_hostname'], '</label>
+							</dt>
+							<dd>
+								<input type="text" name="hostname" value="', $context['ban_trigger']['hostname']['value'], '" size="44" onfocus="document.getElementById(\'hostname_check\').checked = true;" class="input_text" />
+							</dd>';
 
-				echo '
+	echo '
 							<dt>
 								<input type="checkbox" name="ban_suggestions[]" id="email_check" value="email" class="input_check" ', $context['ban_trigger']['email']['selected'] ? 'checked="checked" ' : '', '/>
 								<label for="email_check">', $txt['ban_on_email'], '</label>
@@ -286,7 +288,9 @@ function template_ban_edit_trigger()
 							</dd>
 						</dl>
 					</fieldset>
-					<input type="submit" name="', $context['ban_trigger']['is_new'] ? 'add_new_trigger' : 'edit_trigger', '" value="', $context['ban_trigger']['is_new'] ? $txt['ban_add_trigger_submit'] : $txt['ban_edit_trigger_submit'], '" class="button_submit" />
+					<div class="submitbutton">
+						<input type="submit" name="', $context['ban_trigger']['is_new'] ? 'add_new_trigger' : 'edit_trigger', '" value="', $context['ban_trigger']['is_new'] ? $txt['ban_add_trigger_submit'] : $txt['ban_edit_trigger_submit'], '" class="button_submit" />
+					</div>
 				</div>
 			</div>
 			<input type="hidden" name="bi" value="' . $context['ban_trigger']['id'] . '" />
@@ -296,12 +300,11 @@ function template_ban_edit_trigger()
 		</form>
 	</div>
 
-	<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
 	<script><!-- // --><![CDATA[
 		var oAddMemberSuggest = new smc_AutoSuggest({
 			sSelf: \'oAddMemberSuggest\',
-			sSessionId: smf_session_id,
-			sSessionVar: smf_session_var,
+			sSessionId: elk_session_id,
+			sSessionVar: elk_session_var,
 			sSuggestId: \'username\',
 			sControlId: \'user\',
 			sSearchType: \'member\',
@@ -314,6 +317,7 @@ function template_ban_edit_trigger()
 			document.getElementById(\'user_check\').checked = true;
 			return true;
 		}
+
 		oAddMemberSuggest.registerCallback(\'onBeforeUpdate\', \'onUpdateName\');
 	// ]]></script>';
 }

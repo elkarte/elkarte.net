@@ -1,21 +1,28 @@
 <?php
 
 /**
+ * This class handles database search. (PostgreSQL)
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
- *
- * This class handles database search. (PostgreSQL)
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
+/**
+ * PostgreSQL implementation of DbSearch
+ */
 class DbSearch_PostgreSQL implements DbSearch
 {
+	/**
+	 * This instance of the search
+	 * @var instance
+	 */
 	private static $_search = null;
 
 	/**
@@ -47,12 +54,12 @@ class DbSearch_PostgreSQL implements DbSearch
 			'create_tmp_log_search_topics' => array(
 				'~mediumint\(\d\)~i' => 'int',
 				'~unsigned~i' => '',
-				'~TYPE=HEAP~i' => '',
+				'~ENGINE=MEMORY~i' => '',
 			),
 			'create_tmp_log_search_messages' => array(
 				'~mediumint\(\d\)' => 'int',
 				'~unsigned~i' => '',
-				'~TYPE=HEAP~i' => '',
+				'~ENGINE=MEMORY~i' => '',
 			),
 			'drop_tmp_log_search_topics' => array(
 				'~IF\sEXISTS~i' => '',
@@ -61,10 +68,14 @@ class DbSearch_PostgreSQL implements DbSearch
 				'~IF\sEXISTS~i' => '',
 			),
 			'insert_into_log_messages_fulltext' => array(
+				'~LIKE~i' => 'iLIKE',
+				'~NOT\sLIKE~i' => '~NOT iLIKE',
 				'~NOT\sRLIKE~i' => '!~*',
 				'~RLIKE~i' => '~*',
 			),
 			'insert_log_search_results_subject' => array(
+				'~LIKE~i' => 'iLIKE',
+				'~NOT\sLIKE~i' => 'NOT iLIKE',
 				'~NOT\sRLIKE~i' => '!~*',
 				'~RLIKE~i' => '~*',
 			),
@@ -84,6 +95,67 @@ class DbSearch_PostgreSQL implements DbSearch
 		);
 
 		return $return;
+	}
+
+	/**
+	 * Returns some basic info about the {db_prefix}messages table
+	 * Used in ManageSearch.controller.php in the page to select the index method
+	 */
+	public function membersTableInfo()
+	{
+		global $db_prefix, $txt;
+
+		$db = database();
+
+		$table_info = array();
+
+		// In order to report the sizes correctly we need to perform vacuum (optimize) on the tables we will be using.
+		$temp_tables = $db->db_list_tables();
+		foreach ($temp_tables as $table)
+			if ($table == $db_prefix. 'messages' || $table == $db_prefix. 'log_search_words')
+				$db->db_optimize_table($table);
+
+		// PostGreSql has some hidden sizes.
+		$request = $db->query('', '
+			SELECT relname, relpages * 8 *1024 AS "KB" FROM pg_class
+			WHERE relname = {string:messages} OR relname = {string:log_search_words}
+			ORDER BY relpages DESC',
+			array(
+				'messages' => $db_prefix. 'messages',
+				'log_search_words' => $db_prefix. 'log_search_words',
+			)
+		);
+
+		if ($request !== false && $db->num_rows($request) > 0)
+		{
+			while ($row = $db->fetch_assoc($request))
+			{
+				if ($row['relname'] == $db_prefix . 'messages')
+				{
+					$table_info['data_length'] = (int) $row['KB'];
+					$table_info['index_length'] = (int) $row['KB'];
+
+					// Doesn't support fulltext
+					$table_info['fulltext_length'] = $txt['not_applicable'];
+				}
+				elseif ($row['relname'] == $db_prefix. 'log_search_words')
+				{
+					$table_info['index_length'] = (int) $row['KB'];
+					$table_info['custom_index_length'] = (int) $row['KB'];
+				}
+			}
+			$db->free_result($request);
+		}
+		else
+			// Didn't work for some reason...
+			$table_info = array(
+				'data_length' => $txt['not_applicable'],
+				'index_length' => $txt['not_applicable'],
+				'fulltext_length' => $txt['not_applicable'],
+				'custom_index_length' => $txt['not_applicable'],
+			);
+
+		return $table_info;
 	}
 
 	/**

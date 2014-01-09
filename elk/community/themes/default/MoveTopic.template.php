@@ -11,22 +11,29 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
+
+/**
+ * Have the generic templates available
+ */
+function template_MoveTopic_init()
+{
+	loadTemplate('GenericHelpers');
+}
 
 /**
  * Show an interface for selecting which board to move a post to.
  */
-function template_main()
+function template_move_topic()
 {
 	global $context, $txt, $scripturl;
 
 	echo '
-	<div id="move_topic" class="lower_padding">
+	<div id="move_topic">
 		<form action="', $scripturl, '?action=movetopic2;current_board=' . $context['current_board'] . ';topic=', $context['current_topic'], '.0" method="post" accept-charset="UTF-8" onsubmit="submitonce(this);">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['move_topic'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['move_topic'], '</h2>
 			<div class="windowbg centertext">
 				<div class="content">
 					<div class="move_topic">
@@ -61,24 +68,24 @@ function template_main()
 									<label for="redirect_topic">', $txt['movetopic_redirect'], '</label>
 								</dt>
 								<dd>
-									<input type="checkbox" name="redirect_topic" id="redirect_topic" checked="checked" class="input_check" />
+									<input type="checkbox" name="redirect_topic" id="redirect_topic" ', !empty($context['redirect_topic']) ? 'checked="checked"' : '', ' class="input_check" />
 								</dd>
 								<dt>
 									', $txt['movetopic_expires'], '
 								</dt>
 								<dd>
 									<select name="redirect_expires">
-										<option value="0" selected="selected">', $txt['never'], '</option>
-										<option value="1440">', $txt['one_day'], '</option>
-										<option value="10080">', $txt['one_week'], '</option>
-										<option value="20160">', $txt['two_weeks'], '</option>
-										<option value="43200">', $txt['one_month'], '</option>
-										<option value="86400">', $txt['two_months'], '</option>
+										<option value="0"', empty($context['redirect_expires']) ? ' selected="selected"' : '', '>', $txt['never'], '</option>
+										<option value="1440"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 1440 ? ' selected="selected"' : '', '>', $txt['one_day'], '</option>
+										<option value="10080"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 10080 ? ' selected="selected"' : '', '>', $txt['one_week'], '</option>
+										<option value="20160"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 20160 ? ' selected="selected"' : '', '>', $txt['two_weeks'], '</option>
+										<option value="43200"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 43200 ? ' selected="selected"' : '', '>', $txt['one_month'], '</option>
+										<option value="86400"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 86400 ? ' selected="selected"' : '', '>', $txt['two_months'], '</option>
 									</select>
 								</dd>
 							</dl>
 						</fieldset>
-						<input type="submit" value="', $txt['move_topic'], '" onclick="return submitThisOnce(this);" accesskey="s" class="button_submit" />
+						<input type="submit" value="', $txt['move_topic'], '" onclick="return submitThisOnce(this);" accesskey="s" class="right_submit" />
 					</div>
 				</div>
 			</div>';

@@ -11,23 +11,22 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
- * Who's online page.
+ * Template to display the who's online table header
  */
-function template_main()
+function template_whos_selection_above()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $scripturl, $txt;
 
 	// Display the table header and linktree.
 	echo '
-	<div class="main_section" id="whos_online">
+	<div id="whos_online">
 		<form action="', $scripturl, '?action=who" method="post" id="whoFilter" accept-charset="UTF-8">
-			<div class="title_bar">
-				<h4 class="titlebg margin_lower">', $txt['who_title'], '</h4>
-			</div>';
+			<h2 class="category_header">', $txt['who_title'], '</h2>';
 
 	$extra = '
 				<div class="selectbox floatright">' . $txt['who_show1'] . '
@@ -39,24 +38,32 @@ function template_main()
 	$extra .= '
 					</select>
 					<noscript>
-						<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit" />
+						<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit submitgo" />
 					</noscript>
 				</div>';
 
-	template_pagesection(false, false, 'go_down', array('extra' => $extra));
+	template_pagesection(false, false, array('extra' => $extra));
+}
+
+/**
+ * Who's online page.
+ */
+function template_whos_online()
+{
+	global $context, $settings, $scripturl, $txt;
 
 	echo '
 			<div class="topic_table" id="mlist">
 				<table class="table_grid" >
 					<thead>
-						<tr class="catbg">
-							<th scope="col" class="lefttext first_th" style="width:40%">
+						<tr class="table_head">
+							<th scope="col" class="lefttext" style="width:40%">
 								<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=user', $context['sort_direction'] != 'down' && $context['sort_by'] == 'user' ? '' : ';asc', '" rel="nofollow">', $txt['who_user'], $context['sort_by'] == 'user' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
 							</th>
 							<th scope="col" class="lefttext" style="width:10%">
 								<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=time', $context['sort_direction'] == 'down' && $context['sort_by'] == 'time' ? ';asc' : '', '" rel="nofollow">', $txt['who_time'], $context['sort_by'] == 'time' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
 							</th>
-							<th scope="col" class="lefttext last_th" style="width:50%">', $txt['who_action'], '</th>
+							<th scope="col" class="lefttext" style="width:50%">', $txt['who_action'], '</th>
 						</tr>
 					</thead>
 					<tbody>';
@@ -69,18 +76,7 @@ function template_main()
 		// $alternate will either be true or false. If it's true, use "windowbg2" and otherwise use "windowbg".
 		echo '
 						<tr class="windowbg', $alternate ? '2' : '', '">
-							<td>';
-
-		// Guests don't have some information ... and they can't be contacted.
-		if (!$member['is_guest'])
-		{
-			echo '
-								<span class="contact_info floatright">
-									', $context['can_send_pm'] ? '<a href="' . $member['online']['href'] . '" title="' . $member['online']['text'] . '">' : '', $settings['use_image_buttons'] ? '<img src="' . $member['online']['image_href'] . '" alt="' . $member['online']['text'] . '" />' : $member['online']['label'], $context['can_send_pm'] ? '</a>' : '', '
-								</span>';
-		}
-
-		echo '
+							<td>
 								<span class="member', $member['is_hidden'] ? ' hidden' : '', '">
 									', $member['is_guest'] ? $member['name'] : '<a href="' . $member['href'] . '" title="' . $txt['profile_of'] . ' ' . $member['name'] . '"' . (empty($member['color']) ? '' : ' style="color: ' . $member['color'] . '"') . '>' . $member['name'] . '</a>', '
 								</span>';
@@ -114,7 +110,30 @@ function template_main()
 					</tbody>
 				</table>
 			</div>';
-	template_pagesection(false, false, 'go_down', array('extra' => $extra));
+}
+
+/**
+ * Close up the who's online page
+ */
+function template_whos_selection_below()
+{
+	global $context, $txt;
+
+	$extra_bottom = '
+			<div class="selectbox floatright">' . $txt['who_show1'] . '
+				<select name="show" onchange="document.forms.whoFilter.submit();">';
+
+	foreach ($context['show_methods'] as $value => $label)
+		$extra_bottom .= '
+					<option value="' . $value . '" ' . ($value == $context['show_by'] ? ' selected="selected"' : '') . '>' . $label . '</option>';
+	$extra_bottom .= '
+				</select>
+				<noscript>
+					<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit submitgo" />
+				</noscript>
+			</div>';
+
+	template_pagesection(false, false, array('extra' => $extra_bottom));
 
 	echo '
 		</form>
@@ -130,15 +149,13 @@ function template_credits()
 
 	// The most important part - the credits :P.
 	echo '
-	<div class="main_section" id="credits">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['credits'], '</h3>
-		</div>';
+	<div id="credits">
+		<h2 class="category_header">', $txt['credits'], '</h2>';
 
 	foreach ($context['credits'] as $section)
 	{
 		if (isset($section['pretext']))
-		echo '
+			echo '
 		<div class="windowbg">
 			<div class="content">
 				<p>', $section['pretext'], '</p>
@@ -146,10 +163,8 @@ function template_credits()
 		</div>';
 
 		if (isset($section['title']))
-		echo '
-		<div class="cat_bar">
-			<h3 class="catbg">', $section['title'], '</h3>
-		</div>';
+			echo '
+			<h3 class="category_header">', $section['title'], '</h3>';
 
 		echo '
 		<div class="windowbg2">
@@ -194,9 +209,7 @@ function template_credits()
 	if (!empty($context['credits_software_graphics']))
 	{
 		echo '
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['credits_software_graphics'], '</h3>
-		</div>
+		<h3 class="category_header">', $txt['credits_software_graphics'], '</h3>
 		<div class="windowbg">
 			<div class="content">';
 
@@ -216,9 +229,7 @@ function template_credits()
 	if (!empty($context['credits_addons']))
 	{
 		echo '
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['credits_addons'], '</h3>
-		</div>
+		<h3 class="category_header">', $txt['credits_addons'], '</h3>
 		<div class="windowbg">
 			<div class="content">';
 
@@ -235,9 +246,7 @@ function template_credits()
 
 	// ElkArte !
 	echo '
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['credits_copyright'], '</h3>
-		</div>
+		<h3 class="category_header">', $txt['credits_copyright'], '</h3>
 		<div class="windowbg">
 			<div class="content">
 				<dl>

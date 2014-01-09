@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Functions for working with message icons
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,21 +13,23 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Gets a list of all available message icons.
- *
- * @return type
  */
-function getMessageIcons()
+function fetchMessageIconsDetails()
 {
 	global $settings, $txt;
+	static $icons;
+
+	if (isset($icons))
+		return $icons;
 
 	$db = database();
 
@@ -64,7 +68,7 @@ function getMessageIcons()
 /**
  * Delete a message icon.
  *
- * @param type $icons
+ * @param array $icons
  */
 function deleteMessageIcon($icons)
 {
@@ -83,7 +87,7 @@ function deleteMessageIcon($icons)
 /**
  * Updates a message icon.
  *
- * @param type $icon
+ * @param array $icon array of values to use in the $db->insert
  */
 function updateMessageIcon($icon)
 {
@@ -100,13 +104,13 @@ function updateMessageIcon($icon)
 /**
  * Adds a new message icon.
  *
- * @param type $icon
+ * @param array $icon
  */
 function addMessageIcon($icon)
 {
 	$db = database();
 
-	$db->insert('replace',
+	$db->insert('',
 		'{db_prefix}message_icons',
 		array('id_board' => 'int', 'title' => 'string-80', 'filename' => 'string-80', 'icon_order' => 'int'),
 		$icon,
@@ -116,44 +120,18 @@ function addMessageIcon($icon)
 
 /**
  * Sort the message icons table.
+ *
+ * @deprecated the ordering is done in the query, probably not needed
  */
 function sortMessageIconTable()
 {
 	$db = database();
 
-	$db->query('alter_table_icons', '
+	$db->query('alter_table', '
 		ALTER TABLE {db_prefix}message_icons
 		ORDER BY icon_order',
 		array(
 			'db_error_skip' => true,
 		)
 	);
-}
-
-/**
- * Callback function for createList().
- *
- * @param int $start
- * @param int $items_per_page
- * @param string $sort
- */
-function list_getMessageIcons($start, $items_per_page, $sort)
-{
-	$db = database();
-
-	$request = $db->query('', '
-		SELECT m.id_icon, m.title, m.filename, m.icon_order, m.id_board, b.name AS board_name
-		FROM {db_prefix}message_icons AS m
-			LEFT JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board)
-		WHERE ({query_see_board} OR b.id_board IS NULL)',
-		array(
-		)
-	);
-
-	$message_icons = array();
-	while ($row = $db->fetch_assoc($request))
-		$message_icons[] = $row;
-	$db->free_result($request);
-
-	return $message_icons;
 }

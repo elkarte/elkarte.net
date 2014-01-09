@@ -197,10 +197,10 @@ class JSMinPlus
 
 	public static function minify($js, $filename='')
 	{
-		static $instance;
+		static $instance = null;
 
 		// this is a singleton
-		if(!$instance)
+		if($instance === null)
 			$instance = new JSMinPlus();
 
 		return $instance->min($js, $filename);
@@ -215,7 +215,8 @@ class JSMinPlus
 		}
 		catch(Exception $e)
 		{
-			echo $e->getMessage() . "\n";
+			//echo $e->getMessage() . "\n";
+			return false;
 		}
 
 		return false;

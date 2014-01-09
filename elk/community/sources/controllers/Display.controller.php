@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This controls topic display, with all related functions, its is the forum
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,20 +11,30 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This is perhaps the most important and probably most accessed file in all
- * of ELKARTE.  This file controls topic, message, and attachment display.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
+/**
+ * This controller is the most important and probably most accessed of all.
+ * It controls topic display, with all related.
+ */
 class Display_Controller
 {
+	/**
+	 * Default action handler for this controller
+	 */
+	public function action_index()
+	{
+		// what to do... display things!
+		$this->action_display();
+	}
+
 	/**
 	 * The central part of the board - topic display.
 	 * This function loads the posts in a topic up so they can be displayed.
@@ -32,13 +44,11 @@ class Display_Controller
 	 * It depends on the messages_per_page, defaultMaxMessages and enableAllMessages settings.
 	 * It is accessed by ?topic=id_topic.START.
 	 */
-	function action_index()
+	public function action_display()
 	{
 		global $scripturl, $txt, $modSettings, $context, $settings;
 		global $options, $user_info, $board_info, $topic, $board;
-		global $attachments, $messages_request, $topicinfo, $language, $all_posters;
-
-		$db = database();
+		global $attachments, $messages_request, $language;
 
 		// What are you gonna display if these are empty?!
 		if (empty($topic))
@@ -46,6 +56,7 @@ class Display_Controller
 
 		// Load the template
 		loadTemplate('Display');
+		$context['sub_template'] = 'messages';
 
 		// And the topic functions
 		require_once(SUBSDIR . '/Topic.subs.php');
@@ -61,6 +72,7 @@ class Display_Controller
 		// How much are we sticking on each page?
 		$context['messages_per_page'] = empty($modSettings['disableCustomPerPage']) && !empty($options['messages_per_page']) ? $options['messages_per_page'] : $modSettings['defaultMaxMessages'];
 		$template_layers = Template_Layers::getInstance();
+		$template_layers->addEnd('messages_informations');
 
 		// Let's do some work on what to search index.
 		if (count($_GET) > 2)
@@ -98,33 +110,42 @@ class Display_Controller
 			$_SESSION['last_read_topic'] = $topic;
 		}
 
-		$topic_parameters = array(
-			'member' => $user_info['id'],
-			'topic' => $topic,
-			'board' => $board,
-		);
 		$topic_selects = array();
 		$topic_tables = array();
-		call_integration_hook('integrate_display_topic', array(&$topic_selects, &$topic_tables, &$topic_parameters));
+		$topic_parameters = array(
+			'topic' => $topic,
+			'member' => $user_info['id'],
+			'board' => (int) $board,
+		);
 
-		// @todo Why isn't this cached?
-		// @todo if we get id_board in this query and cache it, we can save a query on posting
+		// Allow addons to add additional details to the topic query
+		call_integration_hook('integrate_topic_query', array(&$topic_selects, &$topic_tables, &$topic_parameters));
+
 		// Load the topic details
 		$topicinfo = getTopicInfo($topic_parameters, 'all', $topic_selects, $topic_tables);
 		if (empty($topicinfo))
 			fatal_lang_error('not_a_topic', false);
 
 		// Is this a moved topic that we are redirecting to?
-		if (!empty($topicinfo['id_redirect_topic']))
+		if (!empty($topicinfo['id_redirect_topic']) && !isset($_GET['noredir']))
 		{
 			markTopicsRead(array($user_info['id'], $topic, $topicinfo['id_last_msg'], 0), $topicinfo['new_from'] !== 0);
-			redirectexit('topic=' . $topicinfo['id_redirect_topic'] . '.0');
+			redirectexit('topic=' . $topicinfo['id_redirect_topic'] . '.0;redirfrom=' . $topicinfo['id_topic']);
 		}
 
 		$context['real_num_replies'] = $context['num_replies'] = $topicinfo['num_replies'];
 		$context['topic_first_message'] = $topicinfo['id_first_msg'];
 		$context['topic_last_message'] = $topicinfo['id_last_msg'];
-		$context['topic_disregarded'] = isset($topicinfo['disregarded']) ? $topicinfo['disregarded'] : 0;
+		$context['topic_unwatched'] = isset($topicinfo['unwatched']) ? $topicinfo['unwatched'] : 0;
+		if (isset($_GET['redirfrom']))
+		{
+			$redir_topics = topicsList(array((int) $_GET['redirfrom']));
+			if (!empty($redir_topics[(int) $_GET['redirfrom']]))
+			{
+				$context['topic_redirected_from'] = $redir_topics[(int) $_GET['redirfrom']];
+				$context['topic_redirected_from']['redir_href'] = $scripturl . '?topic=' . $context['topic_redirected_from']['id_topic'] . '.0;noredir';
+			}
+		}
 
 		// Add up unapproved replies to get real number of replies...
 		if ($modSettings['postmod_active'] && allowedTo('approve_posts'))
@@ -182,22 +203,7 @@ class Display_Controller
 				else
 				{
 					// Find the number of messages posted before said time...
-					$request = $db->query('', '
-						SELECT COUNT(*)
-						FROM {db_prefix}messages
-						WHERE poster_time < {int:timestamp}
-							AND id_topic = {int:current_topic}' . ($modSettings['postmod_active'] && $topicinfo['unapproved_posts'] && !allowedTo('approve_posts') ? '
-							AND (approved = {int:is_approved}' . ($user_info['is_guest'] ? '' : ' OR id_member = {int:current_member}') . ')' : ''),
-						array(
-							'current_topic' => $topic,
-							'current_member' => $user_info['id'],
-							'is_approved' => 1,
-							'timestamp' => $timestamp,
-						)
-					);
-					list ($context['start_from']) = $db->fetch_row($request);
-					$db->free_result($request);
-
+					$context['start_from'] = countNewPosts($topic, $topicinfo, $timestamp);
 					// Handle view_newest_first options, and get the correct start value.
 					$_REQUEST['start'] = empty($options['view_newest_first']) ? $context['start_from'] : $context['total_visible_posts'] - $context['start_from'] - 1;
 				}
@@ -212,23 +218,8 @@ class Display_Controller
 					$context['start_from'] = 0;
 				else
 				{
-					// Find the start value for that message......
-					$request = $db->query('', '
-						SELECT COUNT(*)
-						FROM {db_prefix}messages
-						WHERE id_msg < {int:virtual_msg}
-							AND id_topic = {int:current_topic}' . ($modSettings['postmod_active'] && $topicinfo['unapproved_posts'] && !allowedTo('approve_posts') ? '
-							AND (approved = {int:is_approved}' . ($user_info['is_guest'] ? '' : ' OR id_member = {int:current_member}') . ')' : ''),
-						array(
-							'current_member' => $user_info['id'],
-							'current_topic' => $topic,
-							'virtual_msg' => $virtual_msg,
-							'is_approved' => 1,
-							'no_member' => 0,
-						)
-					);
-					list ($context['start_from']) = $db->fetch_row($request);
-					$db->free_result($request);
+					$only_approved = $modSettings['postmod_active'] && $topicinfo['unapproved_posts'] && !allowedTo('approve_posts');
+					$context['start_from'] = countMessagesBefore($topic, $virtual_msg, false, $only_approved, !$user_info['is_guest']);
 				}
 
 				// We need to reverse the start as well in this case.
@@ -236,19 +227,38 @@ class Display_Controller
 			}
 		}
 
+		// Mark the mention as read if requested
+		if (isset($_REQUEST['mentionread']) && !empty($virtual_msg))
+		{
+			require_once(CONTROLLERDIR . '/Mentions.controller.php');
+
+			$mentions = new Mentions_Controller();
+			$mentions->setData(array(
+				'id_mention' => $_REQUEST['item'],
+				'mark' => $_REQUEST['mark'],
+			));
+			$mentions->action_markread();
+		}
+
 		// Create a previous next string if the selected theme has it as a selected option.
-		$context['previous_next'] = $modSettings['enablePreviousNext'] ? '<a href="' . $scripturl . '?topic=' . $topic . '.0;prev_next=prev#new">' . $txt['previous_next_back'] . '</a> - <a href="' . $scripturl . '?topic=' . $topic . '.0;prev_next=next#new">' . $txt['previous_next_forward'] . '</a>' : '';
+		if ($modSettings['enablePreviousNext'])
+			$context['links'] += array(
+				'go_prev' => $scripturl . '?topic=' . $topic . '.0;prev_next=prev#new',
+				'go_next' => $scripturl . '?topic=' . $topic . '.0;prev_next=next#new'
+			);
 		if (!empty($context['topic_derived_from']))
-			$context['previous_next'] .= ' - <a href="' . $scripturl . '?msg=' . $context['topic_derived_from']['derived_from'] . '">' . sprintf($txt['topic_derived_from'], '<em>' . shorten_text($context['topic_derived_from']['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24)) . '</em></a>';
+			$context['links']['derived_from'] = $scripturl . '?msg=' . $context['topic_derived_from']['derived_from'];
 
 		// Check if spellchecking is both enabled and actually working. (for quick reply.)
 		$context['show_spellchecking'] = !empty($modSettings['enableSpellChecking']) && function_exists('pspell_new');
+		if ($context['show_spellchecking'])
+			loadJavascriptFile('spellcheck.js', array('defer' => true));
 
 		// Do we need to show the visual verification image?
 		$context['require_verification'] = !$user_info['is_mod'] && !$user_info['is_admin'] && !empty($modSettings['posts_require_captcha']) && ($user_info['posts'] < $modSettings['posts_require_captcha'] || ($user_info['is_guest'] && $modSettings['posts_require_captcha'] == -1));
 		if ($context['require_verification'])
 		{
-			require_once(SUBSDIR . '/Editor.subs.php');
+			require_once(SUBSDIR . '/VerificationControls.class.php');
 			$verificationOptions = array(
 				'id' => 'post',
 			);
@@ -266,6 +276,9 @@ class Display_Controller
 
 		// Is this topic sticky, or can it even be?
 		$topicinfo['is_sticky'] = empty($modSettings['enableStickyTopics']) ? '0' : $topicinfo['is_sticky'];
+
+		// Allow addons access to the topicinfo array
+		call_integration_hook('integrate_display_topic', array($topicinfo));
 
 		// Default this topic to not marked for notifications... of course...
 		$context['is_marked_notify'] = false;
@@ -300,13 +313,10 @@ class Display_Controller
 			'num_pages' => floor(($context['total_visible_posts'] - 1) / $context['messages_per_page']) + 1,
 		);
 
-		// Figure out all the link to the next/prev/first/last/etc. for wireless mainly.
-		$context['links'] = array(
-			'first' => $_REQUEST['start'] >= $context['messages_per_page'] ? $scripturl . '?topic=' . $topic . '.0' : '',
+		// Figure out all the link to the next/prev
+		$context['links'] += array(
 			'prev' => $_REQUEST['start'] >= $context['messages_per_page'] ? $scripturl . '?topic=' . $topic . '.' . ($_REQUEST['start'] - $context['messages_per_page']) : '',
 			'next' => $_REQUEST['start'] + $context['messages_per_page'] < $context['total_visible_posts'] ? $scripturl . '?topic=' . $topic. '.' . ($_REQUEST['start'] + $context['messages_per_page']) : '',
-			'last' => $_REQUEST['start'] + $context['messages_per_page'] < $context['total_visible_posts'] ? $scripturl . '?topic=' . $topic. '.' . (floor($context['total_visible_posts'] / $context['messages_per_page']) * $context['messages_per_page']) : '',
-			'up' => $scripturl . '?board=' . $board . '.0'
 		);
 
 		// If they are viewing all the posts, show all the posts, otherwise limit the number.
@@ -345,12 +355,8 @@ class Display_Controller
 		$context['is_very_hot'] = $topicinfo['num_replies'] >= $modSettings['hotTopicVeryPosts'];
 		$context['is_hot'] = $topicinfo['num_replies'] >= $modSettings['hotTopicPosts'];
 		$context['is_approved'] = $topicinfo['approved'];
-
-		// @todo Tricks? We don't want to show the poll icon in the topic class here, so pretend it's not one.
-		$context['is_poll'] = false;
-		determineTopicClass($context);
-
 		$context['is_poll'] = $topicinfo['id_poll'] > 0 && $modSettings['pollMode'] == '1' && allowedTo('poll_view');
+		determineTopicClass($context);
 
 		// Did this user start the topic or not?
 		$context['user']['started'] = $user_info['id'] == $topicinfo['id_member_started'] && !$user_info['is_guest'];
@@ -429,149 +435,9 @@ class Display_Controller
 		if ($context['is_poll'])
 		{
 			$template_layers->add('display_poll');
-
-			// Get information on the poll
 			require_once(SUBSDIR . '/Poll.subs.php');
-			$pollinfo = pollInfo($topicinfo['id_poll']);
 
-			// Get the poll options
-			$pollOptions = pollOptionsForMember($topicinfo['id_poll'], $user_info['id']);
-
-			// Compute total votes.
-			$realtotal = 0;
-			$pollinfo['has_voted'] = false;
-			foreach ($pollOptions as $choice)
-			{
-				$realtotal += $choice['votes'];
-				$pollinfo['has_voted'] |= $choice['voted_this'] != -1;
-			}
-
-			// If this is a guest we need to do our best to work out if they have voted, and what they voted for.
-			if ($user_info['is_guest'] && $pollinfo['guest_vote'] && allowedTo('poll_vote'))
-			{
-				if (!empty($_COOKIE['guest_poll_vote']) && preg_match('~^[0-9,;]+$~', $_COOKIE['guest_poll_vote']) && strpos($_COOKIE['guest_poll_vote'], ';' . $topicinfo['id_poll'] . ',') !== false)
-				{
-					// ;id,timestamp,[vote,vote...]; etc
-					$guestinfo = explode(';', $_COOKIE['guest_poll_vote']);
-
-					// Find the poll we're after.
-					foreach ($guestinfo as $i => $guestvoted)
-					{
-						$guestvoted = explode(',', $guestvoted);
-						if ($guestvoted[0] == $topicinfo['id_poll'])
-							break;
-					}
-
-					// Has the poll been reset since guest voted?
-					if ($pollinfo['reset_poll'] > $guestvoted[1])
-					{
-						// Remove the poll info from the cookie to allow guest to vote again
-						unset($guestinfo[$i]);
-						if (!empty($guestinfo))
-							$_COOKIE['guest_poll_vote'] = ';' . implode(';', $guestinfo);
-						else
-							unset($_COOKIE['guest_poll_vote']);
-					}
-					else
-					{
-						// What did they vote for?
-						unset($guestvoted[0], $guestvoted[1]);
-						foreach ($pollOptions as $choice => $details)
-						{
-							$pollOptions[$choice]['voted_this'] = in_array($choice, $guestvoted) ? 1 : -1;
-							$pollinfo['has_voted'] |= $pollOptions[$choice]['voted_this'] != -1;
-						}
-						unset($choice, $details, $guestvoted);
-					}
-					unset($guestinfo, $guestvoted, $i);
-				}
-			}
-
-			// Set up the basic poll information.
-			$context['poll'] = array(
-				'id' => $topicinfo['id_poll'],
-				'image' => 'normal_' . (empty($pollinfo['voting_locked']) ? 'poll' : 'locked_poll'),
-				'question' => parse_bbc($pollinfo['question']),
-				'total_votes' => $pollinfo['total'],
-				'change_vote' => !empty($pollinfo['change_vote']),
-				'is_locked' => !empty($pollinfo['voting_locked']),
-				'options' => array(),
-				'lock' => allowedTo('poll_lock_any') || ($context['user']['started'] && allowedTo('poll_lock_own')),
-				'edit' => allowedTo('poll_edit_any') || ($context['user']['started'] && allowedTo('poll_edit_own')),
-				'allowed_warning' => $pollinfo['max_votes'] > 1 ? sprintf($txt['poll_options6'], min(count($pollOptions), $pollinfo['max_votes'])) : '',
-				'is_expired' => !empty($pollinfo['expire_time']) && $pollinfo['expire_time'] < time(),
-				'expire_time' => !empty($pollinfo['expire_time']) ? standardTime($pollinfo['expire_time']) : 0,
-				'has_voted' => !empty($pollinfo['has_voted']),
-				'starter' => array(
-					'id' => $pollinfo['id_member'],
-					'name' => $pollinfo['poster_name'],
-					'href' => $pollinfo['id_member'] == 0 ? '' : $scripturl . '?action=profile;u=' . $pollinfo['id_member'],
-					'link' => $pollinfo['id_member'] == 0 ? $pollinfo['poster_name'] : '<a href="' . $scripturl . '?action=profile;u=' . $pollinfo['id_member'] . '">' . $pollinfo['poster_name'] . '</a>'
-				)
-			);
-
-			// Make the lock and edit permissions defined above more directly accessible.
-			$context['allow_lock_poll'] = $context['poll']['lock'];
-			$context['allow_edit_poll'] = $context['poll']['edit'];
-
-			// You're allowed to vote if:
-			// 1. the poll did not expire, and
-			// 2. you're either not a guest OR guest voting is enabled... and
-			// 3. you're not trying to view the results, and
-			// 4. the poll is not locked, and
-			// 5. you have the proper permissions, and
-			// 6. you haven't already voted before.
-			$context['allow_vote'] = !$context['poll']['is_expired'] && (!$user_info['is_guest'] || ($pollinfo['guest_vote'] && allowedTo('poll_vote'))) && empty($pollinfo['voting_locked']) && allowedTo('poll_vote') && !$context['poll']['has_voted'];
-
-			// You're allowed to view the results if:
-			// 1. you're just a super-nice-guy, or
-			// 2. anyone can see them (hide_results == 0), or
-			// 3. you can see them after you voted (hide_results == 1), or
-			// 4. you've waited long enough for the poll to expire. (whether hide_results is 1 or 2.)
-			$context['allow_poll_view'] = allowedTo('moderate_board') || $pollinfo['hide_results'] == 0 || ($pollinfo['hide_results'] == 1 && $context['poll']['has_voted']) || $context['poll']['is_expired'];
-			$context['poll']['show_results'] = $context['allow_poll_view'] && (isset($_REQUEST['viewresults']) || isset($_REQUEST['viewResults']));
-
-			// You're allowed to change your vote if:
-			// 1. the poll did not expire, and
-			// 2. you're not a guest... and
-			// 3. the poll is not locked, and
-			// 4. you have the proper permissions, and
-			// 5. you have already voted, and
-			// 6. the poll creator has said you can!
-			$context['allow_change_vote'] = !$context['poll']['is_expired'] && !$user_info['is_guest'] && empty($pollinfo['voting_locked']) && allowedTo('poll_vote') && $context['poll']['has_voted'] && $context['poll']['change_vote'];
-
-			// You're allowed to return to voting options if:
-			// 1. you are (still) allowed to vote.
-			// 2. you are currently seeing the results.
-			$context['allow_return_vote'] = $context['allow_vote'] && $context['poll']['show_results'];
-
-			// Calculate the percentages and bar lengths...
-			$divisor = $realtotal == 0 ? 1 : $realtotal;
-
-			// Determine if a decimal point is needed in order for the options to add to 100%.
-			$precision = $realtotal == 100 ? 0 : 1;
-
-			// Now look through each option, and...
-			foreach ($pollOptions as $i => $option)
-			{
-				// First calculate the percentage, and then the width of the bar...
-				$bar = round(($option['votes'] * 100) / $divisor, $precision);
-				$barWide = $bar == 0 ? 1 : floor(($bar * 8) / 3);
-
-				// Now add it to the poll's contextual theme data.
-				$context['poll']['options'][$i] = array(
-					'id' => 'options-' . $i,
-					'percent' => $bar,
-					'votes' => $option['votes'],
-					'voted_this' => $option['voted_this'] != -1,
-					'bar' => '<span style="white-space: nowrap;"><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'right' : 'left') . '.png" alt="" /><img src="' . $settings['images_url'] . '/poll_middle.png" style="width:' . $barWide . 'px; height:12px" alt="-" /><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'left' : 'right') . '.png" alt="" /></span>',
-					// Note: IE < 8 requires us to set a width on the container, too.
-					'bar_ndt' => $bar > 0 ? '<div class="bar" style="width: ' . ($bar * 3.5 + 4) . 'px;"><div style="width: ' . $bar * 3.5 . 'px;"></div></div>' : '',
-					'bar_width' => $barWide,
-					'option' => parse_bbc($option['label']),
-					'vote_button' => '<input type="' . ($pollinfo['max_votes'] > 1 ? 'checkbox' : 'radio') . '" name="options[]" id="options-' . $i . '" value="' . $i . '" class="input_' . ($pollinfo['max_votes'] > 1 ? 'check' : 'radio') . '" />'
-				);
-			}
+			loadPollContext($topicinfo['id_poll']);
 
 			// Build the poll moderation button array.
 			$context['poll_buttons'] = array(
@@ -600,33 +466,19 @@ class Display_Controller
 			$firstIndex = $limit - 1;
 		}
 
-		// Get each post and poster in this topic.
-		$request = $db->query('display_get_post_poster', '
-			SELECT id_msg, id_member, approved
-			FROM {db_prefix}messages
-			WHERE id_topic = {int:current_topic}' . (!$modSettings['postmod_active'] || allowedTo('approve_posts') ? '' : (!empty($modSettings['db_mysql_group_by_fix']) ? '' : '
-			GROUP BY id_msg') . '
-			HAVING (approved = {int:is_approved}' . ($user_info['is_guest'] ? '' : ' OR id_member = {int:current_member}') . ')') . '
-			ORDER BY id_msg ' . ($ascending ? '' : 'DESC') . ($context['messages_per_page'] == -1 ? '' : '
-			LIMIT ' . $start . ', ' . $limit),
-			array(
-				'current_member' => $user_info['id'],
-				'current_topic' => $topic,
-				'is_approved' => 1,
-				'blank_id_member' => 0,
-			)
+		// Taking care of member specific settings
+		$limit_settings = array(
+			'messages_per_page' => $context['messages_per_page'],
+			'start' => $start,
+			'offset' => $limit,
 		);
 
-		$messages = array();
-		$all_posters = array();
-		while ($row = $db->fetch_assoc($request))
-		{
-			if (!empty($row['id_member']))
-				$all_posters[$row['id_msg']] = $row['id_member'];
-			$messages[] = $row['id_msg'];
-		}
-		$db->free_result($request);
-		$posters = array_unique($all_posters);
+		// Get each post and poster in this topic.
+		$topic_details = getTopicsPostsAndPoster($topic, $limit_settings, $ascending);
+		$messages = $topic_details['messages'];
+		$posters = array_unique($topic_details['all_posters']);
+		$all_posters = $topic_details['all_posters'];
+		unset($topic_details);
 
 		call_integration_hook('integrate_display_message_list', array(&$messages, &$posters));
 
@@ -637,7 +489,7 @@ class Display_Controller
 			if ($mark_at_msg >= $topicinfo['id_last_msg'])
 				$mark_at_msg = $modSettings['maxMsgID'];
 			if ($mark_at_msg >= $topicinfo['new_from'])
-				markTopicsRead(array($user_info['id'], $topic, $mark_at_msg, $topicinfo['disregarded']), $topicinfo['new_from'] !== 0);
+				markTopicsRead(array($user_info['id'], $topic, $mark_at_msg, $topicinfo['unwatched']), $topicinfo['new_from'] !== 0);
 
 			updateReadNotificationsFor($topic, $board);
 
@@ -678,7 +530,7 @@ class Display_Controller
 			// Fetch attachments.
 			$includeUnapproved = !$modSettings['postmod_active'] || allowedTo('approve_posts');
 			if (!empty($modSettings['attachmentEnable']) && allowedTo('view_attachments'))
-				$attachments = getAttachments($messages, $includeUnapproved, 'filter_accessible_attachment');
+				$attachments = getAttachments($messages, $includeUnapproved, 'filter_accessible_attachment', $all_posters);
 
 			$msg_parameters = array(
 				'message_list' => $messages,
@@ -699,21 +551,13 @@ class Display_Controller
 				$context['likes'] = loadLikes($messages, true);
 			}
 
-			$messages_request = $db->query('', '
-				SELECT
-					m.id_msg, m.icon, m.subject, m.poster_time, m.poster_ip, m.id_member, m.modified_time, m.modified_name, m.body,
-					m.smileys_enabled, m.poster_name, m.poster_email, m.approved,
-					m.id_msg_modified < {int:new_from} AS is_read
-					' . (!empty($msg_selects) ? implode(',', $msg_selects) : '') . '
-				FROM {db_prefix}messages as m
-					' . (!empty($msg_tables) ? implode("\n\t", $msg_tables) : '') . '
-				WHERE m.id_msg IN ({array_int:message_list})
-				ORDER BY m.id_msg' . (empty($options['view_newest_first']) ? '' : ' DESC'),
-				$msg_parameters
-			);
+			$messages_request = loadMessageDetails($msg_selects, $msg_tables, $msg_parameters, $options);
 
-			require_once(SUBSDIR . '/FollowUps.subs.php');
-			$context['follow_ups'] = followupTopics($messages, $includeUnapproved);
+			if (!empty($modSettings['enableFollowup']))
+			{
+				require_once(SUBSDIR . '/FollowUps.subs.php');
+				$context['follow_ups'] = followupTopics($messages, $includeUnapproved);
+			}
 
 			// Go to the last message if the given time is beyond the time of the last message.
 			if (isset($context['start_from']) && $context['start_from'] >= $topicinfo['num_replies'])
@@ -735,13 +579,13 @@ class Display_Controller
 
 		$context['jump_to'] = array(
 			'label' => addslashes(un_htmlspecialchars($txt['jump_to'])),
-			'board_name' => htmlspecialchars(strtr(strip_tags($board_info['name']), array('&amp;' => '&'))),
+			'board_name' => htmlspecialchars(strtr(strip_tags($board_info['name']), array('&amp;' => '&')), ENT_COMPAT, 'UTF-8'),
 			'child_level' => $board_info['child_level'],
 		);
 
 		// Set the callback.  (do you REALIZE how much memory all the messages would take?!?)
 		// This will be called from the template.
-		$context['get_message'] = 'prepareDisplayContext';
+		$context['get_message'] = array($this, 'prepareDisplayContext_callback');
 
 		// Now set all the wonderful, wonderful permissions... like moderation ones...
 		$common_permissions = array(
@@ -792,7 +636,7 @@ class Display_Controller
 		$context['can_reply'] |= $context['can_reply_unapproved'];
 		$context['can_quote'] = $context['can_reply'] && (empty($modSettings['disabledBBC']) || !in_array('quote', explode(',', $modSettings['disabledBBC'])));
 		$context['can_mark_unread'] = !$user_info['is_guest'] && $settings['show_mark_read'];
-		$context['can_disregard'] = !$user_info['is_guest'] && $modSettings['enable_disregard'];
+		$context['can_unwatch'] = !$user_info['is_guest'] && $modSettings['enable_unwatch'];
 		$context['can_send_topic'] = (!$modSettings['postmod_active'] || $topicinfo['approved']) && allowedTo('send_topic');
 		$context['can_print'] = empty($modSettings['disable_print_topic']);
 
@@ -803,18 +647,46 @@ class Display_Controller
 		$context['can_restore_topic'] &= !empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] == $board && !empty($topicinfo['id_previous_board']);
 		$context['can_restore_msg'] &= !empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] == $board && !empty($topicinfo['id_previous_topic']);
 
-		$context['can_follow_up'] = boardsallowedto('post_new') !== array();
+		$context['can_follow_up'] = !empty($modSettings['enableFollowup']) && boardsallowedto('post_new') !== array();
 
 		// Check if the draft functions are enabled and that they have permission to use them (for quick reply.)
 		$context['drafts_save'] = !empty($modSettings['drafts_enabled']) && !empty($modSettings['drafts_post_enabled']) && allowedTo('post_draft') && $context['can_reply'];
 		$context['drafts_autosave'] = !empty($context['drafts_save']) && !empty($modSettings['drafts_autosave_enabled']) && allowedTo('post_autosave_draft');
 		if (!empty($context['drafts_save']))
 			loadLanguage('Drafts');
-		if (!empty($context['drafts_autosave']))
+
+		if (!empty($context['drafts_autosave']) && empty($options['use_editor_quick_reply']))
 			loadJavascriptFile('drafts.js');
+
+		if (!empty($modSettings['mentions_enabled']))
+		{
+			$context['mentions_enabled'] = true;
+
+			// Just using the plain text quick reply and not the editor
+			if (empty($options['use_editor_quick_reply']))
+				loadJavascriptFile(array('jquery.atwho.js', 'jquery.caret.js', 'mentioning.js'));
+
+			loadCSSFile('jquery.atwho.css');
+
+			addInlineJavascript('
+			$(document).ready(function () {
+				for (var i = 0, count = all_elk_mentions.length; i < count; i++)
+					all_elk_mentions[i].oMention = new elk_mentions(all_elk_mentions[i].oOptions);
+			});');
+		}
 
 		// Load up the Quick ModifyTopic and Quick Reply scripts
 		loadJavascriptFile('topic.js');
+
+		// Auto video embeding enabled?
+		if (!empty($modSettings['enableVideoEmbeding']))
+		{
+			addInlineJavascript('
+		$(document).ready(function() {
+			$().linkifyvideo(oEmbedtext);
+		});'
+			);
+		}
 
 		// Load up the "double post" sequencing magic.
 		if (!empty($options['display_quick_reply']))
@@ -842,9 +714,6 @@ class Display_Controller
 				);
 				create_control_richedit($editorOptions);
 
-				// Store the ID.
-				$context['post_box_name'] = $editorOptions['id'];
-
 				$context['attached'] = '';
 				$context['make_poll'] = isset($_REQUEST['poll']);
 
@@ -856,16 +725,24 @@ class Display_Controller
 			}
 		}
 
-		addJavascriptVar('notification_topic_notice', $context['is_marked_notify'] ? $txt['notification_disable_topic'] : $txt['notification_enable_topic'], true);
+		addJavascriptVar(array('notification_topic_notice' => $context['is_marked_notify'] ? $txt['notification_disable_topic'] : $txt['notification_enable_topic']), true);
+		if ($context['can_send_topic'])
+		{
+			addJavascriptVar(array(
+				'sendtopic_cancel' => $txt['modify_cancel'],
+				'sendtopic_back' => $txt['back'],
+				'sendtopic_close' => $txt['find_close'],
+				'sendtopic_error' => $txt['send_error_occurred'],
+				'required_field' => $txt['require_field']), true);
+		}
 
 		// Build the normal button array.
 		$context['normal_buttons'] = array(
 			'reply' => array('test' => 'can_reply', 'text' => 'reply', 'image' => 'reply.png', 'lang' => true, 'url' => $scripturl . '?action=post;topic=' . $context['current_topic'] . '.' . $context['start'] . ';last_msg=' . $context['topic_last_message'], 'active' => true),
-			'add_poll' => array('test' => 'can_add_poll', 'text' => 'add_poll', 'image' => 'add_poll.png', 'lang' => true, 'url' => $scripturl . '?action=editpoll;add;topic=' . $context['current_topic'] . '.' . $context['start']),
 			'notify' => array( 'test' => 'can_mark_notify', 'text' => $context['is_marked_notify'] ? 'unnotify' : 'notify', 'image' => ($context['is_marked_notify'] ? 'un' : '') . 'notify.png', 'lang' => true, 'custom' => 'onclick="return notifyButton(this);"', 'url' => $scripturl . '?action=notify;sa=' . ($context['is_marked_notify'] ? 'off' : 'on') . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 			'mark_unread' => array('test' => 'can_mark_unread', 'text' => 'mark_unread', 'image' => 'markunread.png', 'lang' => true, 'url' => $scripturl . '?action=markasread;sa=topic;t=' . $context['mark_unread_time'] . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
-			'disregard' => array('test' => 'can_disregard', 'text' => ($context['topic_disregarded'] ? 'un' : '') . 'disregard', 'image' => ($context['topic_disregarded'] ? 'un' : '') . 'disregard.png', 'lang' => true, 'custom' => 'onclick="return disregardButton(this);"', 'url' => $scripturl . '?action=disregardtopic;topic=' . $context['current_topic'] . '.' . $context['start'] . ';sa=' . ($context['topic_disregarded'] ? 'off' : 'on') . ';' . $context['session_var'] . '=' . $context['session_id']),
-			'send' => array('test' => 'can_send_topic', 'text' => 'send_topic', 'image' => 'sendtopic.png', 'lang' => true, 'url' => $scripturl . '?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.0'),
+			'unwatch' => array('test' => 'can_unwatch', 'text' => ($context['topic_unwatched'] ? '' : 'un') . 'watch', 'image' => ($context['topic_unwatched'] ? '' : 'un') . 'watched.png', 'lang' => true, 'custom' => 'onclick="return unwatchButton(this);"', 'url' => $scripturl . '?action=unwatchtopic;topic=' . $context['current_topic'] . '.' . $context['start'] . ';sa=' . ($context['topic_unwatched'] ? 'off' : 'on') . ';' . $context['session_var'] . '=' . $context['session_id']),
+			'send' => array('test' => 'can_send_topic', 'text' => 'send_topic', 'image' => 'sendtopic.png', 'lang' => true, 'url' => $scripturl . '?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.0', 'custom' => 'onclick="return sendtopicOverlayDiv(this.href, \'' . $txt['send_topic'] . '\', \'\');"'),
 			'print' => array('test' => 'can_print', 'text' => 'print', 'image' => 'print.png', 'lang' => true, 'custom' => 'rel="nofollow"', 'class' => 'new_win', 'url' => $scripturl . '?action=topic;sa=printpage;topic=' . $context['current_topic'] . '.0'),
 		);
 
@@ -896,11 +773,9 @@ class Display_Controller
 	 * In-topic quick moderation.
 	 * Accessed by ?action=quickmod2
 	 */
-	function action_quickmod2()
+	public function action_quickmod2()
 	{
-		global $topic, $board, $user_info, $modSettings, $context;
-
-		$db = database();
+		global $topic, $board, $user_info, $context;
 
 		// Check the session = get or post.
 		checkSession('request');
@@ -923,7 +798,7 @@ class Display_Controller
 			$mgsOptions = basicMessageInfo(min($messages), true);
 
 			$_SESSION['split_selection'][$topic] = $messages;
-			redirectexit('action=splittopics;sa=selectTopics;topic=' . $topic . '.0;subname_enc=' .urlencode($mgsOptions['subject']) . ';' . $context['session_var'] . '=' . $context['session_id']);
+			redirectexit('action=splittopics;sa=selectTopics;topic=' . $topic . '.0;subname_enc=' . urlencode($mgsOptions['subject']) . ';' . $context['session_var'] . '=' . $context['session_id']);
 		}
 
 		require_once(SUBSDIR . '/Topic.subs.php');
@@ -943,28 +818,7 @@ class Display_Controller
 			isAllowedTo('delete_own');
 
 		// Allowed to remove which messages?
-		$request = $db->query('', '
-			SELECT id_msg, subject, id_member, poster_time
-			FROM {db_prefix}messages
-			WHERE id_msg IN ({array_int:message_list})
-				AND id_topic = {int:current_topic}' . (!$allowed_all ? '
-				AND id_member = {int:current_member}' : '') . '
-			LIMIT ' . count($messages),
-			array(
-				'current_member' => $user_info['id'],
-				'current_topic' => $topic,
-				'message_list' => $messages,
-			)
-		);
-		$messages = array();
-		while ($row = $db->fetch_assoc($request))
-		{
-			if (!$allowed_all && !empty($modSettings['edit_disable_time']) && $row['poster_time'] + $modSettings['edit_disable_time'] * 60 < time())
-				continue;
-
-			$messages[$row['id_msg']] = array($row['subject'], $row['id_member']);
-		}
-		$db->free_result($request);
+		$messages = determineRemovableMessages($topic, $messages, $allowed_all);
 
 		// Get the first message in the topic - because you can't delete that!
 		$first_message = $topic_info['id_first_msg'];
@@ -989,291 +843,152 @@ class Display_Controller
 
 		redirectexit(!empty($topicGone) ? 'board=' . $board : 'topic=' . $topic . '.' . $_REQUEST['start']);
 	}
-}
 
-/**
- * Callback for the message display.
- * It actually gets and prepares the message context.
- * This function will start over from the beginning if reset is set to true, which is
- * useful for showing an index before or after the posts.
- *
- * @param bool $reset default false.
- */
-function prepareDisplayContext($reset = false)
-{
-	global $settings, $txt, $modSettings, $scripturl, $options, $user_info;
-	global $memberContext, $context, $messages_request, $topic;
-	static $counter = null;
-
-	// If the query returned false, bail.
-	if ($messages_request == false)
-		return false;
-
-	// Can't work with a database without a database :P
-	$db = database();
-
-	// Remember which message this is.  (ie. reply #83)
-	if ($counter === null || $reset)
-		$counter = empty($options['view_newest_first']) ? $context['start'] : $context['total_visible_posts'] - $context['start'];
-
-	// Start from the beginning...
-	if ($reset)
-		return $db->data_seek($messages_request, 0);
-
-	// Attempt to get the next message.
-	$message = $db->fetch_assoc($messages_request);
-	if (!$message)
+	/**
+	 * Callback for the message display.
+	 * It actually gets and prepares the message context.
+	 * This method will start over from the beginning if reset is set to true, which is
+	 * useful for showing an index before or after the posts.
+	 *
+	 * @param bool $reset default false.
+	 */
+	public function prepareDisplayContext_callback($reset = false)
 	{
-		$db->free_result($messages_request);
-		return false;
-	}
+		global $settings, $txt, $modSettings, $scripturl, $options, $user_info;
+		global $memberContext, $context, $messages_request, $topic;
+		static $counter = null;
 
-	// $context['icon_sources'] says where each icon should come from - here we set up the ones which will always exist!
-	if (empty($context['icon_sources']))
-	{
-		$stable_icons = array('xx', 'thumbup', 'thumbdown', 'exclamation', 'question', 'lamp', 'smiley', 'angry', 'cheesy', 'grin', 'sad', 'wink', 'poll', 'moved', 'recycled', 'wireless', 'clip');
-		$context['icon_sources'] = array();
-		foreach ($stable_icons as $icon)
-			$context['icon_sources'][$icon] = 'images_url';
-	}
+		// If the query returned false, bail.
+		if ($messages_request == false)
+			return false;
 
-	// Message Icon Management... check the images exist.
-	if (empty($modSettings['messageIconChecks_disable']))
-	{
-		// If the current icon isn't known, then we need to do something...
-		if (!isset($context['icon_sources'][$message['icon']]))
-			$context['icon_sources'][$message['icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $message['icon'] . '.png') ? 'images_url' : 'default_images_url';
-	}
-	elseif (!isset($context['icon_sources'][$message['icon']]))
-		$context['icon_sources'][$message['icon']] = 'images_url';
+		// Remember which message this is.  (ie. reply #83)
+		if ($counter === null || $reset)
+			$counter = empty($options['view_newest_first']) ? $context['start'] : $context['total_visible_posts'] - $context['start'];
 
-	// If you're a lazy bum, you probably didn't give a subject...
-	$message['subject'] = $message['subject'] != '' ? $message['subject'] : $txt['no_subject'];
+		// Start from the beginning...
+		if ($reset)
+			return currentContext($messages_request, $reset);
 
-	// Are you allowed to remove at least a single reply?
-	$context['can_remove_post'] |= allowedTo('delete_own') && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 >= time()) && $message['id_member'] == $user_info['id'];
+		// Attempt to get the next message.
+		$message = currentContext($messages_request);
+		if (!$message)
+			return false;
 
-	// Have you liked this post, can you
-	$message['likes'] = !empty($context['likes'][$message['id_msg']]['member']) && isset($context['likes'][$message['id_msg']]['member'][$user_info['id']]);
-	$message['use_likes'] = allowedTo('like_posts') && $message['id_member'] !== $user_info['id'];
-	$message['like_count'] = !empty($context['likes'][$message['id_msg']]['count']) ? $context['likes'][$message['id_msg']]['count'] : 0;
-
-	// If it couldn't load, or the user was a guest.... someday may be done with a guest table.
-	if (!loadMemberContext($message['id_member'], true))
-	{
-		// Notice this information isn't used anywhere else....
-		$memberContext[$message['id_member']]['name'] = $message['poster_name'];
-		$memberContext[$message['id_member']]['id'] = 0;
-		$memberContext[$message['id_member']]['group'] = $txt['guest_title'];
-		$memberContext[$message['id_member']]['link'] = $message['poster_name'];
-		$memberContext[$message['id_member']]['email'] = $message['poster_email'];
-		$memberContext[$message['id_member']]['show_email'] = showEmailAddress(true, 0);
-		$memberContext[$message['id_member']]['is_guest'] = true;
-	}
-	else
-	{
-		$memberContext[$message['id_member']]['can_view_profile'] = allowedTo('profile_view_any') || ($message['id_member'] == $user_info['id'] && allowedTo('profile_view_own'));
-		$memberContext[$message['id_member']]['is_topic_starter'] = $message['id_member'] == $context['topic_starter_id'];
-		$memberContext[$message['id_member']]['can_see_warning'] = !isset($context['disabled_fields']['warning_status']) && $memberContext[$message['id_member']]['warning_status'] && ($context['user']['can_mod'] || (!$user_info['is_guest'] && !empty($modSettings['warning_show']) && ($modSettings['warning_show'] > 1 || $message['id_member'] == $user_info['id'])));
-	}
-
-	$memberContext[$message['id_member']]['ip'] = $message['poster_ip'];
-	$memberContext[$message['id_member']]['show_profile_buttons'] = $settings['show_profile_buttons'] && (!empty($memberContext[$message['id_member']]['can_view_profile']) || (!empty($memberContext[$message['id_member']]['website']['url']) && !isset($context['disabled_fields']['website'])) || (in_array($memberContext[$message['id_member']]['show_email'], array('yes', 'yes_permission_override', 'no_through_forum'))) || $context['can_send_pm']);
-
-	// Do the censor thang.
-	censorText($message['body']);
-	censorText($message['subject']);
-
-	// Run BBC interpreter on the message.
-	$message['body'] = parse_bbc($message['body'], $message['smileys_enabled'], $message['id_msg']);
-
-	// Compose the memory eat- I mean message array.
-	$output = array(
-		'attachment' => loadAttachmentContext($message['id_msg']),
-		'alternate' => $counter % 2,
-		'id' => $message['id_msg'],
-		'href' => $scripturl . '?topic=' . $topic . '.msg' . $message['id_msg'] . '#msg' . $message['id_msg'],
-		'link' => '<a href="' . $scripturl . '?topic=' . $topic . '.msg' . $message['id_msg'] . '#msg' . $message['id_msg'] . '" rel="nofollow">' . $message['subject'] . '</a>',
-		'member' => &$memberContext[$message['id_member']],
-		'icon' => $message['icon'],
-		'icon_url' => $settings[$context['icon_sources'][$message['icon']]] . '/post/' . $message['icon'] . '.png',
-		'subject' => $message['subject'],
-		'time' => relativeTime($message['poster_time']),
-		'timestamp' => forum_time(true, $message['poster_time']),
-		'counter' => $counter,
-		'modified' => array(
-			'time' => relativeTime($message['modified_time']),
-			'timestamp' => forum_time(true, $message['modified_time']),
-			'name' => $message['modified_name']
-		),
-		'body' => $message['body'],
-		'new' => empty($message['is_read']),
-		'approved' => $message['approved'],
-		'first_new' => isset($context['start_from']) && $context['start_from'] == $counter,
-		'is_ignored' => !empty($modSettings['enable_buddylist']) && !empty($options['posts_apply_ignore_list']) && in_array($message['id_member'], $context['user']['ignoreusers']),
-		'can_approve' => !$message['approved'] && $context['can_approve'],
-		'can_unapprove' => !empty($modSettings['postmod_active']) && $context['can_approve'] && $message['approved'],
-		'can_modify' => (!$context['is_locked'] || allowedTo('moderate_board')) && (allowedTo('modify_any') || (allowedTo('modify_replies') && $context['user']['started']) || (allowedTo('modify_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || !$message['approved'] || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time()))),
-		'can_remove' => allowedTo('delete_any') || (allowedTo('delete_replies') && $context['user']['started']) || (allowedTo('delete_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time())),
-		'can_see_ip' => allowedTo('moderate_forum') || ($message['id_member'] == $user_info['id'] && !empty($user_info['id'])),
-		'can_like' => $message['use_likes'] && !$message['likes'],
-		'can_unlike' => $message['use_likes'] && $message['likes'],
-		'like_counter' =>$message['like_count'],
-	);
-
-	// Is this user the message author?
-	$output['is_message_author'] = $message['id_member'] == $user_info['id'];
-	if (!empty($output['modified']['name']))
-		$output['modified']['last_edit_text'] = sprintf($txt['last_edit_by'], $output['modified']['time'], $output['modified']['name']);
-
-	call_integration_hook('integrate_prepare_display_context', array(&$output, &$message));
-
-	if (empty($options['view_newest_first']))
-		$counter++;
-	else
-		$counter--;
-
-	return $output;
-}
-
-/**
- * This loads an attachment's contextual data including, most importantly, its size if it is an image.
- * Pre-condition: $attachments array to have been filled with the proper attachment data, as Display() does.
- * (@todo change this pre-condition, too fragile and error-prone.)
- * It requires the view_attachments permission to calculate image size.
- * It attempts to keep the "aspect ratio" of the posted image in line, even if it has to be resized by
- * the max_image_width and max_image_height settings.
- *
- * @param type $id_msg message number to load attachments for
- * @return array of attachments
- */
-function loadAttachmentContext($id_msg)
-{
-	global $attachments, $modSettings, $txt, $scripturl, $topic;
-
-	// Set up the attachment info - based on code by Meriadoc.
-	$attachmentData = array();
-	$have_unapproved = false;
-	if (isset($attachments[$id_msg]) && !empty($modSettings['attachmentEnable']))
-	{
-		foreach ($attachments[$id_msg] as $i => $attachment)
+		// $context['icon_sources'] says where each icon should come from - here we set up the ones which will always exist!
+		if (empty($context['icon_sources']))
 		{
-			$attachmentData[$i] = array(
-				'id' => $attachment['id_attach'],
-				'name' => preg_replace('~&amp;#(\\d{1,7}|x[0-9a-fA-F]{1,6});~', '&#\\1;', htmlspecialchars($attachment['filename'])),
-				'downloads' => $attachment['downloads'],
-				'size' => ($attachment['filesize'] < 1024000) ? round($attachment['filesize'] / 1024, 2) . ' ' . $txt['kilobyte'] : round($attachment['filesize'] / 1024 / 1024, 2) . ' ' . $txt['megabyte'],
-				'byte_size' => $attachment['filesize'],
-				'href' => $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attachment['id_attach'],
-				'link' => '<a href="' . $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attachment['id_attach'] . '">' . htmlspecialchars($attachment['filename']) . '</a>',
-				'is_image' => !empty($attachment['width']) && !empty($attachment['height']) && !empty($modSettings['attachmentShowImages']),
-				'is_approved' => $attachment['approved'],
-			);
-
-			// If something is unapproved we'll note it so we can sort them.
-			if (!$attachment['approved'])
-				$have_unapproved = true;
-
-			if (!$attachmentData[$i]['is_image'])
-				continue;
-
-			$attachmentData[$i]['real_width'] = $attachment['width'];
-			$attachmentData[$i]['width'] = $attachment['width'];
-			$attachmentData[$i]['real_height'] = $attachment['height'];
-			$attachmentData[$i]['height'] = $attachment['height'];
-
-			// Let's see, do we want thumbs?
-			if (!empty($modSettings['attachmentThumbnails']) && !empty($modSettings['attachmentThumbWidth']) && !empty($modSettings['attachmentThumbHeight']) && ($attachment['width'] > $modSettings['attachmentThumbWidth'] || $attachment['height'] > $modSettings['attachmentThumbHeight']) && strlen($attachment['filename']) < 249)
-			{
-				// A proper thumb doesn't exist yet? Create one! Or, it needs update.
-				if (empty($attachment['id_thumb']) || $attachment['thumb_width'] > $modSettings['attachmentThumbWidth'] || $attachment['thumb_height'] > $modSettings['attachmentThumbHeight'] || ($attachment['thumb_width'] < $modSettings['attachmentThumbWidth'] && $attachment['thumb_height'] < $modSettings['attachmentThumbHeight']))
-				{
-					$filename = getAttachmentFilename($attachment['filename'], $attachment['id_attach'], $attachment['id_folder']);
-
-					require_once(SUBSDIR . '/Attachments.subs.php');
-					$attachment = array_merge($attachment, updateAttachmentThumbnail($filename, $attachment['id_attach'], $id_msg, $attachment['id_thumb']));
-				}
-
-				// Only adjust dimensions on successful thumbnail creation.
-				if (!empty($attachment['thumb_width']) && !empty($attachment['thumb_height']))
-				{
-					$attachmentData[$i]['width'] = $attachment['thumb_width'];
-					$attachmentData[$i]['height'] = $attachment['thumb_height'];
-				}
-			}
-
-			if (!empty($attachment['id_thumb']))
-			{
-				$attachmentData[$i]['thumbnail'] = array(
-					'id' => $attachment['id_thumb'],
-					'href' => $scripturl . '?action=dlattach;topic=' . $topic . '.0;attach=' . $attachment['id_thumb'] . ';image',
-				);
-			}
-			$attachmentData[$i]['thumbnail']['has_thumb'] = !empty($attachment['id_thumb']);
-
-			// If thumbnails are disabled, check the maximum size of the image.
-			if (!$attachmentData[$i]['thumbnail']['has_thumb'] && ((!empty($modSettings['max_image_width']) && $attachment['width'] > $modSettings['max_image_width']) || (!empty($modSettings['max_image_height']) && $attachment['height'] > $modSettings['max_image_height'])))
-			{
-				if (!empty($modSettings['max_image_width']) && (empty($modSettings['max_image_height']) || $attachment['height'] * $modSettings['max_image_width'] / $attachment['width'] <= $modSettings['max_image_height']))
-				{
-					$attachmentData[$i]['width'] = $modSettings['max_image_width'];
-					$attachmentData[$i]['height'] = floor($attachment['height'] * $modSettings['max_image_width'] / $attachment['width']);
-				}
-				elseif (!empty($modSettings['max_image_width']))
-				{
-					$attachmentData[$i]['width'] = floor($attachment['width'] * $modSettings['max_image_height'] / $attachment['height']);
-					$attachmentData[$i]['height'] = $modSettings['max_image_height'];
-				}
-			}
-			elseif ($attachmentData[$i]['thumbnail']['has_thumb'])
-			{
-				// If the image is too large to show inline, make it a popup.
-				if (((!empty($modSettings['max_image_width']) && $attachmentData[$i]['real_width'] > $modSettings['max_image_width']) || (!empty($modSettings['max_image_height']) && $attachmentData[$i]['real_height'] > $modSettings['max_image_height'])))
-					$attachmentData[$i]['thumbnail']['javascript'] = 'return reqWin(\'' . $attachmentData[$i]['href'] . ';image\', ' . ($attachment['width'] + 20) . ', ' . ($attachment['height'] + 20) . ', true);';
-				else
-					$attachmentData[$i]['thumbnail']['javascript'] = 'return expandThumb(' . $attachment['id_attach'] . ');';
-			}
-
-			if (!$attachmentData[$i]['thumbnail']['has_thumb'])
-				$attachmentData[$i]['downloads']++;
+			require_once(SUBSDIR . '/MessageIndex.subs.php');
+			$context['icon_sources'] = MessageTopicIcons();
 		}
+
+		// Message Icon Management... check the images exist.
+		if (empty($modSettings['messageIconChecks_disable']))
+		{
+			// If the current icon isn't known, then we need to do something...
+			if (!isset($context['icon_sources'][$message['icon']]))
+				$context['icon_sources'][$message['icon']] = file_exists($settings['theme_dir'] . '/images/post/' . $message['icon'] . '.png') ? 'images_url' : 'default_images_url';
+		}
+		elseif (!isset($context['icon_sources'][$message['icon']]))
+			$context['icon_sources'][$message['icon']] = 'images_url';
+
+		// If you're a lazy bum, you probably didn't give a subject...
+		$message['subject'] = $message['subject'] != '' ? $message['subject'] : $txt['no_subject'];
+
+		// Are you allowed to remove at least a single reply?
+		$context['can_remove_post'] |= allowedTo('delete_own') && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 >= time()) && $message['id_member'] == $user_info['id'];
+
+		// Have you liked this post, can you?
+		$message['you_liked'] = !empty($context['likes'][$message['id_msg']]['member']) && isset($context['likes'][$message['id_msg']]['member'][$user_info['id']]);
+		$message['use_likes'] = allowedTo('like_posts') && ($message['id_member'] != $user_info['id'] || !empty($modSettings['likeAllowSelf'])) && (empty($modSettings['likeMinPosts']) ? true : $modSettings['likeMinPosts'] <= $user_info['posts']);
+		$message['like_count'] = !empty($context['likes'][$message['id_msg']]['count']) ? $context['likes'][$message['id_msg']]['count'] : 0;
+
+		// If it couldn't load, or the user was a guest.... someday may be done with a guest table.
+		if (!loadMemberContext($message['id_member'], true))
+		{
+			// Notice this information isn't used anywhere else....
+			$memberContext[$message['id_member']]['name'] = $message['poster_name'];
+			$memberContext[$message['id_member']]['id'] = 0;
+			$memberContext[$message['id_member']]['group'] = $txt['guest_title'];
+			$memberContext[$message['id_member']]['link'] = $message['poster_name'];
+			$memberContext[$message['id_member']]['email'] = $message['poster_email'];
+			$memberContext[$message['id_member']]['show_email'] = showEmailAddress(true, 0);
+			$memberContext[$message['id_member']]['is_guest'] = true;
+		}
+		else
+		{
+			$memberContext[$message['id_member']]['can_view_profile'] = allowedTo('profile_view_any') || ($message['id_member'] == $user_info['id'] && allowedTo('profile_view_own'));
+			$memberContext[$message['id_member']]['is_topic_starter'] = $message['id_member'] == $context['topic_starter_id'];
+			$memberContext[$message['id_member']]['can_see_warning'] = !isset($context['disabled_fields']['warning_status']) && $memberContext[$message['id_member']]['warning_status'] && ($context['user']['can_mod'] || (!$user_info['is_guest'] && !empty($modSettings['warning_show']) && ($modSettings['warning_show'] > 1 || $message['id_member'] == $user_info['id'])));
+		}
+
+		$memberContext[$message['id_member']]['ip'] = $message['poster_ip'];
+		$memberContext[$message['id_member']]['show_profile_buttons'] = $settings['show_profile_buttons'] && (!empty($memberContext[$message['id_member']]['can_view_profile']) || (!empty($memberContext[$message['id_member']]['website']['url']) && !isset($context['disabled_fields']['website'])) || (in_array($memberContext[$message['id_member']]['show_email'], array('yes', 'yes_permission_override', 'no_through_forum'))) || $context['can_send_pm']);
+
+		// Do the censor thang.
+		censorText($message['body']);
+		censorText($message['subject']);
+
+		// Run BBC interpreter on the message.
+		$message['body'] = parse_bbc($message['body'], $message['smileys_enabled'], $message['id_msg']);
+
+		// Compose the memory eat- I mean message array.
+		require_once(SUBSDIR . '/Attachments.subs.php');
+		$output = array(
+			'attachment' => loadAttachmentContext($message['id_msg']),
+			'alternate' => $counter % 2,
+			'id' => $message['id_msg'],
+			'href' => $scripturl . '?topic=' . $topic . '.msg' . $message['id_msg'] . '#msg' . $message['id_msg'],
+			'link' => '<a href="' . $scripturl . '?topic=' . $topic . '.msg' . $message['id_msg'] . '#msg' . $message['id_msg'] . '" rel="nofollow">' . $message['subject'] . '</a>',
+			'member' => &$memberContext[$message['id_member']],
+			'icon' => $message['icon'],
+			'icon_url' => $settings[$context['icon_sources'][$message['icon']]] . '/post/' . $message['icon'] . '.png',
+			'subject' => $message['subject'],
+			'time' => standardTime($message['poster_time']),
+			'html_time' => htmlTime($message['poster_time']),
+			'timestamp' => forum_time(true, $message['poster_time']),
+			'counter' => $counter,
+			'modified' => array(
+				'time' => standardTime($message['modified_time']),
+				'html_time' => htmlTime($message['modified_time']),
+				'timestamp' => forum_time(true, $message['modified_time']),
+				'name' => $message['modified_name']
+			),
+			'body' => $message['body'],
+			'new' => empty($message['is_read']),
+			'approved' => $message['approved'],
+			'first_new' => isset($context['start_from']) && $context['start_from'] == $counter,
+			'is_ignored' => !empty($modSettings['enable_buddylist']) && in_array($message['id_member'], $context['user']['ignoreusers']),
+			'is_message_author' => $message['id_member'] == $user_info['id'],
+			'can_approve' => !$message['approved'] && $context['can_approve'],
+			'can_unapprove' => !empty($modSettings['postmod_active']) && $context['can_approve'] && $message['approved'],
+			'can_modify' => (!$context['is_locked'] || allowedTo('moderate_board')) && (allowedTo('modify_any') || (allowedTo('modify_replies') && $context['user']['started']) || (allowedTo('modify_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || !$message['approved'] || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time()))),
+			'can_remove' => allowedTo('delete_any') || (allowedTo('delete_replies') && $context['user']['started']) || (allowedTo('delete_own') && $message['id_member'] == $user_info['id'] && (empty($modSettings['edit_disable_time']) || $message['poster_time'] + $modSettings['edit_disable_time'] * 60 > time())),
+			'can_see_ip' => allowedTo('moderate_forum') || ($message['id_member'] == $user_info['id'] && !empty($user_info['id'])),
+			'can_like' => $message['use_likes'] && !$message['you_liked'],
+			'can_unlike' => $message['use_likes'] && $message['you_liked'],
+			'like_counter' => $message['like_count'],
+			'likes_enabled' => !empty($modSettings['likes_enabled']) && ($message['use_likes'] || ($message['like_count'] != 0)),
+		);
+
+		if (!empty($output['modified']['name']))
+			$output['modified']['last_edit_text'] = sprintf($txt['last_edit_by'], $output['modified']['time'], $output['modified']['name'], standardTime($output['modified']['timestamp']));
+
+		if (!empty($output['member']['karma']['allow']))
+		{
+			$output['member']['karma'] += array(
+				'applaud_url' => $scripturl . '?action=karma;sa=applaud;uid=' . $output['member']['id'] . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';m=' . $output['id'] . ';' . $context['session_var'] . '=' . $context['session_id'],
+				'smite_url' => $scripturl . '?action=karma;sa=smite;uid=' . $output['member']['id'] . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';m=' . $output['id'] . ';' . $context['session_var'] . '=' . $context['session_id']
+			);
+		}
+
+		call_integration_hook('integrate_prepare_display_context', array(&$output, &$message));
+
+		if (empty($options['view_newest_first']))
+			$counter++;
+		else
+			$counter--;
+
+		return $output;
 	}
-
-	// Do we need to instigate a sort?
-	if ($have_unapproved)
-		usort($attachmentData, 'approved_attach_sort');
-
-	return $attachmentData;
-}
-
-/**
- * A sort function for putting unapproved attachments first.
- * @param $a
- * @param $b
- * @return int, -1, 0, 1
- */
-function approved_attach_sort($a, $b)
-{
-	if ($a['is_approved'] == $b['is_approved'])
-		return 0;
-
-	return $a['is_approved'] > $b['is_approved'] ? -1 : 1;
-}
-
-/**
- * Callback filter for the retrieval of attachments.
- * This function returns false when:
- *  - the attachment is unapproved, and
- *  - the viewer is not the poster of the message where the attachment is
- *
- * @param array $attachment_info
- */
-function filter_accessible_attachment($attachment_info)
-{
-	global $all_posters, $user_info;
-
-	if (!$attachment_info['approved'] && (!isset($all_posters[$attachment_info['id_msg']]) || $all_posters[$attachment_info['id_msg']] != $user_info['id']))
-		return false;
-
-	return true;
 }

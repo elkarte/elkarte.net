@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file contains functions that deal with getting and setting cache values.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has the hefty job of loading information for the forum.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -87,8 +87,7 @@ function cache_quick_get($key, $file, $function, $params, $level = 1)
  */
 function cache_put_data($key, $value, $ttl = 120)
 {
-	global $boardurl, $modSettings, $memcached;
-	global $cache_hits, $cache_count, $db_show_debug;
+	global $cache_memcached, $memcached, $cache_hits, $cache_count, $db_show_debug;
 	global $cache_accelerator, $cache_enable;
 
 	if (empty($cache_enable))
@@ -108,7 +107,7 @@ function cache_put_data($key, $value, $ttl = 120)
 	{
 		case 'memcached':
 			// The simple yet efficient memcached.
-			if (function_exists('memcached_set') || function_exists('memcache_set') && isset($modSettings['cache_memcached']) && trim($modSettings['cache_memcached']) != '')
+			if (function_exists('memcached_set') || function_exists('memcache_set') && !empty($cache_memcached))
 			{
 				// Not connected yet?
 				if (empty($memcached))
@@ -163,7 +162,7 @@ function cache_put_data($key, $value, $ttl = 120)
 		case 'zend':
 			// Zend Platform/ZPS/etc.
 			if (function_exists('zend_shm_cache_store'))
-				zend_shm_cache_store('ELKARTE::' . $key, $value, $ttl);
+				zend_shm_cache_store('ELK::' . $key, $value, $ttl);
 			elseif (function_exists('output_cache_put'))
 				output_cache_put($key, $value);
 			break;
@@ -182,11 +181,11 @@ function cache_put_data($key, $value, $ttl = 120)
 				@unlink(CACHEDIR . '/data_' . $key . '.php');
 			else
 			{
-				$cache_data = '<' . '?' . 'php if (!defined(\'ELKARTE\')) die; if (' . (time() + $ttl) . ' < time()) $expired = true; else{$expired = false; $value = \'' . addcslashes($value, '\\\'') . '\';}';
+				$cache_data = '<' . '?' . 'php if (!defined(\'ELK\')) die; if (' . (time() + $ttl) . ' < time()) $expired = true; else{$expired = false; $value = \'' . addcslashes($value, '\\\'') . '\';}';
 
 				// Write out the cache file, check that the cache write was successful; all the data must be written
 				// If it fails due to low diskspace, or other, remove the cache file
-				if (file_put_contents(CACHEDIR . '/data_' . $key . '.php', $cache_data, LOCK_EX) !== strlen($cache_data))
+				if (@file_put_contents(CACHEDIR . '/data_' . $key . '.php', $cache_data, LOCK_EX) !== strlen($cache_data))
 					@unlink(CACHEDIR . '/data_' . $key . '.php');
 			}
 			break;
@@ -210,9 +209,8 @@ function cache_put_data($key, $value, $ttl = 120)
  */
 function cache_get_data($key, $ttl = 120)
 {
-	global $boardurl, $modSettings, $memcached;
-	global $cache_hits, $cache_count, $db_show_debug;
-	global $cache_accelerator, $cache_enable;
+	global $cache_memcached, $memcached, $cache_hits, $cache_count, $db_show_debug;
+	global $cache_accelerator, $cache_enable, $expired;
 
 	if (empty($cache_enable))
 		return;
@@ -231,9 +229,9 @@ function cache_get_data($key, $ttl = 120)
 
 	switch ($cache_accelerator)
 	{
-		case 'memcache':
+		case 'memcached':
 			// Okay, let's go for it memcached!
-			if ((function_exists('memcache_get') || function_exists('memcached_get')) && isset($modSettings['cache_memcached']) && trim($modSettings['cache_memcached']) != '')
+			if ((function_exists('memcache_get') || function_exists('memcached_get')) && !empty($cache_memcached))
 			{
 				// Not connected yet?
 				if (empty($memcached))
@@ -241,7 +239,7 @@ function cache_get_data($key, $ttl = 120)
 				if (!$memcached)
 					return null;
 
-				$value = (function_exists('memcache_get')) ? memcache_get($cache['connection'], $key) : memcached_get($cache['connection'], $key);
+				$value = (function_exists('memcache_get')) ? memcache_get($memcached, $key) : memcached_get($memcached, $key);
 			}
 			break;
 		case 'eaccelerator':
@@ -262,7 +260,7 @@ function cache_get_data($key, $ttl = 120)
 		case 'zend':
 			// Zend's pricey stuff.
 			if (function_exists('zend_shm_cache_fetch'))
-				$value = zend_shm_cache_fetch('ELKARTE::' . $key, $ttl);
+				$value = zend_shm_cache_fetch('ELK::' . $key);
 			elseif (function_exists('output_cache_get'))
 				$value = output_cache_get($key, $ttl);
 			break;
@@ -271,7 +269,7 @@ function cache_get_data($key, $ttl = 120)
 				$value = xcache_get($key);
 			break;
 		default:
-			// Otherwise it's Elkarte data!
+			// Otherwise it's ElkArte data!
 			if (file_exists(CACHEDIR . '/data_' . $key . '.php') && filesize(CACHEDIR . '/data_' . $key . '.php') > 10)
 			{
 				// php will cache file_exists et all, we can't 100% depend on its results so proceed with caution
@@ -308,7 +306,7 @@ function cache_get_data($key, $ttl = 120)
  */
 function get_memcached_server($level = 3)
 {
-	global $modSettings, $memcached, $db_persist, $cache_memcached;
+	global $memcached, $db_persist, $cache_memcached;
 
 	$servers = explode(',', $cache_memcached);
 	$server = explode(':', trim($servers[array_rand($servers)]));
@@ -342,7 +340,7 @@ function get_memcached_server($level = 3)
  *
  * It may only remove the files of a certain type (if the $type parameter is given)
  * Type can be user, data or left blank
- * 	- user clears out user data
+ *  - user clears out user data
  *  - data clears out system / opcode data
  *  - If no type is specified will perfom a complete cache clearing
  * For cache engines that do not distinguish on types, a full cache flush will be done
@@ -351,12 +349,12 @@ function get_memcached_server($level = 3)
  */
 function clean_cache($type = '')
 {
-	global $cache_accelerator, $modSettings, $memcached;
+	global $cache_accelerator, $cache_uid, $cache_password, $cache_memcached, $memcached;
 
 	switch ($cache_accelerator)
 	{
 		case 'memcached':
-			if (function_exists('memcache_flush') || function_exists('memcached_flush') && isset($modSettings['cache_memcached']) && trim($modSettings['cache_memcached']) != '')
+			if ((function_exists('memcache_flush') || function_exists('memcached_flush')) && !empty($cache_memcached))
 			{
 				// Not connected yet?
 				if (empty($memcached))
@@ -364,7 +362,7 @@ function clean_cache($type = '')
 				if (!$memcached)
 					return;
 
-				// clear it out
+				// clear it out, really invalidate whats there
 				if (function_exists('memcache_flush'))
 					memcache_flush($memcached);
 				else
@@ -404,18 +402,22 @@ function clean_cache($type = '')
 			break;
 		case 'zend':
 			if (function_exists('zend_shm_cache_clear'))
-				zend_shm_cache_clear('ELKARTE');
+				zend_shm_cache_clear('ELK');
 			break;
 		case 'xcache':
 			if (function_exists('xcache_clear_cache') && function_exists('xcache_count'))
 			{
-				// @todo interface !!!
-				//$_SERVER["PHP_AUTH_USER"] = 'userid';
-				//$_SERVER["PHP_AUTH_PW"] = 'password'; /* not the md5 one in the .ini but the real password */
+				// xcache may need auth credentials, depending on how its been set up
+				if (!empty($cache_uid) && !empty($cache_password))
+				{
+					$_SERVER["PHP_AUTH_USER"] = $cache_uid;
+					$_SERVER["PHP_AUTH_PW"] = $cache_password;
+				}
 
 				// Get the counts so we clear each instance
 				$pcnt = xcache_count(XC_TYPE_PHP);
 				$vcnt = xcache_count(XC_TYPE_VAR);
+
 				// Time to clear the user vars and/or the opcache
 				if ($type === '' || $type === 'user')
 				{
@@ -448,7 +450,11 @@ function clean_cache($type = '')
 
 	// Invalidate cache, to be sure!
 	// ... as long as Load.php can be modified, anyway.
-	@touch(SOURCEDIR . '/' . 'Load.php');
+	@touch(SOURCEDIR . '/Load.php');
+
+	// Give addons a way to trigger cache cleaning.
+	call_integration_hook('integrate_clean_cache');
+
 	clearstatcache();
 }
 
@@ -465,7 +471,7 @@ function cache_get_key($key)
 
 	// no need to do this every time, slows us down :P
 	if (empty($key_prefix))
-		$key_prefix = md5($boardurl . filemtime(SOURCEDIR . '/Load.php')) . '-ELKARTE-';
+		$key_prefix = md5($boardurl . filemtime(SOURCEDIR . '/Load.php')) . '-ELK-';
 
 	return $key_prefix . ((empty($cache_accelerator) || $cache_accelerator === 'filebased') ? strtr($key, ':/', '-_') : $key);
 }

@@ -1,6 +1,10 @@
 <?php
 
 /**
+ * Handles sound processing. In order to make sure the visual
+ * verification is still accessible for all users, a sound clip is being addded
+ * that reads the letters that are being shown.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,15 +15,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * Handles sound processing. In order to make sure the visual
- * verification is still accessible for all users, a sound clip is being addded
- * that reads the letters that are being shown.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -28,9 +28,7 @@ if (!defined('ELKARTE'))
  * Used by action_verificationcode() (Register.controller.php).
  *
  * @param string $word
- * @return boolean false on failure
  */
-
 function createWaveFile($word)
 {
 	global $settings, $user_info;
@@ -61,25 +59,26 @@ function createWaveFile($word)
 
 	// Loop through all letters of the word $word.
 	$sound_word = '';
-	for ($i = 0; $i < strlen($word); $i++)
+	$str_len = strlen($word);
+	for ($i = 0; $i < $str_len; $i++)
 	{
-		$sound_letter = implode('', file($settings['default_theme_dir'] . '/fonts/sound/' . $word{$i} . '.' . $sound_language . '.wav'));
+		$sound_letter = implode('', file($settings['default_theme_dir'] . '/fonts/sound/' . $word[$i] . '.' . $sound_language . '.wav'));
 		if (strpos($sound_letter, 'data') === false)
 			return false;
 
 		$sound_letter = substr($sound_letter, strpos($sound_letter, 'data') + 8);
-		switch ($word{$i} === 's' ? 0 : mt_rand(0, 2))
+		switch ($word[$i] === 's' ? 0 : mt_rand(0, 2))
 		{
 			case 0:
 				for ($j = 0, $n = strlen($sound_letter); $j < $n; $j++)
 					for ($k = 0, $m = round(mt_rand(15, 25) / 10); $k < $m; $k++)
-						$sound_word .= $word{$i} === 's' ? $sound_letter{$j} : chr(mt_rand(max(ord($sound_letter{$j}) - 1, 0x00), min(ord($sound_letter{$j}) + 1, 0xFF)));
+						$sound_word .= $word[$i] === 's' ? $sound_letter[$j] : chr(mt_rand(max(ord($sound_letter[$j]) - 1, 0x00), min(ord($sound_letter[$j]) + 1, 0xFF)));
 			break;
 
 			case 1:
 				for ($j = 0, $n = strlen($sound_letter) - 1; $j < $n; $j += 2)
-					$sound_word .= (mt_rand(0, 3) == 0 ? '' : $sound_letter{$j}) . (mt_rand(0, 3) === 0 ? $sound_letter{$j + 1} : $sound_letter{$j}) . (mt_rand(0, 3) === 0 ? $sound_letter{$j} : $sound_letter{$j + 1}) . $sound_letter{$j + 1} . (mt_rand(0, 3) == 0 ? $sound_letter{$j + 1} : '');
-				$sound_word .= str_repeat($sound_letter{$n}, 2);
+					$sound_word .= (mt_rand(0, 3) == 0 ? '' : $sound_letter[$j]) . (mt_rand(0, 3) === 0 ? $sound_letter[$j + 1] : $sound_letter[$j]) . (mt_rand(0, 3) === 0 ? $sound_letter[$j] : $sound_letter[$j + 1]) . $sound_letter[$j + 1] . (mt_rand(0, 3) == 0 ? $sound_letter[$j + 1] : '');
+				$sound_word .= str_repeat($sound_letter[$n], 2);
 			break;
 
 			case 2:
@@ -89,7 +88,7 @@ function createWaveFile($word)
 					if (mt_rand(0, 10) === 0)
 						$shift += mt_rand(-3, 3);
 					for ($k = 0, $m = round(mt_rand(15, 25) / 10); $k < $m; $k++)
-						$sound_word .= chr(min(max(ord($sound_letter{$j}) + $shift, 0x00), 0xFF));
+						$sound_word .= chr(min(max(ord($sound_letter[$j]) + $shift, 0x00), 0xFF));
 				}
 			break;
 
@@ -99,20 +98,36 @@ function createWaveFile($word)
 	}
 
 	$data_size = strlen($sound_word);
-	$file_size = $data_size + 0x24;
-	$sample_rate = 16000;
+	$chunk_id = 0x52494646; // Contains the letters "RIFF" (0x52494646 in big-endian form).
+	$chunk_size = $data_size + 0x20; // This is the size of the entire file in bytes minus 8 bytes for the two leading fields not included in this count: ChunkID and ChunkSize.
+	$format = 0x57415645; // Contains the letters "WAVE" (0x57415645 big-endian form).
+	$subchunk1ID = 0x666D7420; // Contains the letters "fmt "(0x666d7420 big-endian form).
+	$subchunk1Size = 0x10000000; // 16 for PCM.  This is the size of the rest of the Subchunk which follows this number.
+	$audioFormat = 0x0100; // PCM = 1 (i.e. Linear quantization)
+	$numChannels = 0x0100; // Mono = 1, Stereo = 2, etc.
+	$sample_rate = 0x803E0000; // 8000, 16000, etc
+	$byteRate = 0x803E0000; // = SampleRate * NumChannels * BitsPerSample/8 (for use the same as sample rate)
+	$blockAlign = 0x0100; // = NumChannels * BitsPerSample/8
+	$bitsPerSample = 0x0800; // 8 bits = 8, 16 bits = 16, etc.
+	$subchunk2ID = 0x64617461; // Contains the letters "data" (0x64617461 big-endian form).
 
-	// Disable compression.
-	ob_end_clean();
+	// Create the wav file
+	$wav = pack('NVNNNnnNNnnNV', $chunk_id, $chunk_size, $format, $subchunk1ID, $subchunk1Size, $audioFormat, $numChannels, $sample_rate, $byteRate, $blockAlign, $bitsPerSample, $subchunk2ID, $data_size) . $sound_word;
+	$time = $chunk_size / 16000;
+
+	// Clear anything in the buffers
+	while (@ob_get_level() > 0)
+		@ob_end_clean();
+
+	// Set up our headers
 	header('Content-Encoding: none');
+	header('Content-Duration: ' . round($time, 0));
+	header('Content-Disposition: inline; filename="captcha.wav"');
+	header('Content-Type: audio/x-wav');
+	header('Cache-Control: no-cache');
+	header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 525600 * 60) . ' GMT');
+	header('Content-Length: ' . strlen($wav));
 
 	// Output the wav.
-	header('Content-type: audio/x-wav');
-	header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 525600 * 60) . ' GMT');
-	header('Content-Length: ' . ($file_size + 0x08));
-
-	echo pack('nnVnnnnnnnnVVnnnnV', 0x5249, 0x4646, $file_size, 0x5741, 0x5645, 0x666D, 0x7420, 0x1000, 0x0000, 0x0100, 0x0100, $sample_rate, $sample_rate, 0x0100, 0x0800, 0x6461, 0x7461, $data_size), $sound_word;
-
-	// Noting more to add.
-	die();
+	echo $wav;
 }

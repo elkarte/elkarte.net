@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Database and support functions for adding, moving, saving smileys
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,11 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -55,8 +57,6 @@ function validateDuplicateSmiley($code, $current = null)
 {
 	$db = database();
 
-	$db = database();
-
 	$request = $db->query('', '
 		SELECT id_smiley
 		FROM {db_prefix}smileys
@@ -78,8 +78,7 @@ function validateDuplicateSmiley($code, $current = null)
 /**
  * Request the next location for a new smiley
  *
- * @param type $location
- * @return type
+ * @param string $location
  */
 function nextSmileyLocation($location)
 {
@@ -160,7 +159,7 @@ function updateSmileyDisplayType($smileys, $display_type)
 }
 
 /**
- * Updates a smiley..
+ * Updates a smiley.
  *
  * @param array $param
  */
@@ -197,7 +196,7 @@ function getSmiley($id)
 	$db = database();
 
 	$request = $db->query('', '
-		SELECT id_smiley AS id, code, filename, description, hidden AS location, 0 AS is_new
+		SELECT id_smiley AS id, code, filename, description, hidden AS location, 0 AS is_new, smiley_row AS row
 		FROM {db_prefix}smileys
 		WHERE id_smiley = {int:current_smiley}',
 		array(
@@ -308,8 +307,8 @@ function updateSmileyRow($id, $row, $location)
 /**
  * Set an new order for the given smiley.
  *
- * @param type $id
- * @param type $order
+ * @param int $id
+ * @param int $order
  */
 function updateSmileyOrder($id, $order)
 {
@@ -328,8 +327,6 @@ function updateSmileyOrder($id, $order)
 
 /**
  * Get a list of all visible smileys.
- *
- * @return type
  */
 function getSmileys()
 {
@@ -357,9 +354,9 @@ function getSmileys()
 		$location = empty($row['hidden']) ? 'postform' : 'popup';
 		$smileys[$location]['rows'][$row['smiley_row']][] = array(
 			'id' => $row['id_smiley'],
-			'code' => htmlspecialchars($row['code']),
-			'filename' => htmlspecialchars($row['filename']),
-			'description' => htmlspecialchars($row['description']),
+			'code' => htmlspecialchars($row['code'], ENT_COMPAT, 'UTF-8'),
+			'filename' => htmlspecialchars($row['filename'], ENT_COMPAT, 'UTF-8'),
+			'description' => htmlspecialchars($row['description'], ENT_COMPAT, 'UTF-8'),
 			'row' => $row['smiley_row'],
 			'order' => $row['smiley_order'],
 			'selected' => !empty($_REQUEST['move']) && $_REQUEST['move'] == $row['id_smiley'],
@@ -373,7 +370,7 @@ function getSmileys()
 /**
  * Validates, if a smiley set was properly installed.
  *
- * @param type $set
+ * @param string $set name of smiley set to check
  * @return boolean
  */
 function isSmileySetInstalled($set)
@@ -392,7 +389,6 @@ function isSmileySetInstalled($set)
 			'current_package' => $set,
 		)
 	);
-
 	if ($db->num_rows($request) > 0)
 		return false;
 
@@ -428,8 +424,6 @@ function logPackageInstall($param)
 
 /**
  * Get the last smiley_order from the first smileys row.
- *
- * @return type
  */
 function getMaxSmileyOrder()
 {
@@ -454,45 +448,30 @@ function getMaxSmileyOrder()
 /**
  * This function sorts the smiley table by code length,
  * it is needed as MySQL withdrew support for functions in order by.
- * @todo is this ordering itself needed?
+ *
+ * @deprecated the ordering is done in the query, probably not needed
  */
 function sortSmileyTable()
 {
 	$db = database();
 
-	$table = db_table();
-
-	// Add a sorting column.
-	$table->db_add_column('{db_prefix}smileys', array('name' => 'temp_order', 'size' => 8, 'type' => 'mediumint', 'null' => false));
-
-	// Set the contents of this column.
-	$db->query('set_smiley_order', '
-		UPDATE {db_prefix}smileys
-		SET temp_order = LENGTH(code)',
-		array(
-		)
-	);
-
-	// Order the table by this column.
-	$db->query('alter_table_smileys', '
+	// Order the table by code length.
+	$db->query('alter_table', '
 		ALTER TABLE {db_prefix}smileys
-		ORDER BY temp_order DESC',
+		ORDER BY LENGTH(code) DESC',
 		array(
 			'db_error_skip' => true,
 		)
 	);
-
-	// Remove the sorting column.
-	$table->db_remove_column('{db_prefix}smileys', 'temp_order');
 }
 
 /**
  * Callback function for createList().
  * Lists all smiley sets.
  *
- * @param $start
- * @param $items_per_page
- * @param $sort
+ * @param int $start
+ * @param int $items_per_page
+ * @param string $sort
  */
 function list_getSmileySets($start, $items_per_page, $sort)
 {
@@ -500,12 +479,14 @@ function list_getSmileySets($start, $items_per_page, $sort)
 
 	$known_sets = explode(',', $modSettings['smiley_sets_known']);
 	$set_names = explode("\n", $modSettings['smiley_sets_names']);
+
 	$cols = array(
 		'id' => array(),
 		'selected' => array(),
 		'path' => array(),
 		'name' => array(),
 	);
+
 	foreach ($known_sets as $i => $set)
 	{
 		$cols['id'][] = $i;
@@ -513,7 +494,9 @@ function list_getSmileySets($start, $items_per_page, $sort)
 		$cols['path'][] = $set;
 		$cols['name'][] = $set_names[$i];
 	}
+
 	$sort_flag = strpos($sort, 'DESC') === false ? SORT_ASC : SORT_DESC;
+	
 	if (substr($sort, 0, 4) === 'name')
 		array_multisort($cols['name'], $sort_flag, SORT_REGULAR, $cols['path'], $cols['selected'], $cols['id']);
 	elseif (substr($sort, 0, 4) === 'path')
@@ -583,7 +566,7 @@ function list_getNumSmileys()
 		array(
 		)
 	);
-	list($numSmileys) = $db->fetch_row;
+	list ($numSmileys) = $db->fetch_row($request);
 	$db->free_result($request);
 
 	return $numSmileys;

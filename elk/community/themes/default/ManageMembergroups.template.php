@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -20,9 +21,10 @@
 function template_regular_membergroups_list()
 {
 	template_show_list('regular_membergroups_list');
-	echo '<br /><br />';
-	template_show_list('post_count_membergroups_list');
 
+	echo '<br /><br />';
+
+	template_show_list('post_count_membergroups_list');
 }
 
 /**
@@ -34,10 +36,8 @@ function template_new_group()
 
 	echo '
 	<div id="admincenter">
-		<form id="new_group" action="', $scripturl, '?action=admin;area=membergroups;sa=add" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['membergroups_new_group'], '</h3>
-			</div>
+		<form id="admin_form_wrapper" name="new_group" action="', $scripturl, '?action=admin;area=membergroups;sa=add" method="post" accept-charset="UTF-8">
+			<h2 class="category_header">', $txt['membergroups_new_group'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -135,25 +135,28 @@ function template_new_group()
 						</dt>
 						<dd>';
 
-	template_add_edit_group_boards_list('new_group', false);
+	template_add_edit_group_boards_list('new_group', false, false);
 
 	echo '
 						</dd>
 					</dl>
-					<input type="submit" value="', $txt['membergroups_add_group'], '" class="button_submit" />
+					<input type="submit" value="', $txt['membergroups_add_group'], '" class="right_submit" />
 				</div>
 			</div>';
 
 	if ($context['undefined_group'])
 	{
+		// Enable / disable the required posts box when the group type is post based
 		echo '
 			<script><!-- // --><![CDATA[
 				function swapPostGroup(isChecked)
 				{
 					var min_posts_text = document.getElementById(\'min_posts_text\');
+
 					document.getElementById(\'min_posts_input\').disabled = !isChecked;
-					min_posts_text.style.color = isChecked ? "" : "#888888";
+					min_posts_text.style.color = isChecked ? "" : "#888";
 				}
+
 				swapPostGroup(', $context['post_group'] ? 'true' : 'false', ');
 			// ]]></script>';
 	}
@@ -174,239 +177,223 @@ function template_edit_group()
 
 	echo '
 	<div id="admincenter">
-		<form action="', $scripturl, '?action=admin;area=membergroups;sa=edit;group=', $context['group']['id'], '" method="post" accept-charset="UTF-8" name="groupForm" id="groupForm">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['membergroups_edit_group'], ' - ', $context['group']['name'], '
-				</h3>
-			</div>
-			<div class="windowbg2">
-				<div class="content">
-					<dl class="settings">
-						<dt>
-							<label for="group_name_input"><strong>', $txt['membergroups_edit_name'], ':</strong></label>
-						</dt>
-						<dd>
-							<input type="text" name="group_name" id="group_name_input" value="', $context['group']['editable_name'], '" size="30" class="input_text" />
-						</dd>';
+		<form id="admin_form_wrapper" name="groupForm" action="', $scripturl, '?action=admin;area=membergroups;sa=edit;group=', $context['group']['id'], '" method="post" accept-charset="UTF-8" >
+			<h3 class="category_header">', $txt['membergroups_edit_group'], ' - ', $context['group']['name'], '</h3>
+			<div class="content">
+				<dl class="settings">
+					<dt>
+						<label for="group_name_input"><strong>', $txt['membergroups_edit_name'], ':</strong></label>
+					</dt>
+					<dd>
+						<input type="text" name="group_name" id="group_name_input" value="', $context['group']['editable_name'], '" size="30" class="input_text" />
+					</dd>';
 
 	if ($context['group']['id'] != 3 && $context['group']['id'] != 4)
 		echo '
-
-						<dt id="group_desc_text">
-							<label for="group_desc_input"><strong>', $txt['membergroups_edit_desc'], ':</strong></label>
-						</dt>
-						<dd>
-							<textarea name="group_desc" id="group_desc_input" rows="4" cols="40">', $context['group']['description'], '</textarea>
-						</dd>';
+					<dt id="group_desc_text">
+						<label for="group_desc_input"><strong>', $txt['membergroups_edit_desc'], ':</strong></label>
+					</dt>
+					<dd>
+						<textarea name="group_desc" id="group_desc_input" rows="4" cols="40">', $context['group']['description'], '</textarea>
+					</dd>';
 
 	// Group type...
 	if ($context['group']['allow_post_group'])
 	{
 		echo '
-						<dt>
-							<label for="group_type"><strong>', $txt['membergroups_edit_group_type'], ':</strong></label>
-						</dt>
-						<dd>
-							<fieldset id="group_type">
-								<legend>', $txt['membergroups_edit_select_group_type'], '</legend>
-								<label for="group_type_private"><input type="radio" name="group_type" id="group_type_private" value="0" ', !$context['group']['is_post_group'] && $context['group']['type'] == 0 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_private'], '</label><br />';
+					<dt>
+						<label for="group_type"><strong>', $txt['membergroups_edit_group_type'], ':</strong></label>
+					</dt>
+					<dd>
+						<fieldset id="group_type">
+							<legend>', $txt['membergroups_edit_select_group_type'], '</legend>
+							<label for="group_type_private"><input type="radio" name="group_type" id="group_type_private" value="0" ', !$context['group']['is_post_group'] && $context['group']['type'] == 0 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_private'], '</label><br />';
 
 		if ($context['group']['allow_protected'])
 			echo '
-								<label for="group_type_protected"><input type="radio" name="group_type" id="group_type_protected" value="1" ', $context['group']['type'] == 1 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_protected'], '</label><br />';
+							<label for="group_type_protected"><input type="radio" name="group_type" id="group_type_protected" value="1" ', $context['group']['type'] == 1 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_protected'], '</label><br />';
 
 		echo '
-								<label for="group_type_request"><input type="radio" name="group_type" id="group_type_request" value="2" ', $context['group']['type'] == 2 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_request'], '</label><br />
-								<label for="group_type_free"><input type="radio" name="group_type" id="group_type_free" value="3" ', $context['group']['type'] == 3 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_free'], '</label><br />
-								<label for="group_type_post"><input type="radio" name="group_type" id="group_type_post" value="-1" ', $context['group']['is_post_group'] ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(1);" />', $txt['membergroups_group_type_post'], '</label><br />
-							</fieldset>
-						</dd>';
+							<label for="group_type_request"><input type="radio" name="group_type" id="group_type_request" value="2" ', $context['group']['type'] == 2 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_request'], '</label><br />
+							<label for="group_type_free"><input type="radio" name="group_type" id="group_type_free" value="3" ', $context['group']['type'] == 3 ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(0);" />', $txt['membergroups_group_type_free'], '</label><br />
+							<label for="group_type_post"><input type="radio" name="group_type" id="group_type_post" value="-1" ', $context['group']['is_post_group'] ? 'checked="checked"' : '', ' class="input_radio" onclick="swapPostGroup(1);" />', $txt['membergroups_group_type_post'], '</label><br />
+						</fieldset>
+					</dd>';
 	}
 
 	if ($context['group']['id'] != 3 && $context['group']['id'] != 4)
 		echo '
-						<dt id="group_moderators_text">
-							<label for="group_moderators"><strong>', $txt['moderators'], ':</strong></label>
-						</dt>
-						<dd>
-							<input type="text" name="group_moderators" id="group_moderators" value="', $context['group']['moderator_list'], '" size="30" class="input_text" />
-							<div id="moderator_container"></div>
-						</dd>
-						<dt id="group_hidden_text">
-							<label for="group_hidden_input"><strong>', $txt['membergroups_edit_hidden'], ':</strong></label>
-						</dt>
-						<dd>
-							<select name="group_hidden" id="group_hidden_input" onchange="if (this.value == 2 &amp;&amp; !confirm(\'', $txt['membergroups_edit_hidden_warning'], '\')) this.value = 0;">
-								<option value="0" ', $context['group']['hidden'] ? '' : 'selected="selected"', '>', $txt['membergroups_edit_hidden_no'], '</option>
-								<option value="1" ', $context['group']['hidden'] == 1 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_hidden_boardindex'], '</option>
-								<option value="2" ', $context['group']['hidden'] == 2 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_hidden_all'], '</option>
-							</select>
-						</dd>';
+					<dt id="group_moderators_text">
+						<label for="group_moderators"><strong>', $txt['moderators'], ':</strong></label>
+					</dt>
+					<dd>
+						<input type="text" name="group_moderators" id="group_moderators" value="', $context['group']['moderator_list'], '" size="30" class="input_text" />
+						<div id="moderator_container"></div>
+					</dd>
+					<dt id="group_hidden_text">
+						<label for="group_hidden_input"><strong>', $txt['membergroups_edit_hidden'], ':</strong></label>
+					</dt>
+					<dd>
+						<select name="group_hidden" id="group_hidden_input" onchange="if (this.value == 2 &amp;&amp; !confirm(\'', $txt['membergroups_edit_hidden_warning'], '\')) this.value = 0;">
+							<option value="0" ', $context['group']['hidden'] ? '' : 'selected="selected"', '>', $txt['membergroups_edit_hidden_no'], '</option>
+							<option value="1" ', $context['group']['hidden'] == 1 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_hidden_boardindex'], '</option>
+							<option value="2" ', $context['group']['hidden'] == 2 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_hidden_all'], '</option>
+						</select>
+					</dd>';
 
 	// Can they inherit permissions?
 	if ($context['group']['id'] > 1 && $context['group']['id'] != 3)
 	{
 		echo '
-						<dt id="group_inherit_text">
-							<label for="group_inherit_input"><strong>', $txt['membergroups_edit_inherit_permissions'], '</strong></label>:<br />
-							<span class="smalltext">', $txt['membergroups_edit_inherit_permissions_desc'], '</span>
-						</dt>
-						<dd>
-							<select name="group_inherit" id="group_inherit_input">
-								<option value="-2">', $txt['membergroups_edit_inherit_permissions_no'], '</option>
-								<option value="-1" ', $context['group']['inherited_from'] == -1 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $txt['membergroups_guests'], '</option>
-								<option value="0" ', $context['group']['inherited_from'] == 0 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $txt['membergroups_members'], '</option>';
+					<dt id="group_inherit_text">
+						<label for="group_inherit_input"><strong>', $txt['membergroups_edit_inherit_permissions'], '</strong></label>:<br />
+						<span class="smalltext">', $txt['membergroups_edit_inherit_permissions_desc'], '</span>
+					</dt>
+					<dd>
+						<select name="group_inherit" id="group_inherit_input">
+							<option value="-2">', $txt['membergroups_edit_inherit_permissions_no'], '</option>
+							<option value="-1" ', $context['group']['inherited_from'] == -1 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $txt['membergroups_guests'], '</option>
+							<option value="0" ', $context['group']['inherited_from'] == 0 ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $txt['membergroups_members'], '</option>';
 
 		// For all the inheritable groups show an option.
 		foreach ($context['inheritable_groups'] as $id => $group)
 			echo '
-								<option value="', $id, '" ', $context['group']['inherited_from'] == $id ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $group, '</option>';
+							<option value="', $id, '" ', $context['group']['inherited_from'] == $id ? 'selected="selected"' : '', '>', $txt['membergroups_edit_inherit_permissions_from'], ': ', $group, '</option>';
 
 		echo '
-							</select>
-							<input type="hidden" name="old_inherit" value="', $context['group']['inherited_from'], '" />
-						</dd>';
+						</select>
+						<input type="hidden" name="old_inherit" value="', $context['group']['inherited_from'], '" />
+					</dd>';
 	}
 
 	if ($context['group']['allow_post_group'])
 		echo '
-
-						<dt id="min_posts_text">
-							<label for="min_posts_input"><strong>', $txt['membergroups_min_posts'], ':</strong></label>
-						</dt>
-						<dd>
-							<input type="text" name="min_posts" id="min_posts_input"', $context['group']['is_post_group'] ? ' value="' . $context['group']['min_posts'] . '"' : '', ' size="6" class="input_text" />
-						</dd>';
+					<dt id="min_posts_text">
+						<label for="min_posts_input"><strong>', $txt['membergroups_min_posts'], ':</strong></label>
+					</dt>
+					<dd>
+						<input type="text" name="min_posts" id="min_posts_input"', $context['group']['is_post_group'] ? ' value="' . $context['group']['min_posts'] . '"' : '', ' size="6" class="input_text" />
+					</dd>';
 
 	echo '
-						<dt>
-							<label for="online_color_input"><strong>', $txt['membergroups_online_color'], ':</strong></label>
-						</dt>
-						<dd>
-							<input type="text" name="online_color" id="online_color_input" value="', $context['group']['color'], '" size="20" class="input_text" />
-						</dd>
-						<dt>
-							<label for="icon_count_input"><strong>', $txt['membergroups_icon_count'], ':</strong></label>
-						</dt>
-						<dd>
-							<input type="text" name="icon_count" id="icon_count_input" value="', $context['group']['icon_count'], '" size="4" onkeyup="if (this.value.length > 2) this.value = 99;" onkeydown="this.onkeyup();" onchange="if (this.value != 0) this.form.icon_image.onchange();" class="input_text" />
-						</dd>
-						<dt>
-							<label for="icon_image_input"><strong>', $txt['membergroups_icon_image'], ':</strong></label>
-							<br />
-							<span class="smalltext">', $txt['membergroups_icon_image_note'], '</span>
-						</dt>
-						<dd>
-							<span class="floatleft">
-								', $txt['membergroups_images_url'], '
-								<input type="text" name="icon_image" id="icon_image_input" value="', $context['group']['icon_image'], '" onchange="if (this.value &amp;&amp; this.form.icon_count.value === 0) this.form.icon_count.value = 1;else if (!this.value) this.form.icon_count.value = 0; document.getElementById(\'msg_icon_0\').src = smf_images_url + \'/group_icons/\' + (this.value &amp;&amp; this.form.icon_count.value > 0 ? this.value : \'blank.png\')" size="20" class="input_text" />
-							</span>
-							<span id="messageicon_0" class="groupicon">
-								<img id="msg_icon_0" src="', $settings['images_url'], '/group_icons/', $context['group']['icon_image'] == '' ? 'blank.png' : $context['group']['icon_image'], '" alt="*" />
-							</span>
-						</dd>
-						<dt>
-							<label for="max_messages_input"><strong>', $txt['membergroups_max_messages'], ':</strong></label><br />
-							<span class="smalltext">', $txt['membergroups_max_messages_note'], '</span>
-						</dt>
-						<dd>
-							<input type="text" name="max_messages" id="max_messages_input" value="', $context['group']['id'] == 1 ? 0 : $context['group']['max_messages'], '" size="6"', $context['group']['id'] == 1 ? ' disabled="disabled"' : '', ' class="input_text" />
-						</dd>';
+					<dt>
+						<label for="online_color_input"><strong>', $txt['membergroups_online_color'], ':</strong></label>
+					</dt>
+					<dd>
+						<input type="text" name="online_color" id="online_color_input" value="', $context['group']['color'], '" size="20" class="input_text" />
+					</dd>
+					<dt>
+						<label for="icon_count_input"><strong>', $txt['membergroups_icon_count'], ':</strong></label>
+					</dt>
+					<dd>
+						<input type="text" name="icon_count" id="icon_count_input" value="', $context['group']['icon_count'], '" size="4" onkeyup="if (this.value.length > 2) this.value = 99;" onkeydown="this.onkeyup();" onchange="if (this.value != 0) this.form.icon_image.onchange();" class="input_text" />
+					</dd>
+					<dt>
+						<label for="icon_image_input"><strong>', $txt['membergroups_icon_image'], ':</strong></label>
+						<br />
+						<span class="smalltext">', $txt['membergroups_icon_image_note'], '</span>
+					</dt>
+					<dd>
+						<span class="floatleft">
+							', $txt['membergroups_images_url'], '
+							<input type="text" name="icon_image" id="icon_image_input" value="', $context['group']['icon_image'], '" onchange="if (this.value &amp;&amp; this.form.icon_count.value === 0) this.form.icon_count.value = 1;else if (!this.value) this.form.icon_count.value = 0; document.getElementById(\'msg_icon_0\').src = elk_images_url + \'/group_icons/\' + (this.value &amp;&amp; this.form.icon_count.value > 0 ? this.value : \'blank.png\')" size="20" class="input_text" />
+						</span>
+						<span id="messageicon_0" class="groupicon">
+							<img id="msg_icon_0" src="', $settings['images_url'], '/group_icons/', $context['group']['icon_image'] == '' ? 'blank.png' : $context['group']['icon_image'], '" alt="*" />
+						</span>
+					</dd>
+					<dt>
+						<label for="max_messages_input"><strong>', $txt['membergroups_max_messages'], ':</strong></label><br />
+						<span class="smalltext">', $txt['membergroups_max_messages_note'], '</span>
+					</dt>
+					<dd>
+						<input type="text" name="max_messages" id="max_messages_input" value="', $context['group']['id'] == 1 ? 0 : $context['group']['max_messages'], '" size="6"', $context['group']['id'] == 1 ? ' disabled="disabled"' : '', ' class="input_text" />
+					</dd>';
 
 	if (!empty($context['categories']))
 	{
 		echo '
-						<dt>
-							<strong>', $txt['membergroups_new_board'], ':</strong>', $context['group']['is_post_group'] ? '<br />
-							<span class="smalltext">' . $txt['membergroups_new_board_post_groups'] . '</span>' : '', '
-						</dt>
-						<dd>';
-		template_add_edit_group_boards_list('groupForm');
+					<dt>
+						<strong>', $txt['membergroups_new_board'], ':</strong>', $context['group']['is_post_group'] ? '<br />
+						<span class="smalltext">' . $txt['membergroups_new_board_post_groups'] . '</span>' : '', '
+					</dt>
+					<dd>';
+
+		template_add_edit_group_boards_list('groupForm', true, false);
+
 		echo '
-						</dd>';
+					</dd>';
 	}
 
 	echo '
-					</dl>
+				</dl>
+				<div class="submitbutton">
 					<input type="submit" name="save" value="', $txt['membergroups_edit_save'], '" class="button_submit" />', $context['group']['allow_delete'] ? '
 					<input type="submit" name="delete" value="' . $txt['membergroups_delete'] . '" onclick="return confirm(\'' . $txt['membergroups_confirm_delete'] . '\');" class="button_submit" />' : '', '
+					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+					<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
 				</div>
 			</div>
-			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-			<input type="hidden" name="', $context['admin-mmg_token_var'], '" value="', $context['admin-mmg_token'], '" />
 		</form>
-	</div>
-	<script><!-- // --><![CDATA[
+	</div>';
+
+	addInlineJavascript('
 		aIconLists[aIconLists.length] = new IconList({
 			sBackReference: "aIconLists[" + aIconLists.length + "]",
 			sIconIdPrefix: "msg_icon_",
-			sScriptUrl: smf_scripturl,
+			sScriptUrl: elk_scripturl,
 			bShowModify: false,
-			sSessionId: smf_session_id,
-			sSessionVar: smf_session_var,
-			sAction: "groupicons" ,
-			sLabelIconList: "', $txt['membergroups_icons'], '",
+			sSessionId: elk_session_id,
+			sSessionVar: elk_session_var,
+			sAction: "groupicons",
+			sLabelIconList: "' . $txt['membergroups_icons'] . '",
 			sLabelIconBox: "icon_image_input",
 			sBoxBackground: "transparent",
-			sBoxBackgroundHover: "#ffffff",
+			sBoxBackgroundHover: "#FFF",
 			iBoxBorderWidthHover: 1,
-			sBoxBorderColorHover: "#adadad" ,
-			sContainerBackground: "#ffffff",
+			sBoxBorderColorHover: "#adadad",
+			sContainerBackground: "#fff",
 			sContainerBorder: "1px solid #adadad",
-			sItemBorder: "1px solid #ffffff",
+			sItemBorder: "1px solid #fff",
 			sItemBorderHover: "1px dotted gray",
 			sItemBackground: "transparent",
 			sItemBackgroundHover: "#e0e0f0"
-		});
-	// ]]></script>
-	<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-	<script><!-- // --><![CDATA[
+		});', true);
+
+	if ($context['group']['id'] != 3 && $context['group']['id'] != 4)
+	{
+		$js = '
 		var oModeratorSuggest = new smc_AutoSuggest({
 			sSelf: \'oModeratorSuggest\',
-			sSessionId: smf_session_id,
-			sSessionVar: smf_session_var,
+			sSessionId: elk_session_id,
+			sSessionVar: elk_session_var,
 			sSuggestId: \'group_moderators\',
 			sControlId: \'group_moderators\',
 			sSearchType: \'member\',
 			bItemList: true,
 			sPostName: \'moderator_list\',
 			sURLMask: \'action=profile;u=%item_id%\',
-			sTextDeleteItem: \'', $txt['autosuggest_delete_item'], '\',
+			sTextDeleteItem: \'' . $txt['autosuggest_delete_item'] . '\',
 			sItemListContainerId: \'moderator_container\',
 			aListItems: [';
 
 		foreach ($context['group']['moderators'] as $id_member => $member_name)
-			echo '
+			$js .= '
 						{
-							sItemId: ', JavaScriptEscape($id_member), ',
-							sItemName: ', JavaScriptEscape($member_name), '
-						}', $id_member == $context['group']['last_moderator_id'] ? '' : ',';
+							sItemId: ' . JavaScriptEscape($id_member) . ',
+							sItemName: ' . JavaScriptEscape($member_name) . '
+						}' . $id_member == $context['group']['last_moderator_id'] ? '' : ',';
 
-		echo '
+		$js .= '
 			]
-		});
-	// ]]></script>';
+		});';
 
+		addInlineJavascript($js, true);
+	}
+
+	// If post based is selected, disable moderation selection, visability, group description and enable post count,
 	if ($context['group']['allow_post_group'])
-		echo '
-		<script><!-- // --><![CDATA[
-			function swapPostGroup(isChecked)
-			{
-				var min_posts_text = document.getElementById(\'min_posts_text\');
-				var group_desc_text = document.getElementById(\'group_desc_text\');
-				var group_hidden_text = document.getElementById(\'group_hidden_text\');
-				var group_moderators_text = document.getElementById(\'group_moderators_text\');
-				document.forms.groupForm.min_posts.disabled = !isChecked;
-				min_posts_text.style.color = isChecked ? "" : "#888888";
-				document.forms.groupForm.group_desc_input.disabled = isChecked;
-				group_desc_text.style.color = !isChecked ? "" : "#888888";
-				document.forms.groupForm.group_hidden_input.disabled = isChecked;
-				group_hidden_text.style.color = !isChecked ? "" : "#888888";
-				document.forms.groupForm.group_moderators.disabled = isChecked;
-				group_moderators_text.style.color = !isChecked ? "" : "#888888";
-			}
-			swapPostGroup(', $context['group']['is_post_group'] ? 'true' : 'false', ');
-		// ]]></script>';
+		addInlineJavascript('swapPostGroup(' . ($context['group']['is_post_group'] ? 'true' : 'false') . ');', true);
 }
 
 /**
@@ -414,10 +401,12 @@ function template_edit_group()
  *
  * @param int $form_id
  * @param bool $collapse
+ * @param bool $deny
  */
-function template_add_edit_group_boards_list($form_id, $collapse = true)
+function template_add_edit_group_boards_list($form_id, $collapse = true, $deny = true)
 {
-	global $context, $txt, $modSettings;
+	global $context, $txt;
+
 	echo '
 							<fieldset id="visible_boards">
 								<legend>', $txt['membergroups_new_board_desc'], '</legend>
@@ -425,7 +414,7 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 
 	foreach ($context['categories'] as $category)
 	{
-		if (empty($modSettings['deny_boards_access']))
+		if (empty($deny))
 			echo '
 									<li class="category">
 										<a href="javascript:void(0);" onclick="selectBoards([', implode(', ', $category['child_ids']), '], \'', $form_id, '\'); return false;"><strong>', $category['name'], '</strong></a>
@@ -447,10 +436,10 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 
 		foreach ($category['boards'] as $board)
 		{
-			if (empty($modSettings['deny_boards_access']))
+			if (empty($deny))
 				echo '
 										<li class="board" style="margin-', $context['right_to_left'] ? 'right' : 'left', ': ', $board['child_level'], 'em;">
-											<input type="checkbox" name="boardaccess[', $board['id'], ']" id="brd', $board['id'], '" value="\'allow\'" ', $board['allow'] ? ' checked="checked"' : '', ' class="input_check" /> <label for="brd', $board['id'], '">', $board['name'], '</label>
+											<input type="checkbox" name="boardaccess[', $board['id'], ']" id="brd', $board['id'], '" value="allow" ', $board['allow'] ? ' checked="checked"' : '', ' class="input_check" /> <label for="brd', $board['id'], '">', $board['name'], '</label>
 										</li>';
 			else
 				echo '
@@ -472,14 +461,13 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 	echo '
 							</ul>';
 
-	if (empty($modSettings['deny_boards_access']))
+	if (empty($deny))
 		echo '
 								<br />
 								<input type="checkbox" id="checkall_check" class="input_check" onclick="invertAll(this, this.form, \'boardaccess\');" /> <label for="checkall_check"><em>', $txt['check_all'], '</em></label>
 							</fieldset>';
 	else
 		echo '
-								<br class="clear" />
 								<span class="select_all_box">
 									<em>', $txt['all'], ': </em>
 									<input type="radio" name="select_all" id="allow_all" class="input_radio" onclick="selectAllRadio(this, this.form, \'boardaccess\', \'allow\');" /> <label for="allow_all">', $txt['board_perms_allow'], '</label>
@@ -505,7 +493,7 @@ function template_add_edit_group_boards_list($form_id, $collapse = true)
 }
 
 /**
- * Templating for viewing the members of a group.
+ * Template for viewing the members of a group.
  */
 function template_group_members()
 {
@@ -513,10 +501,8 @@ function template_group_members()
 
 	echo '
 	<div id="admincenter">
-		<form action="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : '') , ';sa=members;group=', $context['group']['id'], '" method="post" accept-charset="UTF-8" id="view_group">
-			<div class="cat_bar">
-				<h3 class="catbg">', $context['page_title'], '</h3>
-			</div>
+		<form action="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;group=', $context['group']['id'], '" method="post" accept-charset="UTF-8" id="view_group">
+			<h2 class="category_header">', $context['page_title'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">
@@ -526,14 +512,15 @@ function template_group_members()
 						<dd>
 							<span ', $context['group']['online_color'] ? 'style="color: ' . $context['group']['online_color'] . ';"' : '', '>', $context['group']['name'], '</span> ', $context['group']['icons'], '
 						</dd>';
-	//Any description to show?
+
+	// Any description to show?
 	if (!empty($context['group']['description']))
 		echo '
 						<dt>
 							<strong>' . $txt['membergroups_members_description'] . ':</strong>
 						</dt>
 						<dd>
-							', $context['group']['description'] ,'
+							', $context['group']['description'], '
 						</dd>';
 
 	echo '
@@ -541,8 +528,9 @@ function template_group_members()
 							<strong>', $txt['membergroups_members_top'], ':</strong>
 						</dt>
 						<dd>
-							', $context['total_members'] ,'
+							', $context['total_members'], '
 						</dd>';
+
 	// Any group moderators to show?
 	if (!empty($context['group']['moderators']))
 	{
@@ -555,7 +543,7 @@ function template_group_members()
 							<strong>', $txt['membergroups_members_group_moderators'], ':</strong>
 						</dt>
 						<dd>
-							', implode(', ', $moderators) ,'
+							', implode(', ', $moderators), '
 						</dd>';
 	}
 
@@ -563,17 +551,12 @@ function template_group_members()
 					</dl>
 				</div>
 			</div>
-
-			<br />
-			<div class="title_bar">
-				<h4 class="titlebg">', $txt['membergroups_members_group_members'], '</h4>
-			</div>
-			<br />
-			', template_pagesection(false, false, 'go_down'), '
+			<h3 class="category_header">', $txt['membergroups_members_group_members'], '</h3>
+			', template_pagesection(), '
 			<table class="table_grid">
 				<thead>
-					<tr class="catbg">
-						<th class="first_th"><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=name', $context['sort_by'] == 'name' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['name'], $context['sort_by'] == 'name' ? ' <img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a></th>';
+					<tr class="table_head">
+						<th><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=name', $context['sort_by'] == 'name' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['name'], $context['sort_by'] == 'name' ? ' <img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a></th>';
 
 	if ($context['can_send_email'])
 		echo '
@@ -582,10 +565,12 @@ function template_group_members()
 	echo '
 						<th><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=active', $context['sort_by'] == 'active' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['membergroups_members_last_active'], $context['sort_by'] == 'active' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a></th>
 						<th><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=registered', $context['sort_by'] == 'registered' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['date_registered'], $context['sort_by'] == 'registered' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a></th>
-						<th ', empty($context['group']['assignable']) ? ' class="last_th" colspan="2"' : '', '><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=posts', $context['sort_by'] == 'posts' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['posts'], $context['sort_by'] == 'posts' ? ' <img src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '','</a></th>';
+						<th ', empty($context['group']['assignable']) ? ' colspan="2"' : '', '><a href="', $scripturl, '?action=', $context['current_action'], (isset($context['admin_area']) ? ';area=' . $context['admin_area'] : ''), ';sa=members;start=', $context['start'], ';sort=posts', $context['sort_by'] == 'posts' && $context['sort_direction'] == 'up' ? ';desc' : '', ';group=', $context['group']['id'], '">', $txt['posts'], $context['sort_by'] == 'posts' ? ' <img src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a></th>';
+
 	if (!empty($context['group']['assignable']))
 		echo '
-						<th class="last_th centertext" style="width:4%"><input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" /></th>';
+						<th style="width:4%"><input type="checkbox" class="input_check" onclick="invertAll(this, this.form);" /></th>';
+
 	echo '
 					</tr>
 				</thead>
@@ -604,6 +589,7 @@ function template_group_members()
 		echo '
 					<tr class="', $alternate === true ? 'windowbg' : 'windowbg2', '">
 						<td>', $member['name'], '</td>';
+
 		if ($context['can_send_email'])
 		{
 			echo '
@@ -625,6 +611,7 @@ function template_group_members()
 			else
 				echo '
 								<a href="mailto:', $member['email'], '">', $member['email'], '</a>';
+
 			echo '
 						</td>';
 		}
@@ -633,47 +620,57 @@ function template_group_members()
 						<td>', $member['last_online'], '</td>
 						<td>', $member['registered'], '</td>
 						<td', empty($context['group']['assignable']) ? ' colspan="2"' : '', '>', $member['posts'], '</td>';
+
 		if (!empty($context['group']['assignable']))
 			echo '
 						<td class="centertext" style="width:4%">
 							<input type="checkbox" name="rem[]" value="', $member['id'], '" class="input_check" ', ($context['user']['id'] == $member['id'] && $context['group']['id'] == 1 ? 'onclick="if (this.checked) return confirm(\'' . $txt['membergroups_members_deadmin_confirm'] . '\')" ' : ''), '/>
 						</td>';
+
 		echo '
 					</tr>';
 	}
 
 	echo '
 				</tbody>
-			</table>';
+			</table>
+			<div class="flow_auto">
+				<div class="floatleft">';
+
+	template_pagesection();
+
+	echo '
+				</div>
+				<div class="additional_row floatright">';
 
 	if (!empty($context['group']['assignable']))
 		echo '
-			<div class="floatright">
-				<input type="submit" name="remove" value="', $txt['membergroups_members_remove'], '" class="button_submit " />
-			</div>';
+					<input type="submit" name="remove" value="', $txt['membergroups_members_remove'], '" class="button_submit " />';
 
-	template_pagesection();
+
+
 	echo '
-			<br />';
+				</div>
+			</div>';
 
 	if (!empty($context['group']['assignable']))
 	{
 		echo '
-			<div class="cat_bar cat_bar_odd">
-				<h3 class="catbg catbg_odd">', $txt['membergroups_members_add_title'], '</h3>
-			</div>
-			<div class="windowbg">
-				<div class="content">
-					<dl class="settings">
-						<dt>
-							<strong><label for="toAdd">', $txt['membergroups_members_add_desc'], ':</label></strong>
-						</dt>
-						<dd>
-							<input type="text" name="toAdd" id="toAdd" value="" class="input_text" />
-							<div id="toAddItemContainer"></div>
-						</dd>
-					</dl>
-					<input type="submit" name="add" value="', $txt['membergroups_members_add'], '" class="button_submit" />
+			<div class="additional_row">
+				<h3 class="category_header">', $txt['membergroups_members_add_title'], '</h3>
+				<div class="windowbg">
+					<div class="content">
+						<dl class="settings">
+							<dt>
+								<strong><label for="toAdd">', $txt['membergroups_members_add_desc'], ':</label></strong>
+							</dt>
+							<dd>
+								<input type="text" name="toAdd" id="toAdd" value="" class="input_text" />
+								<div id="toAddItemContainer"></div>
+							</dd>
+						</dl>
+						<input type="submit" name="add" value="', $txt['membergroups_members_add'], '" class="right_submit" />
+					</div>
 				</div>
 			</div>';
 	}
@@ -685,23 +682,20 @@ function template_group_members()
 	</div>';
 
 	if (!empty($context['group']['assignable']))
-		echo '
-		<script src="', $settings['default_theme_url'], '/scripts/suggest.js?alp21"></script>
-		<script><!-- // --><![CDATA[
-			var oAddMemberSuggest = new smc_AutoSuggest({
-				sSelf: \'oAddMemberSuggest\',
-				sSessionId: smf_session_id,
-				sSessionVar: smf_session_var,
-				sSuggestId: \'to_suggest\',
-				sControlId: \'toAdd\',
-				sSearchType: \'member\',
-				sPostName: \'member_add\',
-				sURLMask: \'action=profile;u=%item_id%\',
-				sTextDeleteItem: \'', $txt['autosuggest_delete_item'], '\',
-				bItemList: true,
-				sItemListContainerId: \'toAddItemContainer\'
-			});
-		// ]]></script>';
+		addInlineJavascript('
+		var oAddMemberSuggest = new smc_AutoSuggest({
+			sSelf: \'oAddMemberSuggest\',
+			sSessionId: elk_session_id,
+			sSessionVar: elk_session_var,
+			sSuggestId: \'to_suggest\',
+			sControlId: \'toAdd\',
+			sSearchType: \'member\',
+			sPostName: \'member_add\',
+			sURLMask: \'action=profile;u=%item_id%\',
+			sTextDeleteItem: \'' . $txt['autosuggest_delete_item'] . '\',
+			bItemList: true,
+			sItemListContainerId: \'toAddItemContainer\'
+		});', true);
 }
 
 /**
@@ -715,9 +709,7 @@ function template_group_request_reason()
 	echo '
 	<div id="moderationcenter">
 		<form action="', $scripturl, '?action=groups;sa=requests" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">', $txt['mc_groups_reason_title'], '</h3>
-			</div>
+			<h2 class="category_header">', $txt['mc_groups_reason_title'], '</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings">';
@@ -730,14 +722,17 @@ function template_group_request_reason()
 						</dt>
 						<dd>
 							<input type="hidden" name="groupr[]" value="', $request['id'], '" />
-							<textarea name="groupreason[', $request['id'], ']" rows="3" cols="40" style="' . (isBrowser('is_ie8') ? 'width: 635px; min-width: 96%; max-width: 96%' : 'min-width: 80%; max-width: 99%') . ';"></textarea>
+							<textarea id="groupreason" name="groupreason[', $request['id'], ']" rows="3" cols="40" style="' . (isBrowser('is_ie8') ? 'width: 635px; min-width: 96%; max-width: 96%' : 'min-width: 80%; max-width: 99%') . ';"></textarea>
 						</dd>';
 
 	echo '
 					</dl>
-					<input type="submit" name="go" value="', $txt['mc_groupr_submit'], '" class="button_submit" />
-					<input type="hidden" name="req_action" value="got_reason" />
-					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+					<div class="submitbutton">
+						<input type="submit" name="go" value="', $txt['mc_groupr_submit'], '" class="button_submit" />
+						<input type="hidden" name="req_action" value="got_reason" />
+						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
+						<input type="hidden" name="', $context['mod-gr_token_var'], '" value="', $context['mod-gr_token'], '" />
+					</div>
 				</div>
 			</div>
 		</form>

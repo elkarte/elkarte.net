@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * The single function this file contains is used to display the main board index.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,19 +11,31 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * The single function this file contains is used to display the main board index.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
-class BoardIndex_Controller
+/**
+ * BoardIndex_Controller class, displays the main board index
+ */
+class BoardIndex_Controller extends Action_Controller
 {
+	/**
+	 * Forwards to the action to execute here by default.
+	 *
+	 * @see Action_Controller::action_index()
+	 */
+	public function action_index()
+	{
+		// What to do... boardindex, 'course!
+		$this->action_boardindex();
+	}
+
 	/**
 	 * This function shows the board index.
 	 * It uses the BoardIndex template, and main sub template.
@@ -29,7 +43,7 @@ class BoardIndex_Controller
 	 * It updates the most online statistics.
 	 * It is accessed by ?action=boardindex.
 	 */
-	function action_boardindex()
+	public function action_boardindex()
 	{
 		global $txt, $user_info, $modSettings, $context, $settings, $scripturl;
 
@@ -82,8 +96,7 @@ class BoardIndex_Controller
 			$context['latest_posts'] = cache_quick_get('boardindex-latest_posts:' . md5($user_info['query_wanna_see_board'] . $user_info['language']), 'subs/Recent.subs.php', 'cache_getLastPosts', array($latestPostOptions));
 		}
 
-		$settings['display_recent_bar'] = !empty($settings['number_recent_posts']) ? $settings['number_recent_posts'] : 0;
-		$settings['show_member_bar'] &= allowedTo('view_mlist');
+		// Let the template know what the members can do if the theme enables these options
 		$context['show_stats'] = allowedTo('view_stats') && !empty($modSettings['trackStats']);
 		$context['show_member_list'] = allowedTo('view_mlist');
 		$context['show_who'] = allowedTo('who_view') && !empty($modSettings['who_enabled']);
@@ -105,16 +118,30 @@ class BoardIndex_Controller
 
 			// This is used to show the "how-do-I-edit" help.
 			$context['calendar_can_edit'] = allowedTo('calendar_edit_any');
+			$show_calendar = true;
 		}
 		else
-			$context['show_calendar'] = false;
+			$show_calendar = false;
 
 		$context['page_title'] = sprintf($txt['forum_index'], $context['forum_name']);
+		$context['sub_template'] = 'boards_list';
 
 		// Mark read button
 		$context['mark_read_button'] = array(
-			'markread' => array('text' => 'mark_as_read', 'image' => 'markread.png', 'lang' => true, 'custom' => 'onclick="return markallreadButton(this);"', 'url' => $scripturl . '?action=markasread;sa=all;' . $context['session_var'] . '=' . $context['session_id']),
+			'markread' => array('text' => 'mark_as_read', 'image' => 'markread.png', 'lang' => true, 'custom' => 'onclick="return markallreadButton(this);"', 'url' => $scripturl . '?action=markasread;sa=all;bi;' . $context['session_var'] . '=' . $context['session_id']),
 		);
+
+		$context['info_center_callbacks'] = array();
+		if (!empty($settings['number_recent_posts']) && (!empty($context['latest_posts']) || !empty($context['latest_post'])))
+			$context['info_center_callbacks'][] = 'recent_posts';
+
+		if ($show_calendar)
+			$context['info_center_callbacks'][] = 'show_events';
+
+		if (!empty($settings['show_stats_index']))
+			$context['info_center_callbacks'][] = 'show_stats';
+
+		$context['info_center_callbacks'][] = 'show_users';
 
 		// Allow mods to add additional buttons here
 		call_integration_hook('integrate_mark_read_button');
@@ -124,7 +151,7 @@ class BoardIndex_Controller
 	 * Collapse or expand a category
 	 * ?action=collapse
 	 */
-	function action_collapse()
+	public function action_collapse()
 	{
 		global $user_info, $context;
 

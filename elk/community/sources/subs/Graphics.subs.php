@@ -1,6 +1,12 @@
 <?php
 
 /**
+ * This file deals with low-level graphics operations performed on images,
+ * specially as needed for avatars (uploaded avatars), attachments, or
+ * visual verification images.
+ *
+ * TrueType fonts supplied by www.LarabieFonts.com
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,18 +17,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file deals with low-level graphics operations performed on images,
- * specially as needed for avatars (uploaded avatars), attachments, or
- * visual verification images.
- * It uses, for gifs at least, Gif Util. For more information on that,
- * please see its website.
- * TrueType fonts supplied by www.LarabieFonts.com
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -172,7 +171,7 @@ function imageMemoryCheck($sizes)
 {
 	global $modSettings;
 
-	// doing the old 'set it and hope' way?
+	// Doing the old 'set it and hope' way?
 	if (empty($modSettings['attachment_thumb_memory']))
 	{
 		setMemoryLimit('128M');
@@ -184,7 +183,7 @@ function imageMemoryCheck($sizes)
 	// simply a shortcut of 8bpp, 3 channels, 1.66 overhead
 	$needed_memory = ($sizes[0] * $sizes[1] * 5);
 
-	// if we need more, lets try to get it
+	// If we need more, lets try to get it
 	return setMemoryLimit($needed_memory, true);
 }
 
@@ -219,7 +218,7 @@ function resizeImageFile($source, $destination, $max_width, $max_height, $prefer
 
 	// Get the image file, we have to work with something after all
 	$fp_destination = fopen($destination, 'wb');
-	if ($fp_destination && substr($source, 0, 7) == 'http://')
+	if ($fp_destination && (substr($source, 0, 7) == 'http://' || substr($source, 0, 8) == 'https://'))
 	{
 		$fileContents = fetch_web_data($source);
 
@@ -252,30 +251,29 @@ function resizeImageFile($source, $destination, $max_width, $max_height, $prefer
 		return false;
 
 	// A known and supported format?
-	// @todo test PSD and gif.
 	if (checkImagick() && isset($default_formats[$sizes[2]]))
-	{
 		return resizeImage(null, $destination, null, null, $max_width, $max_height, true, $preferred_format);
-	}
 	elseif (checkGD() && isset($default_formats[$sizes[2]]) && function_exists('imagecreatefrom' . $default_formats[$sizes[2]]))
 	{
 		$imagecreatefrom = 'imagecreatefrom' . $default_formats[$sizes[2]];
 		if ($src_img = @$imagecreatefrom($destination))
-		{
 			return resizeImage($src_img, $destination, imagesx($src_img), imagesy($src_img), $max_width === null ? imagesx($src_img) : $max_width, $max_height === null ? imagesy($src_img) : $max_height, true, $preferred_format);
-		}
 	}
 
 	return false;
 }
 
 /**
- * Resizes src_img proportionally to fit within max_width and max_height limits
- * if it is too large.
- * If GD2 is present, it'll use it to achieve better quality.
- * It saves the new image to destination_filename, as preferred_format
+ * Resizes an image proportionally to fit within the defined max_width and max_height limits
+ * Will do nothing to the image if the file fits within the size limits
+ *
+ * If Image Magick is present it will use those function over any GD solutions
+ * If GD2 is present, it'll use it to achieve better quality (imagecopyresampled)
+ * It saves the new image to destination_filename, in the preferred_format
  * if possible, default is jpeg.
+ *
  * @uses GD
+ * @uses Imagick
  *
  * @param resource $src_img
  * @param string $destName
@@ -288,10 +286,11 @@ function resizeImageFile($source, $destination, $max_width, $max_height, $prefer
  */
 function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $max_height, $force_resize = false, $preferred_format = 0)
 {
-	global $gd2, $modSettings;
+	global $gd2;
 
 	if (checkImagick())
 	{
+		// These are the file formats we know about
 		static $default_formats = array(
 			'1' => 'gif',
 			'2' => 'jpeg',
@@ -301,14 +300,18 @@ function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $
 		);
 		$preferred_format = empty($preferred_format) || !isset($default_formats[$preferred_format]) ? 2 : $preferred_format;
 
-		$imagick = New Imagick($destName);
+		// Get a new instance of Image Magick for use
+		$imagick = new Imagick($destName);
 		$src_width = empty($src_width) ? $imagick->getImageWidth() : $src_width;
 		$src_height = empty($src_height) ? $imagick->getImageHeight() : $src_height;
 		$dest_width = empty($max_width) ? $src_width : $max_width;
 		$dest_height = empty($max_height) ? $src_height : $max_height;
 
+		// Create a new image in our prefered format and resize it if needed
 		$imagick->setImageFormat($default_formats[$preferred_format]);
 		$imagick->resizeImage($dest_width, $dest_height, Imagick::FILTER_LANCZOS, 1, true);
+
+		// Save the new image in the destination location
 		$success = $imagick->writeImage($destName);
 
 		return !empty($success);
@@ -377,8 +380,8 @@ function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $
 
 		return $success;
 	}
+	// Without Image Magick or GD, no image resizing at all.
 	else
-		// Without GD, no image resizing at all.
 		return false;
 }
 
@@ -443,7 +446,6 @@ function imagecopyresamplebicubic($dst_img, $src_img, $dst_x, $dst_y, $src_x, $s
 		}
 	}
 }
-
 if (!function_exists('imagecreatefrombmp'))
 {
 	/**
@@ -599,8 +601,10 @@ if (!function_exists('imagecreatefrombmp'))
 					$byte = ord($scan_line{$j++});
 
 					imagesetpixel($dst_img, $x, $y, $palette[(($byte) & 128) != 0]);
-					for ($shift = 1; $shift < 8; $shift++) {
-						if (++$x < $info['width']) imagesetpixel($dst_img, $x, $y, $palette[(($byte << $shift) & 128) != 0]);
+					for ($shift = 1; $shift < 8; $shift++)
+					{
+						if (++$x < $info['width'])
+							imagesetpixel($dst_img, $x, $y, $palette[(($byte << $shift) & 128) != 0]);
 					}
 				}
 			}
@@ -634,9 +638,9 @@ function gif_outputAsPng($gif, $lpszFileName, $background_color = -1)
 	if (!($fh = @fopen($lpszFileName, 'wb')))
 		return false;
 
-	@fwrite($fh, $fd, strlen($fd));
-	@fflush($fh);
-	@fclose($fh);
+	fwrite($fh, $fd, strlen($fd));
+	fflush($fh);
+	fclose($fh);
 
 	return true;
 }
@@ -645,7 +649,7 @@ function gif_outputAsPng($gif, $lpszFileName, $background_color = -1)
  * Show an image containing the visual verification code for registration.
  * Requires the GD extension.
  * Uses a random font for each letter from default_theme_dir/fonts.
- * Outputs a gif or a png (depending on whether gif ix supported).
+ * Outputs a png if possible, otherwise a gif.
  *
  * @param string $code
  * @return false if something goes wrong.
@@ -655,9 +659,9 @@ function showCodeImage($code)
 	global $gd2, $settings, $user_info, $modSettings;
 
 	// Note: The higher the value of visual_verification_type the harder the verification is - from 0 as disabled through to 4 as "Very hard".
-
 	// What type are we going to be doing?
 	$imageType = $modSettings['visual_verification_type'];
+
 	// Special case to allow the admin center to show samples.
 	if ($user_info['is_admin'] && isset($_GET['type']))
 		$imageType = (int) $_GET['type'];
@@ -735,19 +739,20 @@ function showCodeImage($code)
 	// For non-hard things don't even change fonts.
 	if (!$varyFonts)
 	{
-		$font_list = array($font_list[0]);
+		$font_list = !empty($font_list) ? array($font_list[0]) : $font_list;
+
 		// Try use Screenge if we can - it looks good!
-		if (in_array('Screenge.ttf', $ttfont_list))
-			$ttfont_list = array('Screenge.ttf');
+		if (in_array('VDS_New.ttf', $ttfont_list))
+			$ttfont_list = array('VDS_New.ttf');
 		else
 			$ttfont_list = empty($ttfont_list) ? array() : array($ttfont_list[0]);
-
 	}
 
 	// Create a list of characters to be shown.
 	$characters = array();
 	$loaded_fonts = array();
-	for ($i = 0; $i < strlen($code); $i++)
+	$str_len = strlen($code);
+	for ($i = 0; $i < $str_len; $i++)
 	{
 		$characters[$i] = array(
 			'id' => $code{$i},
@@ -763,7 +768,7 @@ function showCodeImage($code)
 			$loaded_fonts[$font_index] = imageloadfont($settings['default_theme_dir'] . '/fonts/' . $font_list[$font_index]);
 
 	// Determine the dimensions of each character.
-	$total_width = $character_spacing * strlen($code) + 20;
+	$total_width = $character_spacing * strlen($code) + 50;
 	$max_height = 0;
 	foreach ($characters as $char_index => $character)
 	{
@@ -771,9 +776,9 @@ function showCodeImage($code)
 		{
 			// GD2 handles font size differently.
 			if ($fontSizeRandom)
-				$font_size = $gd2 ? mt_rand(19, 21) : mt_rand(25, 32);
+				$font_size = $gd2 ? mt_rand(17, 19) : mt_rand(25, 27);
 			else
-				$font_size = $gd2 ? 24 : 30;
+				$font_size = $gd2 ? 17 : 27;
 
 			$img_box = imagettfbbox($font_size, 0, $settings['default_theme_dir'] . '/fonts/' . $ttfont_list[$character['font']], $character['id']);
 
@@ -787,7 +792,7 @@ function showCodeImage($code)
 		}
 
 		$max_height = max($characters[$char_index]['height'] + 5, $max_height);
-		$total_width += $characters[$char_index]['width'];
+		$total_width += $characters[$char_index]['width'] + 2;
 	}
 
 	// Create an image.
@@ -824,6 +829,7 @@ function showCodeImage($code)
 	if (!$disableChars)
 	{
 		$cur_x = 0;
+		$last_index = -1;
 		foreach ($characters as $char_index => $character)
 		{
 			// How much rotation will we give?
@@ -844,8 +850,8 @@ function showCodeImage($code)
 					array(0, 0, 0),
 					array(143, 39, 31),
 				);
-				if (!isset($last_index))
-					$last_index = -1;
+
+				// Pick a color, but not the same one twice in a row
 				$new_index = $last_index;
 				while ($last_index == $new_index)
 					$new_index = mt_rand(0, count($colors) - 1);
@@ -883,6 +889,7 @@ function showCodeImage($code)
 				elseif ($is_reverse)
 				{
 					imagefilledpolygon($code_image, $fontcord, 4, $fg_color);
+
 					// Put the character back!
 					imagettftext($code_image, $font_size, $angle, $font_x, $font_y, $randomness_color, $fontface, $character['id']);
 				}
@@ -916,6 +923,7 @@ function showCodeImage($code)
 	// Make the background color transparent on the hard image.
 	if (!$simpleBGColor)
 		imagecolortransparent($code_image, $bg_color);
+
 	if ($hasBorder)
 		imagerectangle($code_image, 0, 0, $total_width - 1, $max_height - 1, $fg_color);
 
@@ -936,13 +944,15 @@ function showCodeImage($code)
 				{
 					$x1 = mt_rand(0, $total_width);
 					$x2 = mt_rand(0, $total_width);
-					$y1 = 0; $y2 = $max_height;
+					$y1 = 0;
+					$y2 = $max_height;
 				}
 				else
 				{
 					$y1 = mt_rand(0, $max_height);
 					$y2 = mt_rand(0, $max_height);
-					$x1 = 0; $x2 = $total_width;
+					$x1 = 0;
+					$x2 = $total_width;
 				}
 				imagesetthickness($code_image, mt_rand(1, 2));
 				imageline($code_image, $x1, $y1, $x2, $y2, mt_rand(0, 1) ? $fg_color : $randomness_color);

@@ -1,24 +1,28 @@
 <?php
 
 /**
+ * Handles all mark as read options, boards, topics, replies
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * This class handles a part of the actions to mark boards, topics, or replies, as read/unread.
  */
-class MarkRead_Controller
+class MarkRead_Controller extends Action_Controller
 {
 	/**
 	 * This is the main function for markasread file.
+	 *
+	 * @see Action_Controller::action_index()
 	 */
 	public function action_index()
 	{
@@ -40,50 +44,83 @@ class MarkRead_Controller
 	 */
 	private function _dispatch()
 	{
-		// sa=all action_markboards()
-		if (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'all')
-			$sa = 'action_markboards';
-		elseif (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'unreadreplies')
-			// mark topics from unread
-			$sa = 'action_markreplies';
-		elseif (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'topic')
-			// mark a single topic as read
-			$sa = 'action_marktopic';
-		else
-			// the rest, for now...
-			$sa = 'action_markasread';
+		$subAction = isset($_REQUEST['sa']) ? $_REQUEST['sa'] : 'action_markasread';
 
-		return $this->{$sa}();
+		switch ($subAction)
+		{
+			// sa=all action_markboards()
+			case 'all':
+				$subAction = 'action_markboards';
+				break;
+			case 'unreadreplies':
+				// mark topics from unread
+				$subAction = 'action_markreplies';
+				break;
+			case 'topic':
+				// mark a single topic as read
+				$subAction = 'action_marktopic';
+				break;
+			default:
+				// the rest, for now...
+				$subAction = 'action_markasread';
+				break;
+		}
+
+		return $this->{$subAction}();
 	}
 
 	/**
 	 * This is the main method for markasread controller when using APIs.
+	 * @uses Xml template generic_xml_buttons sub template
 	 */
 	public function action_index_api()
 	{
-		global $context, $txt;
+		global $context, $txt, $user_info, $scripturl;
+
+		loadTemplate('Xml');
+
+		Template_Layers::getInstance()->removeAll();
+		$context['sub_template'] = 'generic_xml_buttons';
 
 		// Guests can't mark things.
-		is_not_guest('', false);
+		if ($user_info['is_guest'])
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_guests']
+			);
+			return;
+		}
 
-		checkSession('get');
+		if (checkSession('get', '', false))
+		{
+			// Again, this is a special case, someone will deal with the others later :P
+			if (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'all')
+			{
+				loadLanguage('Errors');
+				$context['xml_data'] = array(
+					'error' => 1,
+					'url' => $scripturl . '?action=markasread;sa=all;' . $context['session_var'] . '=' . $context['session_id'],
+				);
+
+				return;
+			}
+			else
+				obExit(false);
+		}
 
 		$this->_dispatch();
 
-		// For the time being this is a special case
-		if (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'all')
+		// For the time being this is a special case, but in BoardIndex no, we don't want it
+		if (isset($_REQUEST['sa']) && $_REQUEST['sa'] == 'all' && !isset($_REQUEST['bi']))
 		{
-			loadTemplate('Xml');
-
-			Template_Layers::getInstance()->removeAll();
-			$context['sub_template'] = 'generic_xml_buttons';
-
 			$context['xml_data'] = array(
 				'text' => $txt['unread_topics_visit_none'],
 			);
 		}
+		// No need to do anything, just die
 		else
-			// No need to do anything, just die
 			obExit(false);
 	}
 
@@ -100,8 +137,8 @@ class MarkRead_Controller
 		// Find all the boards this user can see.
 		$boards = accessibleBoards();
 
+		// Mark boards as read
 		if (!empty($boards))
-			// Mark boards as read
 			markBoardsRead($boards, isset($_REQUEST['unread']), true);
 
 		$_SESSION['id_msg_last_visit'] = $modSettings['maxMsgID'];
@@ -130,7 +167,7 @@ class MarkRead_Controller
 
 		$markRead = array();
 		foreach ($topics as $id_topic)
-			$markRead[] = array($user_info['id'], (int) $id_topic, $modSettings['maxMsgID'], $logged_topics[$id_topic]);
+			$markRead[] = array($user_info['id'], (int) $id_topic, $modSettings['maxMsgID'], (int) !empty($logged_topics[$id_topic]));
 
 		markTopicsRead($markRead, true);
 
@@ -173,12 +210,12 @@ class MarkRead_Controller
 			$earlyMsg = 0;
 		else
 		{
-			$earlyMsg = messageAt((int) $_REQUEST['start'], $topic);
+			list ($earlyMsg) = messageAt((int) $_REQUEST['start'], $topic);
 			$earlyMsg--;
 		}
 
 		// Blam, unread!
-		markTopicsRead(array($user_info['id'], $topic, $earlyMsg, $topicinfo['disregarded']), true);
+		markTopicsRead(array($user_info['id'], $topic, $earlyMsg, $topicinfo['unwatched']), true);
 
 		return 'board=' . $board . '.0';
 	}
@@ -190,9 +227,7 @@ class MarkRead_Controller
 	 */
 	public function action_markasread()
 	{
-		global $board, $user_info, $board_info, $modSettings;
-
-		$db = database();
+		global $board, $board_info;
 
 		checkSession('get');
 
@@ -243,18 +278,7 @@ class MarkRead_Controller
 			// Find all boards with the parents in the board list
 			$boards_to_add = accessibleBoards($boards);
 			if (!empty($boards_to_add))
-			{
-				// we've got some!
-				$logBoardInserts = '';
-				foreach ($boards_to_add as $b)
-					$logBoardInserts[] = array($modSettings['maxMsgID'], $user_info['id'], $b['id_board']);
-					$db->insert('replace',
-					'{db_prefix}log_boards',
-					array('id_msg' => 'int', 'id_member' => 'int', 'id_board' => 'int'),
-					$logBoardInserts,
-					array('id_member', 'id_board')
-				);
-			}
+				markBoardsRead($boards_to_add);
 
 			if (empty($board))
 				return '';

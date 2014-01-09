@@ -1,22 +1,25 @@
 <?php
 
 /**
+ * This file is mainly concerned with tasks relating to follow-ups, such as
+ * link messages and topics, delete follow-ups, etc.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
- *
- * This file is mainly concerned with minor tasks relating to follow-ups, such as
- * link messages and topics, delete follow-ups, etc.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Retrieves all the follow-up topic for a certain message
+ *
+ * @param array $messages int array of message ids to work on
+ * @param boolean $include_approved
  */
 function followupTopics($messages, $include_approved = false)
 {
@@ -24,9 +27,9 @@ function followupTopics($messages, $include_approved = false)
 
 	$request = $db->query('', '
 		SELECT fu.derived_from, fu.follow_up, m.subject
-		FROM {db_prefix}follow_ups as fu
-			LEFT JOIN {db_prefix}topics as t ON (t.id_topic = fu.follow_up)
-			LEFT JOIN {db_prefix}messages as m ON (t.id_first_msg = m.id_msg)
+		FROM {db_prefix}follow_ups AS fu
+			LEFT JOIN {db_prefix}topics AS t ON (t.id_topic = fu.follow_up)
+			LEFT JOIN {db_prefix}messages AS m ON (t.id_first_msg = m.id_msg)
 			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})
 		WHERE fu.derived_from IN ({array_int:messages})' . ($include_approved ? '' : '
 			AND m.approved = {int:approved}'),
@@ -45,6 +48,9 @@ function followupTopics($messages, $include_approved = false)
 
 /**
  * Retrieves the message from which the topic started
+ *
+ * @param int $topic id of the original topic the threads were started from
+ * @param boolean $include_approved
  */
 function topicStartedHere($topic, $include_approved = false)
 {
@@ -52,8 +58,8 @@ function topicStartedHere($topic, $include_approved = false)
 
 	$request = $db->query('', '
 		SELECT fu.derived_from, m.subject
-		FROM {db_prefix}follow_ups as fu
-			LEFT JOIN {db_prefix}messages as m ON (fu.derived_from = m.id_msg)
+		FROM {db_prefix}follow_ups AS fu
+			LEFT JOIN {db_prefix}messages AS m ON (fu.derived_from = m.id_msg)
 			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})
 		WHERE fu.follow_up = {int:original_topic}' . ($include_approved ? '' : '
 			AND m.approved = {int:approved}') . '
@@ -73,6 +79,9 @@ function topicStartedHere($topic, $include_approved = false)
 
 /**
  * Simple function used to create a "followup" relation between a message and a topic
+ *
+ * @param int $msg message id
+ * @param int $topic topic id
  */
 function linkMessages($msg, $topic)
 {
@@ -89,7 +98,10 @@ function linkMessages($msg, $topic)
 /**
  * Used to break a "followup" relation between a message and a topic
  * Actually the function is not used at all...
+ *
  * @todo remove?
+ * @param int $msg message id
+ * @param int $topic topic id
  */
 function unlinkMessages($msg, $topic)
 {
@@ -109,6 +121,8 @@ function unlinkMessages($msg, $topic)
 
 /**
  * Removes all the follow-ups from the db by topics
+ *
+ * @param int $topics topic id
  */
 function removeFollowUpsByTopic($topics)
 {
@@ -125,6 +139,8 @@ function removeFollowUpsByTopic($topics)
 
 /**
  * Removes all the follow-ups from the db by message id
+ *
+ * @param mixed $msgs int or array of ints for the message id's to work on
  */
 function removeFollowUpsByMessage($msgs)
 {

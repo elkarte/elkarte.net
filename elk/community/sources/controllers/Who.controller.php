@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * This file is mainly concerned with the Who's Online list.
+ * Although, it also handles credits. :P
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,30 +12,27 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file is mainly concerned with the Who's Online list.
- * Although, it also handles credits. :P
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Who Controller
  */
-class Who_Controller
+class Who_Controller extends Action_Controller
 {
 	/**
 	 * Default action of this class.
-	 * ?action=who
+	 * Accessed with ?action=who
 	 */
 	public function action_index()
 	{
-		// we know how to... peek at who's online
+		// We know how to... peek at who's online
 		$this->action_who();
 	}
 
@@ -144,6 +144,8 @@ class Who_Controller
 		// Prepare some page index variables.
 		$context['page_index'] = constructPageIndex($scripturl . '?action=who;sort=' . $context['sort_by'] . ($context['sort_direction'] == 'up' ? ';asc' : '') . ';show=' . $context['show_by'], $_REQUEST['start'], $totalMembers, $modSettings['defaultMaxMembers']);
 		$context['start'] = $_REQUEST['start'];
+		$context['sub_template'] = 'whos_online';
+		Template_Layers::getInstance()->add('whos_selection');
 
 		// Look for people online, provided they don't mind if you see they are.
 		$members = onlineMembers($conditions, $sort_method, $context['sort_direction'], $context['start']);
@@ -163,7 +165,8 @@ class Who_Controller
 				'id' => $row['id_member'],
 				'ip' => allowedTo('moderate_forum') ? $row['ip'] : '',
 				// It is *going* to be today or yesterday, so why keep that information in there?
-				'time' => strtr(relativeTime($row['log_time']), array($txt['today'] => '', $txt['yesterday'] => '')),
+				'time' => strtr(standardTime($row['log_time'], true), array($txt['today'] => '', $txt['yesterday'] => '')),
+				'html_time' => htmlTime($row['log_time']),
 				'timestamp' => forum_time(true, $row['log_time']),
 				'query' => $actions,
 				'is_hidden' => $row['show_online'] == 0,
@@ -235,13 +238,15 @@ class Who_Controller
 		$context['can_send_pm'] = allowedTo('pm_send');
 		$context['can_send_email'] = allowedTo('send_email_to_members');
 
-		// any profile fields disabled?
+		// Any profile fields disabled?
 		$context['disabled_fields'] = isset($modSettings['disabled_profile_fields']) ? array_flip(explode(',', $modSettings['disabled_profile_fields'])) : array();
 	}
 
 	/**
 	 * It prepares credit and copyright information for the credits page or the admin page.
 	 * Accessed by ?action=who;sa=credits
+	 * @uses Who language file
+	 * @uses Who template, credits sub template
 	 */
 	public function action_credits()
 	{

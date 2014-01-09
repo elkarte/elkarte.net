@@ -1,22 +1,26 @@
 <?php
 
 /**
- * @name      ElkArte Forum
- * @copyright ElkArte Forum contributors
- * @license   BSD http://opensource.org/licenses/BSD-3-Clause
- *
- * @version 1.0 Alpha
- *
  * This is the base class for DbTable functionality.
  * It contains abstract methods to be implemented for the specific database system,
  * related to a table structure.
  * Add-ons will need this, to change the database for their needs.
  *
+ * @name      ElkArte Forum
+ * @copyright ElkArte Forum contributors
+ * @license   BSD http://opensource.org/licenses/BSD-3-Clause
+ *
+ * @version 1.0 Beta
+ *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
+/**
+ * This is used to create a table without worrying about schema compatabilities
+ * across supported database systems.
+ */
 abstract class DbTable
 {
 	/**
@@ -25,23 +29,23 @@ abstract class DbTable
 	 *  - If the table exists will, by default, do nothing.
 	 *  - Builds table with columns as passed to it - at least one column must be sent.
 	 *  The columns array should have one sub-array for each column - these sub arrays contain:
-	 *  	'name' = Column name
-	 *  	'type' = Type of column - values from (smallint, mediumint, int, text, varchar, char, tinytext, mediumtext, largetext)
-	 *  	'size' => Size of column (If applicable) - for example 255 for a large varchar, 10 for an int etc.
-	 *  		If not set it will pick a size.
-	 *  	- 'default' = Default value - do not set if no default required.
-	 *  	- 'null' => Can it be null (true or false) - if not set default will be false.
-	 *  	- 'auto' => Set to true to make it an auto incrementing column. Set to a numerical value to set from what
-	 *  		it should begin counting.
+	 *    'name' = Column name
+	 *    'type' = Type of column - values from (smallint, mediumint, int, text, varchar, char, tinytext, mediumtext, largetext)
+	 *    'size' => Size of column (If applicable) - for example 255 for a large varchar, 10 for an int etc.
+	 *      If not set it will pick a size.
+	 *    - 'default' = Default value - do not set if no default required.
+	 *    - 'null' => Can it be null (true or false) - if not set default will be false.
+	 *    - 'auto' => Set to true to make it an auto incrementing column. Set to a numerical value to set from what
+	 *      it should begin counting.
 	 *  - Adds indexes as specified within indexes parameter. Each index should be a member of $indexes. Values are:
-	 *  	- 'name' => Index name (If left empty it will be generated).
-	 *  	- 'type' => Type of index. Choose from 'primary', 'unique' or 'index'. If not set will default to 'index'.
-	 *  	- 'columns' => Array containing columns that form part of key - in the order the index is to be created.
+	 *    - 'name' => Index name (If left empty it will be generated).
+	 *    - 'type' => Type of index. Choose from 'primary', 'unique' or 'index'. If not set will default to 'index'.
+	 *    - 'columns' => Array containing columns that form part of key - in the order the index is to be created.
 	 *  - parameters: (None yet)
 	 *  - if_exists values:
-	 *  	- 'ignore' will do nothing if the table exists. (And will return true)
-	 *  	- 'overwrite' will drop any existing table of the same name.
-	 *  	- 'error' will return false if the table already exists.
+	 *    - 'ignore' will do nothing if the table exists. (And will return true)
+	 *    - 'overwrite' will drop any existing table of the same name.
+	 *    - 'error' will return false if the table already exists.
 	 *
 	 * @param string $table_name
 	 * @param array $columns in the format specified.
@@ -109,7 +113,7 @@ abstract class DbTable
 	 *
 	 * @param string $table_name
 	 * @param string $index_name
-	 * @param array$parameters default array()
+	 * @param array $parameters default array()
 	 * @param string $error default 'fatal'
 	 */
 	abstract function db_remove_index($table_name, $index_name, $parameters = array(), $error = 'fatal');
@@ -150,14 +154,6 @@ abstract class DbTable
 	 * @return mixed
 	 */
 	abstract function db_list_indexes($table_name, $detail = false, $parameters = array());
-
-	/**
-	 * Creates a query for a column
-	 *
-	 * @param array $column
-	 * @return type
-	 */
-	abstract function db_create_query_column($column);
 
 	/**
 	 * Alter table.

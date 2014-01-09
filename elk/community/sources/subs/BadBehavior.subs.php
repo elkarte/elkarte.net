@@ -1,15 +1,17 @@
 <?php
 
 /**
+ * Functions to support the bad behavior controller
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -18,9 +20,10 @@ if (!defined('ELKARTE'))
  * It attempts to TRUNCATE the table to reset the auto_increment.
  * Redirects back to the badbehavior log when done.
  *
+ * @param string $type
  * @param array $filter
  */
-function deleteBadBehavior($type ,$filter)
+function deleteBadBehavior($type, $filter)
 {
 	$db = database();
 
@@ -103,7 +106,6 @@ function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 
 	$bb_entries = array();
 
-	$db = database();
 	$request = $db->query('', '
 		SELECT id, ip, date, request_method, request_uri, server_protocol, http_headers, user_agent, request_entity, valid, id_member, session
 		FROM {db_prefix}log_badbehavior' . (!empty($filter) ? '
@@ -121,12 +123,11 @@ function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 		$key_response = bb2_get_response($row['valid']);
 
 		//Prevent undefined errors and log ..
-		if(isset($key_response[0]) && $key_response[0]  == '00000000')
+		if (isset($key_response[0]) && $key_response[0] == '00000000')
 		{
 			$key_response['response'] = '';
 			$key_response['explanation'] = '';
 			$key_response['log'] = '';
-			trigger_error('bb2_get_response(): returned invalid response key \'' . $key_response[0] . '\'', E_USER_WARNING);
 		}
 
 		$bb_entries[$row['id']] = array(
@@ -150,10 +151,11 @@ function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 				'ip' => $row['ip'],
 				'session' => $row['session']
 			),
-			'date' => standardTime($row['date']),
-			'timestamp' => $row['date'],
+			'time' => standardTime($row['date']),
+			'html_time' => htmlTime($row['date']),
+			'timestamp' => forum_time(true, $row['date']),
 			'request_uri' => array(
-				'html' => htmlspecialchars((substr($row['request_uri'], 0, 1) === '?' ? $scripturl : '') . $row['request_uri']),
+				'html' => htmlspecialchars((substr($row['request_uri'], 0, 1) === '?' ? $scripturl : '') . $row['request_uri'], ENT_COMPAT, 'UTF-8'),
 				'href' => base64_encode($db->escape_wildcard_string($row['request_uri']))
 			),
 			'http_headers' => array(

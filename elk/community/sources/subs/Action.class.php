@@ -1,10 +1,14 @@
 <?php
+
 /**
+ * Defines an action with its associated sub-actions
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -22,36 +26,84 @@ class Action
 	/**
 	 * Array of sub-actions.
 	 * The accepted array format is:
-	 *  - 'sub_action name' => 'function name', or
-	 *  - 'sub_action name' => array ('function' => 'function name'), or
-	 *  - 'sub_action name' => array (
-	 *  	'controller' => 'controller name',
-	 *  	'function' => 'method name'), or
-	 *  - 'sub_action name' => array ('controller object, i.e. $this', 'method name'), or
-	 *  - 'sub_action name' => array (
-	 *  	'file' => 'file name',
-	 *		'dir' => 'controller file location', if not set ADMINDIR is assumed
-	 *  	'controller' => 'controller name',
-	 *  	'function' => 'method name')
+	 *    'sub_action name' => 'function name',
+	 *  or
+	 *    'sub_action name' => array(
+	 *    'function' => 'function name'),
+	 *  or
+	 *    'sub_action name' => array(
+	 *    'controller' => 'controller name',
+	 *    'function' => 'method name',
+	 *    'enabled' => true/false,
+	 *    'permission' => area),
+	 *  or
+	 *    'sub_action name' => array(
+	 *    'controller object, i.e. $this',
+	 *    'method name',
+	 *    'enabled' => true/false
+	 *    'permission' => area),
+	 *  or
+	 *    'sub_action name' => array(
+	 *    'file' => 'file name',
+	 *    'dir' => 'controller file location', if not set ADMINDIR is assumed
+	 *    'controller' => 'controller name',
+	 *    'function' => 'method name',
+	 *    'enabled' => true/false,
+	 *    'permission' => area)
+	 */
+
+	/**
+	 * All the subactions we understand
 	 * @var array
 	 */
 	protected $_subActions;
+
+	/**
+	 * The default subAction.
+	 * @var string
+	 */
+	protected $_default;
+
+	/**
+	 * An (unique) id that triggers a hook
+	 * @var string
+	 */
+	protected $_name;
+
+	/**
+	 * Constructor!
+	 *
+	 * @param string $name
+	 */
+	public function __construct($name = null)
+	{
+		$this->_name = $name;
+	}
 
 	/**
 	 * Initialize the instance with an array of sub-actions.
 	 * Sub-actions have to be in the format expected for Action::_subActions array,
 	 * indexed by sa.
 	 *
-	 * @param array $subactions
+	 * @param array $subactions array of know subactions
+	 * @param string $default default action if unknown sa is requested
 	 */
-	function initialize ($subactions)
+	public function initialize($subactions, $default = '')
 	{
+		if ($this->_name !== null)
+			call_integration_hook('integrate_' . $this->_name, array(&$subactions));
+
 		$this->_subActions = array();
 
 		if (!is_array($subactions))
 			$subactions = array($subactions);
 
 		$this->_subActions = $subactions;
+
+		if (isset($subactions[$default]))
+			$this->_default = $default;
+
+		return isset($_REQUEST['sa']) && isset($this->_subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : $this->_default;
 	}
 
 	/**
@@ -60,7 +112,7 @@ class Action
 	 *
 	 * @param string $sa
 	 */
-	function dispatch($sa)
+	public function dispatch($sa)
 	{
 		// for our sanity...
 		if (!key_exists($sa, $this->_subActions) || !is_array($this->_subActions[$sa]))
@@ -71,6 +123,15 @@ class Action
 
 		$subAction = $this->_subActions[$sa];
 
+		// unless it's disabled, then we redirect to the default action
+		if (isset($subAction['enabled']) && !$subAction['enabled'])
+			if (!empty($this->_default))
+				$subAction = $this->_subActions[$this->_default];
+			else
+				// no dice
+				fatal_lang_error('error_sa_not_set');
+
+		// are you even permitted to?
 		if (isset($subAction['permission']))
 			isAllowedTo($subAction['permission']);
 
@@ -88,6 +149,11 @@ class Action
 				// 'controller'->'function'
 				$controller_name = $subAction['controller'];
 				$controller = new $controller_name();
+
+				// Starting a new controller, run pre_dispatch
+				if (method_exists($controller, 'pre_dispatch'))
+					$controller->pre_dispatch();
+
 				$controller->{$subAction['function']}();
 			}
 			elseif (isset($subAction['function']))
@@ -122,6 +188,28 @@ class Action
 	}
 
 	/**
+	 * Return the subaction.
+	 * This method checks if $sa is enabled, and falls back to default if not.
+	 * Used only to set the context for the template.
+	 *
+	 * @param string $sa
+	 */
+	public function subaction($sa)
+	{
+		$subAction = $this->_subActions[$sa];
+
+		// if it's disabled, then default action
+		if (isset($subAction['enabled']) && !$subAction['enabled'])
+			if (!empty($this->_default))
+				$sa = $this->_default;
+			else
+				// no dice
+				fatal_lang_error('error_sa_not_set');
+
+		return $sa;
+	}
+
+	/**
 	 * Security check: verify that the user has the permission to perform the given action.
 	 * Verifies if the user has the permission set for the given action.
 	 * Return true if no permission was set for the action.
@@ -130,7 +218,7 @@ class Action
 	 *
 	 * @param string $sa
 	 */
-	function isAllowedTo($sa)
+	public function isAllowedTo($sa)
 	{
 		if (is_array($this->_subActions) && key_exists($sa, $this->_subActions))
 		{

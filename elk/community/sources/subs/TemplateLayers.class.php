@@ -1,15 +1,17 @@
 <?php
 
 /**
+ * Functions used to manage template layers
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -68,15 +70,25 @@ class Template_Layers
 	private $_sorted_layers = null;
 
 	/**
-	 * In case of fatal errors prevents the output of the "below" layers
+	 * Layers not removed in case of errors
 	 */
-	private $_prevent_reversing = false;
+	private $_error_safe_layers = null;
+
+	/**
+	 * Are we handling an error?
+	 * Hopefully not, so default is false
+	 */
+	private $_is_error = false;
+
+	/**
+	 * The layers added when this is true will be used in the error screen
+	 */
+	private static $_error_safe = false;
 
 	/**
 	 * Instance of the class
 	 */
 	private static $_instance = null;
-
 
 	/**
 	 * Add a new layer to the pile
@@ -88,6 +100,9 @@ class Template_Layers
 	{
 		$this->_all_general[$layer] = $priority === null ? $this->_general_highest_priority : (int) $priority;
 		$this->_general_highest_priority = max($this->_all_general) + 100;
+
+		if (self::$_error_safe)
+			$this->_error_safe_layers[] = $layer;
 	}
 
 	/**
@@ -99,17 +114,23 @@ class Template_Layers
 	public function addBefore($layer, $following)
 	{
 		$this->_all_before[$layer] = $following;
+
+		if (self::$_error_safe)
+			$this->_error_safe_layers[] = $layer;
 	}
 
 	/**
 	 * Add a layer to the pile after another existing layer
 	 *
 	 * @param string $layer the name of a layer
-	 * @param string $following the name of the layer after which $layer must be added
+	 * @param string $previous the name of the layer after which $layer must be added
 	 */
 	public function addAfter($layer, $previous)
 	{
 		$this->_all_after[$layer] = $previous;
+
+		if (self::$_error_safe)
+			$this->_error_safe_layers[] = $layer;
 	}
 
 	/**
@@ -122,6 +143,9 @@ class Template_Layers
 	{
 		$this->_all_end[$layer] = $priority === null ? $this->_end_highest_priority : (int) $priority;
 		$this->_end_highest_priority = max($this->_all_end) + 100;
+
+		if (self::$_error_safe)
+			$this->_error_safe_layers[] = $layer;
 	}
 
 	/**
@@ -134,6 +158,9 @@ class Template_Layers
 	{
 		$this->_all_begin[$layer] = $priority === null ? $this->_begin_highest_priority : (int) -$priority;
 		$this->_begin_highest_priority = max($this->_all_begin) + 100;
+
+		if (self::$_error_safe)
+			$this->_error_safe_layers[] = $layer;
 	}
 
 	/**
@@ -238,6 +265,16 @@ class Template_Layers
 			}
 		}
 
+		// If we are dealing with an error page (fatal_error) then we have to prune all the unwanted layers
+		if ($this->_is_error)
+		{
+			$dummy = $all_layers;
+			$all_layers = array();
+			foreach ($dummy as $key => $val)
+				if (in_array($key, $this->_error_safe_layers))
+					$all_layers[$key] = $val;
+		}
+
 		asort($all_layers);
 		$this->_sorted_layers = array_keys($all_layers);
 
@@ -251,9 +288,6 @@ class Template_Layers
 	 */
 	public function reverseLayers()
 	{
-		if ($this->_prevent_reversing)
-			return array();
-
 		if ($this->_sorted_layers === null)
 			$this->prepareContext();
 
@@ -263,29 +297,47 @@ class Template_Layers
 	/**
 	 * Check if at least one layer has been added
 	 *
+	 * @param boolean $base if true will not consider body and html layers in result
 	 * @return bool true if at least one layer has been added
 	 * @todo at that moment _all_after and _all_before are not considered because they may not be "forced"
 	 */
-	public function hasLayers()
+	public function hasLayers($base = false)
 	{
-		return (!empty($this->_all_general) || !empty($this->_all_begin) || !empty($this->_all_end));
+		if (!$base)
+			return (!empty($this->_all_general) || !empty($this->_all_begin) || !empty($this->_all_end));
+		else
+			return array_diff_key(array_merge($this->_all_general, $this->_all_begin, $this->_all_end), array('body' => 0, 'html' => 0));
 	}
 
-	public function preventReverse()
+	/**
+	 * Return the layers that have been loaded
+	 */
+	public function getLayers()
 	{
-		$this->_prevent_reversing = true;
+		return array_keys(array_merge($this->_all_general, $this->_all_begin, $this->_all_end, $this->_all_after, $this->_all_before));
+	}
+
+	/**
+	 * Turns "error mode" on, so that only the allowed layers are displayed
+	 */
+	public function isError()
+	{
+		$this->_is_error = true;
 	}
 
 	/**
 	 * Find and return Template_Layers instance if it exists,
 	 * or create a new instance if it didn't already exist.
 	 *
+	 * @param boolean $error_safe if error mode is on or off
 	 * @return an instance of the class
 	 */
-	public static function getInstance()
+	public static function getInstance($error_safe = false)
 	{
 		if (self::$_instance === null)
 			self::$_instance = new Template_Layers();
+
+		self::$_error_safe = $error_safe;
 
 		return self::$_instance;
 	}

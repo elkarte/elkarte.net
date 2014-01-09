@@ -1,20 +1,22 @@
 <?php
 
 /**
+ * This file contains the database work for languages.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Removes the given language from all members..
- * @param int $lang_id 
+ * @param int $lang_id
  */
 function removeLanguageFromMember($lang_id)
 {
@@ -73,7 +75,7 @@ function list_getLanguages()
 	foreach ($all_languages as $lang)
 	{
 		// Load the file to get the character set.
-		require($settings['default_theme_dir'] . '/languages/index.' . $lang['filename'] . '.php');
+		require($lang['location']);
 
 		$languages[$lang['filename']] = array(
 			'id' => $lang['filename'],
@@ -128,10 +130,11 @@ function cleanLangString($string, $to_display = true)
 		// Are we in a string (0 = no, 1 = single quote, 2 = parsed)
 		$in_string = 0;
 		$is_escape = false;
-		for ($i = 0; $i < strlen($string); $i++)
+		$str_len = strlen($string);
+		for ($i = 0; $i < $str_len; $i++)
 		{
 			// Handle ecapes first.
-			if ($string{$i} == '\\')
+			if ($string[$i] == '\\')
 			{
 				// Toggle the escape.
 				$is_escape = !$is_escape;
@@ -140,15 +143,15 @@ function cleanLangString($string, $to_display = true)
 					continue;
 			}
 			// Special case - parsed string with line break etc?
-			elseif (($string{$i} == 'n' || $string{$i} == 't') && $in_string == 2 && $is_escape)
+			elseif (($string[$i] == 'n' || $string[$i] == 't') && $in_string == 2 && $is_escape)
 			{
 				// Put the escape back...
-				$new_string .= $string{$i} == 'n' ? "\n" : "\t";
+				$new_string .= $string[$i] == 'n' ? "\n" : "\t";
 				$is_escape = false;
 				continue;
 			}
 			// Have we got a single quote?
-			elseif ($string{$i} == '\'')
+			elseif ($string[$i] == '\'')
 			{
 				// Already in a parsed string, or escaped in a linear string, means we print it - otherwise something special.
 				if ($in_string != 2 && ($in_string != 1 || !$is_escape))
@@ -165,7 +168,7 @@ function cleanLangString($string, $to_display = true)
 				}
 			}
 			// Otherwise a double quote?
-			elseif ($string{$i} == '"')
+			elseif ($string[$i] == '"')
 			{
 				// Already in a single quote string, or escaped in a parsed string, means we print it - otherwise something special.
 				if ($in_string != 1 && ($in_string != 2 || !$is_escape))
@@ -182,10 +185,10 @@ function cleanLangString($string, $to_display = true)
 				}
 			}
 			// A join/space outside of a string is simply removed.
-			elseif ($in_string == 0 && (empty($string{$i}) || $string{$i} == '.'))
+			elseif ($in_string == 0 && (empty($string[$i]) || $string[$i] == '.'))
 				continue;
 			// Start of a variable?
-			elseif ($in_string == 0 && $string{$i} == '$')
+			elseif ($in_string == 0 && $string[$i] == '$')
 			{
 				// Find the whole of it!
 				preg_match('~([\$A-Za-z0-9\'\[\]_-]+)~', substr($string, $i), $matches);
@@ -208,7 +211,7 @@ function cleanLangString($string, $to_display = true)
 			}
 
 			// Actually add the character to the string!
-			$new_string .= $string{$i};
+			$new_string .= $string[$i];
 			// If anything was escaped it ain't any longer!
 			$is_escape = false;
 		}
@@ -222,7 +225,8 @@ function cleanLangString($string, $to_display = true)
 		$in_string = 0;
 		// This is for deciding whether to HTML a quote.
 		$in_html = false;
-		for ($i = 0; $i < strlen($string); $i++)
+		$str_len = strlen($string);
+		for ($i = 0; $i < $str_len; $i++)
 		{
 			// We don't do parsed strings apart from for breaks.
 			if ($in_string == 2)
@@ -239,7 +243,7 @@ function cleanLangString($string, $to_display = true)
 			}
 
 			// Is this a variable?
-			if ($string{$i} == '{' && $string{$i + 1} == '%' && $string{$i + 2} == '$')
+			if ($string[$i] == '{' && $string[$i + 1] == '%' && $string[$i + 2] == '$')
 			{
 				// Grab the variable.
 				preg_match('~\{%([\$A-Za-z0-9\'\[\]_-]+)%\}~', substr($string, $i), $matches);
@@ -258,10 +262,10 @@ function cleanLangString($string, $to_display = true)
 				continue;
 			}
 			// Is this a lt sign?
-			elseif ($string{$i} == '<')
+			elseif ($string[$i] == '<')
 			{
 				// Probably HTML?
-				if ($string{$i + 1} != ' ')
+				if ($string[$i + 1] != ' ')
 					$in_html = true;
 				// Assume we need an entity...
 				else
@@ -271,7 +275,7 @@ function cleanLangString($string, $to_display = true)
 				}
 			}
 			// What about gt?
-			elseif ($string{$i} == '>')
+			elseif ($string[$i] == '>')
 			{
 				// Will it be HTML?
 				if ($in_html)
@@ -284,10 +288,10 @@ function cleanLangString($string, $to_display = true)
 				}
 			}
 			// Is it a slash? If so escape it...
-			if ($string{$i} == '\\')
+			if ($string[$i] == '\\')
 				$new_string .= '\\';
 			// The infamous double quote?
-			elseif ($string{$i} == '"')
+			elseif ($string[$i] == '"')
 			{
 				// If we're in HTML we leave it as a quote - otherwise we entity it.
 				if (!$in_html)
@@ -297,14 +301,14 @@ function cleanLangString($string, $to_display = true)
 				}
 			}
 			// A single quote?
-			elseif ($string{$i} == '\'')
+			elseif ($string[$i] == '\'')
 			{
 				// Must be in a string so escape it.
 				$new_string .= '\\';
 			}
 
 			// Finally add the character to the string!
-			$new_string .= $string{$i};
+			$new_string .= $string[$i];
 		}
 
 		// If we ended as a string then close it off.
@@ -329,7 +333,7 @@ function list_getLanguagesList()
 
 	// We're going to use this URL.
 	// @todo no we are not, this needs to be changed - again
-	$url = 'http://download.elkarte.net/fetch_language.php?version=' . urlencode(strtr($forum_version, array('ELKARTE ' => '')));
+	$url = 'http://download.elkarte.net/fetch_language.php?version=' . urlencode(strtr($forum_version, array('ElkArte ' => '')));
 
 	// Load the class file and stick it into an array.
 	require_once(SUBSDIR . '/XmlArray.class.php');

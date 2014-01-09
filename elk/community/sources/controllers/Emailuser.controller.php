@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * The functions in this file deal with sending topics to a friend or reports to
+ * a moderator.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,24 +12,24 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * The functions in this file deal with sending topics to a friend or moderator,
- * and email to a user.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
-class Emailuser_Controller
+/**
+ * Emailuser_Controller class, allows for sending topics via email
+ */
+class Emailuser_Controller extends Action_Controller
 {
 	/**
 	 * This function initializes or sets up the necessary, for the other actions
 	 */
-	function pre_dispatch()
+	public function pre_dispatch()
 	{
 		global $context;
 
@@ -38,11 +41,13 @@ class Emailuser_Controller
 	}
 
 	/**
-	 * Default action handler (when no ;sa is specified)
+	 * Default action handler
+	 *
+	 * @see Action_Controller::action_index()
 	 */
-	function action_emailuser()
+	public function action_index()
 	{
-		// default action: action_sendtopic()
+		// just accept we haz a default action: action_sendtopic()
 		$this->action_sendtopic();
 	}
 
@@ -53,9 +58,9 @@ class Emailuser_Controller
 	 * Redirects back to the first page of the topic when done.
 	 * Is accessed via ?action=emailuser;sa=sendtopic.
 	 */
-	function action_sendtopic()
+	public function action_sendtopic()
 	{
-		global $topic, $txt, $context, $scripturl, $modSettings;
+		global $topic, $txt, $context, $modSettings;
 
 		// Check permissions...
 		isAllowedTo('send_topic');
@@ -65,7 +70,6 @@ class Emailuser_Controller
 			fatal_lang_error('not_a_topic', false);
 
 		require_once(SUBSDIR . '/Topic.subs.php');
-
 		$row = getTopicInfo($topic, 'message');
 		if (empty($row))
 			fatal_lang_error('not_a_topic', false);
@@ -82,6 +86,7 @@ class Emailuser_Controller
 		{
 			$context['page_title'] = sprintf($txt['sendtopic_title'], $row['subject']);
 			$context['start'] = $_REQUEST['start'];
+			$context['sub_template'] = 'send_topic';
 
 			return;
 		}
@@ -90,36 +95,159 @@ class Emailuser_Controller
 		checkSession();
 		spamProtection('sendtopic');
 
+		$result = $this->_sendTopic($row);
+		if ($result !== true)
+			$context['sendtopic_error'] = $result;
+
+		// Back to the topic!
+		redirectexit('topic=' . $topic . '.0');
+	}
+
+	/**
+	 * Like action_sendtopic, but done via ajax from an API request
+	 * @uses Xml Template generic_xml_buttons sub template
+	 */
+	public function action_sendtopic_api()
+	{
+		global $topic, $modSettings, $txt, $context, $scripturl;
+
+		loadTemplate('Xml');
+
+		Template_Layers::getInstance()->removeAll();
+		$context['sub_template'] = 'generic_xml_buttons';
+
+		if (empty($_POST['send']))
+			die();
+
+		// We need at least a topic... go away if you don't have one.
+		// Guests can't mark things.
+		if (empty($topic))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_a_topic']
+			);
+			return;
+		}
+
+		// Is the session valid?
+		if (checkSession('post', '', false))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'url' => $scripturl . '?action=emailuser;sa=sendtopic;topic=' . $topic . '.0',
+			);
+			return;
+		}
+
+		require_once(SUBSDIR . '/Topic.subs.php');
+
+		$row = getTopicInfo($topic, 'message');
+		if (empty($row))
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_a_topic']
+			);
+			return;
+		}
+
+		// Can't send topic if its unapproved and using post moderation.
+		if ($modSettings['postmod_active'] && !$row['approved'])
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => $txt['not_approved_topic']
+			);
+			return;
+		}
+
+		$is_spam = spamProtection('sendtopic', false);
+		if ($is_spam !== false)
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = array(
+				'error' => 1,
+				'text' => sprintf($txt['sendtopic_WaitTime_broken'], $is_spam)
+			);
+			return;
+		}
+
+		// Censor the subject....
+		censorText($row['subject']);
+
+		$result = $this->_sendTopic($row);
+		if ($result !== true)
+		{
+			loadLanguage('Errors');
+			$context['xml_data'] = $result;
+			return;
+		}
+
+		$context['xml_data'] = array(
+			'text' => $txt['topic_sent'],
+		);
+	}
+
+	/**
+	 * Prepares the form data and database data for sending in an email format\
+	 * Does the actual sending of the email if everthing checks out as OK
+	 *
+	 * @param array $row
+	 */
+	private function _sendTopic($row)
+	{
+		global $scripturl, $topic, $txt;
+
 		// This is needed for sendmail().
 		require_once(SUBSDIR . '/Mail.subs.php');
 
-		// Trim the names..
-		$_POST['y_name'] = trim($_POST['y_name']);
-		$_POST['r_name'] = trim($_POST['r_name']);
+		// Time to check and clean what was placed in the form
+		require_once(SUBSDIR . '/DataValidator.class.php');
+		$validator = new Data_Validator();
+		$validator->sanitation_rules(array(
+			'y_name' => 'trim',
+			'r_name' => 'trim'
+		));
+		$validator->validation_rules(array(
+			'y_name' => 'required|notequal[_]',
+			'y_email' => 'required|valid_email',
+			'r_name' => 'required|notequal[_]',
+			'r_email' => 'required|valid_email'
+		));
+		$validator->text_replacements(array(
+			'y_name' => $txt['sendtopic_sender_name'],
+			'y_email' => $txt['sendtopic_sender_email'],
+			'r_name' => $txt['sendtopic_receiver_name'],
+			'r_email' => $txt['sendtopic_receiver_email']
+		));
 
-		// Make sure they aren't playing "let's use a fake email".
-		if ($_POST['y_name'] == '_' || !isset($_POST['y_name']) || $_POST['y_name'] == '')
-			fatal_lang_error('no_name', false);
-		if (!isset($_POST['y_email']) || $_POST['y_email'] == '')
-			fatal_lang_error('no_email', false);
-		if (preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['y_email']) == 0)
-			fatal_lang_error('email_invalid_character', false);
+		// Any errors or are we good to go?
+		if (!$validator->validate($_POST))
+		{
+			$errors = $validator->validation_errors();
 
-		// The receiver should be valid to.
-		if ($_POST['r_name'] == '_' || !isset($_POST['r_name']) || $_POST['r_name'] == '')
-			fatal_lang_error('no_name', false);
-		if (!isset($_POST['r_email']) || $_POST['r_email'] == '')
-			fatal_lang_error('no_email', false);
-		if (preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['r_email']) == 0)
-			fatal_lang_error('email_invalid_character', false);
+			return array(
+				'errors' => $errors,
+				'type' => 'minor',
+				'title' => $txt['validation_failure'],
+				// And something for ajax
+				'error' => 1,
+				'text' => $errors[0],
+			);
+		}
 
 		// Emails don't like entities...
 		$row['subject'] = un_htmlspecialchars($row['subject']);
 
 		$replacements = array(
 			'TOPICSUBJECT' => $row['subject'],
-			'SENDERNAME' => $_POST['y_name'],
-			'RECPNAME' => $_POST['r_name'],
+			'SENDERNAME' => $validator->y_name,
+			'RECPNAME' => $validator->r_name,
 			'TOPICLINK' => $scripturl . '?topic=' . $topic . '.0',
 		);
 
@@ -132,11 +260,11 @@ class Emailuser_Controller
 		}
 
 		$emaildata = loadEmailTemplate($emailtemplate, $replacements);
-		// And off we go!
-		sendmail($_POST['r_email'], $emaildata['subject'], $emaildata['body'], $_POST['y_email']);
 
-		// Back to the topic!
-		redirectexit('topic=' . $topic . '.0');
+		// And off we go!
+		sendmail($validator->r_email, $emaildata['subject'], $emaildata['body'], $validator->y_email);
+
+		return true;
 	}
 
 	/**
@@ -146,14 +274,12 @@ class Emailuser_Controller
 	 * Does not check permissions for a message ID as there is no information disclosed.
 	 * ?action=emailuser;sa=email
 	 */
-	function action_email()
+	public function action_email()
 	{
-		global $context, $modSettings, $user_info, $txt, $scripturl;
-
-		$db = database();
+		global $context, $user_info, $txt, $scripturl;
 
 		// Can the user even see this information?
-		if ($user_info['is_guest'] && !empty($modSettings['guest_hideContacts']))
+		if ($user_info['is_guest'])
 			fatal_lang_error('no_access', false);
 
 		isAllowedTo('send_email_to_members');
@@ -170,23 +296,11 @@ class Emailuser_Controller
 		}
 		elseif (isset($_REQUEST['msg']))
 		{
-			$request = $db->query('', '
-				SELECT IFNULL(mem.email_address, m.poster_email) AS email_address, IFNULL(mem.real_name, m.poster_name) AS real_name, IFNULL(mem.id_member, 0) AS id_member, hide_email
-				FROM {db_prefix}messages AS m
-					LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = m.id_member)
-				WHERE m.id_msg = {int:id_msg}',
-				array(
-					'id_msg' => (int) $_REQUEST['msg'],
-				)
-			);
-			$row = $db->fetch_assoc($request);
-			$db->free_result($request);
+			require_once(SUBSDIR . '/Messages.subs.php');
+			$row = mailFromMesasge((int) $_REQUEST['msg']);
 
 			$context['form_hidden_vars']['msg'] = (int) $_REQUEST['msg'];
 		}
-
-		if (empty($request) || $db->num_rows($request) == 0)
-			fatal_lang_error('cant_find_user_email');
 
 		// Are you sure you got the address?
 		if (empty($row['email_address']))
@@ -195,6 +309,11 @@ class Emailuser_Controller
 		// Can they actually do this?
 		$context['show_email_address'] = showEmailAddress(!empty($row['hide_email']), $row['id_member']);
 		if ($context['show_email_address'] === 'no')
+			fatal_lang_error('no_access', false);
+
+		// Does the user want to be contacted at all by you?
+		require_once(SUBSDIR . '/Members.subs.php');
+		if (!canContact($row['id_member']))
 			fatal_lang_error('no_access', false);
 
 		// Setup the context!
@@ -207,27 +326,60 @@ class Emailuser_Controller
 		);
 
 		// Can we see this person's email address?
-		$context['can_view_receipient_email'] = $context['show_email_address'] == 'yes' || $context['show_email_address'] == 'yes_permission_override';
+		$context['can_view_recipient_email'] = $context['show_email_address'] == 'yes' || $context['show_email_address'] == 'yes_permission_override';
+
+		// Template
+		$context['sub_template'] = 'custom_email';
+		$context['page_title'] = $txt['send_email'];
 
 		// Are we actually sending it?
 		if (isset($_POST['send']) && isset($_POST['email_body']))
 		{
-			require_once(SUBSDIR . '/Mail.subs.php');
-
 			checkSession();
+
+			// Don't let them send too many!
+			spamProtection('sendmail');
+
+			require_once(SUBSDIR . '/Mail.subs.php');
+			require_once(SUBSDIR . '/DataValidator.class.php');
+
+			// We will need to do some data checking
+			$validator = new Data_Validator();
+			$validator->sanitation_rules(array(
+				'y_name' => 'trim',
+				'email_body' => 'trim',
+				'email_subject' => 'trim'
+			));
+			$validator->validation_rules(array(
+				'y_name' => 'required|notequal[_]',
+				'y_email' => 'required|valid_email',
+				'email_body' => 'required',
+				'email_subject' => 'required'
+			));
+			$validator->text_replacements(array(
+				'y_name' => $txt['sendtopic_sender_name'],
+				'y_email' => $txt['sendtopic_sender_email'],
+				'email_body' => $txt['message'],
+				'email_subject' => $txt['send_email_subject']
+			));
+			$validator->validate($_POST);
 
 			// If it's a guest sort out their names.
 			if ($user_info['is_guest'])
 			{
-				if (empty($_POST['y_name']) || $_POST['y_name'] == '_' || trim($_POST['y_name']) == '')
-					fatal_lang_error('no_name', false);
-				if (empty($_POST['y_email']))
-					fatal_lang_error('no_email', false);
-				if (preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['y_email']) == 0)
-					fatal_lang_error('email_invalid_character', false);
+				$errors = $validator->validation_errors(array('y_name', 'y_email'));
+				if ($errors)
+				{
+					$context['sendemail_error'] = array(
+						'errors' => $errors,
+						'type' => 'minor',
+						'title' => $txt['validation_failure'],
+					);
+					return;
+				}
 
-				$from_name = trim($_POST['y_name']);
-				$from_email = trim($_POST['y_email']);
+				$from_name = $validator->y_name;
+				$from_email = $validator->y_email;
 			}
 			else
 			{
@@ -236,19 +388,24 @@ class Emailuser_Controller
 			}
 
 			// Check we have a body (etc).
-			if (trim($_POST['email_body']) == '' || trim($_POST['email_subject']) == '')
-				fatal_lang_error('email_missing_data');
+			$errors = $validator->validation_errors(array('email_body', 'email_subject'));
+			if (!empty($errors))
+			{
+				$context['sendemail_error'] = array(
+					'errors' => $errors,
+					'type' => 'minor',
+					'title' => $txt['validation_failure'],
+				);
+				return;
+			}
 
 			// We use a template in case they want to customise!
 			$replacements = array(
-				'EMAILSUBJECT' => $_POST['email_subject'],
-				'EMAILBODY' => $_POST['email_body'],
+				'EMAILSUBJECT' => $validator->email_subject,
+				'EMAILBODY' => $validator->email_body,
 				'SENDERNAME' => $from_name,
 				'RECPNAME' => $context['recipient']['name'],
 			);
-
-			// Don't let them send too many!
-			spamProtection('sendmail');
 
 			// Get the template and get out!
 			$emaildata = loadEmailTemplate('send_email', $replacements);
@@ -262,9 +419,6 @@ class Emailuser_Controller
 			else
 				redirectexit();
 		}
-
-		$context['sub_template'] = 'custom_email';
-		$context['page_title'] = $txt['send_email'];
 	}
 
 	/**
@@ -275,9 +429,9 @@ class Emailuser_Controller
 	 * Uses action_reporttm2() if post data was sent.
 	 * Accessed through ?action=reporttm.
 	 */
-	function action_reporttm()
+	public function action_reporttm()
 	{
-		global $txt, $topic, $modSettings, $user_info, $context;
+		global $txt, $modSettings, $user_info, $context;
 
 		$context['robot_no_index'] = true;
 
@@ -285,7 +439,7 @@ class Emailuser_Controller
 		isAllowedTo('report_any');
 
 		// No errors, yet.
-		$report_errors = error_context::context('report', 1);
+		$report_errors = Error_Context::context('report', 1);
 
 		// ...or maybe some.
 		$context['report_error'] = array(
@@ -298,23 +452,21 @@ class Emailuser_Controller
 			$this->action_reporttm2();
 
 		// We need a message ID to check!
-		if (empty($_REQUEST['msg']) && empty($_REQUEST['mid']))
+		if (empty($_REQUEST['msg']))
 			fatal_lang_error('no_access', false);
 
-		// For compatibility, accept mid, but we should be using msg. (not the flavor kind!)
-		$message_id = empty($_REQUEST['msg']) ? (int) $_REQUEST['mid'] : (int) $_REQUEST['msg'];
-
-		// Check the message's ID - don't want anyone reporting a post they can't even see!
-		require_once(SUBSDIR . '/Topic.subs.php');
-		$message_info = messageTopicDetails($topic, $message_id);
-		if (empty($message_info ))
+		// Check the message's ID - don't want anyone reporting a post that does not exist
+		require_once(SUBSDIR . '/Messages.subs.php');
+		$message_id = (int) $_REQUEST['msg'];
+		$message_info = basicMessageInfo($message_id, true, true);
+		if ($message_info === false)
 			fatal_lang_error('no_board', false);
 
 		// Do we need to show the visual verification image?
 		$context['require_verification'] = $user_info['is_guest'] && !empty($modSettings['guests_report_require_captcha']);
 		if ($context['require_verification'])
 		{
-			require_once(SUBSDIR . '/Editor.subs.php');
+			require_once(SUBSDIR . '/VerificationControls.class.php');
 			$verificationOptions = array(
 				'id' => 'report',
 			);
@@ -363,11 +515,9 @@ class Emailuser_Controller
 	 * Called by action_reporttm(), and thus has the same permission and setting requirements as it does.
 	 * Accessed through ?action=reporttm when posting.
 	 */
-	function action_reporttm2()
+	public function action_reporttm2()
 	{
 		global $txt, $scripturl, $topic, $board, $user_info, $modSettings, $language, $context;
-
-		$db = database();
 
 		// You must have the proper permissions!
 		isAllowedTo('report_any');
@@ -378,7 +528,7 @@ class Emailuser_Controller
 		require_once(SUBSDIR . '/Mail.subs.php');
 
 		// No errors, yet.
-		$report_errors = error_context::context('report', 1);
+		$report_errors = Error_Context::context('report', 1);
 
 		// Check their session.
 		if (checkSession('post', '', false) != '')
@@ -395,21 +545,19 @@ class Emailuser_Controller
 		// Guests need to provide their address!
 		if ($user_info['is_guest'])
 		{
-			$_POST['email'] = !isset($_POST['email']) ? '' : trim($_POST['email']);
-			if ($_POST['email'] === '')
-				$report_errors->addError('no_email');
-			elseif (preg_match('~^[0-9A-Za-z=_+\-/][0-9A-Za-z=_\'+\-/\.]*@[\w\-]+(\.[\w\-]+)*(\.[\w]{2,6})$~', $_POST['email']) == 0)
-				$report_errors->addError('bad_email');
+			require_once(SUBSDIR . '/DataValidator.class.php');
+			if (!Data_Validator::is_valid($_POST, array('email' => 'valid_email'), array('email' => 'trim')))
+				empty($_POST['email']) ? $report_errors->addError('no_email') : $report_errors->addError('bad_email');
 
 			isBannedEmail($_POST['email'], 'cannot_post', sprintf($txt['you_are_post_banned'], $txt['guest_title']));
 
-			$user_info['email'] = htmlspecialchars($_POST['email']);
+			$user_info['email'] = htmlspecialchars($_POST['email'], ENT_COMPAT, 'UTF-8');
 		}
 
 		// Could they get the right verification code?
 		if ($user_info['is_guest'] && !empty($modSettings['guests_report_require_captcha']))
 		{
-			require_once(SUBSDIR . '/Editor.subs.php');
+			require_once(SUBSDIR . '/VerificationControls.class.php');
 			$verificationOptions = array(
 				'id' => 'report',
 			);
@@ -424,27 +572,14 @@ class Emailuser_Controller
 
 		// Any errors?
 		if ($report_errors->hasErrors())
-			return action_reporttm();
+			return $this->action_reporttm();
 
 		// Get the basic topic information, and make sure they can see it.
 		$msg_id = (int) $_POST['msg'];
+		$message = posterDetails($msg_id, $topic);
 
-		$request = $db->query('', '
-			SELECT m.id_msg, m.id_topic, m.id_board, m.subject, m.body, m.id_member AS id_poster, m.poster_name, mem.real_name
-			FROM {db_prefix}messages AS m
-				LEFT JOIN {db_prefix}members AS mem ON (m.id_member = mem.id_member)
-			WHERE m.id_msg = {int:id_msg}
-				AND m.id_topic = {int:current_topic}
-			LIMIT 1',
-			array(
-				'current_topic' => $topic,
-				'id_msg' => $msg_id,
-			)
-		);
-		if ($db->num_rows($request) == 0)
+		if (empty($message))
 			fatal_lang_error('no_board', false);
-		$message = $db->fetch_assoc($request);
-		$db->free_result($request);
 
 		$poster_name = un_htmlspecialchars($message['real_name']) . ($message['real_name'] != $message['poster_name'] ? ' (' . $message['poster_name'] . ')' : '');
 		$reporterName = un_htmlspecialchars($user_info['name']) . ($user_info['name'] != $user_info['username'] && $user_info['username'] != '' ? ' (' . $user_info['username'] . ')' : '');
@@ -477,6 +612,7 @@ class Emailuser_Controller
 		}
 
 		// Find out who the real moderators are - for mod preferences.
+		require_once(SUBSDIR . '/Boards.subs.php');
 		$real_mods = getBoardModerators($board, true);
 
 		// Send every moderator an email.
@@ -485,7 +621,7 @@ class Emailuser_Controller
 			// Maybe they don't want to know?!
 			if (!empty($row['mod_prefs']))
 			{
-				list(,, $pref_binary) = explode('|', $row['mod_prefs']);
+				list (,, $pref_binary) = explode('|', $row['mod_prefs']);
 				if (!($pref_binary & 1) && (!($pref_binary & 2) || !in_array($row['id_member'], $real_mods)))
 					continue;
 			}
@@ -504,7 +640,6 @@ class Emailuser_Controller
 			// Send it to the moderator.
 			sendmail($row['email_address'], $emaildata['subject'], $emaildata['body'], $user_info['email'], null, false, 2);
 		}
-		$db->free_result($request);
 
 		// Keep track of when the mod reports get updated, that way we know when we need to look again.
 		updateSettings(array('last_mod_report_action' => time()));

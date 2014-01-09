@@ -1,22 +1,28 @@
 <?php
 
 /**
+ * Functions to assist in viewing and maintaining the error logs
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Delete all or some of the errors in the error log.
  * It applies any necessary filters to deletion.
- * This should only be called by ManageErrors::action_log().
+ * This should only be called by ManageErrors.controller::action_log().
  * It attempts to TRUNCATE the table to reset the auto_increment.
  * Redirects back to the error log when done.
+ *
+ * @param string $type action
+ * @param array $filter db query of the view filter being used
+ * @param array $error_list int list of error ID's to work on
  */
 function deleteErrors($type, $filter = null, $error_list = null)
 {
@@ -52,9 +58,9 @@ function deleteErrors($type, $filter = null, $error_list = null)
 /**
  * Counts error log entries
  *
- * @return int
+ * @param array $filter db query of the filter being used
  */
-function numErrors()
+function numErrors($filter = array())
 {
 	$db = database();
 
@@ -80,7 +86,6 @@ function numErrors()
  * @param int $start
  * @param string $sort_direction
  * @param array $filter
- * @return array
  */
 function getErrorLogData($start, $sort_direction = 'DESC', $filter = null)
 {
@@ -88,7 +93,6 @@ function getErrorLogData($start, $sort_direction = 'DESC', $filter = null)
 
 	$db = database();
 
-	$db = database();
 	// Find and sort out the errors.
 	$request = $db->query('', '
 		SELECT id_error, id_member, ip, url, log_time, message, session, error_type, file, line
@@ -118,9 +122,10 @@ function getErrorLogData($start, $sort_direction = 'DESC', $filter = null)
 				'session' => $row['session']
 			),
 			'time' => standardTime($row['log_time']),
-			'timestamp' => $row['log_time'],
+			'html_time' => htmlTime($row['log_time']),
+			'timestamp' => forum_time(true, $row['log_time']),
 			'url' => array(
-				'html' => htmlspecialchars((substr($row['url'], 0, 1) == '?' ? $scripturl : '') . $row['url']),
+				'html' => htmlspecialchars((substr($row['url'], 0, 1) == '?' ? $scripturl : '') . $row['url'], ENT_COMPAT, 'UTF-8'),
 				'href' => base64_encode($db->escape_wildcard_string($row['url']))
 			),
 			'message' => array(
@@ -141,8 +146,8 @@ function getErrorLogData($start, $sort_direction = 'DESC', $filter = null)
 				$log['errors'][$row['id_error']]['file'] = array(
 				'file' => $row['file'],
 				'line' => $row['line'],
-				'href' => $scripturl . '?action=admin;area=logs;sa=errorlog;file=' . base64_encode($row['file']) . ';line=' . $row['line'],
-				'link' => $linkfile ? '<a href="' . $scripturl . '?action=admin;area=logs;sa=errorlog;file=' . base64_encode($row['file']) . ';line=' . $row['line'] . '" onclick="return reqWin(this.href, 600, 480, false);">' . $row['file'] . '</a>' : $row['file'],
+				'href' => $scripturl . '?action=admin;area=logs;sa=errorlog;activity=file;file=' . base64_encode($row['file']) . ';line=' . $row['line'],
+				'link' => $linkfile ? '<a href="' . $scripturl . '?action=admin;area=logs;sa=errorlog;activity=file;file=' . base64_encode($row['file']) . ';line=' . $row['line'] . '" onclick="return reqWin(this.href, 600, 480, false);">' . $row['file'] . '</a>' : $row['file'],
 				'search' => base64_encode($row['file']),
 			);
 		}
@@ -160,7 +165,6 @@ function getErrorLogData($start, $sort_direction = 'DESC', $filter = null)
  *
  * @param bool $sort
  * @param int $filter
- * @return array
  */
 function fetchErrorsByType($filter = null, $sort = null)
 {
@@ -171,7 +175,6 @@ function fetchErrorsByType($filter = null, $sort = null)
 	$sum = 0;
 	$types = array();
 
-	$db = database();
 	// What type of errors do we have and how many do we have?
 	$request = $db->query('', '
 		SELECT error_type, COUNT(*) AS num_errors

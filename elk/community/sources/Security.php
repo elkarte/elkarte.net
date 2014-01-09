@@ -1,6 +1,9 @@
 <?php
 
 /**
+ * This file has the very important job of ensuring forum security.
+ * This task includes banning and permissions, namely.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,16 +12,13 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has the very important job of ensuring forum security.
- * This task includes banning and permissions, namely.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -42,8 +42,27 @@ function validateSession($type = 'admin')
 	call_integration_hook('integrate_validateSession', array(&$types));
 	$type = in_array($type, $types) || $type == 'moderate' ? $type : 'admin';
 
+	// Set the lifetime for our admin session. Default is ten minutes.
+	$refreshTime = 600;
+
+	if (isset($modSettings['admin_session_lifetime']))
+	{
+		// Maybe someone is paranoid or mistakenly misconfigured the param? Give them at least 5 minutes.
+		if ($modSettings['admin_session_lifetime'] < 5)
+			$refreshTime = 300;
+
+		// A whole day should be more than enough..
+		elseif ($modSettings['admin_session_lifetime'] > 14400)
+			$refreshTime = 86400;
+
+		// We are between our internal min and max. Let's keep the board owner's value.
+		else
+			$refreshTime = $modSettings['admin_session_lifetime'] * 60;
+	}
+
 	// If we're using XML give an additional ten minutes grace as an admin can't log on in XML mode.
-	$refreshTime = isset($_GET['xml']) ? 4200 : 3600;
+	if (isset($_GET['xml']))
+		$refreshTime += 600;
 
 	// Is the security option off?
 	if (!empty($modSettings['securityDisable' . ($type != 'admin' ? '_' . $type : '')]))
@@ -90,7 +109,8 @@ function validateSession($type = 'admin')
 	if (!empty($user_settings['openid_uri']))
 	{
 		require_once(SUBSDIR . '/OpenID.subs.php');
-		openID_revalidate();
+		$openID = new OpenID();
+		$openID->revalidate();
 
 		$_SESSION[$type . '_time'] = time();
 		unset($_SESSION['request_referer']);
@@ -116,6 +136,7 @@ function validateSession($type = 'admin')
  * Message is what to tell them when asking them to login.
  *
  * @param string $message = ''
+ * @param bollean $is_fatal = true
  */
 function is_not_guest($message = '', $is_fatal = true)
 {
@@ -123,7 +144,7 @@ function is_not_guest($message = '', $is_fatal = true)
 
 	// Luckily, this person isn't a guest.
 	if (isset($user_info['is_guest']) && !$user_info['is_guest'])
-		return;
+		return true;
 
 	// People always worry when they see people doing things they aren't actually doing...
 	$_GET['action'] = '';
@@ -136,7 +157,7 @@ function is_not_guest($message = '', $is_fatal = true)
 		obExit(false);
 
 	// Attempt to detect if they came from dlattach.
-	if (ELKARTE != 'SSI' && empty($context['theme_loaded']))
+	if (ELK != 'SSI' && empty($context['theme_loaded']))
 		loadTheme();
 
 	// Never redirect to an attachment
@@ -152,6 +173,8 @@ function is_not_guest($message = '', $is_fatal = true)
 		$_SESSION['login_url'] = $scripturl . '?' . $_SERVER['QUERY_STRING'];
 		redirectexit('action=login');
 	}
+	elseif (isset($_GET['api']))
+		return false;
 	else
 	{
 		loadTemplate('Login');
@@ -452,6 +475,8 @@ function banPermissions()
 			'remove_own', 'remove_any',
 			'post_unapproved_topics', 'post_unapproved_replies_own', 'post_unapproved_replies_any',
 		);
+		Template_Layers::getInstance()->addAfter('admin_warning', 'body');
+
 		call_integration_hook('integrate_post_ban_permissions', array(&$denied_permissions));
 		$user_info['permissions'] = array_diff($user_info['permissions'], $denied_permissions);
 	}
@@ -621,6 +646,9 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 {
 	global $sc, $modSettings, $boardurl;
 
+	// We'll work out user agent checks
+	$req = request();
+
 	// Is it in as $_POST['sc']?
 	if ($type == 'post')
 	{
@@ -647,7 +675,7 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 	}
 
 	// Verify that they aren't changing user agents on us - that could be bad.
-	if ((!isset($_SESSION['USER_AGENT']) || $_SESSION['USER_AGENT'] != $_SERVER['HTTP_USER_AGENT']) && empty($modSettings['disableCheckUA']))
+	if ((!isset($_SESSION['USER_AGENT']) || $_SESSION['USER_AGENT'] != $req->user_agent()) && empty($modSettings['disableCheckUA']))
 		$error = 'session_verify_fail';
 
 	// Make sure a page with session check requirement is not being prefetched.
@@ -701,9 +729,6 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 		$log_error = true;
 	}
 
-	if (strtolower($_SERVER['HTTP_USER_AGENT']) == 'hacker')
-		fatal_error('Sound the alarm!  It\'s a hacker!  Close the castle gates!!', false);
-
 	// Everything is ok, return an empty string.
 	if (!isset($error))
 		return '';
@@ -736,12 +761,14 @@ function checkConfirm($action)
 {
 	global $modSettings;
 
-	if (isset($_GET['confirm']) && isset($_SESSION['confirm_' . $action]) && md5($_GET['confirm'] . $_SERVER['HTTP_USER_AGENT']) === $_SESSION['confirm_' . $action])
+	$req = request();
+
+	if (isset($_GET['confirm']) && isset($_SESSION['confirm_' . $action]) && md5($_GET['confirm'] . $req->user_agent()) === $_SESSION['confirm_' . $action])
 		return true;
 	else
 	{
 		$token = md5(mt_rand() . session_id() . (string) microtime() . $modSettings['rand_seed']);
-		$_SESSION['confirm_' . $action] = md5($token . $_SERVER['HTTP_USER_AGENT']);
+		$_SESSION['confirm_' . $action] = md5($token . $req->user_agent());
 
 		return $token;
 	}
@@ -758,10 +785,13 @@ function createToken($action, $type = 'post')
 {
 	global $modSettings, $context;
 
+	// we need user agent
+	$req = request();
+
 	$token = md5(mt_rand() . session_id() . (string) microtime() . $modSettings['rand_seed'] . $type);
 	$token_var = substr(preg_replace('~^\d+~', '', md5(mt_rand() . (string) microtime() . mt_rand())), 0, rand(7, 12));
 
-	$_SESSION['token'][$type . '-' . $action] = array($token_var, md5($token . $_SERVER['HTTP_USER_AGENT']), time(), $token);
+	$_SESSION['token'][$type . '-' . $action] = array($token_var, md5($token . $req->user_agent()), time(), $token);
 
 	$context[$action . '_token'] = $token;
 	$context[$action . '_token_var'] = $token_var;
@@ -775,19 +805,21 @@ function createToken($action, $type = 'post')
  * @param string $action
  * @param string $type = 'post' (get, request, or post)
  * @param bool $reset = true
- * @return boolean
+ * @param bool $fatal if true a fatal_lang_error is issued for invalid tokens, otherwise false is returned
+ * @return boolean except for $action == 'login' where the token is returned
  */
-function validateToken($action, $type = 'post', $reset = true)
+function validateToken($action, $type = 'post', $reset = true, $fatal = true)
 {
 	$type = $type == 'get' || $type == 'request' ? $type : 'post';
+	$token_index = $type . '-' . $action;
 
 	// Logins are special: the token is used to has the password with javascript before POST it
 	if ($action == 'login')
 	{
-		if (isset($_SESSION['token'][$type . '-' . $action]))
+		if (isset($_SESSION['token'][$token_index]))
 		{
-			$return = $_SESSION['token'][$type . '-' . $action][3];
-			unset($_SESSION['token'][$type . '-' . $action]);
+			$return = $_SESSION['token'][$token_index][3];
+			unset($_SESSION['token'][$token_index]);
 			return $return;
 		}
 		else
@@ -795,17 +827,18 @@ function validateToken($action, $type = 'post', $reset = true)
 	}
 
 	// This nasty piece of code validates a token.
-	/*
-		1. The token exists in session.
-		2. The {$type} variable should exist.
-		3. We concat the variable we received with the user agent
-		4. Match that result against what is in the session.
-		5. If it matchs, success, otherwise we fallout.
-	*/
-	if (isset($_SESSION['token'][$type . '-' . $action], $GLOBALS['_' . strtoupper($type)][$_SESSION['token'][$type . '-' . $action][0]]) && md5($GLOBALS['_' . strtoupper($type)][$_SESSION['token'][$type . '-' . $action][0]] . $_SERVER['HTTP_USER_AGENT']) === $_SESSION['token'][$type . '-' . $action][1])
+	// 1. The token exists in session.
+	// 2. The {$type} variable should exist.
+	// 3. We concat the variable we received with the user agent
+	// 4. Match that result against what is in the session.
+	// 5. If it matchs, success, otherwise we fallout.
+
+	// we use user agent
+	$req = request();
+	if (isset($_SESSION['token'][$token_index], $GLOBALS['_' . strtoupper($type)][$_SESSION['token'][$token_index][0]]) && md5($GLOBALS['_' . strtoupper($type)][$_SESSION['token'][$token_index][0]] . $req->user_agent()) === $_SESSION['token'][$token_index][1])
 	{
 		// Invalidate this token now.
-		unset($_SESSION['token'][$type . '-' . $action]);
+		unset($_SESSION['token'][$token_index]);
 
 		return true;
 	}
@@ -819,11 +852,14 @@ function validateToken($action, $type = 'post', $reset = true)
 		// I'm back baby.
 		createToken($action, $type);
 
-		fatal_lang_error('token_verify_fail', false);
+		if ($fatal)
+			fatal_lang_error('token_verify_fail', false);
+		else
+			return false;
 	}
 	// Remove this token as its useless
 	else
-		unset($_SESSION['token'][$type . '-' . $action]);
+		unset($_SESSION['token'][$token_index]);
 
 	// Randomly check if we should remove some older tokens.
 	if (mt_rand(0, 138) == 23)
@@ -838,8 +874,9 @@ function validateToken($action, $type = 'post', $reset = true)
  * if $complete = true will remove all tokens
  *
  * @param bool $complete = false
+ * @param string $suffix = false
  */
-function cleanTokens($complete = false)
+function cleanTokens($complete = false, $suffix = '')
 {
 	// We appreciate cleaning up after yourselves.
 	if (!isset($_SESSION['token']))
@@ -847,8 +884,15 @@ function cleanTokens($complete = false)
 
 	// Clean up tokens, trying to give enough time still.
 	foreach ($_SESSION['token'] as $key => $data)
-		if ($data[2] + 10800 < time() || $complete)
+	{
+		if (!empty($suffix))
+			$force = $complete || strpos($key, $suffix);
+		else
+			$force = $complete;
+
+		if ($data[2] + 10800 < time() || $force)
 			unset($_SESSION['token'][$key]);
+	}
 }
 
 /**
@@ -861,7 +905,6 @@ function cleanTokens($complete = false)
  *
  * @param string $action
  * @param bool $is_fatal = true
- * @return boolean
  */
 function checkSubmitOnce($action, $is_fatal = true)
 {
@@ -1165,7 +1208,7 @@ function showEmailAddress($userProfile_hideEmail, $userProfile_id)
 	// If the forum is set to show full email addresses: yes.
 	// Otherwise: no_through_forum.
 
-	if ((!empty($modSettings['guest_hideContacts']) && $user_info['is_guest']) || isset($_SESSION['ban']['cannot_post']))
+	if ($user_info['is_guest'] || isset($_SESSION['ban']['cannot_post']))
 		return 'no';
 	elseif ((!$user_info['is_guest'] && $user_info['id'] == $userProfile_id && !$userProfile_hideEmail) || allowedTo('moderate_forum'))
 		return 'yes_permission_override';
@@ -1182,9 +1225,9 @@ function showEmailAddress($userProfile_hideEmail, $userProfile_id)
  * The time taken depends on error_type - generally uses the modSetting.
  *
  * @param string $error_type used also as a $txt index. (not an actual string.)
- * @return boolean
+ * @param boolean $fatal is the spam check a fatal error on failure
  */
-function spamProtection($error_type)
+function spamProtection($error_type, $fatal = true)
 {
 	global $modSettings, $user_info;
 
@@ -1231,8 +1274,13 @@ function spamProtection($error_type)
 	if ($db->affected_rows() != 1)
 	{
 		// Spammer!  You only have to wait a *few* seconds!
-		fatal_lang_error($error_type . '_WaitTime_broken', false, array($timeLimit));
-		return true;
+		if ($fatal)
+		{
+			fatal_lang_error($error_type . '_WaitTime_broken', false, array($timeLimit));
+			return true;
+		}
+		else
+			return $timeLimit;
 	}
 
 	// They haven't posted within the limit.
@@ -1269,7 +1317,8 @@ RemoveHandler .php .php3 .phtml .cgi .fcgi .pl .fpl .shtml';
 	else
 	{
 		$fh = @fopen($path . '/.htaccess', 'w');
-		if ($fh) {
+		if ($fh)
+		{
 			fwrite($fh, '<Files *>
 	Order Deny,Allow
 	Deny from all' . $close);
@@ -1283,7 +1332,8 @@ RemoveHandler .php .php3 .phtml .cgi .fcgi .pl .fpl .shtml';
 	else
 	{
 		$fh = @fopen($path . '/index.php', 'w');
-		if ($fh) {
+		if ($fh)
+		{
 			fwrite($fh, '<?php
 
 /**
@@ -1299,8 +1349,7 @@ if (file_exists(dirname(dirname(__FILE__)) . \'/Settings.php\'))
 }
 // Can\'t find it... just forget it.
 else
-	exit;
-');
+	exit;');
 			fclose($fh);
 		}
 		$errors[] = 'index-php_cannot_create_file';
@@ -1420,6 +1469,10 @@ function validatePasswordFlood($id_member, $password_flood_value = false, $was_c
 		fatal_lang_error('no_access', false);
 	}
 
+	// Let's just initialize to something (and 0 is better than nothing)
+	$time_stamp = 0;
+	$number_tries = 0;
+
 	// Right, have we got a flood value?
 	if ($password_flood_value !== false)
 		@list ($time_stamp, $number_tries) = explode('|', $password_flood_value);
@@ -1428,7 +1481,7 @@ function validatePasswordFlood($id_member, $password_flood_value = false, $was_c
 	if (empty($number_tries) || $time_stamp < (time() - 10))
 	{
 		// If it wasn't *that* long ago, don't give them another five goes.
-		$number_tries = !empty($number_tries) && $time_stamp < (time() - 20) ? 2 : 0;
+		$number_tries = !empty($number_tries) && $time_stamp < (time() - 20) ? 2 : $number_tries;
 		$time_stamp = time();
 	}
 
@@ -1444,16 +1497,16 @@ function validatePasswordFlood($id_member, $password_flood_value = false, $was_c
 }
 
 /**
-* This sets the X-Frame-Options header.
-*
-* @param string $option the frame option, defaults to deny.
-* @return void.
-*/
+ * This sets the X-Frame-Options header.
+ *
+ * @param string $override the frame option, defaults to deny.
+ */
 function frameOptionsHeader($override = null)
 {
 	global $modSettings;
 
 	$option = 'SAMEORIGIN';
+
 	if (is_null($override) && !empty($modSettings['frame_security']))
 		$option = $modSettings['frame_security'];
 	elseif (in_array($override, array('SAMEORIGIN', 'DENY', 'SAMEORIGIN')))
@@ -1465,4 +1518,26 @@ function frameOptionsHeader($override = null)
 
 	// Finally set it.
 	header('X-Frame-Options: ' . $option);
+}
+
+/**
+ * This adds additional security headers that may prevent browsers from doing something they should not
+ *
+ * X-XSS-Protection header - This header enables the Cross-site scripting (XSS) filter
+ * built into most recent web browsers. It's usually enabled by default, so the role of this
+ * header is to re-enable the filter for this particular website if it was disabled by the user.
+ *
+ * X-Content-Type-Options header - It prevents the browser from doing MIME-type sniffing,
+ * only IE and Chrome are honouring this header. This reduces exposure to drive-by download attacks
+ * and sites serving user uploaded content that could be treated as executable or dynamic HTML files.
+ *
+ * @param boolean $override
+ */
+function securityOptionsHeader($override = null)
+{
+	if ($override !== true)
+	{
+		header('X-XSS-Protection: 1; mode=block');
+		header('X-Content-Type-Options: nosniff');
+	}
 }

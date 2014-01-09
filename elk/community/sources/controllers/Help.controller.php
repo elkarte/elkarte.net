@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file has the job of taking care of help messages and the help center.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,22 +11,31 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file has the important job of taking care of help messages and the help center.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Class to handle the help page and boxes
  */
-class Help_Controller
+class Help_Controller extends Action_Controller
 {
+	/**
+	 * Default action handler: just help.
+	 *
+	 * @see Action_Controller::action_index()
+	 */
+	public function action_index()
+	{
+		// I need help!
+		$this->action_help();
+	}
+
 	/**
 	 * Prepares the help page.
 	 * Uses Help template and Manual language file.
@@ -71,6 +82,7 @@ class Help_Controller
 	 * Data: $_GET['help'] parameter, it holds what string to display
 	 * and where to get the string from. ($helptxt or $txt)
 	 * It is accessed via ?action=quickhelp;help=?.
+	 *
 	 * @uses ManagePermissions language file, if the help starts with permissionhelp.
 	 * @uses Help template, 'popup' sub-template.
 	 */
@@ -96,8 +108,8 @@ class Help_Controller
 		// Load our template
 		loadTemplate('Help');
 
-		// Allow mods to load their own language file here
-	 	call_integration_hook('integrate_quickhelp');
+		// Allow addons to load their own language file here.
+		call_integration_hook('integrate_quickhelp');
 
 		// Set the page title to something relevant.
 		$context['page_title'] = $context['forum_name'] . ' - ' . $txt['help'];

@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Function to support online user functions
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,13 +13,11 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * Handle online users
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
@@ -25,6 +25,7 @@ if (!defined('ELKARTE'))
  * Used by the board index and SSI.
  * Also returns the membergroups of the users that are currently online.
  * (optionally) hides members that chose to hide their online presense.
+ *
  * @param array $membersOnlineOptions
  * @return array
  */
@@ -201,6 +202,7 @@ function getMembersOnlineStats($membersOnlineOptions)
 
 /**
  * Check if the number of users online is a record and store it.
+ *
  * @param int $total_users_online
  */
 function trackStatsUsersOnline($total_users_online)

@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * This file contains the functions to add, modify, remove, collapse and expand categories.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,19 +13,17 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This file contains the functions to add, modify, remove, collapse and expand categories.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Edit the position and properties of a category.
  * general function to modify the settings and position of a category.
- * used by ManageBoards.php to change the settings of a category.
+ * used by ManageBoards.controller.php to change the settings of a category.
  *
  * @param int $category_id
  * @param array $catOptions

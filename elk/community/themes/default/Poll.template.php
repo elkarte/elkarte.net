@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -22,19 +23,20 @@ function template_poll_edit()
 	global $context, $txt;
 
 	// Some javascript for adding more options.
+	echo '
+	<script><!-- // --><![CDATA[
+		var pollOptionNum = 0,
+			pollTabIndex = null,
+			pollOptionId = ', $context['last_choice_id'], ',
+			txt_option = "', $txt['option'], '",
+			form_name = \'postmodify\';
+	// ]]></script>';
+
 	if (!empty($context['form_url']))
 		echo '
-	<script><!-- // --><![CDATA[
-		var pollOptionNum = 0, pollTabIndex;
-		var pollOptionId = ', $context['last_choice_id'], ';
-		var txt_option = "', $txt['option'], '";
-		var form_name = \'postmodify\';
-	// ]]></script>
 	<div id="edit_poll">
 		<form action="', $context['form_url'], '" method="post" accept-charset="UTF-8" onsubmit="submitonce(this); smc_saveEntities(\'postmodify\', [\'question\'], \'options-\');" name="postmodify" id="postmodify">
-			<div class="cat_bar">
-				<h3 class="catbg">', $context['page_title'], '</h3>
-			</div>
+			<h2 class="category_header">', $context['page_title'], '</h2>
 			<div>
 				<div class="roundframe">';
 
@@ -112,12 +114,19 @@ function template_poll_edit()
 									', $txt['poll_results_visibility'], ':
 								</dt>
 								<dd>
-									<input type="radio" name="poll_hide" id="poll_results_anyone" value="0"', $context['poll']['hide_results'] == 0 ? ' checked="checked"' : '', ' class="input_radio" /> <label for="poll_results_anyone">', $txt['poll_results_anyone'], '</label><br />
-									<input type="radio" name="poll_hide" id="poll_results_voted" value="1"', $context['poll']['hide_results'] == 1 ? ' checked="checked"' : '', ' class="input_radio" /> <label for="poll_results_voted">', $txt['poll_results_voted'], '</label><br />
-									<input type="radio" name="poll_hide" id="poll_results_expire" value="2"', $context['poll']['hide_results'] == 2 ? ' checked="checked"' : '', empty($context['poll']['expiration']) ? ' disabled="disabled"' : '', ' class="input_radio" /> <label for="poll_results_expire">', $txt['poll_results_after'], '</label>
+									<label for="poll_results_anyone">
+										<input type="radio" name="poll_hide" id="poll_results_anyone" value="0"', $context['poll']['hide_results'] == 0 ? ' checked="checked"' : '', ' class="input_radio" /> ', $txt['poll_results_anyone'], '
+									</label><br />
+									<label for="poll_results_voted">
+										<input type="radio" name="poll_hide" id="poll_results_voted" value="1"', $context['poll']['hide_results'] == 1 ? ' checked="checked"' : '', ' class="input_radio" /> ', $txt['poll_results_voted'], '
+									</label><br />
+									<label for="poll_results_expire">
+										<input type="radio" name="poll_hide" id="poll_results_expire" value="2"', $context['poll']['hide_results'] == 2 ? ' checked="checked"' : '', empty($context['poll']['expiration']) ? ' disabled="disabled"' : '', ' class="input_radio" /> ', $txt['poll_results_after'], '
+									</label>
 								</dd>
 							</dl>
 						</fieldset>';
+
 	// If this is an edit, we can allow them to reset the vote counts.
 	if (!empty($context['is_edit']))
 		echo '
@@ -128,9 +137,7 @@ function template_poll_edit()
 
 	if (!empty($context['form_url']))
 		echo '
-					<div class="padding flow_auto">
-						<input type="submit" name="post" value="', $txt['save'], '" onclick="return submitThisOnce(this);" accesskey="s" class="button_submit" />
-					</div>
+					<input type="submit" name="post" value="', $txt['save'], '" onclick="return submitThisOnce(this);" accesskey="s" class="right_submit" />
 				</div>
 			</div>
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />

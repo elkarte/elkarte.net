@@ -11,47 +11,39 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ * 
+ */
+
+/**
+ * This is where we get information about who they want to send the topic to, etc.
  *
- * This template contains two humble sub templates - main. Its job is pretty
- * simple: it collects the information we need to actually send the topic.
- *
- * The main sub template gets shown from:
- * 	'?action=emailuser;sa=sendtopic;topic=##.##'
+ * The template gets shown from:
+ *  '?action=emailuser;sa=sendtopic;topic=##.##'
  * And should submit to:
- * 	'?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.' . $context['start']
- * It should send the following fields:
- * 	y_name: sender's name.
- * 	y_email: sender's email.
- * 	comment: any additional comment.
- * 	r_name: receiver's name.
- * 	r_email: receiver's email address.
- * 	send: this just needs to be set, as by the submit button.
- * 	sc: the session id, or $context['session_id'].
+ *  '?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.' . $context['start']
  *
- * The report sub template gets shown from:
- * 	'?action=reporttm;topic=##.##;msg=##'
- * It should submit to:
- * 	'?action=reporttm;topic=' . $context['current_topic'] . '.' . $context['start']
- * It only needs to send the following fields:
- * 	comment: an additional comment to give the moderator.
- * 	sc: the session id, or $context['session_id'].
-
-*/
-
-// This is where we get information about who they want to send the topic to, etc.
-function template_main()
+ * It should send the following fields:
+ *  y_name: sender's name.
+ *  y_email: sender's email.
+ *  comment: any additional comment.
+ *  r_name: receiver's name.
+ *  r_email: receiver's email address.
+ *  send: this just needs to be set, as by the submit button.
+ *  sc: the session id, or $context['session_id'].
+ */
+function template_send_topic()
 {
 	global $context, $settings, $txt, $scripturl;
+
+	template_show_error('sendtopic_error');
 
 	echo '
 	<div id="send_topic">
 		<form action="', $scripturl, '?action=emailuser;sa=sendtopic;topic=', $context['current_topic'], '.', $context['start'], '" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">
-					<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $context['page_title'], '
-				</h3>
-			</div>
+			<h2 class="category_header">
+				<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $context['page_title'], '
+			</h2>
 			<div class="windowbg2">
 				<div class="content">
 					<fieldset id="sender" class="send_topic">
@@ -59,19 +51,19 @@ function template_main()
 							<dt>
 								<label for="y_name"><strong>', $txt['sendtopic_sender_name'], ':</strong></label>
 							</dt>
-							<dd>
-								<input type="text" id="y_name" name="y_name" size="30" maxlength="40" value="', $context['user']['name'], '" class="input_text" />
+							<dd class="y_name">
+								<input required="required" type="text" id="y_name" name="y_name" size="30" maxlength="40" value="', $context['user']['name'], '" class="input_text" />
 							</dd>
 							<dt>
 								<label for="y_email"><strong>', $txt['sendtopic_sender_email'], ':</strong></label>
 							</dt>
-							<dd>
-								<input type="text" id="y_email" name="y_email" size="30" maxlength="50" value="', $context['user']['email'], '" class="input_text" />
+							<dd class="y_email">
+								<input required="required" type="text" id="y_email" name="y_email" size="30" maxlength="50" value="', $context['user']['email'], '" class="input_text" />
 							</dd>
 							<dt>
 								<label for="comment"><strong>', $txt['sendtopic_comment'], ':</strong></label>
 							</dt>
-							<dd>
+							<dd class="comment">
 								<input type="text" id="comment" name="comment" size="30" maxlength="100" class="input_text" />
 							</dd>
 						</dl>
@@ -81,18 +73,18 @@ function template_main()
 							<dt>
 								<label for="r_name"><strong>', $txt['sendtopic_receiver_name'], ':</strong></label>
 							</dt>
-							<dd>
-								<input type="text" id="r_name" name="r_name" size="30" maxlength="40" class="input_text" />
+							<dd class="r_name">
+								<input required="required" type="text" id="r_name" name="r_name" size="30" maxlength="40" class="input_text" />
 							</dd>
 							<dt>
 								<label for="r_email"><strong>', $txt['sendtopic_receiver_email'], ':</strong></label>
 							</dt>
-							<dd>
-								<input type="text" id="r_email" name="r_email" size="30" maxlength="50" class="input_text" />
+							<dd class="r_email">
+								<input required="required" type="text" id="r_email" name="r_email" size="30" maxlength="50" class="input_text" />
 							</dd>
 						</dl>
 					</fieldset>
-					<div class="flow_auto">
+					<div class="submitbutton">
 						<input type="submit" name="send" value="', $txt['sendtopic_send'], '" class="button_submit" />
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					</div>
@@ -102,19 +94,21 @@ function template_main()
 	</div>';
 }
 
-// Send an email to a user!
+/**
+ * Send an email to a user!
+ */
 function template_custom_email()
 {
 	global $context, $settings, $txt, $scripturl;
 
+	template_show_error('sendemail_error');
+
 	echo '
 	<div id="send_topic">
 		<form action="', $scripturl, '?action=emailuser;sa=email" method="post" accept-charset="UTF-8">
-			<div class="cat_bar">
-				<h3 class="catbg">
-					<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $context['page_title'], '
-				</h3>
-			</div>
+			<h2 class="category_header">
+				<img src="', $settings['images_url'], '/profile/email_sm.png" alt="" class="icon" />', $context['page_title'], '
+			</h2>
 			<div class="windowbg">
 				<div class="content">
 					<dl class="settings send_mail">
@@ -126,7 +120,7 @@ function template_custom_email()
 						</dd>';
 
 	// Can the user see the persons email?
-	if ($context['can_view_receipient_email'])
+	if ($context['can_view_recipient_email'])
 		echo '
 						<dt>
 							<strong>', $txt['sendtopic_receiver_email'], ':</strong>
@@ -179,8 +173,8 @@ function template_custom_email()
 							<textarea id="email_body" name="email_body" rows="10" cols="20" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 90%; min-width: 90%' : 'width: 90%') . ';"></textarea>
 						</dd>
 					</dl>
-					<hr class="hrcolor" />
-					<div class="flow_auto">
+					<hr />
+					<div class="submitbutton">
 						<input type="submit" name="send" value="', $txt['sendtopic_send'], '" class="button_submit" />
 					</div>
 				</div>
@@ -196,6 +190,16 @@ function template_custom_email()
 	</div>';
 }
 
+/**
+ * The report sub template gets shown from:
+ *  '?action=reporttm;topic=##.##;msg=##'
+ * It should submit to:
+ *  '?action=reporttm;topic=' . $context['current_topic'] . '.' . $context['start']
+ *
+ * It only needs to send the following fields:
+ *  comment: an additional comment to give the moderator.
+ *  sc: the session id, or $context['session_id'].
+ */
 function template_report()
 {
 	global $context, $txt, $scripturl;
@@ -204,16 +208,14 @@ function template_report()
 	<div id="report_topic">
 		<form action="', $scripturl, '?action=reporttm;topic=', $context['current_topic'], '.', $context['start'], '" method="post" accept-charset="UTF-8">
 			<input type="hidden" name="msg" value="' . $context['message_id'] . '" />
-				<div class="cat_bar">
-					<h3 class="catbg">', $txt['report_to_mod'], '</h3>
-				</div>
+				<h2 class="category_header">', $txt['report_to_mod'], '</h2>
 				<div class="windowbg">
 					<div class="content">';
 
 	template_show_error('report_error');
 
 	echo '
-						<p class="noticebox">', $txt['report_to_mod_func'], '</p>
+						<p class="warningbox">', $txt['report_to_mod_func'], '</p>
 						<br />
 						<dl class="settings" id="report_post">';
 
@@ -233,24 +235,24 @@ function template_report()
 								<label for="report_comment">', $txt['enter_comment'], '</label>:
 							</dt>
 							<dd>
-								<textarea type="text" id="report_comment" name="comment" style="width: 70%" rows="5">', $context['comment_body'], '</textarea>
+								<textarea type="text" id="report_comment" name="comment">', $context['comment_body'], '</textarea>
 							</dd>';
 
 	if ($context['require_verification'])
 	{
-		echo '
+		template_control_verification($context['visual_verification_id'], '
 							<dt>
-								', $txt['verification'], ':
+								' . $txt['verification'] . ':
 							</dt>
 							<dd>
-								', template_control_verification($context['visual_verification_id'], 'all'), '
-							</dd>';
+								', '
+							</dd>');
 	}
 
 	echo '
 						</dl>
-						<div class="flow_auto">
-							<input type="submit" name="save" value="', $txt['rtm10'], '" style="margin-left: 1ex;" class="button_submit" />
+						<div class="submitbutton">
+							<input type="submit" name="save" value="', $txt['rtm10'], '" class="button_submit" />
 							<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 						</div>
 					</div>

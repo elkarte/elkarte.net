@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -25,9 +26,7 @@ function template_report_type()
 	<div id="admincenter">
 		<form action="', $scripturl, '?action=admin;area=reports" method="post" accept-charset="', $context['character_set'], '">
 			<div id="generate_reports_type">
-				<div class="cat_bar">
-					<h3 class="catbg">', $txt['generate_reports_type'], '</h3>
-				</div>
+				<h2 class="category_header">', $txt['generate_reports_type'], '</h2>
 				<div class="windowbg">
 					<div class="content">
 						<dl class="generate_report">';
@@ -40,6 +39,7 @@ function template_report_type()
 								<input type="radio" id="rt_', $type['id'], '" name="rt" value="', $type['id'], '"', $type['is_first'] ? ' checked="checked"' : '', ' class="input_radio" />
 								<strong><label for="rt_', $type['id'], '">', $type['title'], '</label></strong>
 							</dt>';
+
 		if (isset($type['description']))
 			echo '
 							<dd>', $type['description'], '</dd>';
@@ -47,7 +47,7 @@ function template_report_type()
 
 	echo '
 						</dl>
-						<input type="submit" name="continue" value="', $txt['generate_reports_continue'], '" class="button_submit" />
+						<input type="submit" name="continue" value="', $txt['generate_reports_continue'], '" class="right_submit" />
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
 					</div>
 				</div>
@@ -59,15 +59,13 @@ function template_report_type()
 /**
  * This is the standard template for showing reports in.
  */
-function template_main()
+function template_generate_report()
 {
 	global $context, $txt;
 
 	echo '
 	<div id="admincenter">
-		<div class="cat_bar">
-			<h3 class="catbg">', $txt['results'], '</h3>
-		</div>
+		<h2 class="category_header">', $txt['results'], '</h2>
 		<div id="report_buttons">';
 
 	if (!empty($context['report_buttons']))
@@ -86,7 +84,7 @@ function template_main()
 		if (!empty($table['title']))
 			echo '
 			<thead>
-				<tr class="catbg">
+				<tr class="table_head">
 					<th scope="col" colspan="', $table['column_count'], '">', $table['title'], '</th>
 				</tr>
 			</thead>
@@ -102,7 +100,7 @@ function template_main()
 				<tr class="windowbg table_caption">';
 			else
 				echo '
-				<tr class="', !empty($row[0]['separator']) ? 'catbg' : ($alternate ? 'windowbg' : 'windowbg2'), '" style="vertical-align:top">';
+				<tr class="', !empty($row[0]['separator']) ? 'category_header' : ($alternate ? 'windowbg' : 'windowbg2'), '" style="vertical-align:top">';
 
 			// Now do each column.
 			$column_number = 0;
@@ -159,8 +157,8 @@ function template_print_above()
 {
 	global $context, $settings;
 
-	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"', $context['right_to_left'] ? ' dir="rtl"' : '', '>
+	echo '<!DOCTYPE html>
+<html ', $context['right_to_left'] ? 'dir="rtl"' : '', '>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $context['page_title'], '</title>
@@ -181,11 +179,11 @@ function template_print()
 	{
 		echo '
 		<div style="overflow: visible;', $table['max_width'] != 'auto' ? ' width:' . $table['max_width'] . 'px;' : '', '">
-			<table style="width:100%" class="table_padding bordercolor">';
+			<table class="table_grid">';
 
 		if (!empty($table['title']))
 			echo '
-				<tr class="catbg">
+				<tr class="table_head">
 					<td colspan="', $table['column_count'], '">
 						', $table['title'], '
 					</td>
@@ -198,7 +196,7 @@ function template_print()
 		{
 			if ($row_number == 0 && !empty($table['shading']['top']))
 				echo '
-				<tr class="titlebg" style="vertical-align:top">';
+				<tr class="secondary_header" style="vertical-align:top">';
 			else
 				echo '
 				<tr class="', $alternate ? 'windowbg' : 'windowbg2', '" style="vertical-align:top">';
@@ -211,7 +209,7 @@ function template_print()
 				if (!empty($data['separator']) && $column_number == 0)
 				{
 					echo '
-					<td colspan="', $table['column_count'], '" class="catbg">
+					<td colspan="', $table['column_count'], '" class="category_header">
 						<strong>', $data['v'], ':</strong>
 					</td>';
 					break;
@@ -220,7 +218,7 @@ function template_print()
 				// Shaded?
 				if ($column_number == 0 && !empty($table['shading']['left']))
 					echo '
-					<td class="titlebg" style="text-align:', $table['align']['shaded'], $table['width']['shaded'] != 'auto' ? ';width:' . $table['width']['shaded'] . '"' : '"', '>
+					<td class="secondary_header" style="text-align:', $table['align']['shaded'], $table['width']['shaded'] != 'auto' ? ';width:' . $table['width']['shaded'] . '"' : '"', '>
 						', $data['v'] == $table['default_value'] ? '' : ($data['v'] . (empty($data['v']) ? '' : ':')), '
 					</td>';
 				else

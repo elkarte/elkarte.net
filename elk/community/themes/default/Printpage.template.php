@@ -11,7 +11,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
 /**
@@ -24,8 +25,8 @@ function template_print_above()
 	$url_text = $scripturl . '?action=topic;sa=printpage;topic=' . $topic . '.0';
 	$url_images = $url_text . ';images';
 
-	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"', $context['right_to_left'] ? ' dir="rtl"' : '', '>
+	echo '<!DOCTYPE html>
+<html ', $context['right_to_left'] ? 'dir="rtl"' : '', '>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<meta name="robots" content="noindex" />
@@ -111,7 +112,7 @@ function template_print_above()
 	<body>
 		<div class="print_options">';
 
-	// which option is set, text or text&images
+	// Which option is set, text or text&images
 	if (isset($_REQUEST['images']))
 		echo '
 			<a href="', $url_text, '">', $txt['print_page_text'], '</a> | <strong><a href="', $url_images, '">', $txt['print_page_images'], '</a></strong>';
@@ -129,7 +130,7 @@ function template_print_above()
 /**
  * Interface for print page central view.
  */
-function template_main()
+function template_print_page()
 {
 	global $context, $txt, $scripturl, $topic;
 

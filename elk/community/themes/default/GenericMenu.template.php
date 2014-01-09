@@ -11,10 +11,13 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
+ * @version 1.0 Beta
+ *
  */
 
-// This contains the html for the side bar of the admin center, which is used for all admin pages.
+/**
+ * The sidebar menu option. Used for all admin, moderation, profile and PM pages.
+ */
 function template_generic_menu_sidebar_above()
 {
 	global $context;
@@ -22,7 +25,7 @@ function template_generic_menu_sidebar_above()
 	// This is the main table - we need it so we can keep the content to the right of it.
 	echo '
 	<div id="main_container">
-		<div id="left_admsection">';
+		<div id="menu_sidebar">';
 
 	// What one are we rendering?
 	$context['cur_menu_id'] = isset($context['cur_menu_id']) ? $context['cur_menu_id'] + 1 : 1;
@@ -34,13 +37,8 @@ function template_generic_menu_sidebar_above()
 	{
 		// Show the section header - and pump up the line spacing for readability.
 		echo '
-			<div class="adm_section">
-				<div class="cat_bar">
-					<h4 class="catbg">
-						', $section['title'], '
-					</h4>
-				</div>
-				<ul class="dropmenu left_admmenu">';
+			<h3 class="category_header">', $section['title'], '</h3>
+			<ul class="sidebar_menu">';
 
 		// For every area of this section show a link to that area (bold if it's currently selected.)
 		foreach ($section['areas'] as $i => $area)
@@ -50,25 +48,26 @@ function template_generic_menu_sidebar_above()
 				continue;
 
 			echo '
-					<li ', !empty($area['subsections']) ? 'class="subsections"' : '', ' ', ($i == $menu_context['current_area']) ? 'id="menu_current_area"' : '', '>';
+				<li class="listlevel1', !empty($area['subsections']) ? ' subsections"  aria-haspopup="true"' : '"', ' ', ($i == $menu_context['current_area']) ? 'id="menu_current_area"' : '', '>';
 
 			// Is this the current area, or just some area?
 			if ($i == $menu_context['current_area'])
 			{
 				echo '
-						<strong><a href="', isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i, $menu_context['extra_parameters'], '">', $area['label'], '</a></strong>';
+					<strong><a class="linklevel1" href="', isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i, $menu_context['extra_parameters'], '">', $area['label'], '</a></strong>';
 
 				if (empty($context['tabs']))
 					$context['tabs'] = isset($area['subsections']) ? $area['subsections'] : array();
 			}
 			else
 				echo '
-						<a href="', isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i, $menu_context['extra_parameters'], '">', $area['label'], '</a>';
-			// Is there any subsections?
+					<a class="linklevel1" href="', isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i, $menu_context['extra_parameters'], '">', $area['label'], '</a>';
+
+			// Are there any subsections?
 			if (!empty($area['subsections']))
 			{
 				echo '
-						<ul>';
+					<ul class="menulevel2">';
 
 				foreach ($area['subsections'] as $sa => $sub)
 				{
@@ -78,21 +77,21 @@ function template_generic_menu_sidebar_above()
 					$url = isset($sub['url']) ? $sub['url'] : (isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i) . ';sa=' . $sa;
 
 					echo '
-							<li>
-								<a ', !empty($sub['selected']) ? 'class="chosen" ' : '', 'href="', $url, $menu_context['extra_parameters'], '">', $sub['label'], '</a>
-							</li>';
+						<li class="listlevel2">
+							<a class="linklevel2', !empty($sub['selected']) ? ' chosen' : '', '" href="', $url, $menu_context['extra_parameters'], '">', $sub['label'], '</a>
+						</li>';
 				}
 
 				echo '
-						</ul>';
+					</ul>';
 			}
+
 			echo '
-					</li>';
+				</li>';
 		}
 
 		echo '
-				</ul>
-			</div>';
+			</ul>';
 
 		$firstSection = false;
 	}
@@ -103,11 +102,13 @@ function template_generic_menu_sidebar_above()
 		<div id="main_admsection">';
 
 	// If there are any "tabs" setup, this is the place to shown them.
-	if (!empty($context['tabs']) && empty($context['force_disable_tabs']))
+	if (empty($context['force_disable_tabs']))
 		template_generic_menu_tabs($menu_context);
 }
 
-// Part of the sidebar layer - closes off the main bit.
+/**
+ * Part of the sidebar layer - closes off the main bit.
+ */
 function template_generic_menu_sidebar_below()
 {
 	echo '
@@ -115,7 +116,9 @@ function template_generic_menu_sidebar_below()
 	</div>';
 }
 
-// This contains the html for the side bar of the admin center, which is used for all admin pages.
+/**
+ * The drop menu option. Used for all admin, moderation, profile and PM pages.
+ */
 function template_generic_menu_dropdown_above()
 {
 	global $context;
@@ -125,18 +128,15 @@ function template_generic_menu_dropdown_above()
 	$menu_context = &$context['menu_data_' . $context['cur_menu_id']];
 
 	echo '
-				<div id="admin_menu">';
-
-	echo '
-					<ul class="dropmenu" id="dropdown_menu_', $context['cur_menu_id'], '">';
+				<ul class="admin_menu" id="dropdown_menu_', $context['cur_menu_id'], '">';
 
 	// Main areas first.
 	foreach ($menu_context['sections'] as $section)
 	{
 		echo '
-						<li ', !empty($section['areas']) ? 'class="subsections"' : '', '>
-							<a class="', !empty($section['selected']) ? 'active ' : '', '" href="', $section['url'], $menu_context['extra_parameters'], '">', $section['title'] , '</a>
-							<ul>';
+					<li class="listlevel1', !empty($section['areas']) ? ' subsections" aria-haspopup="true"' : '"', '>
+						<a class="linklevel1', !empty($section['selected']) ? ' active' : '', '" href="', $section['url'], $menu_context['extra_parameters'], '">', $section['title'], '</a>
+						<ul class="menulevel2">';
 
 		// For every area of this section show a link to that area (bold if it's currently selected.)
 		// @todo Code for additional_items class was deprecated and has been removed. Suggest following up in Sources if required.
@@ -147,20 +147,20 @@ function template_generic_menu_dropdown_above()
 				continue;
 
 			echo '
-								<li', !empty($area['subsections']) ? ' class="subsections"' : '', '>';
+							<li class="listlevel2', !empty($area['subsections']) ? ' subsections" aria-haspopup="true"' : '"', '>';
 
 			echo '
-									<a ', !empty($area['selected']) ? 'class="chosen" ' : '', 'href="', (isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i), $menu_context['extra_parameters'], '">', $area['icon'], $area['label'], '</a>';
+								<a class="linklevel2', !empty($area['selected']) ? ' chosen' : '', '" href="', (isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i), $menu_context['extra_parameters'], '">', $area['icon'], $area['label'], '</a>';
 
 			// Is this the current area, or just some area?
 			if (!empty($area['selected']) && empty($context['tabs']))
-					$context['tabs'] = isset($area['subsections']) ? $area['subsections'] : array();
+				$context['tabs'] = isset($area['subsections']) ? $area['subsections'] : array();
 
 			// Are there any subsections?
 			if (!empty($area['subsections']))
 			{
 				echo '
-									<ul>';
+								<ul class="menulevel3">';
 
 				foreach ($area['subsections'] as $sa => $sub)
 				{
@@ -170,44 +170,49 @@ function template_generic_menu_dropdown_above()
 					$url = isset($sub['url']) ? $sub['url'] : (isset($area['url']) ? $area['url'] : $menu_context['base_url'] . ';area=' . $i) . ';sa=' . $sa;
 
 					echo '
-										<li ', !empty($area['subsections']) ? ' class="subsections"' : '', '>
-											<a ', !empty($sub['selected']) ? 'class="chosen" ' : '', ' href="', $url, $menu_context['extra_parameters'], '">', $sub['label'], '</a>
-										</li>';
+									<li class="listlevel3">
+										<a class="linklevel3', !empty($sub['selected']) ? ' chosen ' : '', '" href="', $url, $menu_context['extra_parameters'], '">', $sub['label'], '</a>
+									</li>';
 				}
 
 				echo '
-									</ul>';
+								</ul>';
 			}
 
 			echo '
-								</li>';
+							</li>';
 		}
+
 		echo '
-							</ul>
-						</li>';
+						</ul>
+					</li>';
 	}
 
 	echo '
-					</ul>
-				</div>';
+				</ul>';
 
 	// This is the main table - we need it so we can keep the content to the right of it.
 	echo '
 				<div id="admin_content">';
 
 	// It's possible that some pages have their own tabs they wanna force...
-// 	if (!empty($context['tabs']))
-		template_generic_menu_tabs($menu_context);
+	template_generic_menu_tabs($menu_context);
 }
 
-// Part of the admin layer - used with admin_above to close the table started in it.
+/**
+ * Part of the admin layer - used with admin_above to close the table started in it.
+ */
 function template_generic_menu_dropdown_below()
 {
 	echo '
 				</div>';
 }
 
-// Some code for showing a tabbed view.
+/**
+ * Some code for showing a tabbed view.
+ *
+ * @param array $menu_context
+ */
 function template_generic_menu_tabs(&$menu_context)
 {
 	global $context, $settings, $scripturl, $txt;
@@ -218,12 +223,7 @@ function template_generic_menu_tabs(&$menu_context)
 	if (!empty($tab_context['title']))
 	{
 		echo '
-					<div class="cat_bar">
-						<h3 class="catbg">';
-
-		// The function is in Admin.template.php, but since this template is used elsewhere too better check if the function is available
-		if (function_exists('template_admin_quick_search'))
-			template_admin_quick_search();
+					<div class="category_header">';
 
 		// Exactly how many tabs do we have?
 		if (!empty($context['tabs']))
@@ -247,7 +247,7 @@ function template_generic_menu_tabs(&$menu_context)
 				if (isset($tab['url']) && !isset($tab_context['tabs'][$id]['url']))
 					$tab_context['tabs'][$id]['url'] = $tab['url'];
 
-				// Any additional paramaters for the url?
+				// Any additional parameters for the url?
 				if (isset($tab['add_params']) && !isset($tab_context['tabs'][$id]['add_params']))
 					$tab_context['tabs'][$id]['add_params'] = $tab['add_params'];
 
@@ -275,28 +275,39 @@ function template_generic_menu_tabs(&$menu_context)
 			}
 		}
 
+		echo '
+						<h3 class="floatleft">';
+
 		// Show an icon and/or a help item?
-		if (!empty($selected_tab['icon']) || !empty($tab_context['icon']) || !empty($selected_tab['help']) || !empty($tab_context['help']))
+		if (!empty($selected_tab['icon']) || !empty($tab_context['icon']) || !empty($selected_tab['help']) || !empty($tab_context['help']) || !empty($selected_tab['class']) || !empty($tab_context['class']))
 		{
 			if (!empty($selected_tab['icon']) || !empty($tab_context['icon']))
 				echo '
 						<img src="', $settings['images_url'], '/icons/', !empty($selected_tab['icon']) ? $selected_tab['icon'] : $tab_context['icon'], '" alt="" class="icon" />';
+			elseif (!empty($selected_tab['class']) || !empty($tab_context['class']))
+				echo '
+						<span class="hdicon cat_img_', !empty($selected_tab['class']) ? $selected_tab['class'] : $tab_context['class'], '"></span>';
+
 
 			if (!empty($selected_tab['help']) || !empty($tab_context['help']))
 				echo '
-						<a href="', $scripturl, '?action=quickhelp;help=', !empty($selected_tab['help']) ? $selected_tab['help'] : $tab_context['help'], '" onclick="return reqOverlayDiv(this.href);" class="help"><img src="', $settings['images_url'], '/helptopics_hd.png" alt="', $txt['help'], '" class="icon" /></a>';
+						<a class="hdicon cat_img_helptopics help" href="', $scripturl, '?action=quickhelp;help=', !empty($selected_tab['help']) ? $selected_tab['help'] : $tab_context['help'], '" onclick="return reqOverlayDiv(this.href);" title="', $txt['help'], '"></a>';
 
 			echo '
 						', $tab_context['title'];
 		}
 		else
-		{
 			echo '
 						', $tab_context['title'];
-		}
 
 		echo '
-						</h3>
+						</h3>';
+
+		// The function is in Admin.template.php, but since this template is used elsewhere,
+		// we need to check if the function is available.
+		if (function_exists('template_admin_quick_search'))
+			template_admin_quick_search();
+		echo '
 					</div>';
 	}
 
@@ -312,32 +323,27 @@ function template_generic_menu_tabs(&$menu_context)
 	{
 		// The admin tabs.
 		echo '
-					<div id="adm_submenus">
-						<ul class="dropmenu">';
+					<ul id="adm_submenus">';
 
-			foreach ($tab_context['tabs'] as $sa => $tab)
-			{
-				if (!empty($tab['disabled']))
-					continue;
+		foreach ($tab_context['tabs'] as $sa => $tab)
+		{
+			if (!empty($tab['disabled']))
+				continue;
 
-				if (!empty($tab['is_selected']))
-				{
-					echo '
-							<li>
-								<a class="active" href="', isset($tab['url']) ? $tab['url'] : $menu_context['base_url'] . ';area=' . $menu_context['current_area'] . ';sa=' . $sa, $menu_context['extra_parameters'], isset($tab['add_params']) ? $tab['add_params'] : '', '">', $tab['label'], '</a>
-							</li>';
-				}
-				else
-					echo '
-							<li>
-								<a href="', isset($tab['url']) ? $tab['url'] : $menu_context['base_url'] . ';area=' . $menu_context['current_area'] . ';sa=' . $sa, $menu_context['extra_parameters'], isset($tab['add_params']) ? $tab['add_params'] : '', '">', $tab['label'], '</a>
-							</li>';
-			}
+			if (!empty($tab['is_selected']))
+				echo '
+						<li class="listlevel1">
+							<a class="linklevel1 active" href="', isset($tab['url']) ? $tab['url'] : $menu_context['base_url'] . ';area=' . $menu_context['current_area'] . ';sa=' . $sa, $menu_context['extra_parameters'], isset($tab['add_params']) ? $tab['add_params'] : '', '">', $tab['label'], '</a>
+						</li>';
+			else
+				echo '
+						<li class="listlevel1">
+							<a class="linklevel1" href="', isset($tab['url']) ? $tab['url'] : $menu_context['base_url'] . ';area=' . $menu_context['current_area'] . ';sa=' . $sa, $menu_context['extra_parameters'], isset($tab['add_params']) ? $tab['add_params'] : '', '">', $tab['label'], '</a>
+						</li>';
+		}
 
 		// the end of tabs
 		echo '
-						</ul>
-					</div>
-					<br class="clear" />';
+					</ul>';
 	}
 }

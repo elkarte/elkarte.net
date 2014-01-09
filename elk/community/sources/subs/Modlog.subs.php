@@ -1,6 +1,8 @@
 <?php
 
 /**
+ * Moderation log helper functions.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,18 +13,16 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * Moderation helper functions.
+ * @version 1.0 Beta
  *
  */
 
-if (!defined('ELKARTE'))
+if (!defined('ELK'))
 	die('No access...');
 
 /**
  * Get the number of mod log entries.
- * Callback for createList() in action_modlog().
+ * Callback for createList() in Modlog::action_log().
  *
  * @param $query_string
  * @param $query_params
@@ -61,14 +61,14 @@ function list_getModLogEntryCount($query_string = '', $query_params = array(), $
 
 /**
  * Gets the moderation log entries that match the specified parameters.
- * Callback for createList() in action_modlog().
+ * Callback for createList() in Modlog::action_log().
  *
- * @param $start
- * @param $items_per_page
- * @param $sort
- * @param $query_string
- * @param $query_params
- * @param $log_type
+ * @param int $start
+ * @param int $items_per_page
+ * @param string $sort
+ * @param array $query_string
+ * @param array $query_params
+ * @param int $log_type
  */
 function list_getModLogEntries($start, $items_per_page, $sort, $query_string = '', $query_params = array(), $log_type = 1)
 {
@@ -193,6 +193,7 @@ function list_getModLogEntries($start, $items_per_page, $sort, $query_string = '
 			'position' => empty($row['real_name']) && empty($row['group_name']) ? $txt['guest'] : $row['group_name'],
 			'moderator_link' => $row['id_member'] ? '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['real_name'] . '</a>' : (empty($row['real_name']) ? ($txt['guest'] . (!empty($row['extra']['member_acted']) ? ' (' . $row['extra']['member_acted'] . ')' : '')) : $row['real_name']),
 			'time' => standardTime($row['log_time']),
+			'html_time' => htmlTime($row['log_time']),
 			'timestamp' => forum_time(true, $row['log_time']),
 			'editable' => time() > $row['log_time'] + $context['hoursdisable'] * 3600,
 			'extra' => $row['extra'],
@@ -314,6 +315,7 @@ function list_getModLogEntries($start, $items_per_page, $sort, $query_string = '
 	}
 
 	// Do some formatting of the action string.
+	$callback = pregReplaceCurry('list_getModLogEntriesCallback', 3);
 	foreach ($entries as $k => $entry)
 	{
 		// Make any message info links so its easier to go find that message.
@@ -327,7 +329,7 @@ function list_getModLogEntries($start, $items_per_page, $sort, $query_string = '
 
 		if (empty($entries[$k]['action_text']))
 			$entries[$k]['action_text'] = isset($txt['modlog_ac_' . $entry['action']]) ? $txt['modlog_ac_' . $entry['action']] : $entry['action'];
-		$entries[$k]['action_text'] = preg_replace('~\{([A-Za-z\d_]+)\}~ie', 'isset($entries[$k][\'extra\'][\'$1\']) ? $entries[$k][\'extra\'][\'$1\'] : \'\'', $entries[$k]['action_text']);
+		$entries[$k]['action_text'] = preg_replace_callback('~\{([A-Za-z\d_]+)\}~i', $callback($entries, $k), $entries[$k]['action_text']);
 	}
 
 	// Back we go!
@@ -335,9 +337,23 @@ function list_getModLogEntries($start, $items_per_page, $sort, $query_string = '
 }
 
 /**
+ * Mod Log Replacment Callback.
+ *
+ * Our callback that does the actual replacment.
+ *
+ * @param string $entries
+ * @param string $key
+ * @param string $matches
+ */
+function list_getModLogEntriesCallback($entries, $key, $matches)
+{
+	return isset($entries[$key]['extra'][$matches[1]]) ? $entries[$key]['extra'][$matches[1]] : '';
+}
+
+/**
  * Delete logged actions.
  *
- * @param int $type
+ * @param int $id_log
  * @param int $time
  * @param array $delete
  */
@@ -348,11 +364,11 @@ function deleteLogAction($id_log, $time, $delete = null)
 	$db->query('', '
 		DELETE FROM {db_prefix}log_actions
 		WHERE id_log = {int:moderate_log}
-			' . isset($delete) ? 'AND id_action IN ({array_string:delete_actions})' : '' . '
+			' . (isset($delete) ? 'AND id_action IN ({array_string:delete_actions})' : '') . '
 			AND log_time < {int:twenty_four_hours_wait}',
 		array(
 			'twenty_four_hours_wait' => time() - $time * 3600,
-			'delete_actions' => array_unique($delete),
+			'delete_actions' => !is_null($delete) ? array_unique($delete) : null,
 			'moderate_log' => $id_log,
 		)
 	);
