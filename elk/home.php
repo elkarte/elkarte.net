@@ -3,11 +3,11 @@ $ssi_layers = array('html', 'body');
 $context['page_title'] = 'ElkArte Community Software';
 $context['html_headers'] = '
 	<link rel="stylesheet" href="home.css" />
-	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" />';
+	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.css" />';
 
 require_once('community/SSI.php');
-?>
 
+echo '
 			<div id="main">
 				<div class="box software">
 					<div class="what">
@@ -24,6 +24,8 @@ require_once('community/SSI.php');
 							<li>Likes</li>
 							<li>Drafts</li>
 							<li>OpenID 2.0</li>
+							<li>Drag and drop options in the admin interface</li>
+							<li>Improved Anti Spam measures</li>
 						</ul>
 						<p>and all that cool stuff you may already know from the common social networking platforms. Test ElkArte yourself on the <a href="http://www.elkarte.net/community/">community forum.</a></p>
 					</div>
@@ -39,6 +41,11 @@ require_once('community/SSI.php');
 						<p id="contribs"></p>
 						<p>Many other people have also contributed by submitting patches, constructive discussions and support.</p>
 						<p>Thanks to each and everyone of you!</p>
+					</div>
+					<div id="trans">
+						<h3>ElkArte Language Translators</h3>
+						<p>This is a list of all the awesome <a href="https://www.transifex.com/organization/elkarte/dashboard"><i class="fa fa-language"></i> Language Translators</a> who make it possible for people around the world to use ElkArte.</p>
+						<p id="translators">', require_once("./tx_contrib.php"), '</p>
 					</div>
 				</div>
 				<div class="extended">
@@ -68,9 +75,8 @@ require_once('community/SSI.php');
 					</li>
 				</ul>
 				</div>
-			</div>
+			</div>';
 
-<?php 
 addInlineJavascript('
 	$( document ).ready( function () {
 		var pulls = "";
@@ -103,4 +109,3 @@ addInlineJavascript('
 	});',true);
 
 ssi_shutdown(); 
-?>
