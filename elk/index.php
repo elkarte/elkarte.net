@@ -2,6 +2,8 @@
 $ssi_layers = array('html', 'body');
 $site_url = 'http://www.elkarte.net';
 
+require_once('community/SSI.php');
+
 $txt['what_elk'] = 'What is ElkArte?';
 $txt['what_elk_answer'] = 'ElkArte is a powerful community software, which is based on the well known Simple Machines Forum.
 <br /><br /> Many of our contributors are former SMF team members with several years of experience in developing forum software.';
@@ -71,8 +73,6 @@ $context['html_headers'] .= '
 				});
 			});
 		</script>';
-
-require_once('community/SSI.php');
 
 ?>
 		<div id="main">
