@@ -951,13 +951,8 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 					global $context;
 
 					if (!isset($disabled[\'code\']))
-					{
 						$data = str_replace("\t", "<span style=\"white-space: pre;\">\t</span>", $data);
-
-						// Recent Opera bug requiring temporary fix. &nsbp; is needed before </code> to avoid broken selection.
-						if ($context[\'browser\'][\'is_opera\'])
-							$data .= \'&nbsp;\';
-					}'),
+					'),
 				'block_level' => true,
 			),
 			array(
@@ -968,13 +963,8 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 					global $context;
 
 					if (!isset($disabled[\'code\']))
-					{
 						$data[0] = str_replace("\t", "<span style=\"white-space: pre;\">\t</span>", $data[0]);
-
-						// Recent Opera bug requiring temporary fix. &nsbp; is needed before </code> to avoid broken selection.
-						if ($context[\'browser\'][\'is_opera\'])
-							$data[0] .= \'&nbsp;\';
-					}'),
+					'),
 				'block_level' => true,
 			),
 			array(
@@ -1198,7 +1188,7 @@ function parse_bbc($message, $smileys = true, $cache_id = '', $parse_tags = arra
 				'tag' => 'quote',
 				'parameters' => array(
 					'author' => array('match' => '([^<>]{1,192}?)'),
-					'link' => array('match' => '(?:board=\d+;)?((?:topic|threadid)=[\dmsg#\./]{1,40}(?:;start=[\dmsg#\./]{1,40})?|action=profile;u=\d+)'),
+					'link' => array('match' => '(?:board=\d+;)?((?:topic|threadid)=[\dmsg#\./]{1,40}(?:;start=[\dmsg#\./]{1,40})?|msg=\d{1,40}|action=profile;u=\d+)'),
 					'date' => array('match' => '(\d+)', 'validate' => 'htmlTime'),
 				),
 				'before' => '<div class="quoteheader"><a href="' . $scripturl . '?{link}">' . $txt['quote_from'] . ': {author} ' . ($modSettings['todayMod'] == 3 ? ' - ' : $txt['search_on']) . ' {date}</a></div><blockquote>',
@@ -4352,6 +4342,12 @@ function replaceBasicActionUrl($string)
 	return str_replace($find, $replace, $string);
 }
 
+/**
+ * This function has the only task to retrieve the correct prefix to be used
+ * in responses.
+ *
+ * @return string - The prefix in the default language of the forum
+ */
 function response_prefix()
 {
 	global $language, $user_info, $txt;
