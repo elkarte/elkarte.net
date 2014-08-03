@@ -109,7 +109,7 @@ $context['html_headers'] .= '
 			<div class="buttons">
 				<span class="button_submit btn">
 					<i class="fa fa-download fa-fw"></i>
-					<a href="https://github.com/elkarte/Elkarte/releases"><?php echo $txt['download_btn']; ?></a>
+					<a class="button_submit btn" href="https://github.com/elkarte/Elkarte/releases/tag/v1.0.0-RC.2"><?php echo $txt['download_btn']; ?></a>
 				</span>
 				<span class="button_submit btn">
 					<i class="fa fa-github fa-fw"></i>
