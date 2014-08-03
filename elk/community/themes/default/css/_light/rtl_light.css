@@ -200,10 +200,13 @@ legend {
 /* just in case someone tries to use this class elsewhere. */
 .pm_indicator {
 	right: auto;
-	left: -0.5em;
+	left: -0.4em;
 	float: right;
 	border-radius: 8px 8px 0 8px;
-	box-shadow: -3px 3px 3px rgba(0,0,0,0.25);
+	box-shadow: -2px 2px 3px rgba(0,0,0,0.25), 0 -1px 0 #3d6e32 inset;
+}
+#dropdown_menu_1 .pm_indicator {
+	margin-left: 2px;
 }
 /* Admin menu icons. */
 .linklevel2>img {
@@ -240,6 +243,9 @@ legend {
 /* Color for linktree items. */
 .linktree:after {
 	box-shadow: -2px 2px 0 1px rgba(204, 204, 204, 0.9);
+}
+.linktree {
+	box-shadow: 0 2px 0 -1px #ccc, -3px 2px 0 -1px #ccc, -3px -1px 0 -1px #ccc;
 }
 
 /*	$BUTTONS	*/
@@ -553,6 +559,6 @@ legend {
 		box-shadow: -3px 3px 6px #e5e5e5;
 	}
 	.linktree:after {
-		content: "<";
+		content: "";
 	}
 }

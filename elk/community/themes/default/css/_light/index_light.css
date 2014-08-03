@@ -136,7 +136,7 @@ input[disabled].input_text, input[disabled].input_password {
 	background: #f4f4f4;
 	background-image: linear-gradient(to bottom, #fff, #e4e4e4);
 	color: #555;
-	box-shadow: 1px 1px 2px #e5e5e5;
+	box-shadow: 1px 1px 2px #e5e5e5, 0 -1px 0 #e4e4e4 inset;
 }
 
 /* Hover effects. */
@@ -167,6 +167,7 @@ input[disabled].input_text, input[disabled].input_password {
 
 /* Standard horizontal rule.. ([hr], etc.) */
 hr {
+	border-left: 0;
 	border-top: 1px solid #bbb;
 	background: #eee;
 	background-color: #eee;
@@ -590,6 +591,12 @@ div.bbc_footnotes .meaction{
 	background: #437837;
 	box-shadow: 1px 1px 1px rgba(0,0,0,0.3) inset;
 }
+.linklevel1:hover .pm_indicator {
+	box-shadow: 0 -1px 0 #3d6e32 inset;
+}
+.linklevel1.active:hover .pm_indicator {
+	border-bottom: 1px solid #2d5024;
+}
 /* Top level subsection indicators. */
 /* Comment these out if you don't want them. */
 .subsections:hover .linklevel1:after {
@@ -646,19 +653,23 @@ div.bbc_footnotes .meaction{
 /* just in case someone tries to use this class elsewhere. */
 .pm_indicator, .likes_indicator {
 	position: absolute;
-	top: -1.5em;
-	right: -0.5em;
+	top: -1.45em;
+	right: -0.4em;
 	float: left;
-	padding: 0 0.8em;
+	padding: 0 0.7em;
 	border-radius: 8px 8px 8px 0;
-	box-shadow: 3px 3px 3px rgba(0,0,0,0.25);
+	box-shadow: 2px 2px 3px rgba(0,0,0,0.25), 0 -1px 0 #3d6e32 inset;
 	font-weight: 700;
-	line-height: 1.8em;
+	line-height: 1.7em;
 	font-size: 0.929em;
 	z-index: 2;
 }
 .poster .pm_indicator {
 	font-size: 1em;
+}
+#dropdown_menu_1 .pm_indicator {
+	margin-top: 5px;
+	margin-right: 2px;
 }
 .likes_indicator {
 	font-size: .857em;
@@ -771,6 +782,10 @@ div.bbc_footnotes .meaction{
 .linktree a {
 	color: #555;
 }
+.linktree {
+	border-bottom: 1px solid #ccc;
+	box-shadow: 0 -2px 0 -1px #ccc, 3px -2px 0 -1px #ccc, 3px 1px 0 -1px #ccc;
+}
 .linktree:hover a, .linktree>a:hover,
 .linktree:last-child, .linktree:last-child>a,
 .linktree:last-child>a:hover, .linktree:last-child strong {
@@ -778,7 +793,7 @@ div.bbc_footnotes .meaction{
 	text-decoration: none;
 }
 .linktree:after {
-	box-shadow: 2px -2px 0 1px rgba(204, 204, 204, 0.9);
+	box-shadow: 2px -2px 0 1px rgba(200, 204, 204, 0.9);
 	background: #fcfcfc;
 }
 .linktree:hover, .linktree:last-child {
