@@ -47,7 +47,8 @@ $txt['view_and_remove'] = 'View and remove installed packages';
 $txt['modification_package'] = 'Add-on packages';
 $txt['avatar_package'] = 'Avatar packages';
 $txt['language_package'] = 'Language packages';
-$txt['unknown_package'] = 'Unknown packages';
+$txt['unknown_package'] = 'Other packages';
+$txt['smiley_package'] = 'Smiley packages';
 $txt['use_avatars'] = 'Use Avatars';
 $txt['add_languages'] = 'Add Language';
 $txt['list_files'] = 'List Files';
@@ -193,14 +194,8 @@ $txt['package_db_remove_table'] = 'Drop table &quot;%1$s&quot;';
 $txt['package_db_remove_column'] = 'Remove column &quot;%2$s&quot; from &quot;%1$s&quot;';
 $txt['package_db_remove_index'] = 'Remove index &quot;%1$s&quot; from &quot;%2$s&quot;';
 
-$txt['package_advanced_button'] = 'Emulation Support';
-$txt['package_advanced_options'] = 'Advanced Options';
-$txt['package_apply'] = 'Apply';
-$txt['package_emulate'] = 'Emulate Version';
 $txt['package_emulate_install'] = 'Install Emulating:';
 $txt['package_emulate_uninstall'] = 'Uninstall Emulating:';
-$txt['package_emulate_revert'] = 'Revert';
-$txt['package_emulate_desc'] = 'Sometimes packages are locked to early versions of the software but remain compatible with a newer version. Here you can choose to &quot;emulate&quot; a different version within the package manager.';
 
 // Operations.
 $txt['operation_find'] = 'Find';
@@ -262,10 +257,10 @@ $txt['package_restore_permissions_action_done'] = 'An attempt to restore the sel
 
 $txt['package_file_perms_warning'] = 'Please Note';
 $txt['package_file_perms_warning_desc'] = '
-	Be careful when changing file permissions from this section - incorrect permissions can adversely affect the operation of your forum!<br>
-	On some server configurations selecting the wrong permissions may stop the forum from operating.<br>
-	Certain directories such as <em>attachments</em> need to be writable to use that functionality.<br>
-	This functionality is mainly applicable on non-Windows based servers - it will not work as expected on Windows in regards to permission flags.<br>
+	Be careful when changing file permissions from this section - incorrect permissions can adversely affect the operation of your forum!<br />
+	On some server configurations selecting the wrong permissions may stop the forum from operating.<br />
+	Certain directories such as <em>attachments</em> need to be writable to use that functionality.<br />
+	This functionality is mainly applicable on non-Windows based servers - it will not work as expected on Windows in regards to permission flags.<br />
 	Before proceeding make sure you have an FTP client installed in case you do make an error and need to FTP into the server to remedy it.';
 
 $txt['package_confirm_view_package_content'] = 'Are you sure you want to view the package contents from this location:<br /><br />%1$s';

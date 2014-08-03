@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,11 +22,13 @@ if (!defined('ELK'))
 
 /**
  * Retrieve a list and several other statistics of the users currently online.
- * Used by the board index and SSI.
- * Also returns the membergroups of the users that are currently online.
- * (optionally) hides members that chose to hide their online presense.
  *
- * @param array $membersOnlineOptions
+ * - Used by the board index and SSI.
+ * - Also returns the membergroups of the users that are currently online.
+ * - (optionally) hides members that chose to hide their online presense.
+ *
+ * @package Members
+ * @param mixed[] $membersOnlineOptions
  * @return array
  */
 function getMembersOnlineStats($membersOnlineOptions)
@@ -44,6 +46,7 @@ function getMembersOnlineStats($membersOnlineOptions)
 		'online_color',
 		'group_name',
 	);
+
 	// Default the sorting method to 'most recent online members first'.
 	if (!isset($membersOnlineOptions['sort']))
 	{
@@ -104,7 +107,6 @@ function getMembersOnlineStats($membersOnlineOptions)
 
 			continue;
 		}
-
 		elseif (empty($row['show_online']) && empty($membersOnlineOptions['show_hidden']))
 		{
 			// Just increase the stats and don't add this hidden user to any list.
@@ -203,6 +205,7 @@ function getMembersOnlineStats($membersOnlineOptions)
 /**
  * Check if the number of users online is a record and store it.
  *
+ * @package Members
  * @param int $total_users_online
  */
 function trackStatsUsersOnline($total_users_online)

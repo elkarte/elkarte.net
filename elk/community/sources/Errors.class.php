@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -43,7 +43,7 @@ class Error_Context
 	/**
 	 * A list of all severity code from the less important to the most serious.
 	 *
-	 * @var array/mixed
+	 * @var array|mixed
 	 */
 	private $_severity_levels = array(0);
 
@@ -69,7 +69,7 @@ class Error_Context
 	 * Create and initialize an instance of the class
 	 *
 	 * @param string $id the error identifier
-	 * @param int $default_severity the default error severity level
+	 * @param int|null $default_severity the default error severity level
 	 */
 	private function __construct ($id = 'default', $default_severity = null)
 	{
@@ -91,9 +91,9 @@ class Error_Context
 	/**
 	 * Add an error to the list
 	 *
-	 * @param string $error error code
-	 * @param mixed $severity error severity
-	 * @param string $lang_file lang_file
+	 * @param string[]|string $error error code
+	 * @param string|int|null $severity error severity
+	 * @param string|null $lang_file lang_file
 	 */
 	public function addError($error, $severity = null, $lang_file = null)
 	{
@@ -107,8 +107,8 @@ class Error_Context
 				$this->_errors[$severity][$error] = $error;
 		}
 
-		if (!empty($lang_file))
-			$this->_language_files[] = $lang_file;
+		if (!empty($lang_file) && !isset($this->_language_files[$lang_file]))
+			$this->_language_files[$lang_file] = false;
 	}
 
 	/**
@@ -124,16 +124,20 @@ class Error_Context
 				$error = $error[0];
 
 			foreach ($this->_errors as $severity => $errors)
-				if (in_array($error, $errors))
+			{
+				if (array_key_exists($error, $errors))
 					unset($this->_errors[$severity][$error]);
+				if (empty($this->_errors[$severity]))
+					unset($this->_errors[$severity]);
+			}
 		}
 	}
 
 	/**
 	 * Return an array of errors of a certain severity.
-	 * @todo is it needed at all?
 	 *
-	 * @param string $severity the severity level wanted. If null returns all the errors
+	 * @todo is it needed at all?
+	 * @param string|int|null $severity the severity level wanted. If null returns all the errors
 	 */
 	public function getErrors($severity = null)
 	{
@@ -148,7 +152,7 @@ class Error_Context
 	/**
 	 * Returns if there are errors or not.
 	 *
-	 * @param string $severity the severity level wanted. If null returns all the errors
+	 * @param string|null $severity the severity level wanted. If null returns all the errors
 	 * @return bool
 	 */
 	public function hasErrors($severity = null)
@@ -198,9 +202,10 @@ class Error_Context
 
 	/**
 	 * Return an array containing the error strings
-	 * If severity is null the function returns all the errors
 	 *
-	 * @param string $severity the severity level wanted
+	 * - If severity is null the function returns all the errors
+	 *
+	 * @param string|null $severity the severity level wanted
 	 */
 	public function prepareErrors($severity = null)
 	{
@@ -209,12 +214,7 @@ class Error_Context
 		if (empty($this->_errors))
 			return array();
 
-		// Load the default error language and any other language file needed
-		// @todo: we could load these languages only if really necessary...it just needs a couple of changes
-		loadLanguage('Errors');
-		if (!empty($this->_language_files))
-			foreach ($this->_language_files as $language)
-				loadLanguage($language);
+		$this->_loadLang();
 
 		call_integration_hook('integrate_' . $this->_name . '_errors', array(&$this->_errors, &$this->_severity_levels));
 
@@ -240,11 +240,32 @@ class Error_Context
 	}
 
 	/**
+	 * Load the default error language and any other language file needed
+	 */
+	private function _loadLang()
+	{
+		// Errors is always needed
+		loadLanguage('Errors');
+
+		// Any custom one?
+		if (!empty($this->_language_files))
+			foreach ($this->_language_files as $language => $loaded)
+				if (!$loaded)
+				{
+					loadLanguage($language);
+
+					// Remember this file has been loaded already
+					$this->_language_files[$language] = true;
+				}
+	}
+
+	/**
 	 * Find and return error_context instance if it exists,
 	 * or create a new instance for $id if it didn't already exist.
 	 *
 	 * @param string $id
-	 * @param int $default_severity
+	 * @param int|null $default_severity
+	 * @return Error_Context
 	 */
 	public static function context($id = 'default', $default_severity = null)
 	{
@@ -261,7 +282,7 @@ class Error_Context
 /**
  * Class Error context for attachments
  */
-class attachment_error_context
+class Attachment_Error_Context
 {
 	/**
 	 * Holds our static instance of the class
@@ -289,7 +310,8 @@ class attachment_error_context
 
 	/**
 	 * Add attachment
-	 * Automatically activate the attachments added
+	 *
+	 * - Automatically activate the attachments added
 	 *
 	 * @param string $id
 	 * @param string $name
@@ -316,11 +338,11 @@ class attachment_error_context
 	/**
 	 * Sets the active attach (errors are "attached" to that)
 	 *
-	 * @param int $id A valid attachment, if invalid it defaults to 'generic'
+	 * @param int|null $id A valid attachment, if invalid it defaults to 'generic'
 	 */
 	public function activate($id = null)
 	{
-		if (empty($id) || isset($this->_attachs[$id]))
+		if (empty($id) || !isset($this->_attachs[$id]))
 			$this->_active_attach = 'generic';
 		else
 			$this->_active_attach = $id;
@@ -332,8 +354,7 @@ class attachment_error_context
 	 * Add an error
 	 *
 	 * @param string $error error code
-	 * @param string $attachID = 'generic'
-	 * @param string $lang_file = null
+	 * @param string|null $lang_file = null
 	 */
 	public function addError($error, $lang_file = null)
 	{
@@ -353,10 +374,23 @@ class attachment_error_context
 	}
 
 	/**
+	 * Removes an error
+	 *
+	 * @param string $error error code
+	 */
+	public function removeError($error)
+	{
+		if (empty($error))
+			return;
+
+		$this->_attachs[$this->_active_attach]['error']->removeError($error);
+	}
+
+	/**
 	 * If this error context has errors stored.
 	 *
-	 * @param string $attachID
-	 * @param int $severity the severity level
+	 * @param string|null $attachID
+	 * @param int|null $severity the severity level
 	 */
 	public function hasErrors($attachID = null, $severity = null)
 	{
@@ -383,10 +417,11 @@ class attachment_error_context
 
 	/**
 	 * Prepare the errors for display.
-	 * Return an array containing the error strings
-	 * If severity is null the function returns all the errors
 	 *
-	 * @param int $severity = null the severity level wanted
+	 * - Return an array containing the error strings
+	 * - If severity is null the function returns all the errors
+	 *
+	 * @param int|null $severity = null the severity level wanted
 	 */
 	public function prepareErrors($severity = null)
 	{
@@ -421,13 +456,13 @@ class attachment_error_context
 	}
 
 	/**
-	 * Find and return attachment_error_context instance if it exists,
+	 * Find and return Attachment_Error_Context instance if it exists,
 	 * or create it if it doesn't exist
 	 */
 	public static function context()
 	{
 		if (self::$_context === null)
-			self::$_context = new attachment_error_context();
+			self::$_context = new Attachment_Error_Context();
 
 		return self::$_context;
 	}

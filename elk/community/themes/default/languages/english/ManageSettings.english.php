@@ -1,18 +1,12 @@
 <?php
 // Version: 1.0; ManageSettings
 
-global $scripturl;
-
-$txt['modSettings_desc'] = 'This page allows you to change the settings of features and basic options in your forum.  Please see the <a href="' . $scripturl . '?action=admin;area=theme;sa=list;th=%1$s;%3$s=%2$s">theme settings</a> for more options.  Click the help icons for more information about a setting.';
+$txt['modSettings_desc'] = 'This page allows you to change the settings of features and basic options in your forum.  Please see the <a href="%1$s">theme settings</a> for more options.  Click the help icons for more information about a setting.';
 $txt['security_settings_desc'] = 'This page allows you to set options specifically related to the security and moderation of your forum, including anti-spam options.';
 $txt['modification_settings_desc'] = 'This page contains settings added by any modifications to your forum';
 
-$txt['modification_no_misc_settings'] = 'There are no addons installed that have added any settings to this area yet.';
+$txt['modification_no_misc_settings'] = 'There are no add-ons installed that have added any settings to this area yet.';
 
-$txt['pollMode'] = 'Poll mode';
-$txt['disable_polls'] = 'Disable polls';
-$txt['enable_polls'] = 'Enable polls';
-$txt['polls_as_topics'] = 'Show existing polls as topics';
 $txt['allow_guestAccess'] = 'Allow guests to browse the forum';
 $txt['userLanguage'] = 'Enable user-selectable language support';
 $txt['allow_editDisplayName'] = 'Allow users to edit their displayed name';
@@ -68,11 +62,15 @@ $txt['autoOptMaxOnline'] = 'Maximum users online when optimizing';
 $txt['autoFixDatabase'] = 'Automatically fix broken tables';
 $txt['allow_disableAnnounce'] = 'Allow users to disable announcements';
 $txt['disallow_sendBody'] = 'Don\'t allow post text in notifications';
-$txt['enable_contactform'] = 'Enable contact form';
 $txt['jquery_source'] = 'Source for the jQuery Library';
 $txt['jquery_local'] = 'Local';
 $txt['jquery_cdn'] = 'Google CDN';
 $txt['jquery_auto'] = 'Auto';
+$txt['jquery_version'] = 'Enter the version level to use eg 1.11.1';
+$txt['jquery_default'] = 'Specify a version of jQuery to use with ElkArte';
+$txt['jqueryui_default'] = 'Specify a version of jQueryUI to use with ElkArte';
+$txt['jquery_custom_after'] = 'Local copy looks for jquery-<strong>X.XX.X</strong>.min.js';
+$txt['jqueryui_custom_after'] = 'Local copy looks for jquery-ui-<strong>X.XX.X</strong>.min.js';
 $txt['minify_css_js'] = 'Minify Javascript and CSS files';
 $txt['enable_contactform'] = 'Enable contact form';
 $txt['contact_form_disabled'] = 'Disabled';
@@ -80,6 +78,8 @@ $txt['contact_form_registration'] = 'Show only at registration';
 $txt['contact_form_menu'] = 'Show in the menu';
 $txt['queryless_urls'] = 'Search engine friendly URLs';
 $txt['queryless_urls_note'] = 'Apache/Lighttpd only';
+$txt['queryless_urls_work'] = 'This feature will work on your server.';
+$txt['queryless_urls_notwork'] = 'This feature will not work on your server.';
 $txt['enableReportPM'] = 'Enable reporting of personal messages';
 $txt['antispam_PM'] = 'Personal Message Limits';
 $txt['max_pm_recipients'] = 'Maximum number of recipients allowed in a personal message';
@@ -91,8 +91,7 @@ $txt['todayMod'] = 'Enable shorthand date display';
 $txt['today_disabled'] = 'Disabled';
 $txt['today_only'] = 'Only Today';
 $txt['yesterday_today'] = 'Today &amp; Yesterday';
-$txt['relative_time'] = 'Use relative times';
-$txt['topbottomEnable'] = 'Enable Go Up/Go Down buttons';
+$txt['relative_time'] = 'Relative Time';
 $txt['onlineEnable'] = 'Show online/offline in posts and PMs';
 $txt['enableVBStyleLogin'] = 'Show a quick login on every page';
 $txt['defaultMaxMembers'] = 'Members per page in member list';
@@ -100,7 +99,6 @@ $txt['displayMemberNames'] = 'Display the member\'s name instead of "My Account"
 $txt['timeLoadPageEnable'] = 'Display time taken to create every page';
 $txt['disableHostnameLookup'] = 'Disable hostname lookups';
 $txt['who_enabled'] = 'Enable who\'s online list';
-$txt['make_email_viewable'] = 'Allow viewable email addresses';
 $txt['meta_keywords'] = 'Meta keywords associated with forum';
 $txt['meta_keywords_note'] = 'For search engines. Leave blank for default.';
 $txt['settings_error'] = 'Warning: Updating of Settings.php failed, the settings cannot be saved.';
@@ -111,6 +109,7 @@ $txt['karma_options'] = 'Disable karma|Enable karma total|Enable karma positive/
 $txt['karmaMinPosts'] = 'Set the minimum posts needed to modify karma';
 $txt['karmaWaitTime'] = 'Set wait time in hours';
 $txt['karmaTimeRestrictAdmins'] = 'Restrict administrators to wait time';
+$txt['karmaDisableSmite'] = 'Disable the ability for memebers to smite';
 $txt['karmaLabel'] = 'Karma label';
 $txt['karmaApplaudLabel'] = 'Karma applaud label';
 $txt['karmaSmiteLabel'] = 'Karma smite label';
@@ -168,7 +167,7 @@ $txt['loadavg_disabled_conf'] = '<span class="error">Load balancing support is d
 
 $txt['setting_password_strength'] = 'Required strength for user passwords';
 $txt['setting_password_strength_low'] = 'Low - 4 character minimum';
-$txt['setting_password_strength_medium'] = 'Medium - cannot contain username';
+$txt['setting_password_strength_medium'] = 'Medium - cannot contain user name';
 $txt['setting_password_strength_high'] = 'High - mixture of different characters';
 $txt['setting_enable_password_conversion'] = 'Allow password hash conversion';
 
@@ -200,7 +199,6 @@ $txt['badbehavior_httpbl_threat_desc'] = '(default 25)';
 $txt['badbehavior_httpbl_maxage'] = 'http:BL Maximum Age';
 $txt['badbehavior_httpbl_maxage_desc'] = '(default 30)';
 $txt['badbehavior_eucookie'] = 'Check to enable EU Cookie Handling';
-$txt['badbehavior_display_stats'] = 'Check to display bad behavior in the page footer';
 $txt['badbehavior_reverse_proxy'] = 'Enable Reverse Proxy';
 $txt['badbehavior_reverse_proxy_header'] = 'Reverse Proxy Header';
 $txt['badbehavior_reverse_proxy_header_desc'] = '(default X-Forwarded-For)';
@@ -213,16 +211,16 @@ $txt['badbehavior_postcount_wl_desc'] = '(0 to disable)';
 $txt['badbehavior_ip_wl'] = 'Whitelist by IP address';
 $txt['badbehavior_ip_wl_desc'] = 'IP Address (CIDR Format 127.0.0.1 or 127.0.0.0/24)';
 $txt['badbehavior_ip_wl_add'] = 'Add another IP address';
-$txt['badbehavior_useragent_wl'] = 'Whitelist by user agent string';
+$txt['badbehavior_useragent_wl'] = 'Whitelist by User Agent string';
 $txt['badbehavior_useragent_wl_desc'] = 'Example: Mozilla/4.0 (It\'s me, let me in)';
-$txt['badbehavior_useragent_wl_add'] = 'Add another Useragent string';
+$txt['badbehavior_useragent_wl_add'] = 'Add another User Agent string';
 $txt['badbehavior_url_wl'] = 'Whitelist by URL';
 $txt['badbehavior_url_wl_desc'] = 'Example: /subscriptions.php';
 $txt['badbehavior_url_wl_add'] = 'Add another URL';
 $txt['badbehavior_wl_comment'] = 'Comment';
 
 $txt['configure_emptyfield'] = 'Verification Empty Field';
-$txt['configure_emptyfield_desc'] = '<span class="smalltext">Below you can enable the empty field verification method.  This will insert a hidden field that should stay empty, this is used to trick spam bots in to erroneosly posting information. Although this can be used alone, its best enabled with the CAPTCHA verifcation.</span>';
+$txt['configure_emptyfield_desc'] = '<span class="smalltext">Below you can enable the empty field verification method.  This will insert a hidden field that should stay empty which will be used to trick spam bots into erroneously posting information. Although this can be used alone, it\'s best enabled with the CAPTCHA verification.</span>';
 $txt['enable_emptyfield'] = 'Enable empty field verification';
 $txt['configure_verification_means'] = 'Configure Verification Methods';
 $txt['setting_qa_verification_number'] = 'Number of verification questions user must answer';
@@ -248,6 +246,7 @@ $txt['setup_verification_add_more_answers'] = 'Add another answer';
 
 $txt['moderation_settings'] = 'Moderation Settings';
 $txt['setting_warning_enable'] = 'Enable User Warning System';
+$txt['warning_enable'] = '<strong>User Warning System</strong><br />This feature enables members of the admin and moderation team to issue warnings to members - and to use a members warning level to determine the actions available to them on the forum. Upon enabling this feature a permission will be available within the permissions section to define which groups may assign warnings to members. Warning levels can be adjusted from a member\'s profile.';
 $txt['setting_warning_watch'] = 'Warning level for user watch';
 $txt['setting_warning_watch_note'] = 'The user warning level after which a user watch is put in place - 0 to disable.';
 $txt['setting_warning_moderate'] = 'Warning level for post moderation';
@@ -266,7 +265,7 @@ $txt['setting_warning_show_all'] = 'All Users';
 
 $txt['signature_settings'] = 'Signature Settings';
 $txt['signature_settings_desc'] = 'Use the settings on this page to decide how member signatures should be treated.';
-$txt['signature_settings_warning'] = 'Note that settings are not applied to existing signatures by default.<br /><a class="button_submit" href="' . $scripturl . '?action=admin;area=featuresettings;sa=sig;apply;%2$s=%1$s">Run the process now</a>';
+$txt['signature_settings_warning'] = 'Note that settings are not applied to existing signatures by default.<br /><a class="button_submit" href="%1$s">Run the process now</a>';
 $txt['signature_settings_applied'] = 'The updated rules have been applied to the existing signatures.';
 $txt['signature_enable'] = 'Enable signatures';
 $txt['signature_max_length'] = 'Maximum allowed characters';
@@ -280,7 +279,7 @@ $txt['signature_max_image_height'] = 'Maximum height of signature images (pixels
 $txt['signature_max_font_size'] = 'Maximum font size allowed in signatures (pixels)';
 $txt['signature_bbc'] = 'Enabled BBC tags';
 
-$txt['groups_pm_send'] = 'Membergroups allowed to send personal messages';
+$txt['groups_pm_send'] = 'Member groups allowed to send personal messages';
 $txt['pm_posts_verification'] = 'Post count under which users must pass verification when sending personal messages';
 $txt['pm_posts_verification_note'] = '(0 for no limit, admins are exempt)';
 $txt['pm_posts_per_hour'] = 'Number of personal messages a user may send in an hour';
@@ -295,8 +294,13 @@ $txt['custom_profile_fieldtype'] = 'Field Type';
 $txt['custom_profile_make_new'] = 'New Field';
 $txt['custom_profile_none'] = 'You have not created any custom profile fields yet!';
 $txt['custom_profile_icon'] = 'Icon';
+$txt['custom_profile_sort'] = 'To change the order of the custom fields, simply drag and drop it to the location you want.';
 
 $txt['custom_profile_type_text'] = 'Text';
+$txt['custom_profile_type_url'] = 'URL';
+$txt['custom_profile_type_date'] = 'Date';
+$txt['custom_profile_type_email'] = 'Email';
+$txt['custom_profile_type_color'] = 'Color';
 $txt['custom_profile_type_textarea'] = 'Large Text';
 $txt['custom_profile_type_select'] = 'Select Box';
 $txt['custom_profile_type_radio'] = 'Radio Button';
@@ -318,7 +322,7 @@ $txt['custom_edit_registration_disable'] = 'No';
 $txt['custom_edit_registration_allow'] = 'Yes';
 $txt['custom_edit_registration_require'] = 'Yes, and require entry';
 $txt['custom_edit_display'] = 'Show on Topic View';
-$txt['custom_edit_memberlist'] = 'Show on Memberlist View';
+$txt['custom_edit_memberlist'] = 'Show on Member List View';
 $txt['custom_edit_picktype'] = 'Field Type';
 
 $txt['custom_edit_max_length'] = 'Maximum Length';
@@ -337,17 +341,17 @@ $txt['custom_edit_privacy'] = 'Privacy';
 $txt['custom_edit_privacy_desc'] = 'Who can see and edit this field.';
 $txt['custom_edit_privacy_all'] = 'Users can see this field; owner can edit it';
 $txt['custom_edit_privacy_see'] = 'Users can see this field; only admins can edit it';
-$txt['custom_edit_privacy_owner'] = 'Users cannot see this field; owner and admins can edit it.';
+$txt['custom_edit_privacy_owner'] = 'Users cannot see this field; owner and admins can edit it';
 $txt['custom_edit_privacy_none'] = 'This field is only visible to admins';
 $txt['custom_edit_can_search'] = 'Searchable';
-$txt['custom_edit_can_search_desc'] = 'Can this field be searched from the members list.';
+$txt['custom_edit_can_search_desc'] = 'Can this field be searched from the members list?';
 $txt['custom_edit_mask'] = 'Input Mask';
 $txt['custom_edit_mask_desc'] = 'For text fields an input mask can be selected to validate the data.';
 $txt['custom_edit_mask_email'] = 'Valid Email';
 $txt['custom_edit_mask_number'] = 'Numeric';
 $txt['custom_edit_mask_nohtml'] = 'No HTML';
 $txt['custom_edit_mask_regex'] = 'Regex (Advanced)';
-$txt['custom_edit_enclose'] = 'Show Enclosed Within Text (Optional)';
+$txt['custom_edit_enclose'] = 'Wrap user input in text (Optional)';
 $txt['custom_edit_enclose_desc'] = 'We <strong>strongly</strong> recommend to use an input mask to validate the input supplied by the user.';
 
 $txt['custom_edit_placement'] = 'Choose Placement';
@@ -360,13 +364,13 @@ $txt['custom_profile_placement_withicons'] = 'With Icons';
 $txt['custom_profile_placement_abovesignature'] = 'Above Signature';
 
 // Use numeric entities in the string below!
-$txt['custom_edit_delete_sure'] = 'Are you sure you wish to delete this field - all related user data will be lost!';
+$txt['custom_edit_delete_sure'] = 'Are you sure you wish to delete this field? All related user data will be lost!';
 
 $txt['standard_profile_title'] = 'Standard Profile Fields';
 $txt['standard_profile_field'] = 'Field';
 
 $txt['core_settings_welcome_msg'] = 'Welcome to Your New Forum';
-$txt['core_settings_welcome_msg_desc'] = 'To get you started we suggest you select which of ElkArte\'s core features you want to enable. We\'d recommend only enabling with those features you need!';
+$txt['core_settings_welcome_msg_desc'] = 'To get you started we suggest you select which of ElkArte\'s core features you want to enable. We\'d recommend only enabling those features you actually need.'; // don't scream from the beginning :P
 $txt['core_settings_item_cd'] = 'Calendar';
 $txt['core_settings_item_cd_desc'] = 'Enabling this feature will open up a selection of options to enable your users to view the calendar, add and review events, see users birthdates on a calendar and much, much more.';
 $txt['core_settings_item_dr'] = 'Drafts';
@@ -378,17 +382,15 @@ $txt['core_settings_item_ih_desc'] = 'This feature allows you to enable or disab
 $txt['core_settings_item_k'] = 'Karma';
 $txt['core_settings_item_k_desc'] = 'Karma is a feature that shows the popularity of a member. Members, if allowed, can \'applaud\' or \'smite\' other members, which is how their popularity is calculated.';
 $txt['core_settings_item_pe'] = 'Post by Email Management';
-$txt['core_settings_item_pe_desc'] = 'This will allow users of your forum to reply to emailed notifications and personal messages and have them post directly as a reply to the appropriate thread or PM.  This provides a familiar mailist feel.  Use of this functionality will require additional setup steps on your hosting provider.';
+$txt['core_settings_item_pe_desc'] = 'This will allow users of your forum to reply to emailed notifications and personal messages and have them post directly as a reply to the appropriate thread or PM.  This provides a familiar mailing list feeling.  Use of this functionality will require additional setup steps on your hosting provider.';
 $txt['core_settings_item_l'] = 'Likes';
 $txt['core_settings_item_l_desc'] = 'Likes is a feature that allows members to like a post to show their approval and popularity of the message content.';
-$txt['core_settings_item_pe'] = 'Post by Email Management';
-$txt['core_settings_item_pe_desc'] = 'This will allow users of your forum to reply to emailed notifications and personal messages and have them post directly as a reply to the appropriate thread or PM.  This provides a familiar mailist feel.  Use of this functionality will require additional setup steps on your hosting provider.';
 $txt['core_settings_item_ml'] = 'Moderation, Administration and User Logs';
 $txt['core_settings_item_ml_desc'] = 'Enable the moderation and administration logs to keep an audit trail of all the key actions taken on your forum. Also allows forum moderators to view a history of key changes a user makes to their profile.';
 $txt['core_settings_item_pm'] = 'Post Moderation';
 $txt['core_settings_item_pm_desc'] = 'Post moderation enables you to select groups and boards within which posts must be approved before they become public. Upon enabling this feature be sure to visit the permission section to set up the relevant permissions.';
 $txt['core_settings_item_ps'] = 'Paid Subscriptions';
-$txt['core_settings_item_ps_desc'] = 'Paid subscriptions allow users to pay for subscriptions to change membergroups within the forum and thus change their access rights.';
+$txt['core_settings_item_ps_desc'] = 'Paid subscriptions allow users to pay for subscriptions to change member groups within the forum and thus change their access rights.';
 $txt['core_settings_item_rg'] = 'Report Generation';
 $txt['core_settings_item_rg_desc'] = 'This administration feature allows the generation of reports (which can be printed) to present your current forum setup in an easy to view manner - particularly useful for large forums.';
 $txt['core_settings_item_sp'] = 'Search Engine Tracking';
@@ -403,7 +405,6 @@ $txt['core_settings_disabled'] = 'Disabled';
 $txt['languages_lang_name'] = 'Language Name';
 $txt['languages_locale'] = 'Locale';
 $txt['languages_default'] = 'Default';
-$txt['languages_character_set'] = 'Character Set';
 $txt['languages_users'] = 'Users';
 $txt['language_settings_writable'] = 'Warning: Settings.php is not writable so the default language setting cannot be saved.';
 $txt['edit_languages'] = 'Edit Languages';
@@ -437,9 +438,9 @@ $txt['languages_download'] = 'Download Language Pack';
 $txt['languages_download_note'] = 'This page lists all the files that are contained within the language pack and some useful information about each one. All files that have their associated check box marked will be copied.';
 $txt['languages_download_info'] = '<strong>Note:</strong>
 	<ul class="normallist">
-		<li>Files which have the status &quot;Not Writable&quot; means the system will not be able to copy this file to the directory at the present and you must make the destination writable either using an FTP client or by filling in your details at the bottom of the page.</li>
-		<li>The Version information for a file displays the last forum version which it was updated for. If it is indicated in green then this is a newer version than you have at current. If amber this indicates it\'s the same version number as at current, red indicates you have a newer version installed than contained in the pack.</li>
-		<li>Where a file already exists on your forum the &quot;Already Exists&quot; column will have one of two values. &quot;Identical&quot; indicates that the file already exists in an identical form and need not be overwritten. &quot;Different&quot; means that the contents vary in some way and overwriting is probably the optimum solution.</li>
+		<li>The file status &quot;Not Writable&quot; means the system will not be able to copy this file to the directory at the present and you must make the destination writable either using an FTP client or by filling in your details at the bottom of the page.</li>
+		<li>The Version information for a file displays the last forum version which it was updated for. If it is indicated in green then this is a newer version than you have at current, amber indicates it\'s the same version number as at current, red indicates you have a newer version installed than contained in the pack.</li>
+		<li>In case a file already exists on your forum, the &quot;Already Exists&quot; column will have one of two values: &quot;Identical&quot; indicates that the file already exists in an identical form and does not need to be overwritten. &quot;Different&quot; means that the contents vary in some way and overwriting is probably the optimum solution.</li>
 	</ul>';
 
 $txt['languages_download_main_files'] = 'Primary Files';

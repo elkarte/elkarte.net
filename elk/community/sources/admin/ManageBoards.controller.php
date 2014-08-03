@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 /**
  * This class controls execution for actions in the manage boards area
  * of the admin panel.
+ *
+ * @package Boards
  */
 class ManageBoards_Controller extends Action_Controller
 {
@@ -33,10 +35,12 @@ class ManageBoards_Controller extends Action_Controller
 	protected $_boardSettings;
 
 	/**
-	 * The main dispatcher; doesn't do anything, just delegates.
-	 * This is the main entry point for all the manageboards admin screens.
-	 * Called by ?action=admin;area=manageboards.
-	 * It checks the permissions, based on the sub-action, and calls a function based on the sub-action.
+	 * The main dispatcher; delegates.
+	 *
+	 * What it does:
+	 * - This is the main entry point for all the manageboards admin screens.
+	 * - Called by ?action=admin;area=manageboards.
+	 * - It checks the permissions, based on the sub-action, and calls a function based on the sub-action.
 	 *
 	 * @uses ManageBoards language file.
 	 */
@@ -48,7 +52,7 @@ class ManageBoards_Controller extends Action_Controller
 		loadLanguage('ManageBoards');
 
 		// We're working with them settings here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Format: 'sub-action' => array('controller', 'function', 'permission'=>'need')
 		$subActions = array(
@@ -90,8 +94,6 @@ class ManageBoards_Controller extends Action_Controller
 				'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_boards', array(&$subActions));
-
 		// Create the tabs for the template.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
 			'title' => $txt['boards_and_cats'],
@@ -120,9 +122,11 @@ class ManageBoards_Controller extends Action_Controller
 
 	/**
 	 * The main control panel thing, the screen showing all boards and categories.
-	 * Called by ?action=admin;area=manageboards or ?action=admin;area=manageboards;sa=move.
-	 * Requires manage_boards permission.
-	 * It also handles the interface for moving boards.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=manageboards or ?action=admin;area=manageboards;sa=move.
+	 * - Requires manage_boards permission.
+	 * - It also handles the interface for moving boards.
 	 *
 	 * @uses ManageBoards template, main sub-template.
 	 */
@@ -263,11 +267,12 @@ class ManageBoards_Controller extends Action_Controller
 
 	/**
 	 * Modify a specific category.
-	 * (screen for editing and repositioning a category.)
-	 * Also used to show the confirm deletion of category screen
-	 * (sub-template confirm_category_delete).
-	 * Called by ?action=admin;area=manageboards;sa=cat
-	 * Requires manage_boards permission.
+	 *
+	 * What it does:
+	 * - screen for editing and repositioning a category.
+	 * - Also used to show the confirm deletion of category screen
+	 * - Called by ?action=admin;area=manageboards;sa=cat
+	 * - Requires manage_boards permission.
 	 *
 	 * @uses ManageBoards template, modify_category sub-template.
 	 */
@@ -357,11 +362,13 @@ class ManageBoards_Controller extends Action_Controller
 
 	/**
 	 * Function for handling a submitted form saving the category.
-	 * (complete the modifications to a specific category.)
-	 * It also handles deletion of a category.
-	 * It requires manage_boards permission.
-	 * Called by ?action=admin;area=manageboards;sa=cat2
-	 * Redirects to ?action=admin;area=manageboards.
+	 *
+	 * What it does:
+	 * - complete the modifications to a specific category.
+	 * - It also handles deletion of a category.
+	 * - It requires manage_boards permission.
+	 * - Called by ?action=admin;area=manageboards;sa=cat2
+	 * - Redirects to ?action=admin;area=manageboards.
 	 */
 	public function action_cat2()
 	{
@@ -419,11 +426,12 @@ class ManageBoards_Controller extends Action_Controller
 
 	/**
 	 * Modify a specific board...
-	 * screen for editing and repositioning a board.
-	 * called by ?action=admin;area=manageboards;sa=board
-	 * also used to show the confirm deletion of category screen (sub-template confirm_board_delete).
 	 *
-	 * requires manage_boards permission.
+	 * What it doews
+	 * - screen for editing and repositioning a board.
+	 * - called by ?action=admin;area=manageboards;sa=board
+	 * - also used to show the confirm deletion of category screen (sub-template confirm_board_delete).
+	 * - requires manage_boards permission.
 	 *
 	 * @uses the modify_board sub-template of the ManageBoards template.
 	 * @uses ManagePermissions language
@@ -543,7 +551,7 @@ class ManageBoards_Controller extends Action_Controller
 			}
 		}
 
-		// Are there any places to move child boards to in the case where we are confirming a delete?
+		// Are there any places to move sub-boards to in the case where we are confirming a delete?
 		if (!empty($_REQUEST['boardid']))
 		{
 			$context['can_move_children'] = false;
@@ -590,17 +598,19 @@ class ManageBoards_Controller extends Action_Controller
 
 	/**
 	 * Make changes to/delete a board.
-	 * (function for handling a submitted form saving the board.)
-	 * It also handles deletion of a board.
-	 * Called by ?action=admin;area=manageboards;sa=board2
-	 * Redirects to ?action=admin;area=manageboards.
-	 * It requires manage_boards permission.
+	 *
+	 * What it does:
+	 * - function for handling a submitted form saving the board.
+	 * - It also handles deletion of a board.
+	 * - Called by ?action=admin;area=manageboards;sa=board2
+	 * - Redirects to ?action=admin;area=manageboards.
+	 * - It requires manage_boards permission.
 	 */
 	public function action_board2()
 	{
 		global $context;
 
-		$_POST['boardid'] = (int) $_POST['boardid'];
+		$board_id = isset($_POST['boardid']) ? (int) $_POST['boardid'] : 0;
 		checkSession();
 		validateToken('admin-be-' . $_REQUEST['boardid']);
 
@@ -667,9 +677,9 @@ class ManageBoards_Controller extends Action_Controller
 			$boardOptions['inherit_permissions'] = $_POST['profile'] == -1;
 
 			// We need to know what used to be case in terms of redirection.
-			if (!empty($_POST['boardid']))
+			if (!empty($board_id))
 			{
-				$properties = getBoardProperties($_POST['boardid']);
+				$properties = getBoardProperties($board_id);
 
 				// If we're turning redirection on check the board doesn't have posts in it - if it does don't make it a redirection board.
 				if ($boardOptions['redirect'] && empty($properties['oldRedirect']) && $properties['numPosts'])
@@ -682,6 +692,8 @@ class ManageBoards_Controller extends Action_Controller
 					$boardOptions['num_posts'] = 0;
 
 			}
+
+			call_integration_hook('integrate_save_board', array($board_id, &$boardOptions));
 
 			// Create a new board...
 			if (isset($_POST['add']))
@@ -696,7 +708,7 @@ class ManageBoards_Controller extends Action_Controller
 			}
 			// ...or update an existing board.
 			else
-				modifyBoard($_POST['boardid'], $boardOptions);
+				modifyBoard($board_id, $boardOptions);
 		}
 		elseif (isset($_POST['delete']) && !isset($_POST['confirmation']) && !isset($_POST['no_children']))
 		{
@@ -705,16 +717,16 @@ class ManageBoards_Controller extends Action_Controller
 		}
 		elseif (isset($_POST['delete']))
 		{
-			// First off - check if we are moving all the current child boards first - before we start deleting!
+			// First off - check if we are moving all the current sub-boards first - before we start deleting!
 			if (isset($_POST['delete_action']) && $_POST['delete_action'] == 1)
 			{
 				if (empty($_POST['board_to']))
 					fatal_lang_error('mboards_delete_board_error');
 
-				deleteBoards(array($_POST['boardid']), (int) $_POST['board_to']);
+				deleteBoards(array($board_id), (int) $_POST['board_to']);
 			}
 			else
-				deleteBoards(array($_POST['boardid']), 0);
+				deleteBoards(array($board_id), 0);
 		}
 
 		if (isset($_REQUEST['rid']) && $_REQUEST['rid'] == 'permissions')
@@ -738,7 +750,9 @@ class ManageBoards_Controller extends Action_Controller
 		// Get all settings
 		$config_vars = $this->_boardSettings->settings();
 
-		call_integration_hook('integrate_modify_board_settings');
+		// Add some javascript stuff for the recycle box.
+		addInlineJavascript('
+				document.getElementById("recycle_board").disabled = !document.getElementById("recycle_enable").checked;', true);
 
 		// Don't let guests have these permissions.
 		$context['post_url'] = $scripturl . '?action=admin;area=manageboards;save;sa=settings';
@@ -748,10 +762,6 @@ class ManageBoards_Controller extends Action_Controller
 		loadTemplate('ManageBoards');
 		$context['page_title'] = $txt['boards_and_cats'] . ' - ' . $txt['settings'];
 		$context['sub_template'] = 'show_settings';
-
-		// Add some javascript stuff for the recycle box.
-		addInlineJavascript('
-				document.getElementById("recycle_board").disabled = !document.getElementById("recycle_enable").checked;', true);
 
 		// Warn the admin against selecting the recycle topic without selecting a board.
 		$context['force_form_onsubmit'] = 'if(document.getElementById(\'recycle_enable\').checked && document.getElementById(\'recycle_board\').value == 0) { return confirm(\'' . $txt['recycle_board_unselected_notice'] . '\');} return true;';
@@ -820,7 +830,8 @@ class ManageBoards_Controller extends Action_Controller
 				array('check', 'deny_boards_access'),
 		);
 
-		call_integration_hook('integrate_boards_settings', array(&$config_vars));
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_board_settings', array(&$config_vars));
 
 		return $config_vars;
 	}

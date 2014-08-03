@@ -16,7 +16,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -25,6 +25,8 @@ if (!defined('ELK'))
 
 /**
  * Check and create a directory automatically.
+ *
+ * @package Attachments
  */
 function automanage_attachments_check_directory()
 {
@@ -131,9 +133,12 @@ function automanage_attachments_check_directory()
 
 /**
  * Creates a directory as defined by the admin attach options
- * Attempts to make the directory writable
- * Places an .htaccess in new directories for security
  *
+ * What it does:
+ * - Attempts to make the directory writable
+ * - Places an .htaccess in new directories for security
+ *
+ * @package Attachments
  * @param string $updir
  */
 function automanage_attachments_create_directory($updir)
@@ -143,14 +148,14 @@ function automanage_attachments_create_directory($updir)
 	$tree = get_directory_tree_elements($updir);
 	$count = count($tree);
 
-	$directory = attachments_init_dir($tree, $count);
+	$directory = !empty($tree) ? attachments_init_dir($tree, $count) : false;
 	if ($directory === false)
 	{
 		// Maybe it's just the folder name
 		$tree = get_directory_tree_elements(BOARDDIR . DIRECTORY_SEPARATOR . $updir);
 		$count = count($tree);
 
-		$directory = attachments_init_dir($tree, $count);
+		$directory = !empty($tree) ? attachments_init_dir($tree, $count) : false;
 		if ($directory === false)
 			return false;
 	}
@@ -217,8 +222,12 @@ function automanage_attachments_create_directory($updir)
 
 /**
  * Determines the current base directory and attachment directory
- * Increments the above directory to the next availble slot
- * Uses automanage_attachments_create_directory to create the incremental directory
+ *
+ * What it does:
+ * - Increments the above directory to the next availble slot
+ * - Uses automanage_attachments_create_directory to create the incremental directory
+ *
+ * @package Attachments
  */
 function automanage_attachments_by_space()
 {
@@ -270,8 +279,9 @@ function automanage_attachments_by_space()
 /**
  * Finds the current directory tree for the supplied base directory
  *
+ * @package Attachments
  * @param string $directory
- * @return boolean on fail else array of directory names
+ * @return string[]|boolean on fail else array of directory names
  */
 function get_directory_tree_elements($directory)
 {
@@ -297,9 +307,12 @@ function get_directory_tree_elements($directory)
 
 /**
  * Helper function for automanage_attachments_create_directory
- * Gets the directory w/o drive letter for windows
  *
- * @param array $tree
+ * What it does:
+ * - Gets the directory w/o drive letter for windows
+ *
+ * @package Attachments
+ * @param string[] $tree
  * @param int $count
  */
 function attachments_init_dir(&$tree, &$count)
@@ -325,17 +338,20 @@ function attachments_init_dir(&$tree, &$count)
 
 /**
  * Handles the actual saving of attachments to a directory.
- * Loops through $_FILES['attachment'] array and saves each file to the current attachments folder.
- * Validates the save location actually exists.
  *
- * @param $id_msg = null id of the message with attachments, if any.
+ * What it does:
+ * - Loops through $_FILES['attachment'] array and saves each file to the current attachments folder.
+ * - Validates the save location actually exists.
+ *
+ * @package Attachments
+ * @param int|null $id_msg = null or id of the message with attachments, if any.
  *                  If null, this is an upload in progress for a new post.
  */
 function processAttachments($id_msg = null)
 {
 	global $context, $modSettings, $txt, $user_info, $ignore_temp, $topic, $board;
 
-	$attach_errors = attachment_Error_Context::context('attachment', 1);
+	$attach_errors = Attachment_Error_Context::context();
 
 	// Make sure we're uploading to the right place.
 	if (!empty($modSettings['automanage_attachments']))
@@ -355,16 +371,16 @@ function processAttachments($id_msg = null)
 		log_error(sprintf($txt['attach_folder_admin_warning'], $context['attach_dir']), 'critical');
 	}
 
-	if (!isset($initial_error) && !isset($context['attachments']))
+	if (!isset($initial_error) && !isset($context['attachments']['quantity']))
 	{
 		// If this isn't a new post, check the current attachments.
 		if (!empty($id_msg))
 			list ($context['attachments']['quantity'], $context['attachments']['total_size']) = attachmentsSizeForMessage($id_msg);
 		else
-			$context['attachments'] = array(
-				'quantity' => 0,
-				'total_size' => 0,
-			);
+		{
+			$context['attachments']['quantity'] = 0;
+			$context['attachments']['total_size'] = 0;
+		}
 	}
 
 	// Hmm. There are still files in session.
@@ -390,7 +406,7 @@ function processAttachments($id_msg = null)
 			foreach ($_SESSION['temp_attachments'] as $attachID => $attachment)
 			{
 				if (strpos($attachID, 'post_tmp_' . $user_info['id']) !== false)
-					unlink($attachment['tmp_name']);
+					@unlink($attachment['tmp_name']);
 			}
 
 			$attach_errors->activate()->addError('temp_attachments_flushed');
@@ -420,8 +436,8 @@ function processAttachments($id_msg = null)
 
 		// This is a generic error
 		$attach_errors->activate();
-		$attach_errors->addError($txt['attach_no_upload']);
-		$attach_errors->addError(is_array($attachment) ? vsprintf($txt[$attachment[0]], $attachment[1]) : $txt[$attachment]);
+		$attach_errors->addError('attach_no_upload');
+		$attach_errors->addError(is_array($attachment) ? array($attachment[0], $attachment[1]) : $attachment);
 
 		// And delete the files 'cos they ain't going nowhere.
 		foreach ($_FILES['attachment']['tmp_name'] as $n => $dummy)
@@ -440,27 +456,19 @@ function processAttachments($id_msg = null)
 			continue;
 
 		// First, let's first check for PHP upload errors.
-		$errors = array();
-		if (!empty($_FILES['attachment']['error'][$n]))
-		{
-			if ($_FILES['attachment']['error'][$n] == 2)
-				$errors[] = array('file_too_big', array($modSettings['attachmentSizeLimit']));
-			elseif ($_FILES['attachment']['error'][$n] == 6)
-				log_error($_FILES['attachment']['name'][$n] . ': ' . $txt['php_upload_error_6'], 'critical');
-			else
-				log_error($_FILES['attachment']['name'][$n] . ': ' . $txt['php_upload_error_' . $_FILES['attachment']['error'][$n]]);
-			if (empty($errors))
-				$errors[] = 'attach_php_error';
-		}
+		$errors = attachmentUploadChecks($n);
 
-		// Try to move and rename the file before doing any more checks on it.
+		// Set the names and destination for this file
 		$attachID = 'post_tmp_' . $user_info['id'] . '_' . md5(mt_rand());
 		$destName = $context['attach_dir'] . '/' . $attachID;
+
+		// If we are error free, Try to move and rename the file before doing more checks on it.
 		if (empty($errors))
 		{
 			$_SESSION['temp_attachments'][$attachID] = array(
 				'name' => htmlspecialchars(basename($_FILES['attachment']['name'][$n]), ENT_COMPAT, 'UTF-8'),
 				'tmp_name' => $destName,
+				'attachid' => $attachID,
 				'size' => $_FILES['attachment']['size'][$n],
 				'type' => $_FILES['attachment']['type'][$n],
 				'id_folder' => $modSettings['currentAttachmentUploadDir'],
@@ -477,6 +485,7 @@ function processAttachments($id_msg = null)
 					unlink($_FILES['attachment']['tmp_name'][$n]);
 			}
 		}
+		// Upload error(s) were detected, flag the error, remove the file
 		else
 		{
 			$_SESSION['temp_attachments'][$attachID] = array(
@@ -489,13 +498,13 @@ function processAttachments($id_msg = null)
 				unlink($_FILES['attachment']['tmp_name'][$n]);
 		}
 
-		// If there's no errors to this pont. We still do need to apply some addtional checks before we are finished.
+		// If there were no errors to this pont, we apply some addtional checks
 		if (empty($_SESSION['temp_attachments'][$attachID]['errors']))
 			attachmentChecks($attachID);
 
+		// Sort out the errors for display and delete any associated files.
 		if (!empty($_SESSION['temp_attachments'][$attachID]['errors']))
 		{
-			// Sort out the errors for display and delete any associated files.
 			$attach_errors->addAttach($attachID, $_SESSION['temp_attachments'][$attachID]['name']);
 			$log_these = array('attachments_no_create', 'attachments_no_write', 'attach_timeout', 'ran_out_of_space', 'cant_access_upload_path', 'attach_0_byte_file');
 
@@ -503,12 +512,12 @@ function processAttachments($id_msg = null)
 			{
 				if (!is_array($error))
 				{
-					$attach_errors->addError($txt[$error]);
+					$attach_errors->addError($error);
 					if (in_array($error, $log_these))
 						log_error($_SESSION['temp_attachments'][$attachID]['name'] . ': ' . $txt[$error], 'critical');
 				}
 				else
-					$attach_errors->addError(vsprintf($txt[$error[0]], $error[1]));
+					$attach_errors->addError(array($error[0], $error[1]));
 			}
 		}
 	}
@@ -527,9 +536,83 @@ function processAttachments($id_msg = null)
 }
 
 /**
+ * Deletes a temporary attachment from the $_SESSION (and the filesystem)
+ *
+ * @package Attachments
+ * @param string $attach_id the temporary name generated when a file is uploaded
+ *               and used in $_SESSION to help identify the attachment itself
+ */
+function removeTempAttachById($attach_id)
+{
+	foreach ($_SESSION['temp_attachments'] as $attachID => $attach)
+	{
+		if ($attachID === $attach_id)
+		{
+			// This file does exist, so lets terminate it!
+			if (file_exists($attach['tmp_name']))
+			{
+				@unlink($attach['tmp_name']);
+				unset($_SESSION['temp_attachments'][$attachID]);
+
+				return true;
+			}
+			// Nope can't delete it if we can't find it
+			else
+				return 'attachment_not_found';
+		}
+	}
+
+	return 'attachment_not_found';
+}
+
+/**
+ * Checks if an uploaded file produced any appropriate error code
+ *
+ * What it does:
+ * - Checks for error codes in the error segment of the file array that is
+ * created by PHP during the file upload.
+ *
+ * @package Attachments
+ * @param int $attachID
+ */
+function attachmentUploadChecks($attachID)
+{
+	global $modSettings, $txt;
+
+	$errors = array();
+
+	// Did PHP create any errors during the upload processing of this file?
+	if (!empty($_FILES['attachment']['error'][$attachID]))
+	{
+		// The file exceeds the max_filesize directive in php.ini
+		if ($_FILES['attachment']['error'][$attachID] == 1)
+			$errors[] = array('file_too_big', array($modSettings['attachmentSizeLimit']));
+		// The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form.
+		elseif ($_FILES['attachment']['error'][$attachID] == 2)
+			$errors[] = array('file_too_big', array($modSettings['attachmentSizeLimit']));
+		// Missing or a full a temp directory on the server
+		elseif ($_FILES['attachment']['error'][$attachID] == 6)
+			log_error($_FILES['attachment']['name'][$attachID] . ': ' . $txt['php_upload_error_6'], 'critical');
+		// One of many errors such as (3)partially uploaded, (4)empty file,
+		else
+			log_error($_FILES['attachment']['name'][$attachID] . ': ' . $txt['php_upload_error_' . $_FILES['attachment']['error'][$attachID]]);
+
+		// If we did not set an user error (3,4,6,7,8) to show then give them a generic one as there is
+		// no need to provide back specifics of a server error, those are logged
+		if (empty($errors))
+			$errors[] = 'attach_php_error';
+	}
+
+	return $errors;
+}
+
+/**
  * Performs various checks on an uploaded file.
+ *
+ * What it does:
  * - Requires that $_SESSION['temp_attachments'][$attachID] be properly populated.
  *
+ * @package Attachments
  * @param int $attachID id of the attachment to check
  */
 function attachmentChecks($attachID)
@@ -599,7 +682,7 @@ function attachmentChecks($attachID)
 		}
 	}
 
-	// Is there room for this sucker?
+	// Is there room for this in the directory?
 	if (!empty($modSettings['attachmentDirSizeLimit']) || !empty($modSettings['attachmentDirFileLimit']))
 	{
 		// Check the folder size and count. If it hasn't been done already.
@@ -634,6 +717,7 @@ function attachmentChecks($attachID)
 		if (!empty($modSettings['attachmentDirFileLimit']) && $context['dir_files'] + 2 > $modSettings['attachmentDirFileLimit']
 			|| (!empty($modSettings['attachmentDirSizeLimit']) && $context['dir_size'] > $modSettings['attachmentDirSizeLimit'] * 1024))
 		{
+			// If we are managing the directories space automatically, lets get to it
 			if (!empty($modSettings['automanage_attachments']) && $modSettings['automanage_attachments'] == 1)
 			{
 				// Move it to the new folder if we can.
@@ -645,7 +729,7 @@ function attachmentChecks($attachID)
 					$context['dir_size'] = 0;
 					$context['dir_files'] = 0;
 				}
-				// Or, let the user know that it ain't gonna happen.
+				// Or, let the user know that its not going to happen.
 				else
 				{
 					if (isset($context['dir_creation_error']))
@@ -660,11 +744,11 @@ function attachmentChecks($attachID)
 	}
 
 	// Is the file too big?
-	$context['attachments']['total_size'] += $_SESSION['temp_attachments'][$attachID]['size'];
 	if (!empty($modSettings['attachmentSizeLimit']) && $_SESSION['temp_attachments'][$attachID]['size'] > $modSettings['attachmentSizeLimit'] * 1024)
 		$_SESSION['temp_attachments'][$attachID]['errors'][] = array('file_too_big', array(comma_format($modSettings['attachmentSizeLimit'], 0)));
 
 	// Check the total upload size for this post...
+	$context['attachments']['total_size'] += $_SESSION['temp_attachments'][$attachID]['size'];
 	if (!empty($modSettings['attachmentPostLimit']) && $context['attachments']['total_size'] > $modSettings['attachmentPostLimit'] * 1024)
 		$_SESSION['temp_attachments'][$attachID]['errors'][] = array('attach_max_total_file_size', array(comma_format($modSettings['attachmentPostLimit'], 0), comma_format($modSettings['attachmentPostLimit'] - (($context['attachments']['total_size'] - $_SESSION['temp_attachments'][$attachID]['size']) / 1024), 0)));
 
@@ -710,11 +794,14 @@ function attachmentChecks($attachID)
 
 /**
  * Create an attachment, with the given array of parameters.
+ *
+ * What it does:
  * - Adds any addtional or missing parameters to $attachmentOptions.
  * - Renames the temporary file.
  * - Creates a thumbnail if the file is an image and the option enabled.
  *
- * @param array $attachmentOptions
+ * @package Attachments
+ * @param mixed[] $attachmentOptions associative array of options
  */
 function createAttachment(&$attachmentOptions)
 {
@@ -752,9 +839,17 @@ function createAttachment(&$attachmentOptions)
 			$attachmentOptions['mime_type'] = 'image/' . $validImageTypes[$size[2]];
 	}
 
+	// It is possible we might have a MIME type that isn't actually an image but still have a size.
+	// For example, Shockwave files will be able to return size but be 'application/shockwave' or similar.
+	if (!empty($attachmentOptions['mime_type']) && strpos($attachmentOptions['mime_type'], 'image/') !== 0)
+	{
+		$attachmentOptions['width'] = 0;
+		$attachmentOptions['height'] = 0;
+	}
+
 	// Get the hash if no hash has been given yet.
 	if (empty($attachmentOptions['file_hash']))
-		$attachmentOptions['file_hash'] = getAttachmentFilename($attachmentOptions['name'], false, null, true);
+		$attachmentOptions['file_hash'] = getAttachmentFilename($attachmentOptions['name'], 0, null, true);
 
 	// Assuming no-one set the extension let's take a look at it.
 	if (empty($attachmentOptions['fileext']))
@@ -784,7 +879,7 @@ function createAttachment(&$attachmentOptions)
 	if (empty($attachmentOptions['id']))
 		return false;
 
-	// Now that we have the attach id, let's rename this sucker and finish up.
+	// Now that we have the attach id, let's rename this and finish up.
 	$attachmentOptions['destination'] = getAttachmentFilename(basename($attachmentOptions['name']), $attachmentOptions['id'], $attachmentOptions['id_folder'], false, $attachmentOptions['file_hash']);
 	rename($attachmentOptions['tmp_name'], $attachmentOptions['destination']);
 
@@ -823,7 +918,7 @@ function createAttachment(&$attachmentOptions)
 
 			$thumb_filename = $attachmentOptions['name'] . '_thumb';
 			$thumb_size = filesize($attachmentOptions['destination'] . '_thumb');
-			$thumb_file_hash = getAttachmentFilename($thumb_filename, false, null, true);
+			$thumb_file_hash = getAttachmentFilename($thumb_filename, 0, null, true);
 			$thumb_path = $attachmentOptions['destination'] . '_thumb';
 
 			// We should check the file size and count here since thumbs are added to the existing totals.
@@ -889,11 +984,13 @@ function createAttachment(&$attachmentOptions)
 
 /**
  * Get the avatar with the specified ID.
- * It gets avatar data (folder, name of the file, filehash, etc)
+ *
+ * What it does:
+ * - It gets avatar data (folder, name of the file, filehash, etc)
  * from the database.
+ * - Must return the same values and in the same order as getAttachmentFromTopic()
  *
- * Must return the same values and in the same order as getAttachmentFromTopic()
- *
+ * @package Attachments
  * @param int $id_attach
  */
 function getAvatar($id_attach)
@@ -928,12 +1025,14 @@ function getAvatar($id_attach)
 }
 
 /**
- * Get the specified attachment. This includes a check of the topic
- * (it only returns the attachment if it's indeed attached to a message
- * in the topic given as parameter), and query_see_board...
+ * Get the specified attachment.
  *
- * Must return the same values and in the same order as getAvatar()
+ * What it does:
+ * - This includes a check of the topic
+ * - it only returns the attachment if it's indeed attached to a message in the topic given as parameter, and query_see_board...
+ * - Must return the same values and in the same order as getAvatar()
  *
+ * @package Attachments
  * @param int $id_attach
  * @param int $id_topic
  */
@@ -965,8 +1064,11 @@ function getAttachmentFromTopic($id_attach, $id_topic)
 
 /**
  * Increase download counter for id_attach.
- * Does not check if it's a thumbnail.
  *
+ * What it does:
+ * - Does not check if it's a thumbnail.
+ *
+ * @package Attachments
  * @param int $id_attach
  */
 function increaseDownloadCounter($id_attach)
@@ -985,13 +1087,16 @@ function increaseDownloadCounter($id_attach)
 
 /**
  * Saves a file and stores it locally for avatar use by id_member.
+ *
+ * What it does:
  * - supports GIF, JPG, PNG, BMP and WBMP formats.
  * - detects if GD2 is available.
  * - uses resizeImageFile() to resize to max_width by max_height, and saves the result to a file.
  * - updates the database info for the member's avatar.
  * - returns whether the download and resize was successful.
- * @uses subs/Graphics.subs.php
  *
+ * @uses subs/Graphics.subs.php
+ * @package Attachments
  * @param string $temporary_path the full path to the temporary file
  * @param int $memID member ID
  * @param int $max_width
@@ -1016,7 +1121,7 @@ function saveAvatar($temporary_path, $memID, $max_width, $max_height)
 	removeAttachments(array('id_member' => $memID));
 
 	$id_folder = getAttachmentPathID();
-	$avatar_hash = empty($modSettings['custom_avatar_enabled']) ? getAttachmentFilename($destName, false, null, true) : '';
+	$avatar_hash = empty($modSettings['custom_avatar_enabled']) ? getAttachmentFilename($destName, 0, null, true) : '';
 	$db->insert('',
 		'{db_prefix}attachments',
 		array(
@@ -1097,10 +1202,14 @@ function saveAvatar($temporary_path, $memID, $max_width, $max_height)
 
 /**
  * Get the size of a specified image with better error handling.
- * @todo see if it's better in subs/Graphics.subs.php, but one step at the time.
- * Uses getimagesize() to determine the size of a file.
- * Attempts to connect to the server first so it won't time out.
  *
+ * What it does:
+ * - Uses getimagesize() to determine the size of a file.
+ * - Attempts to connect to the server first so it won't time out.
+ *
+ * @todo see if it's better in subs/Graphics.subs.php, but one step at the time.
+ *
+ * @package Attachments
  * @param string $url
  * @return array or false, the image size as array(width, height), or false on failure
  */
@@ -1175,10 +1284,15 @@ function url_image_size($url)
 
 /**
  * The current attachments path:
+ *
+ * What it does:
  *  - BOARDDIR . '/attachments', if nothing is set yet.
  *  - if the forum is using multiple attachments directories,
  *    then the current path is stored as unserialize($modSettings['attachmentUploadDir'])[$modSettings['currentAttachmentUploadDir']]
  *  - otherwise, the current path is $modSettings['attachmentUploadDir'].
+ *
+ * @package Attachments
+ * @return string
  */
 function getAttachmentPath()
 {
@@ -1198,6 +1312,9 @@ function getAttachmentPath()
 /**
  * The avatars path: if custom avatar directory is set, that's it.
  * Otherwise, it's attachments path.
+ *
+ * @package Attachments
+ * @return string
  */
 function getAvatarPath()
 {
@@ -1208,10 +1325,13 @@ function getAvatarPath()
 
 /**
  * Little utility function for the $id_folder computation for attachments.
- * This returns the id of the folder where the attachment or avatar will be saved.
- * If multiple attachment directories are not enabled, this will be 1 by default.
  *
- * @return int, return 1 if multiple attachment directories are not enabled,
+ * What it does:
+ * - This returns the id of the folder where the attachment or avatar will be saved.
+ * - If multiple attachment directories are not enabled, this will be 1 by default.
+ *
+ * @package Attachments
+ * @return int 1 if multiple attachment directories are not enabled,
  * or the id of the current attachment directory otherwise.
  */
 function getAttachmentPathID()
@@ -1225,7 +1345,8 @@ function getAttachmentPathID()
 /**
  * Returns the ID of the folder avatars are currently saved in.
  *
- * @return int, returns 1 if custom avatar directory is enabled,
+ * @package Attachments
+ * @return int 1 if custom avatar directory is enabled,
  * and the ID of the current attachment folder otherwise.
  * NB: the latter could also be 1.
  */
@@ -1242,12 +1363,15 @@ function getAvatarPathID()
 
 /**
  * Get all attachments associated with a set of posts.
- * This does not check permissions.
  *
- * @param array $messages array of messages ids
+ * What it does:
+ *  - This does not check permissions.
+ *
+ * @package Attachments
+ * @param int[] $messages array of messages ids
  * @param bool $includeUnapproved = false
- * @param string $filter name of a callback function
- * @param array $all_posters
+ * @param string|null $filter name of a callback function
+ * @param mixed[] $all_posters
  */
 function getAttachments($messages, $includeUnapproved = false, $filter = null, $all_posters = array())
 {
@@ -1298,7 +1422,7 @@ function getAttachments($messages, $includeUnapproved = false, $filter = null, $
  *
  * @deprecated since 1.0
  *
- * @return array, avatars information
+ * @return mixed[] avatars information
  */
 function getAvatarsDefault()
 {
@@ -1326,6 +1450,7 @@ function getAvatarsDefault()
 /**
  * Recursive function to retrieve server-stored avatar files
  *
+ * @package Attachments
  * @param string $directory
  * @param int $level
  * @return array
@@ -1409,11 +1534,11 @@ function getServerStoredAvatars($directory, $level)
 /**
  * Update an attachment's thumbnail
  *
+ * @package Attachments
  * @param string $filename
  * @param int $id_attach
  * @param int $id_msg
  * @param int $old_id_thumb = 0
- *
  * @return array The updated information
  */
 function updateAttachmentThumbnail($filename, $id_attach, $id_msg, $old_id_thumb = 0)
@@ -1446,7 +1571,7 @@ function updateAttachmentThumbnail($filename, $id_attach, $id_msg, $old_id_thumb
 			$thumb_mime = 'image/' . $thumb_ext;
 
 		$thumb_filename = $filename . '_thumb';
-		$thumb_hash = getAttachmentFilename($thumb_filename, false, null, true);
+		$thumb_hash = getAttachmentFilename($thumb_filename, 0, null, true);
 
 		$db = database();
 
@@ -1489,6 +1614,7 @@ function updateAttachmentThumbnail($filename, $id_attach, $id_msg, $old_id_thumb
 /**
  * Compute and return the total size of attachments to a single message.
  *
+ * @package Attachments
  * @param int $id_msg
  * @param bool $include_count = true if true, it also returns the attachments count
  */
@@ -1530,12 +1656,16 @@ function attachmentsSizeForMessage($id_msg, $include_count = true)
 
 /**
  * This loads an attachment's contextual data including, most importantly, its size if it is an image.
- * Pre-condition: $attachments array to have been filled with the proper attachment data, as Display() does.
- * (@todo change this pre-condition, too fragile and error-prone.)
- * It requires the view_attachments permission to calculate image size.
- * It attempts to keep the "aspect ratio" of the posted image in line, even if it has to be resized by
+ *
+ * What it does:
+ * - Pre-condition: $attachments array to have been filled with the proper attachment data, as Display() does.
+ * - It requires the view_attachments permission to calculate image size.
+ * - It attempts to keep the "aspect ratio" of the posted image in line, even if it has to be resized by
  * the max_image_width and max_image_height settings.
  *
+ * @todo change this pre-condition, too fragile and error-prone.
+ *
+ * @package Attachments
  * @param int $id_msg message number to load attachments for
  * @return array of attachments
  */
@@ -1639,9 +1769,11 @@ function loadAttachmentContext($id_msg)
 
 /**
  * A sort function for putting unapproved attachments first.
- * @param array $a
- * @param array $b
- * @return int, -1, 0, 1
+ *
+ * @package Attachments
+ * @param mixed[] $a
+ * @param mixed[] $b
+ * @return int -1, 0, 1
  */
 function approved_attach_sort($a, $b)
 {
@@ -1653,30 +1785,31 @@ function approved_attach_sort($a, $b)
 
 /**
  * Callback filter for the retrieval of attachments.
+ *
+ * What it does:
  * This function returns false when:
  *  - the attachment is unapproved, and
  *  - the viewer is not the poster of the message where the attachment is
  *
- * @param array $attachment_info
- * @param array $all_posters
+ * @package Attachments
+ * @param mixed[] $attachment_info
+ * @param mixed[] $all_posters
  */
 function filter_accessible_attachment($attachment_info, $all_posters)
 {
 	global $user_info;
 
-	if (!$attachment_info['approved'] && (!isset($all_posters[$attachment_info['id_msg']]) || $all_posters[$attachment_info['id_msg']] != $user_info['id']))
-		return false;
-
-	return true;
+	return !(!$attachment_info['approved'] && (!isset($all_posters[$attachment_info['id_msg']]) || $all_posters[$attachment_info['id_msg']] != $user_info['id']));
 }
 
 /**
  * Older attachments may still use this function.
  *
- * @param $filename
- * @param $attachment_id
- * @param $dir
- * @param $new
+ * @package Attachments
+ * @param string $filename
+ * @param int $attachment_id
+ * @param string|null $dir
+ * @param boolean $new
  */
 function getLegacyAttachmentFilename($filename, $attachment_id, $dir = null, $new = false)
 {

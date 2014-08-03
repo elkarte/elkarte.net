@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -16,15 +16,17 @@ if (!defined('ELK'))
 
 /**
  * Loads failed emails from the database
- *  - If its a message or topic will build the link to that for viewing
- *  - If supplied a specific ID will load only that failed email
  *
+ * - If its a message or topic will build the link to that for viewing
+ * - If supplied a specific ID will load only that failed email
+ *
+ * @package Maillist
+ * @param int $id
  * @param int $start
  * @param int $chunk_size
  * @param string $sort
- * @param int $id
  */
-function list_maillist_unapproved($start, $chunk_size, $sort = '', $id = 0)
+function list_maillist_unapproved($id = 0, $start = 0, $chunk_size = 0, $sort = '')
 {
 	global $txt, $boardurl, $user_info;
 
@@ -69,7 +71,7 @@ function list_maillist_unapproved($start, $chunk_size, $sort = '', $id = 0)
 	{
 		$postemail[$i] = array(
 			'id_email' => $row['id_email'],
-			'error' =>  $txt[$row['error'] . '_short'],
+			'error' => $txt[$row['error'] . '_short'],
 			'error_code' => $row['error'],
 			'key' => $row['data_id'],
 			'subject' => $row['subject'],
@@ -82,8 +84,8 @@ function list_maillist_unapproved($start, $chunk_size, $sort = '', $id = 0)
 
 		// Sender details we can use
 		$temp = query_load_user_info($row['email_from']);
-		$postemail[$i]['name'] = !empty($temp['user_info']['name']) ? $temp['user_info']['name']: '';
-		$postemail[$i]['language'] = !empty($temp['user_info']['language']) ? $temp['user_info']['language']: '';
+		$postemail[$i]['name'] = !empty($temp['user_info']['name']) ? $temp['user_info']['name'] : '';
+		$postemail[$i]['language'] = !empty($temp['user_info']['language']) ? $temp['user_info']['language'] : '';
 
 		// Build a link to the topic or message in case someone wants to take a look at that thread
 		if ($row['message_type'] === 't')
@@ -102,6 +104,8 @@ function list_maillist_unapproved($start, $chunk_size, $sort = '', $id = 0)
 
 /**
  * Counts the number of errors (the user can see) for pagination
+ *
+ * @package Maillist
  */
 function list_maillist_count_unapproved()
 {
@@ -142,6 +146,7 @@ function list_maillist_count_unapproved()
 /**
  * Removes an single entry from the postby_emails_error table
  *
+ * @package Maillist
  * @param int $id
  */
 function maillist_delete_error_entry($id)
@@ -160,9 +165,11 @@ function maillist_delete_error_entry($id)
 
 /**
  * Loads the filers or parsers for the post by email system
- *  - If an ID is supplied, it will load that specific filter/parser
- *  - Style defines if it will load parsers or filters
  *
+ * - If an ID is supplied, it will load that specific filter/parser
+ * - Style defines if it will load parsers or filters
+ *
+ * @package Maillist
  * @param int $start
  * @param int $chunk_size
  * @param string $sort
@@ -214,12 +221,13 @@ function list_get_filter_parser($start, $chunk_size, $sort = '', $id = 0, $style
 
 /**
  * Get the count of the filters or parsers of the system
- * If ID is 0, it will retrieve the count.
- * If ID is a valid positive integer, it will return 1 and exit.
  *
+ * - If ID is 0, it will retrieve the count.
+ * - If ID is a valid positive integer, it will return 1 and exit.
+ *
+ * @package Maillist
  * @param int $id
  * @param string $style
- * @return
  */
 function list_count_filter_parser($id, $style)
 {
@@ -247,8 +255,10 @@ function list_count_filter_parser($id, $style)
 
 /**
  * Loads a specific filter/parser from the database for display
- * It will load only that filter/parser
  *
+ * - It will load only that filter/parser
+ *
+ * @package Maillist
  * @param int $id
  * @param string $style parser or filter
  * @return array of filters/parsers
@@ -256,8 +266,6 @@ function list_count_filter_parser($id, $style)
 function maillist_load_filter_parser($id, $style)
 {
 	$db = database();
-
-	$row = array();
 
 	// Load filter/parser details for editing
 	$request = $db->query('', '
@@ -284,6 +292,7 @@ function maillist_load_filter_parser($id, $style)
 /**
  * Removes a specific filter or parser from the system
  *
+ * @package Maillist
  * @param int $id ID of the filter/parser
  */
 function maillist_delete_filter_parser($id)
@@ -304,7 +313,10 @@ function maillist_delete_filter_parser($id)
 
 /**
  * Creates a select list of boards for the admin
- *  - Sets the first one as a blank for use in a template select element
+ *
+ * - Sets the first one as a blank for use in a template select element
+ *
+ * @package Maillist
  */
 function maillist_board_list()
 {
@@ -331,6 +343,7 @@ function maillist_board_list()
 /**
  * Turns on or off the "fake" cron job for imap email retrieval
  *
+ * @package Maillist
  * @param boolean $switch
  */
 function enable_maillist_imap_cron($switch)
@@ -353,8 +366,9 @@ function enable_maillist_imap_cron($switch)
 /**
  * Load in the custom (public and this users private) email templates
  *
+ * @package Maillist
  * @param string $template_type - the type of template (e.g. 'bounce', 'warntpl', etc.)
- * @param string $subject - A subject for the template
+ * @param string|null $subject - A subject for the template
  */
 function maillist_templates($template_type, $subject = null)
 {
@@ -395,7 +409,8 @@ function maillist_templates($template_type, $subject = null)
 /**
  * Log in post-by emails an email being sent
  *
- * @param array $sent
+ * @package Maillist
+ * @param mixed[] $sent associative array of id_email, time_sent, email_to
  */
 function log_email($sent)
 {
@@ -404,7 +419,7 @@ function log_email($sent)
 	$db->insert('ignore',
 		'{db_prefix}postby_emails',
 		array(
-			'id_email' => 'int', 'time_sent' => 'string', 'email_to' => 'string'
+			'id_email' => 'string', 'time_sent' => 'int', 'email_to' => 'string'
 		),
 		$sent,
 		array('id_email')
@@ -413,11 +428,13 @@ function log_email($sent)
 
 /**
  * Updates the processing order for the parser and filter fields
- * Done as a CASE WHEN one two three ELSE 0 END in place of many updates\
- * Called by Xmlcontroller as part of drag sort event
  *
+ * - Done as a CASE WHEN one two three ELSE 0 END in place of many updates\
+ * - Called by Xmlcontroller as part of drag sort event
+ *
+ * @package Maillist
  * @param string $replace constucted as WHEN fieldname=value THEN new viewvalue WHEN .....
- * @param array $filters list of ids in the WHEN clause to keep from updating the entire table
+ * @param int[] $filters list of ids in the WHEN clause to keep from updating the entire table
  */
 function updateParserFilterOrder($replace, $filters)
 {

@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -20,7 +20,7 @@
  */
 function template_admin()
 {
-	global $context, $settings, $scripturl, $txt, $modSettings;
+	global $context, $settings, $scripturl, $txt;
 
 	// Welcome message for the admin.
 	echo '
@@ -57,9 +57,9 @@ function template_admin()
 										<div id="version_details">
 											<strong>', $txt['support_versions'], ':</strong><br />
 											', $txt['support_versions_forum'], ':
-											<em id="yourVersion">', $context['forum_version'], '</em><br />
+											<em id="installedVersion">', $context['forum_version'], '</em><br />
 											', $txt['support_versions_current'], ':
-											<em id="ourVersion">??</em><br />
+											<em id="latestVersion">??</em><br />
 											', $context['can_admin'] ? '<a href="' . $scripturl . '?action=admin;area=maintain;sa=routine;activity=version">' . $txt['version_check_more'] . '</a>' : '', '<br />';
 
 	// Display all the members who can administrate the forum.
@@ -99,18 +99,10 @@ function template_admin()
 						</div>
 					</div>';
 
-	// The below functions include all the scripts needed from the ElkArte site. The language and format are passed for internationalization.
-	if (empty($modSettings['disable_elk_js']))
-		echo '
-					<script src="', $scripturl, '?action=viewadminfile;filename=current-version.js"></script>
-					<script src="', $scripturl, '?action=viewadminfile;filename=latest-news.js"></script>';
-
 	// This sets the announcements and current versions themselves ;).
 	echo '
 					<script><!-- // --><![CDATA[
-						var oAdminIndex = new elk_AdminIndex({
-							sSelf: \'oAdminCenter\',
-
+						var oAdminCenter = new elk_AdminIndex({
 							bLoadAnnouncements: true,
 							sAnnouncementTemplate: ', JavaScriptEscape('
 								<dl>
@@ -126,8 +118,8 @@ function template_admin()
 							sAnnouncementContainerId: \'ourAnnouncements\',
 
 							bLoadVersions: true,
-							sOurVersionContainerId: \'ourVersion\',
-							sYourVersionContainerId: \'yourVersion\',
+							slatestVersionContainerId: \'latestVersion\',
+							sinstalledVersionContainerId: \'installedVersion\',
 							sVersionOutdatedTemplate: ', JavaScriptEscape('
 								<span class="alert">%currentVersion%</span>
 							'), ',
@@ -166,15 +158,15 @@ function template_credits()
 					<div id="admincenter">
 						<div id="support_credits">
 							<h3 class="category_header">
-								', $txt['support_title'], ' <img src="', $settings['images_url'], (!empty($context['theme_variant']) ? '/' . $context['theme_variant'] . '/logo_elk.png' : '/logo_elk.png' ), '" id="credits_logo" alt="" />
+								', $txt['support_title'], ' <img src="', $settings['images_url'], '/', $context['theme_variant_url'], 'logo_elk.png" id="credits_logo" alt="" />
 							</h3>
 							<div class="windowbg">
 								<div class="content">
 									<strong>', $txt['support_versions'], ':</strong><br />
 										', $txt['support_versions_forum'], ':
-									<em id="yourVersion">', $context['forum_version'], '</em>', $context['can_admin'] ? ' <a href="' . $scripturl . '?action=admin;area=maintain;sa=routine;activity=version">' . $txt['version_check_more'] . '</a>' : '', '<br />
+									<em id="installedVersion">', $context['forum_version'], '</em>', $context['can_admin'] ? ' <a href="' . $scripturl . '?action=admin;area=maintain;sa=routine;activity=version">' . $txt['version_check_more'] . '</a>' : '', '<br />
 										', $txt['support_versions_current'], ':
-									<em id="ourVersion">??</em><br />';
+									<em id="latestVersion">??</em><br />';
 
 	// Display all the variables we have server information for.
 	foreach ($context['current_versions'] as $version)
@@ -279,33 +271,21 @@ function template_credits()
 		echo '
 						ourSupportVersions.', $variable, ' = "', $version['version'], '";';
 
-	// Now we just have to include the script and wait ;).
 	echo '
-					// ]]></script>
-					<script src="', $scripturl, '?action=viewadminfile;filename=current-version.js"></script>
-					<script src="', $scripturl, '?action=viewadminfile;filename=latest-news.js"></script>';
+					// ]]></script>';
 
 	// This sets the latest support stuff.
 	echo '
 					<script><!-- // --><![CDATA[
-						function ourCurrentVersion()
-						{
-							var ourVer,
-								yourVer;
+						var oAdminCenter = new elk_AdminIndex({
+							bLoadVersions: true,
+							slatestVersionContainerId: \'latestVersion\',
+							sinstalledVersionContainerId: \'installedVersion\',
+							sVersionOutdatedTemplate: ', JavaScriptEscape('
+								<span class="alert">%currentVersion%</span>
+							'), '
 
-							if (!window.elkVersion)
-								return;
-
-							ourVer = document.getElementById("ourVersion");
-							yourVer = document.getElementById("yourVersion");
-
-							ourVer.innerHTML = window.elkVersion;
-
-							var currentVersion = yourVer;
-							if (currentVersion != window.ourVersion)
-								yourVer.innerHTML = "<span class=\"alert\">" + currentVersion + "</span>";
-						}
-						addLoadEvent(ourCurrentVersion)
+						});
 					// ]]></script>';
 }
 
@@ -314,7 +294,7 @@ function template_credits()
  */
 function template_view_versions()
 {
-	global $context, $scripturl, $txt;
+	global $context, $txt;
 
 	echo '
 					<div id="admincenter">
@@ -399,7 +379,7 @@ function template_view_versions()
 										<td class="windowbg versionFile">
 											<a href="#" id="admin-link">', $txt['dvc_admin'], '</a>
 										</td>
-										<td class="windowbg versionNumber>
+										<td class="windowbg versionNumber">
 											<em id="youradmin">??</em>
 										</td>
 										<td class="windowbg versionNumber">
@@ -616,6 +596,12 @@ function template_view_versions()
 
 	foreach ($context['default_language_versions'] as $language => $files)
 	{
+		echo '
+									<tr>
+										<td colspan=3" class="windowbg2 versionFilePad">
+											<strong>', $language, '</strong>
+										</td>
+									</tr>';
 		foreach ($files as $filename => $version)
 			echo '
 									<tr>
@@ -685,7 +671,7 @@ function template_view_versions()
 	  red.  It also contains the function, swapOption, that toggles showing the detailed information for each of the
 	  file categories. (sources, languages, and templates.) */
 	echo '
-						<script src="', $scripturl, '?action=viewadminfile;filename=detailed-version.js"></script>
+						<script src="', $context['detailed_version_url'], '"></script>
 						<script><!-- // --><![CDATA[
 							var oViewVersions = new elk_ViewVersions({
 								aKnownLanguages: [
@@ -703,6 +689,15 @@ function template_view_versions()
 									Templates: \'Templates\'
 								}
 							});
+							var oAdminCenter = new elk_AdminIndex({
+								bLoadVersions: true,
+								slatestVersionContainerId: \'ourVersion\',
+								sinstalledVersionContainerId: \'yourVersion\',
+								sVersionOutdatedTemplate: ', JavaScriptEscape('
+									<span class="alert">%currentVersion%</span>
+								'), '
+
+							});
 						// ]]></script>';
 }
 
@@ -711,7 +706,7 @@ function template_view_versions()
  */
 function template_edit_censored()
 {
-	global $context, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings, $settings;
 
 	// First section is for adding/removing words from the censored list.
 	echo '
@@ -722,19 +717,19 @@ function template_edit_censored()
 			</h3>
 			<div class="windowbg2">
 				<div class="content">
-					<p>', $txt['admin_censored_where'], '</p>';
+					<div class="information">', $txt['admin_censored_where'],'</div>';
 
-	// Show text boxes for censoring [bad   ] => [good  ].
+	// Show text boxes for censoring [bad] => [good].
 	foreach ($context['censored_words'] as $vulgar => $proper)
 		echo '
 					<div class="censorWords">
-						<input type="text" name="censor_vulgar[]" value="', $vulgar, '" size="30" /> => <input type="text" name="censor_proper[]" value="', $proper, '" size="30" />
+						<input type="text" name="censor_vulgar[]" value="', $vulgar, '" size="30" /> <i class="fa  fa-arrow-circle-right"></i> <input type="text" name="censor_proper[]" value="', $proper, '" size="30" />
 					</div>';
 
 	// Now provide a way to censor more words.
 	echo '
 					<div class="censorWords">
-						<input type="text" name="censor_vulgar[]" size="30" class="input_text" /> => <input type="text" name="censor_proper[]" size="30" class="input_text" />
+						<input type="text" name="censor_vulgar[]" size="30" class="input_text" /> <i class="fa  fa-arrow-circle-right"></i> <input type="text" name="censor_proper[]" size="30" class="input_text" />
 					</div>
 					<div id="moreCensoredWords"></div><div class="censorWords" style="display: none;" id="moreCensoredWords_link">
 						<a class="linkbutton_left" href="#;" onclick="addNewWord(); return false;">', $txt['censor_clickadd'], '</a><br />
@@ -745,16 +740,22 @@ function template_edit_censored()
 					<hr class="clear" />
 					<dl class="settings">
 						<dt>
-							<strong><label for="censorWholeWord_check">', $txt['censor_whole_words'], ':</label></strong>
+							<label for="censorWholeWord_check">', $txt['censor_whole_words'], '</label>
 						</dt>
 						<dd>
 							<input type="checkbox" name="censorWholeWord" value="1" id="censorWholeWord_check"', empty($modSettings['censorWholeWord']) ? '' : ' checked="checked"', ' class="input_check" />
 						</dd>
 						<dt>
-							<strong><label for="censorIgnoreCase_check">', $txt['censor_case'], ':</label></strong>
+							<label for="censorIgnoreCase_check">', $txt['censor_case'], '</label>
 						</dt>
 						<dd>
 							<input type="checkbox" name="censorIgnoreCase" value="1" id="censorIgnoreCase_check"', empty($modSettings['censorIgnoreCase']) ? '' : ' checked="checked"', ' class="input_check" />
+						</dd>
+						<dt>
+							<a href="' . $scripturl . '?action=quickhelp;help=allow_no_censored" onclick="return reqOverlayDiv(this.href);" class="help"><img src="' . $settings['images_url'] . '/helptopics.png" class="icon" alt="' . $txt['help'] . '" /></a><label for="allow_no_censored">', $txt['censor_allow'], '</label></a></dt>
+						</dt>
+						<dd>
+							<input type="checkbox" name="censorAllow" value="1" id="allow_no_censored"', empty($modSettings['allow_no_censored']) ? '' : ' checked="checked"', ' class="input_check" />
 						</dd>
 					</dl>
 					<input type="submit" name="save_censor" value="', $txt['save'], '" class="right_submit" />
@@ -762,22 +763,27 @@ function template_edit_censored()
 			</div>
 			<br />';
 
-	// This table lets you test out your filters by typing in rude words and seeing what comes out.
+	// This lets you test out your filters by typing in rude words and seeing what comes out.
 	echo '
 			<h3 class="category_header">', $txt['censor_test'], '</h3>
-			<div class="windowbg">
-				<div class="content">
-					<div class="centertext">
-						<input type="text" name="censortest" value="', empty($context['censor_test']) ? '' : $context['censor_test'], '" class="input_text" />
-						<input type="submit" value="', $txt['censor_test_save'], '" class="button_submit" />
-					</div>
+			<div class="content">
+				<div class="centertext">
+					<p id="censor_result" style="display:none" class="information">', empty($context['censor_test']) ? '' : $context['censor_test'], '</p>
+					<input id="censortest" type="text" name="censortest" value="', empty($context['censor_test']) ? '' : $context['censor_test'], '" class="input_text" />
+					<input id="preview_button" type="submit" value="', $txt['censor_test_save'], '" class="button_submit" />
 				</div>
 			</div>
-
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-			<input type="hidden" name="', $context['admin-censor_token_var'], '" value="', $context['admin-censor_token'], '" />
+			<input id="token" type="hidden" name="', $context['admin-censor_token_var'], '" value="', $context['admin-censor_token'], '" />
 		</form>
-	</div>';
+	</div>
+	<script><!-- // --><![CDATA[
+		$(document).ready(function() {
+			$("#preview_button").click(function() {
+				return ajax_getCensorPreview();
+			});
+		});
+	// ]]></script>';
 }
 
 /**
@@ -791,11 +797,14 @@ function template_not_done()
 
 	echo '
 	<div id="admincenter">
-		<h3 class="category_header">', $txt['not_done_title'], '</h3>
+		<h3 class="category_header">', empty($context['not_done_title']) ? $txt['not_done_title'] : $context['not_done_title'], '</h3>
 		<div class="windowbg">
-			<div class="content">
-				', $txt['not_done_reason'];
+			<div class="infobox">
+				', $txt['not_done_reason'], '
+			</div>
+			<form id="autoSubmit" name="autoSubmit" action="', $scripturl, $context['continue_get_data'], '" method="post" accept-charset="UTF-8" >';
 
+	// Show the progress bars
 	if (!empty($context['continue_percent']))
 		echo '
 				<div class="progress_bar">
@@ -811,16 +820,15 @@ function template_not_done()
 				</div>';
 
 	echo '
-				<form action="', $scripturl, $context['continue_get_data'], '" method="post" accept-charset="UTF-8" name="autoSubmit" id="autoSubmit">
-					<input type="submit" name="cont" value="', $txt['not_done_continue'], '" class="right_submit" />
-					', $context['continue_post_data'], '
-				</form>
-			</div>
+				<input type="submit" name="cont" value="', $txt['not_done_continue'], '" class="right_submit" />
+				', $context['continue_post_data'], '
+			</form>
 		</div>
 	</div>
 	<script><!-- // --><![CDATA[
 		var countdown = ', $context['continue_countdown'], ',
 			txt_message = "', $txt['not_done_continue'], '";
+
 		doAutoSubmit();
 	// ]]></script>';
 }
@@ -884,9 +892,23 @@ function template_show_settings()
 			{
 				echo
 					(isset($config_var['name']) ? '<a href="#" id="' . $config_var['name'] . '"></a>' : ''), '
-					<h3 class="', !empty($config_var['class']) ? $config_var['class'] : 'category_header', '"', !empty($config_var['force_div_id']) ? ' id="' . $config_var['force_div_id'] . '"' : '', '>
-						', ($config_var['help'] ? (empty($config_var['class']) ? '<span class="hdicon cat_img_helptopics help"></span>' : '<a href="' . $scripturl . '?action=quickhelp;help=' . $config_var['help'] . '" onclick="return reqOverlayDiv(this.href);" class="' . $config_var['class'] . ' help"><img src="' . $settings['images_url'] . '/icons/helptopics_hd.png" class="icon" alt="' . $txt['help'] . '" /></a>') : ($config_var['icon'] ? '<span class="hdicon cat_img_' . $config_var['icon'] . '"></span>' : '')), '
-						', $config_var['label'], '
+					<h3 class="', !empty($config_var['class']) ? $config_var['class'] : 'category_header', '"', !empty($config_var['force_div_id']) ? ' id="' . $config_var['force_div_id'] . '"' : '', '>';
+
+					if ($config_var['help'])
+					{
+						if (empty($config_var['class']))
+							echo '
+						<a href="' . $scripturl . '?action=quickhelp;help=' . $config_var['help'] . '" onclick="return reqOverlayDiv(this.href);" class="hdicon cat_img_helptopics help" alt="' . $txt['help'] . '"></a>';
+						else
+							echo '
+						<a href="' . $scripturl . '?action=quickhelp;help=' . $config_var['help'] . '" onclick="return reqOverlayDiv(this.href);" class="' . $config_var['class'] . ' help"><img src="' . $settings['images_url'] . '/icons/helptopics_hd.png" class="icon" alt="' . $txt['help'] . '" /></a>';
+					}
+					elseif ($config_var['icon'])
+						echo
+						'<span class="hdicon cat_img_' . $config_var['icon'] . '"></span>';
+
+					echo
+						$config_var['label'], '
 					</h3>';
 			}
 			// A description?
@@ -991,18 +1013,19 @@ function template_show_settings()
 					echo '
 							<fieldset id="', $config_var['name'], '">
 								<legend>', $txt['bbcTagsToUse_select'], '</legend>
-									<ul>';
+								<ul>';
 
 					foreach ($context['bbc_columns'] as $bbcColumn)
 					{
 						foreach ($bbcColumn as $bbcTag)
 							echo '
-										<li class="list_bbc floatleft">
-											<input type="checkbox" name="', $config_var['name'], '_enabledTags[]" id="tag_', $config_var['name'], '_', $bbcTag['tag'], '" value="', $bbcTag['tag'], '"', !in_array($bbcTag['tag'], $context['bbc_sections'][$config_var['name']]['disabled']) ? ' checked="checked"' : '', ' class="input_check" /> <label for="tag_', $config_var['name'], '_', $bbcTag['tag'], '">', $bbcTag['tag'], '</label>', $bbcTag['show_help'] ? ' (<a href="' . $scripturl . '?action=quickhelp;help=tag_' . $bbcTag['tag'] . '" onclick="return reqOverlayDiv(this.href);">?</a>)' : '', '
-										</li>';
+									<li class="list_bbc floatleft">
+										<input type="checkbox" name="', $config_var['name'], '_enabledTags[]" id="tag_', $config_var['name'], '_', $bbcTag['tag'], '" value="', $bbcTag['tag'], '"', !in_array($bbcTag['tag'], $context['bbc_sections'][$config_var['name']]['disabled']) ? ' checked="checked"' : '', ' class="input_check" /> <label for="tag_', $config_var['name'], '_', $bbcTag['tag'], '">', $bbcTag['tag'], '</label>', $bbcTag['show_help'] ? ' (<a href="' . $scripturl . '?action=quickhelp;help=tag_' . $bbcTag['tag'] . '" onclick="return reqOverlayDiv(this.href);">?</a>)' : '', '
+									</li>';
 					}
 
-					echo '			</ul>
+					echo '
+								</ul>
 								<input type="checkbox" id="bbc_', $config_var['name'], '_select_all" onclick="invertAll(this, this.form, \'', $config_var['name'], '_enabledTags\');"', $context['bbc_sections'][$config_var['name']]['all_selected'] ? ' checked="checked"' : '', ' class="input_check" /> <label for="bbc_', $config_var['name'], '_select_all"><em>', $txt['bbcTagsToUse_select_all'], '</em></label>
 							</fieldset>';
 				}
@@ -1088,17 +1111,14 @@ function template_admin_search_results()
 	global $context, $txt, $settings, $scripturl;
 
 	echo '
-					<div>
-						<h3 class="category_header">
-							<object id="quick_search">
-								<form action="', $scripturl, '?action=admin;area=search" method="post" accept-charset="UTF-8" class="floatright">
-									<input type="text" name="search_term" value="', $context['search_term'], '" class="input_text" />
-									<input type="hidden" name="search_type" value="', $context['search_type'], '" />
-									<input type="submit" name="search_go" value="', $txt['admin_search_results_again'], '" class="button_submit" />
-								</form>
-							</object>
-							<img class="icon" src="' . $settings['images_url'] . '/buttons/search.png" alt="" />&nbsp;', sprintf($txt['admin_search_results_desc'], $context['search_term']), '
-						</h3>
+					<div class="category_header">
+						<h3 class="floatleft hdicon cat_img_search">', sprintf($txt['admin_search_results_desc'], $context['search_term']), '</h3>
+						<form id="quick_search" class="floatright" action="', $scripturl, '?action=admin;area=search" method="post" accept-charset="UTF-8">
+							<img class="icon" src="', $settings['images_url'], '/filter.png" alt="" />
+							<input type="text" name="search_term" value="', $context['search_term'], '" class="input_text" />
+							<input type="hidden" name="search_type" value="', $context['search_type'], '" />
+							<input type="submit" name="search_go" value="', $txt['admin_search_results_again'], '" class="button_submit" />
+						</form>
 					</div>
 					<div class="windowbg2 generic_list_wrapper">
 						<div class="content">';
@@ -1205,14 +1225,14 @@ function template_callback_question_answer_list()
 	if (!empty($context['languages']))
 	{
 		$lang_dropdown .= '
-				<select name="language[b-%question_last_blank%]">';
+			<select name="language[b-%question_last_blank%]">';
 
 		foreach ($context['languages'] as $lang)
 			$lang_dropdown .= '
-					<option value="' . $lang['filename'] . '"' . ($lang['selected'] ? ' selected="selected"' : '') . '>' . $lang['name'] . '</option>';
+				<option value="' . $lang['filename'] . '"' . ($lang['selected'] ? ' selected="selected"' : '') . '>' . $lang['name'] . '</option>';
 
 		$lang_dropdown .= '
-				</select>';
+			</select>';
 	}
 
 	// Some blank ones.
@@ -1448,7 +1468,7 @@ function template_admin_quick_search()
 
 	if ($context['user']['is_admin'])
 		echo '
-			<form action="', $scripturl, '?action=admin;area=search" method="post" accept-charset="', $context['character_set'], '" id="quick_search" class="floatright">
+			<form action="', $scripturl, '?action=admin;area=search" method="post" accept-charset="UTF-8" id="quick_search" class="floatright">
 				<img class="icon" src="', $settings['images_url'], '/filter.png" alt="" />
 				<input type="text" name="search_term" placeholder="', $txt['admin_search'], '" class="input_text" />
 				<select name="search_type">
@@ -1482,7 +1502,7 @@ function template_callback_external_search_engines()
 		<dt id="add_more_searches" style="display: none;"></dt>
 		<dd></dd>
 		<dt id="add_more_link_div" style="display: none;">
-			<a href="#" onclick="addAnotherSearch(', JavaScriptEscape($txt['name']), ', ', JavaScriptEscape($txt['url']), ', ', JavaScriptEscape($txt['words_sep']), '); return false;">&#171; ', $txt['setup_search_engine_add_more'], ' &#187;</a>
+			<a class="linkbutton" href="#" onclick="addAnotherSearch(', JavaScriptEscape($txt['name']), ', ', JavaScriptEscape($txt['url']), ', ', JavaScriptEscape($txt['words_sep']), '); return false;">', $txt['setup_search_engine_add_more'], '</a>
 		</dt>
 		<dd></dd>';
 

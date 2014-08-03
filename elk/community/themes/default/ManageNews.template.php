@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -57,14 +57,14 @@ function template_email_members()
 	echo '
 						</dd>
 						<dt>
-							<strong>', $txt['admin_news_select_email'], ':</strong><br />
+							<strong><label for="emails">', $txt['admin_news_select_email'], '</label>:</strong><br />
 							<span class="smalltext">', $txt['admin_news_select_email_desc'], '</span>
 						</dt>
 						<dd>
-							<textarea name="emails" rows="5" cols="30" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 98%; min-width: 98%' : 'width: 98%') . ';"></textarea>
+							<textarea id="emails" name="emails" rows="5" cols="30" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 98%; min-width: 98%' : 'width: 98%') . ';"></textarea>
 						</dd>
 						<dt>
-							<strong>', $txt['admin_news_select_members'], ':</strong><br />
+							<strong><label for="members">', $txt['admin_news_select_members'], '</label>:</strong><br />
 							<span class="smalltext">', $txt['admin_news_select_members_desc'], '</span>
 						</dt>
 						<dd>
@@ -201,7 +201,7 @@ function template_email_members_compose()
 				<a class="hdicon cat_img_helptopics help" href="', $scripturl, '?action=quickhelp;help=email_members" onclick="return reqOverlayDiv(this.href);" title="', $txt['help'], '"></a> ', $txt['admin_newsletters'], '
 			</h3>
 			<div class="information">
-				', $txt['email_variables'], '
+				', str_replace('{help_emailmembers}', $scripturl . '?action=quickhelp;help=emailmembers" onclick="return reqOverlayDiv(this.href);', $txt['email_variables']), '
 			</div>';
 
 	// The preview section
@@ -236,19 +236,13 @@ function template_email_members_compose()
 				<div class="editor_wrapper">
 					<dl id="post_header">
 						<dt class="clear_left">
-							<span', (isset($context['post_error']['no_subject']) ? ' class="error"' : ''), ' id="caption_subject">', $txt['subject'], ':</span>
+							<label for="subject"', (isset($context['post_error']['no_subject']) ? ' class="error"' : ''), ' id="caption_subject">', $txt['subject'], ':</label>
 						</dt>
 						<dd id="pm_subject">
-							<input type="text" name="subject" value="', $context['subject'], '" tabindex="', $context['tabindex']++, '" size="60" maxlength="60"', isset($context['post_error']['no_subject']) ? ' class="error"' : ' class="input_text"', '/>
+							<input type="text" id="subject" name="subject" value="', $context['subject'], '" tabindex="', $context['tabindex']++, '" size="60" maxlength="60"', isset($context['post_error']['no_subject']) ? ' class="error"' : ' class="input_text"', '/>
 						</dd>
 					</dl>
-					<hr class="clear" />
-					<div id="bbcBox_message"></div>';
-
-	// What about smileys?
-	if (!empty($context['smileys']['postform']) || !empty($context['smileys']['popup']))
-		echo '
-					<div id="smileyBox_message"></div>';
+					<hr class="clear" />';
 
 	// Show BBC buttons, smileys and textbox.
 	echo '

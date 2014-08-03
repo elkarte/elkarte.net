@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -21,8 +21,9 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * ManagePosts controller handles all the administration settings
- *  for topics and posts.
+ * ManagePosts controller handles all the administration settings for topics and posts.
+ *
+ * @package Posts
  */
 class ManagePosts_Controller extends Action_Controller
 {
@@ -34,12 +35,13 @@ class ManagePosts_Controller extends Action_Controller
 
 	/**
 	 * The main entrance point for the 'Posts and topics' screen.
-	 * Like all others, it checks permissions, then forwards to the right function
-	 * based on the given sub-action.
-	 * Defaults to sub-action 'posts'.
 	 *
-	 * Accessed from ?action=admin;area=postsettings.
-	 * Requires (and checks for) the admin_forum permission.
+	 * What it does:
+	 * - Like all others, it checks permissions, then forwards to the right function
+	 * based on the given sub-action.
+	 * - Defaults to sub-action 'posts'.
+	 * - Accessed from ?action=admin;area=postsettings.
+	 * - Requires (and checks for) the admin_forum permission.
 	 *
 	 * @see Action_Controller::action_index()
 	 */
@@ -48,7 +50,7 @@ class ManagePosts_Controller extends Action_Controller
 		global $context, $txt;
 
 		// We're working with them settings here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		$subActions = array(
 			'posts' => array(
@@ -67,13 +69,8 @@ class ManagePosts_Controller extends Action_Controller
 				'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_posts', array(&$subActions));
-
-		// Default the sub-action to 'posts'.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'posts';
-
-		$context['page_title'] = $txt['manageposts_title'];
-		$context['sub_action'] = $subAction;
+		// Good old action handle
+		$action = new Action('manage_posts');
 
 		// Tabs for browsing the different post functions.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -96,18 +93,24 @@ class ManagePosts_Controller extends Action_Controller
 			),
 		);
 
+		// Default the sub-action to 'posts'. call integrate_sa_manage_posts
+		$subAction = $action->initialize($subActions, 'posts');
+
+		// Just for the template
+		$context['page_title'] = $txt['manageposts_title'];
+		$context['sub_action'] = $subAction;
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'posts');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Shows an interface to set and test censored words.
-	 * It uses the censor_vulgar, censor_proper, censorWholeWord, and censorIgnoreCase
-	 * settings.
-	 * Requires the admin_forum permission.
-	 * Accessed from ?action=admin;area=postsettings;sa=censor.
+	 *
+	 * - It uses the censor_vulgar, censor_proper, censorWholeWord, and
+	 * censorIgnoreCase settings.
+	 * - Requires the admin_forum permission.
+	 * - Accessed from ?action=admin;area=postsettings;sa=censor.
 	 *
 	 * @uses the Admin template and the edit_censored sub template.
 	 */
@@ -165,11 +168,13 @@ class ManagePosts_Controller extends Action_Controller
 			updateSettings($updates);
 		}
 
+		// Testing a word to see how it will be censored?
 		if (isset($_POST['censortest']))
 		{
 			require_once(SUBSDIR . '/Post.subs.php');
 			$censorText = htmlspecialchars($_POST['censortest'], ENT_QUOTES, 'UTF-8');
 			preparsecode($censorText);
+			$pre_censor = $censorText;
 			$context['censor_test'] = strtr(censorText($censorText), array('"' => '&quot;'));
 		}
 
@@ -191,17 +196,37 @@ class ManagePosts_Controller extends Action_Controller
 		}
 
 		call_integration_hook('integrate_censors');
-
-		$context['sub_template'] = 'edit_censored';
-		$context['page_title'] = $txt['admin_censored_words'];
-
 		createToken('admin-censor');
+
+		// Using ajax?
+		if (isset($_REQUEST['xml'], $_POST['censortest']))
+		{
+			// Clear the templates
+			$template_layers = Template_Layers::getInstance();
+			$template_layers->removeAll();
+
+			// Send back a response
+			loadTemplate('Json');
+			$context['sub_template'] = 'send_json';
+			$context['json_data'] = array(
+				'result' => true,
+				'censor' => $pre_censor . ' <i class="fa fa-arrow-circle-right"></i> ' . $context['censor_test'],
+				'token_val' => $context['admin-censor_token_var'],
+				'token' => $context['admin-censor_token'],
+			);
+		}
+		else
+		{
+			$context['sub_template'] = 'edit_censored';
+			$context['page_title'] = $txt['admin_censored_words'];
+		}
 	}
 
 	/**
 	 * Modify any setting related to posts and posting.
-	 * Requires the admin_forum permission.
-	 * Accessed from ?action=admin;area=postsettings;sa=posts.
+	 *
+	 * - Requires the admin_forum permission.
+	 * - Accessed from ?action=admin;area=postsettings;sa=posts.
 	 *
 	 * @uses Admin template, edit_post_settings sub-template.
 	 */
@@ -213,8 +238,6 @@ class ManagePosts_Controller extends Action_Controller
 		$this->_initPostSettingsForm();
 
 		$config_vars = $this->_postSettings->settings();
-
-		call_integration_hook('integrate_modify_post_settings');
 
 		// Setup the template.
 		$context['page_title'] = $txt['manageposts_settings'];
@@ -282,12 +305,10 @@ class ManagePosts_Controller extends Action_Controller
 		$config_vars = array(
 				// Simple post options...
 				array('check', 'removeNestedQuotes'),
-				array('check', 'enableEmbeddedFlash', 'subtext' => $txt['enableEmbeddedFlash_warning']),
 				array('check', 'enableVideoEmbeding'),
 				array('check', 'enableCodePrettify'),
 				// Note show the warning as read if pspell not installed!
-				array('check', 'enableSpellChecking', 'subtext' => (function_exists('pspell_new') ? $txt['enableSpellChecking_warning'] : '<span class="error">' . $txt['enableSpellChecking_error'] . '</span>')),
-				array('check', 'disable_wysiwyg'),
+				array('check', 'enableSpellChecking', 'postinput' => (function_exists('pspell_new') ? $txt['enableSpellChecking_warning'] : '<span class="error">' . $txt['enableSpellChecking_error'] . '</span>')),
 			'',
 				// Posting limits...
 				array('int', 'max_messageLength', 'subtext' => $txt['max_messageLength_zero'], 'postinput' => $txt['manageposts_characters']),
@@ -299,8 +320,12 @@ class ManagePosts_Controller extends Action_Controller
 				array('int', 'edit_disable_time', 'subtext' => $txt['edit_disable_time_zero'], 'postinput' => $txt['manageposts_minutes']),
 			'',
 				// First & Last message preview lengths
+				array('select', 'message_index_preview', array($txt['message_index_preview_off'], $txt['message_index_preview_first'], $txt['message_index_preview_last'])),
 				array('int', 'preview_characters', 'subtext' => $txt['preview_characters_zero'], 'postinput' => $txt['preview_characters_units']),
 		);
+
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_post_settings', array(&$config_vars));
 
 		return $config_vars;
 	}

@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -61,46 +61,53 @@ if (!defined('ELK'))
  * Current validation can be one or a combination of:
  *    max_length[x], min_length[x], length[x],
  *    alpha, alpha_numeric, alpha_dash
- *    numeric, integer, boolean, float, notequal[x,y,z]
- *    valid_url, valid_ip, valid_ipv6, valid_email,
+ *    numeric, integer, boolean, float, notequal[x,y,z], isarray, limits[min,max]
+ *    valid_url, valid_ip, valid_ipv6, valid_email, valid_color
  *    php_syntax, contains[x,y,x], required, without[x,y,z]
  */
 class Data_Validator
 {
 	/**
 	 * Validation rules
+	 * @var mixed[]
 	 */
 	protected $_validation_rules = array();
 
 	/**
 	 * Sanitation rules
+	 * @var mixed[]
 	 */
 	protected $_sanitation_rules = array();
 
 	/**
 	 * Text substitutions for field names in the error messages
+	 * @var mixed[]
 	 */
 	protected $_replacements = array();
 
 	/**
 	 * Holds validation errors
+	 * @var mixed[]
 	 */
 	protected $_validation_errors = array();
 
 	/**
 	 * Holds our data
+	 * @var mixed[]
 	 */
 	protected $_data = array();
 
 	/**
 	 * Strict data processing,
 	 * if true drops data for which no sanitation rule was set
+	 * @var boolean
 	 */
 	protected $_strict = false;
 
 	/**
 	 * Holds any special processing that is required for certain fields
 	 * csv or array
+	 * @var string[]
 	 */
 	protected $_datatype = array();
 
@@ -115,11 +122,21 @@ class Data_Validator
 	}
 
 	/**
+	 * Allow testing data values for empty/isset
+	 *
+	 * @param string $property key name of array value to return
+	 */
+	public function __isset($property)
+	{
+		return isset($this->_data[$property]);
+	}
+
+	/**
 	 * Shorthand static method for simple inline validation
 	 *
-	 * @param array $data
-	 * @param array $validation_rules
-	 * @param array $sanitation_rules
+	 * @param mixed[] $data generally $_POST data for this method
+	 * @param mixed[] $validation_rules assoicative array of field => rules
+	 * @param mixed[] $sanitation_rules assoicative array of field => rules
 	 */
 	public static function is_valid(&$data = array(), $validation_rules = array(), $sanitation_rules = array())
 	{
@@ -134,7 +151,7 @@ class Data_Validator
 
 		// Replace the data
 		if (!empty($sanitation_rules))
-			$data = array_replace($data, $validator->validation_data());
+			$data = $validator->_array_replace($data, $validator->validation_data());
 
 		// Return true or false on valid data
 		return $result;
@@ -143,7 +160,7 @@ class Data_Validator
 	/**
 	 * Set the validation rules that will be run against the data
 	 *
-	 * @param array $rules
+	 * @param mixed[] $rules assoicative array of field => rule|rule|rule
 	 */
 	public function validation_rules($rules = array())
 	{
@@ -161,7 +178,7 @@ class Data_Validator
 	/**
 	 * Sets the sanitation rules used to clean data
 	 *
-	 * @param array $rules
+	 * @param mixed[] $rules assoicative array of field => rule|rule|rule
 	 * @param boolean $strict
 	 */
 	public function sanitation_rules($rules = array(), $strict = false)
@@ -181,7 +198,7 @@ class Data_Validator
 
 	/**
 	 * Field Name Replacements
-	 * @param array $replacements
+	 * @param mixed[] $replacements assoicative array of field => txt string key
 	 */
 	public function text_replacements($replacements = array())
 	{
@@ -195,7 +212,7 @@ class Data_Validator
 	 * Set special processing conditions for fields, such as (and only)
 	 * csv or array
 	 *
-	 * @param array $datatype
+	 * @param string[] $datatype csv or array processing for the field
 	 */
 	public function input_processing($datatype = array())
 	{
@@ -208,7 +225,7 @@ class Data_Validator
 	/**
 	 * Run the sanitation and validation on the data
 	 *
-	 * @param array $input
+	 * @param mixed[] $input associative array of data to process name => value
 	 */
 	public function validate($input)
 	{
@@ -226,10 +243,11 @@ class Data_Validator
 	/**
 	 * Return any errors found, either in the raw or nicely formatted
 	 *
-	 * @param mixed $raw
+	 * @param mixed[]|string|boolean $raw
 	 *    - true returns the raw error array,
 	 *    - array returns just error messages of those fields
-	 *    - otherwise all error message(s)
+	 *    - string returns just that error message
+	 *    - default is all error message(s)
 	 */
 	public function validation_errors($raw = false)
 	{
@@ -243,7 +261,7 @@ class Data_Validator
 
 	/**
 	 * Return the validation data, all or a specific key
-	 * @param mixed $key int or string
+	 * @param integer|string|null $key int or string
 	 */
 	public function validation_data($key = null)
 	{
@@ -254,10 +272,25 @@ class Data_Validator
 	}
 
 	/**
+	 * array_replace is a php 5.3+ function, this is needed to support the oldies
+	 */
+	private function _array_replace()
+	{
+		$array = array();
+		$n = func_num_args();
+
+		// Union each array passed
+		while ($n-- > 0)
+			$array += func_get_arg($n);
+
+		return $array;
+	}
+
+	/**
 	 * Performs data validation against the provided rule
 	 *
-	 * @param mixed $input
-	 * @param array $ruleset
+	 * @param mixed[] $input
+	 * @param mixed[] $ruleset
 	 */
 	private function _validate($input, $ruleset)
 	{
@@ -269,41 +302,41 @@ class Data_Validator
 		{
 			// Special processing required on this field like csv or array?
 			if (isset($this->_datatype[$field]) && in_array($this->_datatype[$field], array('csv', 'array')))
-				$result = $this->_validate_recursive($input, $field, $rules);
+				$this->_validate_recursive($input, $field, $rules);
 			else
 			{
 				// Get rules for this field
 				$rules = explode('|', $rules);
 				foreach ($rules as $rule)
 				{
-					$validation_method = null;
 					$validation_parameters = null;
+					$validation_parameters_function = array();
 
 					// Were any parameters provided for the rule, e.g. min_length[6]
 					if (preg_match('~(.*)\[(.*)\]~', $rule, $match))
 					{
 						$validation_method = '_validate_' . $match[1];
 						$validation_parameters = $match[2];
+						$validation_function = $match[1];
+						$validation_parameters_function = explode(',', $match[2]);
 					}
 					// Or just a predefined rule e.g. valid_email
 					else
+					{
 						$validation_method = '_validate_' . $rule;
+						$validation_function = $rule;
+					}
 
-					// Time to validate
-					$result = array();
 					// Defined method to use?
 					if (is_callable(array($this, $validation_method)))
 						$result = $this->$validation_method($field, $input, $validation_parameters);
-					// One of our static methods
-					elseif (strpos($rule, '::') !== false && is_callable($rule))
-						$result = call_user_func($rule, $input[$field], $validation_parameters);
-					// Maybe even a function?
-					elseif (function_exists($rule))
-						$result = $rule($input[$field], $validation_parameters);
+					// Maybe even a custom function set up like a defined one, addons can do this.
+					elseif (is_callable($validation_function) && strpos($validation_function, 'validate_') === 0 && isset($input[$field]))
+						$result = call_user_func_array($validation_function, array_merge((array) $field, (array) $input[$field], $validation_parameters_function));
 					else
 						$result = array(
 							'field' => $validation_method,
-							'input' => $input[$field],
+							'input' => isset($input[$field]) ? $input[$field] : null,
 							'function' => '_validate_invalid_function',
 							'param' => $validation_parameters
 						);
@@ -319,10 +352,11 @@ class Data_Validator
 
 	/**
 	 * Used when a field contains csv or array of data
-	 * Will convert field to individual elements and run a separate validation on that group
+	 *
+	 * -Will convert field to individual elements and run a separate validation on that group
 	 * using the rules defined to the parent node
 	 *
-	 * @param array $input
+	 * @param mixed[] $input
 	 * @param string $field
 	 * @param string $rules
 	 */
@@ -331,8 +365,12 @@ class Data_Validator
 		if (!isset($input[$field]))
 			return;
 
+		// Start a new instance of the validtor to work on this sub data (csv/array)
 		$sub_validator = new Data_Validator();
+
 		$fields = array();
+		$validation_rules = array();
+
 		if ($this->_datatype[$field] === 'array')
 		{
 			// Convert the array to individual values, they all use the same rules
@@ -376,8 +414,8 @@ class Data_Validator
 	/**
 	 * Data sanitation is a good thing
 	 *
-	 * @param mixed $input
-	 * @param array $ruleset
+	 * @param mixed[] $input
+	 * @param mixed[] $ruleset
 	 * @return mixed
 	 */
 	private function _sanitize($input, $ruleset)
@@ -403,33 +441,35 @@ class Data_Validator
 				$rules = explode('|', $rules);
 				foreach ($rules as $rule)
 				{
-					$sanitation_method = null;
 					$sanitation_parameters = null;
+					$sanitation_parameters_function = array();
 
 					// Were any parameters provided for the rule, e.g. Util::htmlspecialchars[ENT_QUOTES]
 					if (preg_match('~(.*)\[(.*)\]~', $rule, $match))
 					{
 						$sanitation_method = '_sanitation_' . $match[1];
 						$sanitation_parameters = $match[2];
+						$sanitation_function = $match[1];
+						$sanitation_parameters_function = explode(',', $match[2]);
 					}
 					// Or just a predefined rule e.g. trim
 					else
+					{
 						$sanitation_method = '_sanitation_' . $rule;
+						$sanitation_function = $rule;
+					}
 
 					// Defined method to use?
 					if (is_callable(array($this, $sanitation_method)))
 						$input[$field] = $this->$sanitation_method($input[$field], $sanitation_parameters);
-					// One of our static methods
-					elseif (strpos($rule, '::') !== false && is_callable($rule))
-						$input[$field] = call_user_func($rule, $input[$field], $sanitation_parameters);
-					// Maybe even a built in php function like strtoupper, intval, etc?
-					elseif (function_exists($rule))
-						$input[$field] = $rule($input[$field]);
+					// One of our static methods or even a built in php function like strtoupper, intval, etc?
+					elseif (is_callable($sanitation_function))
+						$input[$field] = call_user_func_array($sanitation_function, array_merge((array) $input[$field], $sanitation_parameters_function));
 					// Or even a language construct?
-					elseif (in_array($rule, array('empty', 'array', 'isset')))
+					elseif (in_array($sanitation_function, array('empty', 'array', 'isset')))
 					{
 						// could be done as methods instead ...
-						switch ($rule)
+						switch ($sanitation_function)
 						{
 							case 'empty':
 								$input[$field] = empty($input[$field]);
@@ -458,14 +498,18 @@ class Data_Validator
 	 * When the input field is an array or csv, this will build a new validator
 	 * as if the fields were individual ones, each checked against the base rule
 	 *
-	 * @param array $input
+	 * @param mixed[] $input
 	 * @param string $field
 	 * @param string $rules
 	 */
 	private function _sanitize_recursive($input, $field, $rules)
 	{
+		// create a new instance to run against this sub data
 		$validator = new Data_Validator();
+
 		$fields = array();
+		$sanitation_rules = array();
+
 		if ($this->_datatype[$field] === 'array')
 		{
 			// Convert the array to individual values, they all use the same rules
@@ -506,7 +550,7 @@ class Data_Validator
 	/**
 	 * Process any errors and return the error strings
 	 *
-	 * @param array $keys
+	 * @param mixed[]|boolean $keys
 	 */
 	private function _get_error_messages($keys)
 	{
@@ -528,12 +572,13 @@ class Data_Validator
 			$field = isset($this->_replacements[$error['field']]) ? $this->_replacements[$error['field']] : $error['field'];
 
 			// Just want specific field errors returned?
-			if (!empty($keys) && !in_array($error['field'], $keys))
+			if (!empty($keys) && is_array($keys) && !in_array($error['field'], $keys))
 				continue;
 
 			// Set the error message for this validation failure
 			if (isset($error['error']))
 				$result[] = sprintf($txt[$error['error']], $field, $error['error_msg']);
+			// Use our error text based on the function name itself
 			elseif (isset($txt[$error['function']]))
 			{
 				if (!empty($error['param']))
@@ -541,6 +586,9 @@ class Data_Validator
 				else
 					$result[] = sprintf($txt[$error['function']], $field, $error['input']);
 			}
+			// can't find the function text, so set a generic one
+			else
+				$result[] = sprintf($txt['_validate_generic'], $field);
 		}
 
 		return $result;
@@ -552,8 +600,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'contains[value, value, value]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param string|null $validation_parameters array or null
 	 */
 	protected function _validate_contains($field, $input, $validation_parameters = null)
 	{
@@ -578,8 +626,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'notequal[value, value, value]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param string|null $validation_parameters array or null
 	 */
 	protected function _validate_notequal($field, $input, $validation_parameters = null)
 	{
@@ -599,13 +647,54 @@ class Data_Validator
 	}
 
 	/**
+	 * Limits ... Verify that a value is within the defined limits
+	 *
+	 * Usage: '[key]' => 'limits[min, max]'
+	 * >= min and <= max
+	 * Limits may be specified one sided
+	 *  - limits[,10] means <=10 with no lower bound check
+	 *  - limits[10,] means >= 10 with no upper bound
+	 *
+	 * @param string $field
+	 * @param mixed[] $input
+	 * @param string|null $validation_parameters array or null
+	 */
+	protected function _validate_limits($field, $input, $validation_parameters = null)
+	{
+		$validation_parameters = explode(',', $validation_parameters);
+		$validation_parameters = array_filter($validation_parameters, 'strlen');
+		$input[$field] = isset($input[$field]) ? $input[$field] : '';
+		$value = $input[$field];
+
+		// Lower bound ?
+		$passmin = true;
+		if (isset($validation_parameters[0]))
+			$passmin = $value >= $validation_parameters[0];
+
+		// Upper bound ?
+		$passmax = true;
+		if (isset($validation_parameters[1]))
+			$passmax = $value <= $validation_parameters[1];
+
+		if ($passmax && $passmin)
+			return;
+
+		return array(
+			'field' => $field,
+			'input' => $input[$field],
+			'function' => __FUNCTION__,
+			'param' => implode(',', $validation_parameters)
+		);
+	}
+
+	/**
 	 * Without ... Verify that a value does contain any characters/values in list
 	 *
 	 * Usage: '[key]' => 'without[value, value, value]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_without($field, $input, $validation_parameters = null)
 	{
@@ -633,8 +722,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'required'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_required($field, $input, $validation_parameters = null)
 	{
@@ -655,67 +744,19 @@ class Data_Validator
 	 * Usage: '[key]' => 'valid_email'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_valid_email($field, $input, $validation_parameters = null)
 	{
 		if (!isset($input[$field]))
 			return;
 
-		$valid = true;
-		$at_index = strrpos($input[$field], '@');
-
-		// No @ in the email
-		if ($at_index === false)
+		// Quick check, no @ in the email
+		if (strrpos($input[$field], '@') === false)
 			$valid = false;
 		else
-		{
-			// Time to do some checking on the local@domain parts
-			// http://www.linuxjournal.com/article/9585
-			$local = substr($input[$field], 0, $at_index);
-			$local_len = strlen($local);
-
-			$domain = substr($input[$field], $at_index + 1);
-			$domain_len = strlen($domain);
-
-			/* Some RFC 2822 email "rules" ...
-			 * - Uppercase and lowercase English letters (a–z, A–Z)
-			 * - Digits 0 to 9
-			 * - Characters !#$%&'*+-/=?^_`{|}~
-			 * - Character . provided that it is not the first/last and that it does not appear two or more times consecutively
-			 * - Special characters Space "(),:;<>@[\] provided they are contained between quotation marks, and that 2 of them, the
-			 *   backslash \ and quotation mark ", must also be preceded by a backslash \ (e.g. "\\\"").
-			 */
-
-			// local part length problems (RFC 2821)
-			if ($local_len === 0 || $local_len > 64)
-				$valid = false;
-			// local part starts or ends with a '.' (RFC 2822)
-			elseif ($local[0] === '.' || $local[$local_len - 1] === '.')
-				$valid = false;
-			// local part has two consecutive dots (RFC 2822)
-			elseif (preg_match('~\\.\\.~', $local))
-				$valid = false;
-			// domain part length problems (RFC 2821)
-			elseif ($domain_len === 0 || $domain_len > 255)
-				$valid = false;
-			// domain does not have a least two parts
-			elseif (strpos($domain, '.') === false)
-				$valid = false;
-			// character not valid in domain part (RFC 1035)
-			elseif (!preg_match('~^[A-Za-z0-9\\-\\.]+$~', $domain))
-				$valid = false;
-			// domain part has two consecutive dots (RFC 1035)
-			elseif (preg_match('~\\.\\.~', $domain))
-				$valid = false;
-			// character not valid in local part unless local part is quoted (RFC 2822)
-			elseif (!preg_match('/^(\\\\.|[A-Za-z0-9!#%&`_=\\/$\'*+?^{}|~.-])+$/', str_replace("\\\\", "", $local)))
-			{
-				if (!preg_match('/^"(\\\\"|[^"])+"$/', str_replace("\\\\", "", $local)))
-					$valid = false;
-			}
-		}
+			$valid = filter_var($input[$field], FILTER_VALIDATE_EMAIL) !== false;
 
 		if ($valid)
 			return;
@@ -734,8 +775,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'max_length[x]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_max_length($field, $input, $validation_parameters = null)
 	{
@@ -759,8 +800,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'min_length[x]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_min_length($field, $input, $validation_parameters = null)
 	{
@@ -784,8 +825,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'exact_length[x]'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_length($field, $input, $validation_parameters = null)
 	{
@@ -809,8 +850,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'alpha'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_alpha($field, $input, $validation_parameters = null)
 	{
@@ -833,10 +874,11 @@ class Data_Validator
 	 * alpha_numeric ... Determine if the provided value contains only alpha-numeric characters
 	 *
 	 * Usage: '[key]' => 'alpha_numeric'
+	 * Allows letters, numbers dash and underscore characters
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_alpha_numeric($field, $input, $validation_parameters = null)
 	{
@@ -861,8 +903,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'alpha_dash'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_alpha_dash($field, $input, $validation_parameters = null)
 	{
@@ -886,15 +928,14 @@ class Data_Validator
 	 * Usage: '[key]' => 'isarray'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_isarray($field, $input, $validation_parameters = null)
 	{
 		if (!isset($input[$field]))
 			return;
 
-		// A character with the Unicode property of letter (any kind of letter from any language)
 		if (!is_array($input[$field]))
 		{
 			return array(
@@ -912,8 +953,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'numeric'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_numeric($field, $input, $validation_parameters = null)
 	{
@@ -937,8 +978,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'integer'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_integer($field, $input, $validation_parameters = null)
 	{
@@ -962,8 +1003,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'boolean'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_boolean($field, $input, $validation_parameters = null)
 	{
@@ -987,8 +1028,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'float'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_float($field, $input, $validation_parameters = null)
 	{
@@ -1012,8 +1053,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'valid_url'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_valid_url($field, $input, $validation_parameters = null)
 	{
@@ -1037,15 +1078,15 @@ class Data_Validator
 	 * Usage: '[key]' => 'valid_ipv6'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_valid_ipv6($field, $input, $validation_parameters = null)
 	{
 		if (!isset($input[$field]))
 			return;
 
-		if (preg_match('~^((([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}:[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){5}:([0-9A-Fa-f]{1,4}:)?[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){4}:([0-9A-Fa-f]{1,4}:){0,2}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){3}:([0-9A-Fa-f]{1,4}:){0,3}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){2}:([0-9A-Fa-f]{1,4}:){0,4}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(([0-9A-Fa-f]{1,4}:){0,5}:((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(::([0-9A-Fa-f]{1,4}:){0,5}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|([0-9A-Fa-f]{1,4}::([0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4})|(::([0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){1,7}:))$~', $input[$field]) === 0)
+		if (filter_var($input[$field], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false)
 		{
 			return array(
 				'field' => $field,
@@ -1062,15 +1103,15 @@ class Data_Validator
 	 * Usage: '[key]' => 'valid_ip'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_valid_ip($field, $input, $validation_parameters = null)
 	{
 		if (!isset($input[$field]))
 			return;
 
-		if (preg_match('~^((([1]?\d)?\d|2[0-4]\d|25[0-5])\.){3}(([1]?\d)?\d|2[0-4]\d|25[0-5])$~', $input[$field]) === 0)
+		if (filter_var($input[$field], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false)
 		{
 			return array(
 				'field' => $field,
@@ -1089,8 +1130,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'php_syntax'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_php_syntax($field, $input, $validation_parameters = null)
 	{
@@ -1118,11 +1159,11 @@ class Data_Validator
 			$result = @eval('
 				if (false)
 				{
-					' . preg_replace('~^(?:\s*<\\?(?:php)?|\\?>\s*$)~', '', $input[$field]) . '
+					' . preg_replace('~^(?:\s*<\\?(?:php)?|\\?>\s*$)~u', '', $input[$field]) . '
 				}
 			');
 			error_reporting($errorReporting);
-			ob_end_clean();
+			@ob_end_clean();
 		}
 
 		if ($result === false)
@@ -1145,8 +1186,8 @@ class Data_Validator
 	 * Usage: '[key]' => 'valid_color'
 	 *
 	 * @param string $field
-	 * @param array $input
-	 * @param mixed $validation_parameters array or null
+	 * @param mixed[] $input
+	 * @param mixed[]|null $validation_parameters array or null
 	 */
 	protected function _validate_valid_color($field, $input, $validation_parameters = null)
 	{
@@ -1194,7 +1235,7 @@ class Data_Validator
 	 * - auser@gmail.com, a.user@gmail.com, auser+big@gmail.com and a.user+gigantic@googlemail.com are same email address.
 	 *
 	 * @param string $input
-	 * @param mixed $sanitation_parameters
+	 * @param string|null $sanitation_parameters
 	 */
 	protected function _sanitation_gmail_normalize($input, $sanitation_parameters = null)
 	{

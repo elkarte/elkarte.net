@@ -10,7 +10,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -86,6 +86,13 @@ function bb2_db_query($query)
 	// ok they are right its my horror :P
 	if (strpos($query, 'DATE_SUB') !== false)
 		$query = 'DELETE FROM {db_prefix}log_badbehavior WHERE date < ' . (bb2_db_date() - 7 * 86400);
+	elseif (strpos($query, 'OPTIMIZE TABLE') !== false)
+	{
+		// This is just intended to waste spammer time, occurs (rand(1,1000) == 1) from banned.inc.php
+		$db->db_optimize_table('{db_prefix}log_badbehavior');
+
+		return true;
+	}
 	elseif (strpos($query, '@@session.wait_timeout') !== false)
 		return true;
 
@@ -108,7 +115,7 @@ function bb2_db_query($query)
  * or equivalent and appending the result of each call to an array.
  *
  * @param object $result
- * @return array
+ * @return mixed[] associate array of query results
  */
 function bb2_db_rows($result)
 {
@@ -162,20 +169,36 @@ function bb2_insert($settings, $package, $key)
 	$session = !empty($sc) ? (string) $sc : '';
 
 	// Prepare the headers etc for db insertion
-	// We are passed ...  Host. User-Agent, Accept, Accept-Language, Accept-Encoding, DNT, Connection, Referer, Cookie, Authorization
+	// We are passed at least
+	//	Host, User-Agent, Accept, Accept-Language, Accept-Encoding, DNT, Connection, Referer, Cookie, Authorization
 	$headers = '';
-	$skip = array('User-Agent');
+	$length = 0;
+	$skip = array('User-Agent', 'Accept-Encoding', 'DNT', 'X-Wap-Profile');
 	foreach ($package['headers'] as $h => $v)
 	{
 		if (!in_array($h, $skip))
-			$headers .= bb2_db_escape($h . ': ' .  $v . "\n");
+		{
+			// Make sure this header it will fit in the db, if not move on to the next
+			// @todo increase the db space to 512 or convert to text?
+			$check = $length + Util::strlen($h) + Util::strlen($v) + 2;
+			if ($check < 255)
+			{
+				$headers .= bb2_db_escape($h . ': ' .  $v . "\n");
+				$length = $check;
+			}
+		}
 	}
 
 	$request_entity = '';
 	if (!strcasecmp($request_method, "POST"))
 	{
 		foreach ($package['request_entity'] as $h => $v)
+		{
+			if (is_array($v))
+				$v = implode(' | ', $v);
+
 			$request_entity .= bb2_db_escape("$h: $v\n");
+		}
 	}
 
 	// Add it
@@ -213,8 +236,8 @@ function bb2_read_whitelist()
 	// Build up the whitelist array so badbehavior can use it
 	return array_merge(
 		array('ip' => $whitelist['badbehavior_ip_wl']),
-		array('url' => $whitelist['badbehavior_useragent_wl']),
-		array('useragent' => $whitelist['badbehavior_url_wl'])
+		array('url' => $whitelist['badbehavior_url_wl']),
+		array('useragent' => $whitelist['badbehavior_useragent_wl'])
 	);
 }
 
@@ -222,7 +245,7 @@ function bb2_read_whitelist()
  * Retrieve bad behavior settings from database and supply them to
  * bad behavior so it knows to not behave badly
  *
- * @return array
+ * @return mixed[]
  */
 function bb2_read_settings()
 {
@@ -245,7 +268,6 @@ function bb2_read_settings()
 	// Return the settings so BadBehavior can use them
 	return array(
 		'log_table' => '{db_prefix}log_badbehavior',
-		'display_stats' => !empty($modSettings['badbehavior_display_stats']),
 		'strict' => !empty($modSettings['badbehavior_strict']),
 		'verbose' => !empty($modSettings['badbehavior_verbose']),
 		'logging' => !empty($modSettings['badbehavior_logging']),

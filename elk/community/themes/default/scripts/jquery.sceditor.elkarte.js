@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  * Extension functions to provide ElkArte compatibility with sceditor
  */
 
@@ -66,12 +66,12 @@
 						title: emoticon.tooltip || emoticon
 					})
 					.click(function (e) {
-						var	start = '',
+						var start = '',
 							end = '';
 
 						if (base.opts.emoticonsCompat)
 						{
-							start = '<span>';
+							start = '<span> ';
 							end   = ' </span>';
 						}
 
@@ -98,10 +98,11 @@
 		},
 		createPermanentDropDown: function() {
 			var emoticons = $.extend({}, this.opts.emoticons.dropdown),
-				popup_exists = false;
+				popup_exists = false,
+				smiley_popup = '';
 
 			base = this;
-			content = $('<div class="sceditor-insertemoticon" />'),
+			content = $('<div class="sceditor-insertemoticon" />');
 			line = $('<div id="sceditor-smileycontainer" />');
 
 			for (smiley_popup in this.opts.emoticons.popup)
@@ -137,7 +138,7 @@
 						closeButton = $('<div id="sceditor-popup-close" />').text('[' + base._('Close') + ']').click(function () {
 							$(".sceditor-smileyPopup").fadeOut('fast');
 						});
-						
+
 						if (typeof closeButton !== "undefined")
 							popupContent.append(closeButton);
 
@@ -160,7 +161,7 @@
 						});
 
 						// Allow the smiley window to be moved about
-						$('.sceditor-smileyPopup').draggable();
+						$('.sceditor-smileyPopup').draggable({handle: '.sceditor-popup-grip'});
 
 						// stop clicks within the dropdown from being handled
 						$dropdown.click(function (e) {
@@ -183,64 +184,19 @@
 })(jQuery);
 
 /**
- * ElkArte unique commands to add to the toolbar
+ * ElkArte unique commands to add to the toolbar, when a button
+ * with the same name is selected, it will trigger these defiintions
  *
- * Adds FTP, Glow, Shadow, Tt, Pre, Spoiler, Footnote and Move commands
+ * tooltip - the hover text, this is the name in the editors.xxxx.php file
+ * txtExec - this is the text to insert before and after the cursor or seleted text
+ *           when in the plain text part of the editor
+ * exec - this is called when in the wizzy part of the editor to insert text or html tags
+ * state - this is used to determine if a button should be shown as active or not
+ *
+ * Adds Tt, Pre, Spoiler, Footnote commands
  */
 $.sceditor.command
-	.set('ftp', {
-		exec: function (caller) {
-			var	editor = this,
-				content = $(this._('<form><div><label for="link">{0}</label> <input type="text" id="link" value="ftp://" /></div>' +
-					'<div><label for="des">{1}</label> <input type="text" id="des" value="" /></div></form>' +
-					'<div><input type="button" class="button" value="{2}" /></div>',
-				this._("URL:"),
-				this._("Description (optional):"),
-				this._("Insert")
-			));
-
-			content.find('.button').click(function (e) {
-				var val = content.find("#link").val(),
-					description = content.find("#des").val();
-
-				if (val !== "" && val !== "ftp://")
-				{
-					// needed for IE to reset the last range
-					editor.focus();
-
-					if (!editor.getRangeHelper().selectedHtml() || description)
-					{
-						if (!description)
-							description = val;
-
-						editor.insert('<a href="' + val + '">' + description, '</a>', false);
-					}
-					else
-						editor.execCommand("createlink", val);
-				}
-
-				editor.closeDropDown(true);
-				e.preventDefault();
-			});
-
-			editor.createDropDown(caller, "insertlink", content);
-		},
-		txtExec: ['[ftp]', '[/ftp]'],
-		tooltip: 'Insert FTP Link'
-	})
-	.set('glow', {
-		exec: function () {
-			this.insert('[glow=red,2,300]', '[/glow]');
-		},
-		txtExec: ['[glow=red,2,300]', '[/glow]'],
-		tooltip: 'Glow'
-	})
-	.set('shadow', {
-		exec: function () {
-			this.insert('[shadow=red,left]', '[/shadow]');
-		},
-		txtExec: ['[shadow=red,left]', '[/shadow]'],
-		tooltip: 'Shadow'
+	.set('space', {
 	})
 	.set('spoiler', {
 		exec: function () {
@@ -297,18 +253,6 @@ $.sceditor.command
 		txtExec: ['[pre]', '[/pre]'],
 		tooltip: 'Preformatted Text'
 	})
-	.set('move', {
-		state: function() {
-			var currentNode = this.currentNode();
-
-			return $(currentNode).is('marquee') || $(currentNode).parents('marquee').length > 0 ? 1 : 0;
-		},
-		exec: function () {
-			this.insert('[move]', '[/move]', false);
-		},
-		txtExec: ['[move]', '[/move]'],
-		tooltip: 'Move'
-	})
 	/*
 	 * ElkArte modifications to existing commands so they display as we like
 	 *
@@ -327,85 +271,12 @@ $.sceditor.command
 /**
  * ElkArte custom bbc tags added to provide for the existing user experience
  *
- * Adds BBC codes Abbr, Acronym, Bdo, List, Tt, Pre, Php, Move
- * Adds bbc colors Black, Red, Blue, Green, White
+ * These command define what happens to tags as to toggle from and to wizzy mode
+ * It converts html back to bbc or bbc back to html.  Read the sceditor docs for more
+ *
+ * Adds / modifies BBC codes List, Tt, Pre, quote, footnote, code, img
  */
 $.sceditor.plugins.bbcode.bbcode
-	.set('abbr', {
-		tags: {
-			abbr: {
-				title: null
-			}
-		},
-		format: function(element, content) {
-			return '[abbr=' + element.attr('title') + ']' + content + '[/abbr]';
-		},
-		html: function(element, attrs, content) {
-			if (typeof attrs.defaultattr === "undefined" || attrs.defaultattr.length === 0)
-				return content;
-
-			return '<abbr title="' + attrs.defaultattr + '">' + content + '</abbr>';
-		}
-	})
-	.set('acronym', {
-		tags: {
-			acronym: {
-				title: null
-			}
-		},
-		format: function(element, content) {
-			return '[acronym=' + element.attr('title') + ']' + content + '[/acronym]';
-		},
-		html: function(element, attrs, content) {
-			if (typeof attrs.defaultattr === "undefined" || attrs.defaultattr.length === 0)
-				return content;
-
-			return '<acronym title="' + attrs.defaultattr + '">' + content + '</acronym>';
-		}
-	})
-	.set('bdo', {
-		tags: {
-			bdo: {
-				dir: null
-			}
-		},
-		format: function(element, content) {
-			return '[bdo=' + element.attr('dir') + ']' + content + '[/bdo]';
-		},
-		html: function(element, attrs, content) {
-			if (typeof attrs.defaultattr === "undefined" || attrs.defaultattr.length === 0)
-				return content;
-			if (attrs.defaultattr !== 'rtl' && attrs.defaultattr !== 'ltr')
-				return '[bdo=' + attrs.defaultattr + ']' + content + '[/bdo]';
-
-			return '<bdo dir="' + attrs.defaultattr + '">' + content + '</bdo>';
-		}
-	})
-	.set('black', {
-		isInline: true,
-		format: '[black]{0}[/black]',
-		html: '<font color="black">{0}</font>'
-	})
-	.set('blue', {
-		isInline: true,
-		format: '[blue]{0}[/blue]',
-		html: '<font color="blue">{0}</font>'
-	})
-	.set('green', {
-		isInline: true,
-		format: '[green]{0}[/green]',
-		html: '<font color="green">{0}</font>'
-	})
-	.set('red', {
-		isInline: true,
-		format: '[red]{0}[/red]',
-		html: '<font color="red">{0}</font>'
-	})
-	.set('white', {
-		isInline: true,
-		format: '[white]{0}[/white]',
-		html: '<font color="white">{0}</font>'
-	})
 	.set('tt', {
 		tags: {
 			tt: null,
@@ -414,15 +285,6 @@ $.sceditor.plugins.bbcode.bbcode
 		format: '[tt]{0}[/tt]',
 		html: '<span class="tt">{0}</span>'
 	})
-	.set('php', {
-		tags: {
-			php: null,
-			span: {'class': ['php']}
-		},
-		isInline: false,
-		format: '[php]{0}[/php]',
-		html: '<code class="php">{0}</code>'
-	})
 	.set('pre', {
 		tags: {
 			pre: null
@@ -430,13 +292,6 @@ $.sceditor.plugins.bbcode.bbcode
 		isInline: false,
 		format: '[pre]{0}[/pre]',
 		html: '<pre>{0}</pre>'
-	})
-	.set('move', {
-		tags: {
-			marquee: null
-		},
-		format: '[move]{0}[/move]',
-		html: '<marquee>{0}</marquee>'
 	})
 	.set('footnote', {
 		tags: {
@@ -465,7 +320,7 @@ $.sceditor.plugins.bbcode.bbcode
 
 			if ($(element).children("cite:first").length === 1)
 			{
-				from = $(element).children("cite:first").text();
+				from = $(element).children("cite:first").text().trim();
 				$(element).attr({'from': from.php_htmlspecialchars()});
 				from = '=' + from;
 				content = '';
@@ -481,6 +336,9 @@ $.sceditor.plugins.bbcode.bbcode
 			}
 
 			return '[code' + from + ']' + content.replace('&#91;', '[') + '[/code]';
+		},
+		quoteType: function(element) {
+			return element;
 		},
 		html: function(element, attrs, content) {
 			var from = '';
@@ -531,6 +389,13 @@ $.sceditor.plugins.bbcode.bbcode
 				attr_author = attrs.author;
 				sAuthor = bbc_quote_from + ': ' + attr_author;
 			}
+			// Done as [quote=someone]
+			else if (typeof attrs.defaultattr !== "undefined")
+			{
+				// Convert it to an author tag
+				attr_author = attrs.defaultattr;
+				sAuthor = bbc_quote_from + ': ' + attr_author;
+			}
 
 			// Links could be in the form: link=topic=71.msg201#msg201 that would fool javascript, so we need a workaround
 			for (var key in attrs)
@@ -551,13 +416,13 @@ $.sceditor.plugins.bbcode.bbcode
 				sDate = '<date timestamp="' + attr_date + '">' + new Date(attrs.date * 1000) + '</date>';
 			}
 
-			// build the blockquote up with the data
+			// Build the blockquote up with the data
 			if (sAuthor === '' && sDate === '')
 				sAuthor = bbc_quote;
 			else
 				sAuthor += sDate !== '' ? ' ' + bbc_search_on : '';
 
-			content = '<blockquote author="' + attr_author + '" date="' + attr_date + '" link="' + attr_link + '"><cite>' + sAuthor + ' ' + sDate + '</cite>' + content + '</blockquote>';
+			content = '<blockquote author="' + attr_author + '" link="' + attr_link + '" date="' + attr_date + '"><cite>' + sAuthor + ' ' + sDate + '</cite>' + content + '</blockquote>';
 
 			return content;
 		}
@@ -571,7 +436,7 @@ $.sceditor.plugins.bbcode.bbcode
 		allowsEmpty: true,
 		quoteType: $.sceditor.BBCodeParser.QuoteType.never,
 		format: function(element, content) {
-			var	attribs = '',
+			var attribs = '',
 				style = function(name) {
 					return element.style ? element.style[name] : null;
 				};
@@ -589,7 +454,7 @@ $.sceditor.plugins.bbcode.bbcode
 			return '[img' + attribs + ']' + element.attr('src') + '[/img]';
 		},
 		html: function(token, attrs, content) {
-			var	parts,
+			var parts,
 				attribs = '';
 
 			// handle [img width=340 height=240]url[/img]

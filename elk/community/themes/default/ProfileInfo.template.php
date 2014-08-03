@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -28,6 +28,8 @@ function template_ProfileInfo_init()
 	// This setting is used to load a certain number of attachments
 	// in the user's profile summary, change it to a number if you need any
 	$settings['attachments_on_summary'] = 10;
+
+	loadTemplate('GenericMessages');
 }
 
 /**
@@ -115,92 +117,49 @@ function template_action_summary()
  */
 function template_action_showPosts()
 {
-	global $context, $scripturl, $txt;
+	global $context, $txt;
+
+	echo '
+		<div id="profilecenter">
+			<h2 class="category_header">
+				', empty($context['is_topics']) ? $txt['showMessages'] : $txt['showTopics'], $context['user']['is_owner'] ? '' : ' - ' . $context['member']['name'], '
+			</h2>';
 
 	template_pagesection();
 
-	echo '
-		<div class="forumposts">
-			<h2 class="category_header">
-				', (!isset($context['attachments']) && empty($context['is_topics']) ? $txt['showMessages'] : (!empty($context['is_topics']) ? $txt['showTopics'] : $txt['showAttachments'])), ' - ', $context['member']['name'], '
-			</h2>';
-
-	// Are we displaying posts or attachments?
-	if (!isset($context['attachments']))
+	// No posts? Just end the table with a informative message.
+	if (empty($context['posts']))
+		echo '
+				<div class="windowbg2">
+					<div class="content">
+						', $context['is_topics'] ? $txt['show_topics_none'] : $txt['show_posts_none'], '
+					</div>
+				</div>';
+	else
 	{
 		// For every post to be displayed, give it its own div, and show the important details of the post.
 		foreach ($context['posts'] as $post)
 		{
-			echo '
-			<div class="', $post['alternate'] == 0 ? 'windowbg2' : 'windowbg', '">
-				<div class="content">
-					<div class="counter">', $post['counter'], '</div>
-					<div class="topic_details">
-						<h5><strong><a href="', $scripturl, '?board=', $post['board']['id'], '.0">', $post['board']['name'], '</a> / <a href="', $scripturl, '?topic=', $post['topic'], '.', $post['start'], '#msg', $post['id'], '">', $post['subject'], '</a></strong></h5>
-						<span class="smalltext">', $post['time'], '</span>
-					</div>
-					<div class="inner">';
+			$post['title'] = '<strong>' . $post['board']['link'] . ' / ' . $post['topic']['link'] . '</strong>';
+			$post['date'] = $post['html_time'];
+			$post['class'] = $post['alternate'] === 0 ? 'windowbg2' : 'windowbg';
 
 			if (!$post['approved'])
-				echo '
+				$post['body'] = '
 						<div class="approve_post">
-							<em>', $txt['post_awaiting_approval'], '</em>
-						</div>';
+							<em>' . $txt['post_awaiting_approval'] . '</em>
+						</div>' . '
+					' . $post['body'];
 
-			echo '
-					', $post['body'], '
-					</div>';
-
-			if ($post['can_reply'] || $post['can_mark_notify'] || $post['can_delete'])
-				echo '
-					<ul class="quickbuttons">';
-
-			// How about... even... remove it entirely?!
-			if ($post['can_delete'])
-				echo '
-						<li class="listlevel1"><a href="', $scripturl, '?action=deletemsg;msg=', $post['id'], ';topic=', $post['topic'], ';profile;u=', $context['member']['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['remove_message'], '?\');" class="linklevel1 remove_button"><span>', $txt['remove'], '</span></a></li>';
-
-			// Can we request notification of topics?
-			if ($post['can_mark_notify'])
-				echo '
-						<li class="listlevel1"><a href="', $scripturl, '?action=notify;topic=', $post['topic'], '.', $post['start'], '" class="linklevel1 notify_button">', $txt['notify'], '</a></li>';
-
-			// If they *can* reply?
-			if ($post['can_reply'])
-				echo '
-						<li class="listlevel1"><a href="', $scripturl, '?action=post;topic=', $post['topic'], '.', $post['start'], '" class="linklevel1 reply_button">', $txt['reply'], '</a></li>';
-
-			// If they *can* quote?
-			if ($post['can_quote'])
-				echo '
-						<li class="listlevel1"><a href="', $scripturl . '?action=post;topic=', $post['topic'], '.', $post['start'], ';quote=', $post['id'], '" class="linklevel1 quote_button">', $txt['quote'], '</a></li>';
-
-			if ($post['can_reply'] || $post['can_mark_notify'] || $post['can_delete'])
-				echo '
-					</ul>';
-
-			echo '
-				</div>
-			</div>';
+			template_simple_message($post);
 		}
 	}
-	else
-		template_show_list('attachments');
-
-	// No posts? Just end the table with a informative message.
-	if ((isset($context['attachments']) && empty($context['attachments'])) || (!isset($context['attachments']) && empty($context['posts'])))
-		echo '
-				<div class="windowbg2">
-					<div class="content">
-						', isset($context['attachments']) ? $txt['show_attachments_none'] : ($context['is_topics'] ? $txt['show_topics_none'] : $txt['show_posts_none']), '
-					</div>
-				</div>';
-
-	echo '
-		</div>';
 
 	// Show more page numbers.
 	template_pagesection();
+
+	echo '
+		</div>';
 }
 
 /**
@@ -235,7 +194,7 @@ function template_action_showPermissions()
 
 			foreach ($context['no_access_boards'] as $no_access_board)
 				echo '
-						<a href="', $scripturl, '?board=', $no_access_board['id'], '.0">', $no_access_board['name'], '</a>', $no_access_board['is_last'] ? '' : ', ';
+						', $no_access_board['name'], $no_access_board['is_last'] ? '' : ', ';
 
 			echo '
 					</div>
@@ -253,8 +212,8 @@ function template_action_showPermissions()
 					<table class="table_grid">
 						<thead>
 							<tr class="table_head">
-								<th scope="col" class="lefttext" style="width:50%">', $txt['showPermissions_permission'], '</th>
-								<th scope="col" class="lefttext" style="width:50%">', $txt['showPermissions_status'], '</th>
+								<th scope="col" class="lefttext" style="width: 50%;">', $txt['showPermissions_permission'], '</th>
+								<th scope="col" class="lefttext" style="width: 50%;">', $txt['showPermissions_status'], '</th>
 							</tr>
 						</thead>
 						<tbody>';
@@ -318,8 +277,8 @@ function template_action_showPermissions()
 				<table class="table_grid">
 					<thead>
 						<tr class="table_head">
-							<th scope="col" class="lefttext" style="width:50%">', $txt['showPermissions_permission'], '</th>
-							<th scope="col" class="lefttext" style="width:50%">', $txt['showPermissions_status'], '</th>
+							<th scope="col" class="lefttext" style="width: 50%;">', $txt['showPermissions_permission'], '</th>
+							<th scope="col" class="lefttext" style="width: 50%;">', $txt['showPermissions_status'], '</th>
 						</tr>
 					</thead>
 					<tbody>';
@@ -579,17 +538,22 @@ function template_profile_block_summary()
 	echo '
 			<div class="profileblock_left">
 				<h3 class="category_header hdicon cat_img_profile">
-					', ($context['user']['is_owner']) ? '<a href="' . $scripturl . '?action=profile;area=forumprofile;u=' . $context['member']['id'] . '">' . $txt['profile_user_summary'] . ' - ' . $context['member']['name'] . '</a>' : ($txt['profile_user_summary'] . ' - ' . $context['member']['name']), '
+					', ($context['user']['is_owner']) ? '<a href="' . $scripturl . '?action=profile;area=forumprofile;u=' . $context['member']['id'] . '">' . $txt['profile_user_summary'] . '</a>' : $txt['profile_user_summary'], '
 				</h3>
 				<div id="basicinfo">
 					<div class="username">
-						<h4>', $context['member']['name'], ' <span class="position">', (!empty($context['member']['group']) ? $context['member']['group'] : $context['member']['post_group']), '</span></h4>
+						<h4><span class="position">', (!empty($context['member']['group']) ? $context['member']['group'] : $context['member']['post_group']), '</span></h4>
 					</div>
 					', $context['member']['avatar']['image'], '
 					<span id="userstatus">', $context['can_send_pm'] ? '<a href="' . $context['member']['online']['href'] . '" title="' . $context['member']['online']['text'] . '" rel="nofollow">' : '', $settings['use_image_buttons'] ? '<img src="' . $context['member']['online']['image_href'] . '" alt="' . $context['member']['online']['text'] . '" class="centericon" />' : $context['member']['online']['label'], $context['can_send_pm'] ? '</a>' : '', $settings['use_image_buttons'] ? '<span class="smalltext"> ' . $context['member']['online']['label'] . '</span>' : '', '</span>
 				</div>
 				<div id="detailedinfo">
 					<dl>';
+
+	// The members display name
+	echo '
+						<dt>', $txt['display_name'], ':</dt>
+						<dd>', $context['member']['name'], '</dd>';
 
 	// The username if allowed
 	if ($context['user']['is_owner'] || $context['user']['is_admin'])
@@ -742,8 +706,7 @@ function template_profile_block_user_info()
  * Provides a PM link
  * Provides a Email link
  * Shows any profile website information
- * Shows any IM fields they have added in their profile
- * Shows custom profile fields of placement type '1'
+ * Shows custom profile fields of placement type '1', "with icons"
  */
 function template_profile_block_contact()
 {
@@ -1082,7 +1045,7 @@ function template_profile_block_buddies()
 			<a href="', $scripturl, '?action=profile;area=lists;sa=buddies;u=', $context['member']['id'], '">', $txt['buddies'], '</a>
 		</h3>
 		<div class="windowbg">
-			<div class="content flow_auto" ', (isset($div_height) ? 'style="max-height: ' . $div_height . 'px"' : ''), '>
+			<div class="content flow_auto" ', (isset($div_height) ? 'style="max-height: ' . $div_height . 'px;"' : ''), '>
 				<table class="profile_attachments">';
 
 		// Now show them all
@@ -1111,6 +1074,19 @@ function template_profile_block_buddies()
 					echo '
 							&nbsp;<a href="', $scripturl, '?action=pm;sa=send;u=', $data['id'], '"><img src="', $settings['images_url'], '/profile/', ($data['online']['is_online']) ? 'im_on.png' : 'im_off.png', '" alt="', $txt['profile_sendpm_short'], '" title="', $txt['profile_sendpm_short'], ' to ', $data['name'], '" class="icon"/></a>';
 
+				// Other contact info from custom profile fields?
+				if (isset($data['custom_fields']))
+				{
+					$im = array();
+
+					foreach ($data['custom_fields'] as $key => $cpf)
+						if ($cpf['placement'] == 1)
+							$im[] = $cpf['value'];
+
+					echo '
+							&nbsp;' . implode('&nbsp;', $im);
+				}
+				// Done with the contact information
 				echo '
 						</td>';
 
@@ -1119,7 +1095,7 @@ function template_profile_block_buddies()
 				</tr>';
 			}
 
-			// close this final row
+			// Close this final row
 			if ($i % $per_line !== 0)
 				echo '
 				</tr>';
@@ -1160,6 +1136,7 @@ function template_profile_block_attachments()
 	<div class="windowbg">
 		<div class="content">
 			<table class="profile_attachments">';
+
 	// Show the thumbnails
 	if (!empty($context['thumbs']))
 	{
@@ -1171,8 +1148,8 @@ function template_profile_block_attachments()
 
 			echo '
 					<td class="profile_attachment">
-						<span class="attach_title">', $picture['filename'], '</span>
-						<a href="', $picture['url'], '">', $picture['img'], '</a>
+						<span class="attach_title">', $picture['subject'], '</span>
+						<a id="link_', $picture['id'], '" href="', $picture['url'], '">', $picture['img'], '</a>
 					</td>';
 
 			if (++$i % $per_line === 0)
@@ -1216,7 +1193,7 @@ function template_profile_block_posts()
 	// The posts block
 	echo '
 	<h3 class="category_header hdicon cat_img_posts">
-		<a href="', $scripturl, '?action=profile;area=showposts;sa=messages;u=', $context['member']['id'], '">', $txt['profile_posts'], '</a>
+		<a href="', $scripturl, '?action=profile;area=showposts;sa=messages;u=', $context['member']['id'], '">', $txt['profile_recent_posts'], '</a>
 	</h3>
 	<div class="windowbg">
 		<div class="content">

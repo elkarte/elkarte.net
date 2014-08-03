@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -32,7 +32,6 @@ function template_generic_menu_sidebar_above()
 	$menu_context = &$context['menu_data_' . $context['cur_menu_id']];
 
 	// For every section that appears on the sidebar...
-	$firstSection = true;
 	foreach ($menu_context['sections'] as $section)
 	{
 		// Show the section header - and pump up the line spacing for readability.
@@ -92,8 +91,6 @@ function template_generic_menu_sidebar_above()
 
 		echo '
 			</ul>';
-
-		$firstSection = false;
 	}
 
 	// This is where the actual "main content" area for the admin section starts.
@@ -211,7 +208,7 @@ function template_generic_menu_dropdown_below()
 /**
  * Some code for showing a tabbed view.
  *
- * @param array $menu_context
+ * @param integer $menu_context
  */
 function template_generic_menu_tabs(&$menu_context)
 {
@@ -288,7 +285,6 @@ function template_generic_menu_tabs(&$menu_context)
 				echo '
 						<span class="hdicon cat_img_', !empty($selected_tab['class']) ? $selected_tab['class'] : $tab_context['class'], '"></span>';
 
-
 			if (!empty($selected_tab['help']) || !empty($tab_context['help']))
 				echo '
 						<a class="hdicon cat_img_helptopics help" href="', $scripturl, '?action=quickhelp;help=', !empty($selected_tab['help']) ? $selected_tab['help'] : $tab_context['help'], '" onclick="return reqOverlayDiv(this.href);" title="', $txt['help'], '"></a>';
@@ -319,7 +315,7 @@ function template_generic_menu_tabs(&$menu_context)
 					</p>';
 
 	// Print out all the items in this tab (if any).
-	if (!empty($context['tabs']))
+	if (!empty($tab_context['tabs']))
 	{
 		// The admin tabs.
 		echo '

@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -39,6 +39,7 @@ class ProfileInfo_Controller extends Action_Controller
 
 	/**
 	 * View the user profile summary.
+	 *
 	 * @uses ProfileInfo template
 	 */
 	public function action_summary()
@@ -163,7 +164,7 @@ class ProfileInfo_Controller extends Action_Controller
 		else
 			$context['can_see_ip'] = false;
 
-		if (!empty($modSettings['who_enabled']))
+		if (!empty($modSettings['who_enabled']) && $context['member']['online']['is_online'])
 		{
 			include_once(SUBSDIR . '/Who.subs.php');
 			$action = determineActions($user_profile[$memID]['url']);
@@ -209,13 +210,11 @@ class ProfileInfo_Controller extends Action_Controller
 				$boardsAllowed = array(-1);
 			$attachments = $this->list_getAttachments(0, $settings['attachments_on_summary'], 'm.poster_time DESC', $boardsAllowed, $memID);
 
-			// Load them in to $context for use in the template
-			$i = 0;
-
-			// @todo keep or loose the mime thumbs ... useful at all?
+			// Some generic images for mime types
 			$mime_images_url = $settings['default_images_url'] . '/mime_images/';
 			$mime_path = $settings['default_theme_dir'] . '/images/mime_images/';
 
+			// Load them in to $context for use in the template
 			for ($i = 0, $count = count($attachments); $i < $count; $i++)
 			{
 				$context['thumbs'][$i] = array(
@@ -223,22 +222,24 @@ class ProfileInfo_Controller extends Action_Controller
 					'img' => '',
 					'filename' => $attachments[$i]['filename'],
 					'downloads' => $attachments[$i]['downloads'],
+					'subject' => $attachments[$i]['subject'],
+					'id' => $attachments[$i]['id'],
 				);
 
 				// Show a thumbnail image as well?
 				if ($attachments[$i]['is_image'] && !empty($modSettings['attachmentShowImages']) && !empty($modSettings['attachmentThumbnails']))
 				{
 					if (!empty($attachments[$i]['id_thumb']))
-						$context['thumbs'][$i]['img'] = '<img src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id_thumb'] . ';image" title="" alt="" />';
+						$context['thumbs'][$i]['img'] = '<img id="thumb_' . $attachments[$i]['id'] . '" src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id_thumb'] . ';image" title="" alt="" />';
 					else
 					{
-						// no thumbnail available ... use html instead
+						// No thumbnail available ... use html instead
 						if (!empty($modSettings['attachmentThumbWidth']) && !empty($modSettings['attachmentThumbHeight']))
 						{
 							if ($attachments[$i]['width'] > $modSettings['attachmentThumbWidth'] || $attachments[$i]['height'] > $modSettings['attachmentThumbHeight'])
-								$context['thumbs'][$i]['img'] = '<img src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id'] . '" title="" alt="" width="' . $modSettings['attachmentThumbWidth'] . '" height="' . $modSettings['attachmentThumbHeight'] . '" />';
+								$context['thumbs'][$i]['img'] = '<img id="thumb_' . $attachments[$i]['id'] . '" src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id'] . '" title="" alt="" width="' . $modSettings['attachmentThumbWidth'] . '" height="' . $modSettings['attachmentThumbHeight'] . '" />';
 							else
-								$context['thumbs'][$i]['img'] = '<img src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id'] . '" title="" alt="" width="' . $attachments[$i]['width'] . '" height="' . $attachments[$i]['height'] . '" />';
+								$context['thumbs'][$i]['img'] = '<img id="thumb_' . $attachments[$i]['id'] . '" src="' . $scripturl . '?action=dlattach;topic=' . $attachments[$i]['topic'] . '.0;attach=' . $attachments[$i]['id'] . '" title="" alt="" width="' . $attachments[$i]['width'] . '" height="' . $attachments[$i]['height'] . '" />';
 						}
 					}
 				}
@@ -262,7 +263,7 @@ class ProfileInfo_Controller extends Action_Controller
 			// Get the info for this buddy
 			foreach ($user_info['buddies'] as $buddy)
 			{
-				loadMemberContext($buddy);
+				loadMemberContext($buddy, true);
 				$context['buddies'][$buddy] = $memberContext[$buddy];
 			}
 		}
@@ -331,16 +332,17 @@ class ProfileInfo_Controller extends Action_Controller
 			else
 			{
 				// Set up to get the last 10 topics of this member
-				$msgCount = count_user_topics($memID);
+				$topicCount = count_user_topics($memID);
 				$range_limit = '';
 				$maxIndex = 10;
 
-				// If they are a frequent topic starter, we guess the range to help the query
-				if ($msgCount > 1000)
+				// If they are a frequent topic starter we guess the range to help the query
+				if ($topicCount > 1000)
 				{
-					$margin = floor(($max_msg_member - $min_msg_member) * (($start + $modSettings['defaultMaxMessages']) / $msgCount) + .1 * ($max_msg_member - $min_msg_member));
+					list ($min_topic_member, $max_topic_member) = findMinMaxUserTopic($memID);
+					$margin = floor(($max_topic_member - $min_topic_member) * (($start + $modSettings['defaultMaxMessages']) / $topicCount) + .1 * ($max_topic_member - $min_topic_member));
 					$margin *= 5;
-					$range_limit = 't.id_first_msg > ' . ($max_msg_member - $margin);
+					$range_limit = 't.id_first_msg > ' . ($max_topic_member - $margin);
 				}
 
 				// Find this user's most recent topics
@@ -425,10 +427,10 @@ class ProfileInfo_Controller extends Action_Controller
 
 		// If we're specifically dealing with attachments use that function!
 		if (isset($_GET['sa']) && $_GET['sa'] == 'attach')
-			return $this->action_showAttachments($memID);
+			return $this->action_showAttachments();
 		// Instead, if we're dealing with unwatched topics (and the feature is enabled) use that other function.
 		elseif (isset($_GET['sa']) && $_GET['sa'] == 'unwatchedtopics' && $modSettings['enable_unwatch'])
-			return $this->action_showUnwatched($memID);
+			return $this->action_showUnwatched();
 
 		// Are we just viewing topics?
 		$context['is_topics'] = isset($_GET['sa']) && $_GET['sa'] == 'topics' ? true : false;
@@ -467,7 +469,6 @@ class ProfileInfo_Controller extends Action_Controller
 			$msgCount = count_user_posts($memID, $board);
 
 		list ($min_msg_member, $max_msg_member) = findMinMaxUserMessage($memID, $board);
-		$reverse = false;
 		$range_limit = '';
 		$maxIndex = (int) $modSettings['defaultMaxMessages'];
 
@@ -529,20 +530,54 @@ class ProfileInfo_Controller extends Action_Controller
 				),
 				'board' => array(
 					'name' => $row['bname'],
-					'id' => $row['id_board']
+					'id' => $row['id_board'],
+					'link' => '<a href="' . $scripturl . '?board=' . $row['id_board'] . '.0">' . $row['bname'] . '</a>',
 				),
-				'topic' => $row['id_topic'],
+				'topic' => array(
+					'id' => $row['id_topic'],
+					'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'] . '">' . $row['subject'] . '</a>',
+				),
 				'subject' => $row['subject'],
 				'start' => 'msg' . $row['id_msg'],
 				'time' => standardTime($row['poster_time']),
 				'html_time' => htmlTime($row['poster_time']),
 				'timestamp' => forum_time(true, $row['poster_time']),
 				'id' => $row['id_msg'],
-				'can_reply' => false,
-				'can_mark_notify' => false,
-				'can_delete' => false,
+				'tests' => array(
+					'can_reply' => false,
+					'can_mark_notify' => false,
+					'can_delete' => false,
+				),
 				'delete_possible' => ($row['id_first_msg'] != $row['id_msg'] || $row['id_last_msg'] == $row['id_msg']) && (empty($modSettings['edit_disable_time']) || $row['poster_time'] + $modSettings['edit_disable_time'] * 60 >= time()),
 				'approved' => $row['approved'],
+
+				'buttons' => array(
+					// How about... even... remove it entirely?!
+					'remove' => array(
+						'href' => $scripturl . '?action=deletemsg;msg=' . $row['id_msg'] . ';topic=' . $row['id_topic'] . ';profile;u=' . $context['member']['id'] . ';start=' . $context['start'],
+						'text' => $txt['remove'],
+						'test' => 'can_delete',
+						'custom' => 'onclick="return confirm(' . JavaScriptEscape($txt['remove_message'] . '?') . ');"',
+					),
+					// Can we request notification of topics?
+					'notify' => array(
+						'href' => $scripturl . '?action=notify;topic=' . $row['id_topic'] . '.msg' . $row['id_msg'],
+						'text' => $txt['notify'],
+						'test' => 'can_mark_notify',
+					),
+					// If they *can* reply?
+					'reply' => array(
+						'href' => $scripturl . '?action=post;topic=' . $row['id_topic'] . '.msg' . $row['id_msg'],
+						'text' => $txt['reply'],
+						'test' => 'can_reply',
+					),
+					// If they *can* quote?
+					'quote' => array(
+						'href' => $scripturl . '?action=post;topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . ';quote=' . $row['id_msg'],
+						'text' => $txt['quote'],
+						'test' => 'can_quote',
+					),
+				)
 			);
 
 			if ($user_info['id'] == $row['id_member_started'])
@@ -599,7 +634,7 @@ class ProfileInfo_Controller extends Action_Controller
 
 					// Set the permission to true ;).
 					foreach ($board_ids[$type][$board_id] as $counter)
-						$context['posts'][$counter][$allowed] = true;
+						$context['posts'][$counter]['tests'][$allowed] = true;
 				}
 			}
 		}
@@ -608,8 +643,8 @@ class ProfileInfo_Controller extends Action_Controller
 		$quote_enabled = empty($modSettings['disabledBBC']) || !in_array('quote', explode(',', $modSettings['disabledBBC']));
 		foreach ($context['posts'] as $counter => $dummy)
 		{
-			$context['posts'][$counter]['can_delete'] &= $context['posts'][$counter]['delete_possible'];
-			$context['posts'][$counter]['can_quote'] = $context['posts'][$counter]['can_reply'] && $quote_enabled;
+			$context['posts'][$counter]['tests']['can_delete'] &= $context['posts'][$counter]['delete_possible'];
+			$context['posts'][$counter]['tests']['can_quote'] = $context['posts'][$counter]['tests']['can_reply'] && $quote_enabled;
 		}
 	}
 
@@ -618,7 +653,7 @@ class ProfileInfo_Controller extends Action_Controller
 	 */
 	public function action_showAttachments()
 	{
-		global $txt, $scripturl, $modSettings;
+		global $txt, $scripturl, $modSettings, $context;
 
 		// OBEY permissions!
 		$boardsAllowed = boardsAllowedTo('view_attachments');
@@ -629,12 +664,12 @@ class ProfileInfo_Controller extends Action_Controller
 
 		$memID = currentMemberID();
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// This is all the information required to list attachments.
 		$listOptions = array(
-			'id' => 'attachments',
-			'width' => '100%',
+			'id' => 'profile_attachments',
+			'title' => $txt['showAttachments'] . ($context['user']['is_owner'] ? '' : ' - ' . $context['member']['name']),
 			'items_per_page' => $modSettings['defaultMaxMessages'],
 			'no_items_label' => $txt['show_attachments_none'],
 			'base_href' => $scripturl . '?action=profile;area=showposts;sa=attach;u=' . $memID,
@@ -720,6 +755,9 @@ class ProfileInfo_Controller extends Action_Controller
 
 		// Create the request list.
 		createList($listOptions);
+
+		$context['sub_template'] = 'show_list';
+		$context['default_list'] = 'profile_attachments';
 	}
 
 	/**
@@ -735,12 +773,12 @@ class ProfileInfo_Controller extends Action_Controller
 		if ($user_info['id'] != $memID || !$modSettings['enable_unwatch'])
 			return;
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// And here they are: the topics you don't like
 		$listOptions = array(
 			'id' => 'unwatched_topics',
-			'width' => '100%',
+			'title' => $txt['showUnwatched'],
 			'items_per_page' => $modSettings['defaultMaxMessages'],
 			'no_items_label' => $txt['unwatched_topics_none'],
 			'base_href' => $scripturl . '?action=profile;area=showposts;sa=unwatchedtopics;u=' . $memID,
@@ -906,7 +944,7 @@ class ProfileInfo_Controller extends Action_Controller
 	 */
 	public function action_showPermissions()
 	{
-		global $txt, $board, $user_profile, $context;
+		global $txt, $board, $user_profile, $context, $scripturl;
 
 		// Verify if the user has sufficient permissions.
 		isAllowedTo('manage_permissions');
@@ -956,6 +994,7 @@ class ProfileInfo_Controller extends Action_Controller
 				$context['boards'][$row['id_board']] = array(
 					'id' => $row['id_board'],
 					'name' => $row['board_name'],
+					'url' => $scripturl, '?board=', $row['id_board'], '.0',
 					'selected' => $board == $row['id_board'],
 					'profile' => $row['id_profile'],
 					'profile_name' => $context['profiles'][$row['id_profile']]['name'],
@@ -1005,7 +1044,7 @@ class ProfileInfo_Controller extends Action_Controller
 
 		// Let's use a generic list to get all the current warnings
 		// and use the issue warnings grab-a-granny thing.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		$memID = currentMemberID();
 
@@ -1099,7 +1138,7 @@ class ProfileInfo_Controller extends Action_Controller
 	 * @param int $start
 	 * @param int $items_per_page
 	 * @param string $sort
-	 * @param array $boardsAllowed
+	 * @param int[] $boardsAllowed
 	 * @param int $memID
 	 */
 	public function list_getAttachments($start, $items_per_page, $sort, $boardsAllowed, $memID)
@@ -1112,7 +1151,7 @@ class ProfileInfo_Controller extends Action_Controller
 	/**
 	 * Callback for createList()
 	 *
-	 * @param array $boardsAllowed
+	 * @param int[] $boardsAllowed
 	 * @param int $memID
 	 */
 	public function list_getNumAttachments($boardsAllowed, $memID)
@@ -1131,7 +1170,7 @@ class ProfileInfo_Controller extends Action_Controller
 	 * @param string $sort
 	 * @param int $memID
 	 */
-	function list_getUnwatched($start, $items_per_page, $sort, $memID)
+	public function list_getUnwatched($start, $items_per_page, $sort, $memID)
 	{
 		return getUnwatchedBy($start, $items_per_page, $sort, $memID);
 	}

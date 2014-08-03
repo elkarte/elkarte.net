@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,6 +22,8 @@ if (!defined('ELK'))
 
 /**
  * ManageMembergroups controller, administration page for membergroups.
+ *
+ * @package Membergroups
  */
 class ManageMembergroups_Controller extends Action_Controller
 {
@@ -33,10 +35,12 @@ class ManageMembergroups_Controller extends Action_Controller
 
 	/**
 	 * Main dispatcher, the entrance point for all 'Manage Membergroup' actions.
-	 * It forwards to a function based on the given subaction, default being subaction 'index', or, without manage_membergroup
+	 *
+	 * What it does:
+	 * - It forwards to a function based on the given subaction, default being subaction 'index', or, without manage_membergroup
 	 * permissions, then 'settings'.
-	 * Called by ?action=admin;area=membergroups.
-	 * Requires the manage_membergroups or the admin_forum permission.
+	 * - Called by ?action=admin;area=membergroups.
+	 * - Requires the manage_membergroups or the admin_forum permission.
 	 *
 	 * @uses ManageMembergroups template.
 	 * @uses ManageMembers language file.
@@ -79,10 +83,7 @@ class ManageMembergroups_Controller extends Action_Controller
 				'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_membergroups', array(&$subActions));
-
-		// Default to sub action 'index' or 'settings' depending on permissions.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : (allowedTo('manage_membergroups') ? 'index' : 'settings');
+		$action = new Action('manage_membergroups');
 
 		// Setup the admin tabs.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -91,21 +92,28 @@ class ManageMembergroups_Controller extends Action_Controller
 			'description' => $txt['membergroups_description'],
 		);
 
+		// Default to sub action 'index' or 'settings' depending on permissions.
+		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : (allowedTo('manage_membergroups') ? 'index' : 'settings');
+
+		// Set that subaction, call integrate_sa_manage_membergroups
+		$subAction = $action->initialize($subActions, $subAction);
+
+		// Final items for the template
 		$context['page_title'] = $txt['membergroups_title'];
 		$context['sub_action'] = $subAction;
 
 		// Call the right function.
-		$action = new Action();
-		$action->initialize($subActions, 'settings');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Shows an overview of the current membergroups.
-	 * Called by ?action=admin;area=membergroups.
-	 * Requires the manage_membergroups permission.
-	 * Splits the membergroups in regular ones and post count based groups.
-	 * It also counts the number of members part of each membergroup.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=membergroups.
+	 * - Requires the manage_membergroups permission.
+	 * - Splits the membergroups in regular ones and post count based groups.
+	 * - It also counts the number of members part of each membergroup.
 	 *
 	 * @uses ManageMembergroups template, main.
 	 */
@@ -215,12 +223,13 @@ class ManageMembergroups_Controller extends Action_Controller
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
-					'value' => '<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=membergroups;sa=add;generalgroup">' . $txt['membergroups_add_group'] . '</a>',
+					'class' => 'submitbutton',
+					'value' => '<a class="linkbutton" href="' . $scripturl . '?action=admin;area=membergroups;sa=add;generalgroup">' . $txt['membergroups_add_group'] . '</a>',
 				),
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		// The second list shows the post count based groups.
@@ -320,7 +329,8 @@ class ManageMembergroups_Controller extends Action_Controller
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
-					'value' => '<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=membergroups;sa=add;postgroup">' . $txt['membergroups_add_group'] . '</a>',
+					'class' => 'submitbutton',
+					'value' => '<a class="linkbutton" href="' . $scripturl . '?action=admin;area=membergroups;sa=add;postgroup">' . $txt['membergroups_add_group'] . '</a>',
 				),
 			),
 		);
@@ -330,10 +340,12 @@ class ManageMembergroups_Controller extends Action_Controller
 
 	/**
 	 * This function handles adding a membergroup and setting some initial properties.
-	 * Called by ?action=admin;area=membergroups;sa=add.
-	 * It requires the manage_membergroups permission.
-	 * Allows to use a predefined permission profile or copy one from another group.
-	 * Redirects to action=admin;area=membergroups;sa=edit;group=x.
+	 *
+	 * What it does:
+	 * -Called by ?action=admin;area=membergroups;sa=add.
+	 * -It requires the manage_membergroups permission.
+	 * -Allows to use a predefined permission profile or copy one from another group.
+	 * -Redirects to action=admin;area=membergroups;sa=edit;group=x.
 	 *
 	 * @uses the new_group sub template of ManageMembergroups.
 	 */
@@ -358,7 +370,7 @@ class ManageMembergroups_Controller extends Action_Controller
 			require_once(SUBSDIR . '/Permission.subs.php');
 
 			loadIllegalPermissions();
-			$id_group = getMaxGroupID() +1;
+			$id_group = getMaxGroupID() + 1;
 			$minposts = !empty($_POST['min_posts']) ? (int) $_POST['min_posts'] : '-1';
 
 			addMembergroup($id_group, $_POST['group_name'], $minposts, $_POST['group_type']);
@@ -411,6 +423,7 @@ class ManageMembergroups_Controller extends Action_Controller
 			}
 
 			// Make sure all boards selected are stored in a proper array.
+			$changed_boards = array();
 			$accesses = empty($_POST['boardaccess']) || !is_array($_POST['boardaccess']) ? array() : $_POST['boardaccess'];
 			$changed_boards['allow'] = array();
 			$changed_boards['deny'] = array();
@@ -465,9 +478,11 @@ class ManageMembergroups_Controller extends Action_Controller
 
 	/**
 	 * Deleting a membergroup by URL (not implemented).
-	 * Called by ?action=admin;area=membergroups;sa=delete;group=x;session_var=y.
-	 * Requires the manage_membergroups permission.
-	 * Redirects to ?action=admin;area=membergroups.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=membergroups;sa=delete;group=x;session_var=y.
+	 * - Requires the manage_membergroups permission.
+	 * - Redirects to ?action=admin;area=membergroups.
 	 *
 	 * @todo look at this
 	 */
@@ -484,11 +499,13 @@ class ManageMembergroups_Controller extends Action_Controller
 
 	/**
 	 * Editing a membergroup.
-	 * Screen to edit a specific membergroup.
-	 * Called by ?action=admin;area=membergroups;sa=edit;group=x.
-	 * It requires the manage_membergroups permission.
-	 * Also handles the delete button of the edit form.
-	 * Redirects to ?action=admin;area=membergroups.
+	 *
+	 * What it does:
+	 * - Screen to edit a specific membergroup.
+	 * - Called by ?action=admin;area=membergroups;sa=edit;group=x.
+	 * - It requires the manage_membergroups permission.
+	 * - Also handles the delete button of the edit form.
+	 * - Redirects to ?action=admin;area=membergroups.
 	 *
 	 * @uses the edit_group sub template of ManageMembergroups.
 	 */
@@ -557,7 +574,6 @@ class ManageMembergroups_Controller extends Action_Controller
 			$validator->validation_rules(array(
 				'boardaccess' => 'contains[allow,ignore,deny]',
 			));
-
 			$validator->validate($_POST);
 
 			// Can they really inherit from this group?
@@ -579,7 +595,7 @@ class ManageMembergroups_Controller extends Action_Controller
 				'current_group' => $current_group['id_group'],
 				'group_name' => $validator->group_name,
 				'online_color' => $validator->online_color,
-				'icons' => $validator->icon_count <= 0 ? '' : min($validator->icon_count, 99) . '#' . $validator->icon_image,
+				'icons' => $validator->icon_count <= 0 ? '' : min($validator->icon_count, 10) . '#' . $validator->icon_image,
 				// /me wonders why admin is *so* special
 				'description' => $current_group['id_group'] == 1 || $validator->group_type != -1 ? $validator->group_desc : '',
 			);
@@ -590,6 +606,7 @@ class ManageMembergroups_Controller extends Action_Controller
 			// Time to update the boards this membergroup has access to.
 			if ($current_group['id_group'] == 2 || $current_group['id_group'] > 3)
 			{
+				$changed_boards = array();
 				$changed_boards['allow'] = array();
 				$changed_boards['deny'] = array();
 				$changed_boards['ignore'] = array();
@@ -612,7 +629,6 @@ class ManageMembergroups_Controller extends Action_Controller
 			// Remove everyone from this group!
 			if ($min_posts != -1)
 				detachDeletedGroupFromMembers($current_group['id_group']);
-
 			elseif ($current_group['id_group'] != 3)
 			{
 				// Making it a hidden group? If so remove everyone with it as primary group (Actually, just make them additional).
@@ -752,9 +768,11 @@ class ManageMembergroups_Controller extends Action_Controller
 
 	/**
 	 * Set some general membergroup settings and permissions.
-	 * Called by ?action=admin;area=membergroups;sa=settings
-	 * Requires the admin_forum permission (and manage_permissions for changing permissions)
-	 * Redirects to itself.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=membergroups;sa=settings
+	 * - Requires the admin_forum permission (and manage_permissions for changing permissions)
+	 * - Redirects to itself.
 	 *
 	 * @uses membergroup_settings sub template of ManageMembergroups.
 	 */
@@ -766,7 +784,7 @@ class ManageMembergroups_Controller extends Action_Controller
 		$context['page_title'] = $txt['membergroups_settings'];
 
 		// Needed for the settings functions.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// initialize the form
 		$this->_initGroupSettingsForm();
@@ -775,8 +793,6 @@ class ManageMembergroups_Controller extends Action_Controller
 		$context['permissions_excluded'] = array(-1);
 
 		$config_vars = $this->_groupSettings->settings();
-
-		call_integration_hook('integrate_modify_membergroup_settings', array(&$config_vars));
 
 		if (isset($_REQUEST['save']))
 		{
@@ -821,6 +837,9 @@ class ManageMembergroups_Controller extends Action_Controller
 		$config_vars = array(
 			array('permissions', 'manage_membergroups'),
 		);
+
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_membergroup_settings', array(&$config_vars));
 
 		return $config_vars;
 	}

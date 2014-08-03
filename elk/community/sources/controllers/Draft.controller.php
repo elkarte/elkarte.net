@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -67,10 +67,21 @@ class Draft_Controller extends Action_Controller
 		// If just deleting a draft, do it and then redirect back.
 		if (!empty($_REQUEST['delete']))
 		{
-			checkSession('get');
+			checkSession(empty($_POST) ? 'get' : '');
 
-			$id_delete = (int) $_REQUEST['delete'];
-			deleteDrafts($id_delete, $memID);
+			// Lets see what we have been sent, one or many to delete
+			$toDelete = array();
+			if (!is_array($_REQUEST['delete']))
+				$toDelete[] = (int) $_REQUEST['delete'];
+			else
+			{
+				foreach ($_REQUEST['delete'] as $delete_id)
+					$toDelete[] = (int) $delete_id;
+			}
+
+			if (!empty($toDelete))
+				deleteDrafts($toDelete, $memID);
+
 			redirectexit('action=profile;u=' . $memID . ';area=showdrafts;start=' . $context['start']);
 		}
 
@@ -79,9 +90,7 @@ class Draft_Controller extends Action_Controller
 			$_REQUEST['viewscount'] = 10;
 
 		// Get things started
-		$user_drafts = array();
 		$msgCount = draftsCount($memID, 0);
-
 		$maxIndex = (int) $modSettings['defaultMaxMessages'];
 
 		// Make sure the starting place makes sense and construct our friend the page index.
@@ -129,6 +138,7 @@ class Draft_Controller extends Action_Controller
 				'board' => array(
 					'name' => $row['bname'],
 					'id' => $row['id_board'],
+					'link' => '<a href="' . $scripturl . '?board=' . $row['id_board'] . '.0">' . $row['bname'] . '</a>',
 				),
 				'topic' => array(
 					'id' => $row['id_topic'],
@@ -144,6 +154,22 @@ class Draft_Controller extends Action_Controller
 				'sticky' => $row['is_sticky'],
 				'age' => floor((time() - $row['poster_time']) / 86400),
 				'remaining' => (!empty($modSettings['drafts_keep_days']) ? round($modSettings['drafts_keep_days'] - ((time() - $row['poster_time']) / 86400)) : 0),
+				'buttons' => array(
+					'checkbox' => array(
+						'checkbox' => 'always',
+						'value' => $row['id_draft'],
+						'name' => 'delete',
+					),
+					'remove' => array(
+						'href' => $scripturl . '?action=profile;u=' . $context['member']['id'] . ';area=showdrafts;delete=' . $row['id_draft'] . ';start=' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id'],
+						'text' => $txt['draft_delete'],
+						'custom' => 'onclick="return confirm(' . JavaScriptEscape($txt['draft_remove'] . '?') . ');"',
+					),
+					'edit' => array(
+						'href' => $scripturl . '?action=post;' . (empty($row['id_topic']) ? 'board=' . $row['id_board'] : 'topic=' . $row['id_topic']) . '.0;id_draft=' . $row['id_draft'],
+						'text' => $txt['draft_edit'],
+					),
+				)
 			);
 		}
 
@@ -201,7 +227,6 @@ class Draft_Controller extends Action_Controller
 		}
 
 		// Init
-		$user_drafts = array();
 		$maxIndex = (int) $modSettings['defaultMaxMessages'];
 
 		// Default to 10.

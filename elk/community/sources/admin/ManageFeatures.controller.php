@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,6 +22,7 @@ if (!defined('ELK'))
 
 /**
  * Manage features and options administration page.
+ *
  * This controller handles the pages which allow the admin
  * to see and change the basic feature settings of their site.
  */
@@ -64,15 +65,25 @@ class ManageFeatures_Controller extends Action_Controller
 	protected $_mentionSettings;
 
 	/**
+	 * Mentions settings form
+	 * @var Settings_Form
+	 */
+	protected $_PMSettings;
+
+	/**
 	 * This function passes control through to the relevant tab.
-	 * @see Action_Controller::action_index()
 	 *
+	 * @see Action_Controller::action_index()
 	 * @uses Help, ManageSettings languages
 	 * @uses sub_template show_settings
 	 */
 	public function action_index()
 	{
-		global $context, $txt, $settings;
+		global $context, $txt, $settings, $scripturl;
+
+		// Often Helpful
+		loadLanguage('Help');
+		loadLanguage('ManageSettings');
 
 		// All the actions we know about
 		$subActions = array(
@@ -126,31 +137,22 @@ class ManageFeatures_Controller extends Action_Controller
 			),
 		);
 
-		call_integration_hook('integrate_modify_features', array(&$subActions));
-
-		// By default do the basic settings.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'basic';
-
-		loadLanguage('Help');
-		loadLanguage('ManageSettings');
-
-		$context['sub_template'] = 'show_settings';
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['modSettings_title'];
+		// Set up the action control
+		$action = new Action('modify_features');
 
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
 			'title' => $txt['modSettings_title'],
 			'help' => 'featuresettings',
-			'description' => sprintf($txt['modSettings_desc'], $settings['theme_id'], $context['session_id'], $context['session_var']),
+			'description' => sprintf($txt['modSettings_desc'], $scripturl . '?action=admin;area=theme;sa=list;th=' . $settings['theme_id'] . ';' . $context['session_id'] . '=' . $context['session_var']),
 			'tabs' => array(
 				'basic' => array(
 				),
 				'layout' => array(
 				),
-				'karma' => array(
-				),
 				'pmsettings' => array(
+				),
+				'karma' => array(
 				),
 				'likes' => array(
 				),
@@ -166,15 +168,22 @@ class ManageFeatures_Controller extends Action_Controller
 			),
 		);
 
+		// By default do the basic settings, call integrate_sa_modify_features
+		$subAction = $action->initialize($subActions, 'basic');
+
+		// Some final pieces for the template
+		$context['sub_template'] = 'show_settings';
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['modSettings_title'];
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'basic');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Config array for changing the basic forum settings
-	 * Accessed  from ?action=admin;area=featuresettings;sa=basic;
+	 *
+	 * - Accessed from ?action=admin;area=featuresettings;sa=basic;
 	 */
 	public function action_basicSettings_display()
 	{
@@ -215,7 +224,7 @@ class ManageFeatures_Controller extends Action_Controller
 	private function _initBasicSettingsForm()
 	{
 		// We need some settings! ..ok, some work with our settings :P
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_basicSettings = new Settings_Form();
@@ -228,7 +237,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Allows modifying the global layout settings in the forum
-	 * Accessed through ?action=admin;area=featuresettings;sa=layout;
+	 *
+	 * - Accessed through ?action=admin;area=featuresettings;sa=layout;
 	 */
 	public function action_layoutSettings_display()
 	{
@@ -265,7 +275,7 @@ class ManageFeatures_Controller extends Action_Controller
 	private function _initLayoutSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_layoutSettings = new Settings_Form();
@@ -278,7 +288,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Display configuration settings page for karma settings.
-	 * Accessed from ?action=admin;area=featuresettings;sa=karma;
+	 *
+	 * - Accessed from ?action=admin;area=featuresettings;sa=karma;
 	 */
 	public function action_karmaSettings_display()
 	{
@@ -313,7 +324,7 @@ class ManageFeatures_Controller extends Action_Controller
 	private function _initKarmaSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_karmaSettings = new Settings_Form();
@@ -326,7 +337,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Display configuration settings page for likes settings.
-	 * Accessed from ?action=admin;area=featuresettings;sa=likes;
+	 *
+	 * - Accessed from ?action=admin;area=featuresettings;sa=likes;
 	 */
 	public function action_likesSettings_display()
 	{
@@ -361,7 +373,7 @@ class ManageFeatures_Controller extends Action_Controller
 	private function _initLikesSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_likesSettings = new Settings_Form();
@@ -374,7 +386,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Initializes the mentions settings admin page.
-	 * Accessed from ?action=admin;area=featuresettings;sa=mentions;
+	 *
+	 * - Accessed from ?action=admin;area=featuresettings;sa=mentions;
 	 */
 	public function action_mentionSettings_display()
 	{
@@ -418,7 +431,7 @@ class ManageFeatures_Controller extends Action_Controller
 		global $txt, $context;
 
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		loadLanguage('Mentions');
 
@@ -437,7 +450,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Display configuration settings for signatures on forum.
-	 * Accessed from ?action=admin;area=featuresettings;sa=sig;
+	 *
+	 * - Accessed from ?action=admin;area=featuresettings;sa=sig;
 	 */
 	public function action_signatureSettings_display()
 	{
@@ -708,7 +722,7 @@ class ManageFeatures_Controller extends Action_Controller
 		$modSettings['bbc_disabled_signature_bbc'] = $disabledTags;
 
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Saving?
 		if (isset($_GET['save']))
@@ -750,7 +764,7 @@ class ManageFeatures_Controller extends Action_Controller
 
 		$context['post_url'] = $scripturl . '?action=admin;area=featuresettings;save;sa=sig';
 		$context['settings_title'] = $txt['signature_settings'];
-		$context['settings_message'] = !empty($settings_applied) ? $txt['signature_settings_applied'] : sprintf($txt['signature_settings_warning'], $context['session_id'], $context['session_var']);
+		$context['settings_message'] = !empty($settings_applied) ? $txt['signature_settings_applied'] : sprintf($txt['signature_settings_warning'], $scripturl . '?action=admin;area=featuresettings;sa=sig;apply;' . $context['session_id'] . '=' . $context['session_var']);
 
 		Settings_Form::prepare_db($config_vars);
 	}
@@ -761,7 +775,7 @@ class ManageFeatures_Controller extends Action_Controller
 	private function _initSignatureSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_signatureSettings = new Settings_Form();
@@ -774,9 +788,9 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Show all the custom profile fields available to the user.
-	 * Allows for drag/drop sorting of custom profile fields
 	 *
-	 * Accessed with ?action=admin;area=featuresettings;sa=profile
+	 * - Allows for drag/drop sorting of custom profile fields
+	 * - Accessed with ?action=admin;area=featuresettings;sa=profile
 	 *
 	 * @uses sub template show_custom_profile
 	 */
@@ -799,6 +813,8 @@ class ManageFeatures_Controller extends Action_Controller
 		{
 			checkSession();
 			validateToken('admin-scp');
+
+			$changes = array();
 
 			// Do the active ones first.
 			$disable_fields = array_flip($standard_fields);
@@ -830,7 +846,7 @@ class ManageFeatures_Controller extends Action_Controller
 
 		createToken('admin-scp');
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		require_once(SUBSDIR . '/ManageFeatures.subs.php');
 
 		// Create a listing for all our standard fields
@@ -1021,9 +1037,14 @@ class ManageFeatures_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'below_table_data',
 					'value' => '<input type="submit" name="onoff" value="' . $txt['save'] . '" class="right_submit" />
 					<input type="submit" name="new" value="' . $txt['custom_profile_make_new'] . '" class="right_submit" />',
+				),
+				array(
+					'position' => 'top_of_list',
+					'value' => '<p class="infobox">' . $txt['custom_profile_sort'] . '</p>',
 				),
 			),
 			'javascript' => '
@@ -1031,6 +1052,7 @@ class ManageFeatures_Controller extends Action_Controller
 					sa: "profileorder",
 					error: "' . $txt['admin_order_error'] . '",
 					title: "' . $txt['admin_order_title'] . '",
+					placeholder: "ui-state-highlight",
 					href: "?action=admin;area=featuresettings;sa=profile",
 					token: {token_var: "' . $token['admin-sort_token_var'] . '", token_id: "' . $token['admin-sort_token'] . '"}
 				});
@@ -1042,7 +1064,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Edit some profile fields?
-	 * Accessed with ?action=admin;area=featuresettings;sa=profileedit
+	 *
+	 * - Accessed with ?action=admin;area=featuresettings;sa=profileedit
 	 *
 	 * @uses sub template edit_profile_field
 	 */
@@ -1058,6 +1081,15 @@ class ManageFeatures_Controller extends Action_Controller
 		$context[$context['admin_menu_name']]['current_subsection'] = 'profile';
 		$context['page_title'] = $context['fid'] ? $txt['custom_edit_title'] : $txt['custom_add_title'];
 		$context['sub_template'] = 'edit_profile_field';
+
+		// any errors messages to show?
+		if (isset($_GET['msg']))
+		{
+			loadLanguage('Errors');
+
+			if (isset($txt['custom_option_' . $_GET['msg']]))
+				$context['custom_option__error'] = $txt['custom_option_' . $_GET['msg']];
+		}
 
 		// Load the profile language for section names.
 		loadLanguage('Profile');
@@ -1092,6 +1124,10 @@ class ManageFeatures_Controller extends Action_Controller
 				'enclose' => '',
 				'placement' => 0,
 			);
+
+		// All the javascript for this page... everything else is in admin.js
+		addJavascriptVar(array('startOptID' => count($context['field']['options'])));
+		addInlineJavascript('updateInputBoxes();', true);
 
 		// Are we toggling which ones are active?
 		if (isset($_POST['onoff']))
@@ -1318,7 +1354,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Editing personal messages settings
-	 * Accessed with ?action=admin;area=featuresettings;sa=pmsettings
+	 *
+	 * - Accessed with ?action=admin;area=featuresettings;sa=pmsettings
 	 */
 	public function action_pmsettings()
 	{
@@ -1370,7 +1407,7 @@ class ManageFeatures_Controller extends Action_Controller
 		global $context;
 
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		$context['permissions_excluded'] = array(-1);
 
@@ -1388,7 +1425,7 @@ class ManageFeatures_Controller extends Action_Controller
 	 */
 	private function _basicSettings()
 	{
-		global $txt, $modSettings;
+		global $txt, $modSettings, $context;
 
 		// We need to know if personal text is enabled, and if it's in the registration fields option.
 		// If admins have set it up as an on-registration thing, they can't set a default value (because it'll never be used)
@@ -1396,11 +1433,11 @@ class ManageFeatures_Controller extends Action_Controller
 		$reg_fields = isset($modSettings['registration_fields']) ? explode(',', $modSettings['registration_fields']) : array();
 		$can_personal_text = !in_array('personal_text', $disabled_fields) && !in_array('personal_text', $reg_fields);
 
+		// Show / hide custom jquery fields as required
+		addInlineJavascript('showhideJqueryOptions();', true);
+
 		$config_vars = array(
-				// Big Options... polls, sticky, bbc....
-				array('select', 'pollMode', array($txt['disable_polls'], $txt['enable_polls'], $txt['polls_as_topics'])),
-			'',
-				// Basic stuff, titles, flash, permissions...
+				// Basic stuff, titles, permissions...
 				array('check', 'allow_guestAccess'),
 				array('check', 'enable_buddylist'),
 				array('check', 'enable_unwatch'),
@@ -1411,10 +1448,14 @@ class ManageFeatures_Controller extends Action_Controller
 			'',
 				// Javascript and CSS options
 				array('select', 'jquery_source', array('auto' => $txt['jquery_auto'], 'local' => $txt['jquery_local'], 'cdn' => $txt['jquery_cdn'])),
+				array('check', 'jquery_default', 'onchange' => 'showhideJqueryOptions();'),
+				array('text', 'jquery_version', 'postinput' => $txt['jquery_custom_after']),
+				array('check', 'jqueryui_default', 'onchange' => 'showhideJqueryOptions();'),
+				array('text', 'jqueryui_version', 'postinput' => $txt['jqueryui_custom_after']),
 				array('check', 'minify_css_js'),
 			'',
 				// SEO stuff
-				array('check', 'queryless_urls', 'subtext' => '<strong>' . $txt['queryless_urls_note'] . '</strong>'),
+				array('check', 'queryless_urls', 'subtext' => '<strong>' . $txt['queryless_urls_note'] . '</strong><br />' . ($context['server']['is_apache'] || $context['server']['is_lighttpd'] ? $txt['queryless_urls_work'] : '<span class="error">' . $txt['queryless_urls_notwork'] . '</span>')),
 				array('text', 'meta_keywords', 'subtext' => $txt['meta_keywords_note'], 'size' => 50),
 			'',
 				// Number formatting, timezones.
@@ -1437,17 +1478,14 @@ class ManageFeatures_Controller extends Action_Controller
 		);
 
 		// Get all the time zones.
-		if (function_exists('timezone_identifiers_list') && function_exists('date_default_timezone_set'))
+		$all_zones = timezone_identifiers_list();
+		if ($all_zones === false)
+			unset($config_vars['default_timezone']);
+		else
 		{
-			$all_zones = timezone_identifiers_list();
 			// Make sure we set the value to the same as the printed value.
 			foreach ($all_zones as $zone)
 				$config_vars['default_timezone'][2][$zone] = $zone;
-		}
-		else
-		{
-			// we don't know this, huh?
-			unset($config_vars['default_timezone']);
 		}
 
 		call_integration_hook('integrate_modify_basic_settings', array(&$config_vars));
@@ -1479,7 +1517,6 @@ class ManageFeatures_Controller extends Action_Controller
 			'',
 				// Stuff that just is everywhere - today, search, online, etc.
 				array('select', 'todayMod', array($txt['today_disabled'], $txt['today_only'], $txt['yesterday_today'], $txt['relative_time'])),
-				array('check', 'topbottomEnable'),
 				array('check', 'onlineEnable'),
 				array('check', 'enableVBStyleLogin'),
 			'',
@@ -1491,7 +1528,7 @@ class ManageFeatures_Controller extends Action_Controller
 				array('check', 'timeLoadPageEnable'),
 		);
 
-		call_integration_hook('integrate_layout_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_layout_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1519,14 +1556,15 @@ class ManageFeatures_Controller extends Action_Controller
 				array('int', 'karmaMinPosts', 6, 'postinput' => strtolower($txt['posts'])),
 				array('float', 'karmaWaitTime', 6, 'postinput' => $txt['hours']),
 				array('check', 'karmaTimeRestrictAdmins'),
+				array('check', 'karmaDisableSmite'),
 			'',
 				// What does it look like?  [smite]?
 				array('text', 'karmaLabel'),
-				array('text', 'karmaApplaudLabel'),
-				array('text', 'karmaSmiteLabel'),
+				array('text', 'karmaApplaudLabel', 'mask' => 'nohtml'),
+				array('text', 'karmaSmiteLabel', 'mask' => 'nohtml'),
 		);
 
-		call_integration_hook('integrate_karma_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_karma_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1560,7 +1598,7 @@ class ManageFeatures_Controller extends Action_Controller
 				array('int', 'likeDisplayLimit', 6)
 		);
 
-		call_integration_hook('integrate_likes_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_likes_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1586,7 +1624,7 @@ class ManageFeatures_Controller extends Action_Controller
 				array('check', 'mentions_dont_notify_rlike'),
 		);
 
-		call_integration_hook('integrate_mention_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_mention_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1601,7 +1639,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Return signature settings.
-	 * Used in admin center search and settings form
+	 *
+	 * - Used in admin center search and settings form
 	 */
 	private function _signatureSettings()
 	{
@@ -1626,7 +1665,7 @@ class ManageFeatures_Controller extends Action_Controller
 				array('bbc', 'signature_bbc'),
 		);
 
-		call_integration_hook('integrate_signature_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_signature_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1641,7 +1680,8 @@ class ManageFeatures_Controller extends Action_Controller
 
 	/**
 	 * Return pm settings.
-	 * Used in admin center search and settings form
+	 *
+	 * - Used in admin center search and settings form
 	 */
 	private function _pmSettings()
 	{
@@ -1662,7 +1702,7 @@ class ManageFeatures_Controller extends Action_Controller
 				array('callback', 'pm_limits'),
 		);
 
-		call_integration_hook('integrate_pmsettings_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_pmsettings_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -1673,8 +1713,7 @@ class ManageFeatures_Controller extends Action_Controller
  *
  * @todo Move to subs file
  * @todo Merge with other pause functions?
- *    pausePermsSave(), pausAttachmentMaintenance()
- *    pauseRepairProcess()
+ *    pausePermsSave(), pausAttachmentMaintenance(), pauseRepairProcess()
  *
  * @param int $applied_sigs
  */

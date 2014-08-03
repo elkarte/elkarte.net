@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the topic viewing including
  * Quick Modify, Quick Reply, In Topic Moderation, thumbnail expansion etc
@@ -263,36 +263,37 @@ function QuickReply(oOptions)
 	this.opt = oOptions;
 	this.bCollapsed = this.opt.bDefaultCollapsed;
 	this.bIsFull = this.opt.bIsFull;
+
+	// If the initial state is to be collapsed, collapse it.
+	if (this.bCollapsed)
+		this.swap(true);
 }
 
 // When a user presses quote, put it in the quick reply box (if expanded).
 QuickReply.prototype.quote = function (iMessageId, xDeprecated)
 {
-	// Compatibility with older templates.
-	if (typeof(xDeprecated) !== 'undefined')
-		return true;
+	ajax_indicator(true);
 
+	// Collapsed on a quote, then simply got to the full post screen
 	if (this.bCollapsed)
 	{
 		window.location.href = elk_prepareScriptUrl(this.opt.sScriptUrl) + 'action=post;quote=' + iMessageId + ';topic=' + this.opt.iTopicId + '.' + this.opt.iStart;
 		return false;
 	}
+
+	// Insert the quote
+	if (this.bIsFull)
+		insertQuoteFast(iMessageId);
 	else
-	{
-		ajax_indicator(true);
-		if (this.bIsFull)
-			insertQuoteFast(iMessageId);
-		else
-			getXMLDocument(elk_prepareScriptUrl(this.opt.sScriptUrl) + 'action=quotefast;quote=' + iMessageId + ';xml', this.onQuoteReceived);
+		getXMLDocument(elk_prepareScriptUrl(this.opt.sScriptUrl) + 'action=quotefast;quote=' + iMessageId + ';xml', this.onQuoteReceived);
 
-		// Move the view to the quick reply box.
-		if (navigator.appName === 'Microsoft Internet Explorer')
-			window.location.hash = this.opt.sJumpAnchor;
-		else
-			window.location.hash = '#' + this.opt.sJumpAnchor;
+	// Move the view to the quick reply box.
+	if (navigator.appName === 'Microsoft Internet Explorer')
+		window.location.hash = this.opt.sJumpAnchor;
+	else
+		window.location.hash = '#' + this.opt.sJumpAnchor;
 
-		return false;
-	}
+	return false;
 };
 
 // This is the callback function used after the XMLhttp request.
@@ -308,24 +309,46 @@ QuickReply.prototype.onQuoteReceived = function (oXMLDoc)
 	ajax_indicator(false);
 };
 
-// The function handling the swapping of the quick reply.
-QuickReply.prototype.swap = function ()
+// The function handling the swapping of the quick reply area
+QuickReply.prototype.swap = function (bInit, bSavestate)
 {
 	var oQuickReplyContainer = document.getElementById(this.opt.sClassId),
 		sEditorId = this.opt.sContainerId,
 		bIsFull = this.opt.bIsFull;
 
-	// Swap the class on the image sprite
-	oQuickReplyContainer.className = this.bCollapsed ? this.opt.sClassCollapsed : this.opt.sClassExpanded;
-	$('#' + this.opt.sContainerId).slideToggle(function() {
-		if (bIsFull && $(this).is(':visible'))
+	// Default bInit to false and bSavestate to true
+	bInit = typeof(bInit) === 'undefined' ? false : true;
+	bSavestate = typeof(bSavestate) === 'undefined' ? true : false;
+
+	// Flip our current state if not responding to an intial loading
+	if (!bInit)
+		this.bCollapsed = !this.bCollapsed;
+
+	// Swap the class on the expcol image as needed
+	var sTargetClass = !this.bCollapsed ? this.opt.sClassCollapsed : this.opt.sClassExpanded;
+	if (oQuickReplyContainer.className !== sTargetClass)
+		oQuickReplyContainer.className = sTargetClass;
+
+	// And show the new title
+	oQuickReplyContainer.title = oQuickReplyContainer.title = this.bCollapsed ? this.opt.sTitleCollapsed : this.opt.sTitleExpanded;
+
+	// Show or hide away
+	if (this.bCollapsed)
+		$('#' + this.opt.sContainerId).slideUp();
+	else
+	{
+		$('#' + this.opt.sContainerId).slideDown();
+		if (bIsFull)
 			$('#' + sEditorId).resize();
-	});
+	}
 
-	// Give it a new title as well
-	oQuickReplyContainer.title = this.bCollapsed ? this.opt.sTitleExpanded : this.opt.sTitleCollapsed;
+	// Using a cookie for guests?
+	if (bSavestate && 'oCookieOptions' in this.opt && this.opt.oCookieOptions.bUseCookie)
+		this.oCookie.set(this.opt.oCookieOptions.sCookieName, this.bCollapsed ? '1' : '0');
 
-	this.bCollapsed = !this.bCollapsed;
+	// Save the expand /collapse preferance
+	if (!bInit && bSavestate && 'oThemeOptions' in this.opt && this.opt.oThemeOptions.bUseThemeSettings)
+		elk_setThemeOption(this.opt.oThemeOptions.sOptionName, this.bCollapsed ? '1' : '0', 'sThemeId' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sThemeId : null, 'sAdditionalVars' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sAdditionalVars : null);
 };
 
 /**
@@ -492,7 +515,7 @@ QuickModify.prototype.modifyCancel = function ()
 			{
 				if (typeof(this.aAccessKeys[aInputs[i].name]) !== 'undefined')
 				{
-					aInputs[i].name = this.aAccessKeys[aInputs[i].name];
+					aInputs[i].accessKey = this.aAccessKeys[aInputs[i].name];
 				}
 			}
 		}
@@ -521,7 +544,7 @@ QuickModify.prototype.modifySave = function (sSessionId, sSessionVar)
 			{
 				if (typeof(this.aAccessKeys[aInputs[i].name]) !== 'undefined')
 				{
-					aInputs[i].name = this.aAccessKeys[aInputs[i].name];
+					aInputs[i].accessKey = this.aAccessKeys[aInputs[i].name];
 				}
 			}
 		}
@@ -565,6 +588,8 @@ QuickModify.prototype.onModifyDone = function (XMLDoc)
 	var message = XMLDoc.getElementsByTagName('elk')[0].getElementsByTagName('message')[0],
 		body = message.getElementsByTagName('body')[0],
 		error = message.getElementsByTagName('error')[0];
+	$(document.forms.quickModForm.message).removeClass('border_error');
+	$(document.forms.quickModForm.subject).removeClass('border_error');
 
 	if (body)
 	{
@@ -589,7 +614,13 @@ QuickModify.prototype.onModifyDone = function (XMLDoc)
 
 		// Show this message as 'modified on x by y'.
 		if (this.opt.bShowModify)
-			document.getElementById('modified_' + this.sCurMessageId.substr(4)).innerHTML = message.getElementsByTagName('modified')[0].childNodes[0].nodeValue;
+		{
+			var modified_element = document.getElementById('modified_' + this.sCurMessageId.substr(4));
+			modified_element.innerHTML = message.getElementsByTagName('modified')[0].childNodes[0].nodeValue;
+
+			// Just in case it's the first time the message is modified and the element is hidden
+			modified_element.style.display = '';
+		}
 
 		// Hide the icon if we were told to
 		if (this.opt.sIconHide !== null)
@@ -611,14 +642,20 @@ QuickModify.prototype.onModifyDone = function (XMLDoc)
 		// Re-Fix code blocks
 		if (typeof elk_codefix === 'function')
 			elk_codefix();
+
+		// And pretty the code
+		if (typeof prettyPrint === 'function')
+			prettyPrint();
 	}
 	else if (error)
 	{
 		oErrordiv = document.getElementById('error_box');
 		oErrordiv.innerHTML = error.childNodes[0].nodeValue;
 		oErrordiv.style.display = '';
-		document.forms.quickModForm.message.style.border = error.getAttribute('in_body') === '1' ? this.opt.sErrorBorderStyle : '';
-		document.forms.quickModForm.subject.style.border = error.getAttribute('in_subject') === '1' ? this.opt.sErrorBorderStyle : '';
+		if (error.getAttribute('in_body') === '1')
+			$(document.forms.quickModForm.message).addClass('border_error');
+		if (error.getAttribute('in_subject') === '1')
+			$(document.forms.quickModForm.subject).addClass('border_error');
 	}
 };
 
@@ -882,7 +919,7 @@ function ignore_toggles(msgids, text)
 function sendtopicOverlayDiv(desktopURL, sHeader, sIcon)
 {
 	// Set up our div details
-	var sAjax_indicator = '<div class="centertext"><img src="' + elk_images_url + '/loading.gif" ></div>',
+	var sAjax_indicator = '<div class="centertext"><i class="fa fa-spinner fa-spin" alt="loading"></i></div>',
 		oPopup_body;
 
 	sIcon = elk_images_url + '/' + (typeof(sIcon) === 'string' ? sIcon : 'helptopics.png');
@@ -984,11 +1021,11 @@ function sendtopicForm(oPopup_body, url, oContainer)
 
 		data = $this_form.serialize() + '&send=1';
 
-		send_comment = $this_form.find('input[name="comment"]').val();
-		sender_name = $this_form.find('input[name="y_name"]').val();
-		sender_mail = $this_form.find('input[name="y_email"]').val();
-		recipient_name = $this_form.find('input[name="r_name"]').val();
-		recipient_mail = $this_form.find('input[name="r_email"]').val();
+		var send_comment = $this_form.find('input[name="comment"]').val(),
+			sender_name = $this_form.find('input[name="y_name"]').val(),
+			sender_mail = $this_form.find('input[name="y_email"]').val,
+			recipient_name = $this_form.find('input[name="r_name"]').val(),
+			recipient_mail = $this_form.find('input[name="r_email"]').val();
 
 		var missing_elems = false;
 		if (sender_name === '')

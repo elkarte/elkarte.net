@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 /**
  * Checks if the message table already has a fulltext index created and returns the key name
  * Determines if a db is capable of creating a fulltext index
+ *
+ * @package Search
  */
 function detectFulltextIndex()
 {
@@ -79,13 +81,18 @@ function detectFulltextIndex()
 
 /**
  * Creates and outputs the Sphinx configuration file
+ *
+ * @package Search
  */
 function createSphinxConfig()
 {
-	global $context, $db_server, $db_name, $db_user, $db_passwd, $db_prefix, $db_character_set, $modSettings;
+	global $context, $db_server, $db_name, $db_user, $db_passwd, $db_prefix, $modSettings;
 
-	// set up to ouput a file to the users browser
-	ob_end_clean();
+	// Set up to ouput a file to the users browser
+	while (ob_get_level() > 0)
+		@ob_end_clean();
+
+	header('Content-Encoding: none');
 	header('Pragma: ');
 	if (!$context['browser']['is_gecko'])
 		header('Content-Transfer-Encoding: binary');
@@ -108,7 +115,7 @@ function createSphinxConfig()
 		$weight_total += $weight[$weight_factor];
 	}
 
-	// weightless, then use defaults
+	// Weightless, then use defaults
 	if ($weight_total === 0)
 	{
 		$weight = array(
@@ -120,11 +127,11 @@ function createSphinxConfig()
 		$weight_total = 100;
 	}
 
-	// check paths are set, if not use some defaults
+	// Check paths are set, if not use some defaults
 	$modSettings['sphinx_data_path'] = empty($modSettings['sphinx_data_path']) ? '/var/sphinx/data' : $modSettings['sphinx_data_path'];
 	$modSettings['sphinx_log_path'] = empty($modSettings['sphinx_log_path']) ? '/var/sphinx/log' : $modSettings['sphinx_log_path'];
 
-	// output our minimal configuration file to get them started
+	// Output our minimal configuration file to get them started
 	echo '#
 # Sphinx configuration file (sphinx.conf), configured for ElkArte
 #
@@ -137,20 +144,21 @@ function createSphinxConfig()
 source elkarte_source
 {
 	type				= mysql
-	sql_host 			= ', $db_server, '
+	sql_host			= ', $db_server, '
 	sql_user			= ', $db_user, '
 	sql_pass			= ', $db_passwd, '
 	sql_db				= ', $db_name, '
-	sql_port			= 3306', empty($db_character_set) ? '' : '
-	sql_query_pre		= SET NAMES ' . $db_character_set, '
-	sql_query_pre		=	\
+	sql_port			= 3306
+	sql_query_pre		= SET NAMES utf8
+	sql_query_pre		= SET SESSION query_cache_type=OFF
+	sql_query_pre		= \
 		REPLACE INTO ', $db_prefix, 'settings (variable, value) \
 		SELECT \'sphinx_indexed_msg_until\', MAX(id_msg) \
 		FROM ', $db_prefix, 'messages
 	sql_query_range		= \
 		SELECT 1, value \
 		FROM ', $db_prefix, 'settings \
-		WHERE variable = \'sphinx_indexed_msg_until\'
+		WHERE variable	= \'sphinx_indexed_msg_until\'
 	sql_range_step		= 1000
 	sql_query			= \
 		SELECT \
@@ -179,7 +187,8 @@ source elkarte_source
 
 source elkarte_delta_source : elkarte_source
 {
-	sql_query_pre	= ', isset($db_character_set) ? 'SET NAMES ' . $db_character_set : '', '
+	sql_query_pre = SET NAMES utf8
+	sql_query_pre = SET SESSION query_cache_type=OFF
 	sql_query_range	= \
 		SELECT s1.value, s2.value \
 		FROM ', $db_prefix, 'settings AS s1, ', $db_prefix, 'settings AS s2 \
@@ -189,19 +198,19 @@ source elkarte_delta_source : elkarte_source
 
 index elkarte_base_index
 {
-	html_strip 		= 1
-	source 			= elkarte_source
-	path 			= ', $modSettings['sphinx_data_path'], '/elkarte_sphinx_base.index', empty($modSettings['sphinx_stopword_path']) ? '' : '
-	stopwords 		= ' . $modSettings['sphinx_stopword_path'], '
-	min_word_len 	= 2
-	charset_type 	= utf-8
-	charset_table 	= 0..9, A..Z->a..z, _, a..z
+	html_strip		= 1
+	source			= elkarte_source
+	path			= ', $modSettings['sphinx_data_path'], '/elkarte_sphinx_base.index', empty($modSettings['sphinx_stopword_path']) ? '' : '
+	stopwords		= ' . $modSettings['sphinx_stopword_path'], '
+	min_word_len	= 2
+	charset_type	= utf-8
+	charset_table	= 0..9, A..Z->a..z, _, a..z
 }
 
 index elkarte_delta_index : elkarte_base_index
 {
-	source 			= elkarte_delta_source
-	path 			= ', $modSettings['sphinx_data_path'], '/elkarte_sphinx_delta.index
+	source			= elkarte_delta_source
+	path			= ', $modSettings['sphinx_data_path'], '/elkarte_sphinx_delta.index
 }
 
 index elkarte_index
@@ -213,19 +222,20 @@ index elkarte_index
 
 indexer
 {
-	mem_limit 		= ', (empty($modSettings['sphinx_indexer_mem']) ? 32 : (int) $modSettings['sphinx_indexer_mem']), 'M
+	mem_limit		= ', (empty($modSettings['sphinx_indexer_mem']) ? 32 : (int) $modSettings['sphinx_indexer_mem']), 'M
 }
 
 searchd
 {
-	listen 			= ', (empty($modSettings['sphinx_searchd_port']) ? 3312 : (int) $modSettings['sphinx_searchd_port']), '
-	listen 			= ', (empty($modSettings['sphinxql_searchd_port']) ? 3313 : (int) $modSettings['sphinxql_searchd_port']), ':mysql41
-	log 			= ', $modSettings['sphinx_log_path'], '/searchd.log
-	query_log 		= ', $modSettings['sphinx_log_path'], '/query.log
-	read_timeout 	= 5
-	max_children 	= 30
-	pid_file 		= ', $modSettings['sphinx_data_path'], '/searchd.pid
-	max_matches 	= ', (empty($modSettings['sphinx_max_results']) ? 3312 : (int) $modSettings['sphinx_max_results']), '
+	listen					= ', (empty($modSettings['sphinx_searchd_port']) ? 3312 : (int) $modSettings['sphinx_searchd_port']), '
+	listen					= ', (empty($modSettings['sphinxql_searchd_port']) ? 3313 : (int) $modSettings['sphinxql_searchd_port']), ':mysql41
+	log						= ', $modSettings['sphinx_log_path'], '/searchd.log
+	query_log				= ', $modSettings['sphinx_log_path'], '/query.log
+	read_timeout			= 5
+	max_children			= 30
+	compat_sphinxql_magics	= 1
+	pid_file				= ', $modSettings['sphinx_data_path'], '/searchd.pid
+	max_matches				= ', (empty($modSettings['sphinx_max_results']) ? 3312 : (int) $modSettings['sphinx_max_results']), '
 }
 ';
 	obExit(false, false);
@@ -234,8 +244,9 @@ searchd
 /**
  * Drop one or more indexes from a table and adds them back if specified
  *
+ * @package Search
  * @param string $table
- * @param mixed $indexes
+ * @param string[]|string $indexes
  * @param boolean $add
  */
 function alterFullTextIndex($table, $indexes, $add = false)
@@ -270,23 +281,26 @@ function alterFullTextIndex($table, $indexes, $add = false)
 /**
  * Creates a custom search index
  *
+ * @package Search
  * @param int $start
  * @param int $messages_per_batch
- * @param array $column_definition
- * @param array $index_settings array containing specifics of what to create e.g. bytes per word
+ * @param string $column_size_definition
+ * @param mixed[] $index_settings array containing specifics of what to create e.g. bytes per word
  */
-function createSearchIndex($start, $messages_per_batch, $column_definition, $index_settings)
+function createSearchIndex($start, $messages_per_batch, $column_size_definition, $index_settings)
 {
 	global $modSettings;
 
 	$db = database();
 	$db_search = db_search();
+	$step = 1;
 
+	// Starting a new index we set up for the run
 	if ($start === 0)
 	{
 		drop_log_search_words();
 
-		$db_search->create_word_search($column_definition);
+		$db_search->create_word_search($column_size_definition);
 
 		// Temporarily switch back to not using a search index.
 		if (!empty($modSettings['search_index']) && $modSettings['search_index'] == 'custom')
@@ -313,12 +327,14 @@ function createSearchIndex($start, $messages_per_batch, $column_definition, $ind
 	while ($row = $db->fetch_assoc($request))
 		$num_messages[empty($row['todo']) ? 'done' : 'todo'] = $row['num_messages'];
 
+	// Done with indexing the messages, on to the next step
 	if (empty($num_messages['todo']))
 	{
 		$step = 2;
 		$percentage = 80;
 		$start = 0;
 	}
+	// Still on step one, inserting all the indexed words.
 	else
 	{
 		// Number of seconds before the next step.
@@ -350,9 +366,7 @@ function createSearchIndex($start, $messages_per_batch, $column_definition, $ind
 
 				$number_processed++;
 				foreach (text2words($row['body'], $index_settings['bytes_per_word'], true) as $id_word)
-				{
 					$inserts[] = array($id_word, $row['id_msg']);
-				}
 			}
 			$num_messages['done'] += $number_processed;
 			$num_messages['todo'] -= $number_processed;
@@ -368,6 +382,7 @@ function createSearchIndex($start, $messages_per_batch, $column_definition, $ind
 					array('id_word', 'id_msg')
 				);
 
+			// Done then set up for the next step, set up for the next loop.
 			if ($num_messages['todo'] === 0)
 			{
 				$step = 2;
@@ -378,7 +393,7 @@ function createSearchIndex($start, $messages_per_batch, $column_definition, $ind
 				updateSettings(array('search_custom_index_resume' => serialize(array_merge($index_settings, array('resume_at' => $start)))));
 		}
 
-		// Since there are still two steps to go, 80% is the maximum here.
+		// Since there are still steps to go, 80% is the maximum here.
 		$percentage = round($num_messages['done'] / ($num_messages['done'] + $num_messages['todo']), 3) * 80;
 	}
 
@@ -388,8 +403,9 @@ function createSearchIndex($start, $messages_per_batch, $column_definition, $ind
 /**
  * Removes common stop words from the index as they inhibit search performance
  *
+ * @package Search
  * @param int $start
- * @param array $column_definition
+ * @param mixed[] $column_definition
  */
 function removeCommonWordsFromIndex($start, $column_definition)
 {
@@ -444,6 +460,8 @@ function removeCommonWordsFromIndex($start, $column_definition)
 
 /**
  * Drops the log search words table(s)
+ *
+ * @package Search
  */
 function drop_log_search_words()
 {

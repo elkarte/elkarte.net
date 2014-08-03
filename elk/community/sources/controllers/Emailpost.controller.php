@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -15,7 +15,10 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Post-by-email controller.
+ * Post-by-email controller.  Handles items pertaining to posting or PM an
+ * item that was received by email
+ *
+ * @package Maillist
  */
 class Emailpost_Controller extends Action_Controller
 {
@@ -27,24 +30,26 @@ class Emailpost_Controller extends Action_Controller
 	public function action_index()
 	{
 		// default, default, by default... preview
-		$this->action_pbe_preview();
+		$this->action_pbe_preview('');
 	}
 
 	/**
 	 * Main email posting controller, reads, parses, checks and posts an email message or PM
-	 * Allows a user to reply to a topic on the board by emailing a reply to a
+	 *
+	 * What it does:
+	 * - Allows a user to reply to a topic on the board by emailing a reply to a
 	 * notification message.
 	 * - It must have the security key in the email or it will be rejected
 	 * - It must be from the email of a registered user
 	 * - The key must have been sent to that user
 	 * - Keys are used once and then discarded
-	 * Accessed by email imap cron script, and ManageMaillist.controller.php.
+	 * - Accessed by email imap cron script, and ManageMaillist.controller.php.
 	 *
-	 * @param string $data used to supply a full body+headers email
+	 * @param string|null $data used to supply a full headers+body email
 	 * @param boolean $force used to override common failure errors
-	 * @param string $key used to supply a lost key
+	 * @param string|null $key used to supply a lost key
 	 */
-	function action_pbe_post($data = null, $force = false, $key = null)
+	public function action_pbe_post($data = null, $force = false, $key = null)
 	{
 		global $txt, $modSettings, $language, $user_info, $maintenance;
 
@@ -57,9 +62,8 @@ class Emailpost_Controller extends Action_Controller
 		require_once(SUBSDIR . '/Emailpost.subs.php');
 
 		// Init
-		$pbe = array();
 		loadLanguage('Maillist');
-		setMemoryLimit('256M');
+		setMemoryLimit('128M');
 
 		// Load the email parser and get some data to work with
 		$email_message = new Email_Parse();
@@ -96,7 +100,7 @@ class Emailpost_Controller extends Action_Controller
 		$key_owner = query_key_owner($email_message->message_key_id);
 
 		// Can't find this key in the database, either
-		//   a) spam attempt or b) replying with an expired/consumed key
+		// a) spam attempt or b) replying with an expired/consumed key
 		if (empty($key_owner))
 			return pbe_emailError('error_' . ($email_message->message_type === 'p' ? 'pm_' : '') . 'not_find_entry', $email_message);
 
@@ -113,7 +117,6 @@ class Emailpost_Controller extends Action_Controller
 		if ($email_message->message_type === 't' || $email_message->message_type === 'm')
 		{
 			// Load the message/topic details
-			$topic_info = array();
 			$topic_info = query_load_message($email_message->message_type, $email_message->message_id, $pbe);
 			if (empty($topic_info))
 				return pbe_emailError('error_topic_gone', $email_message);
@@ -124,7 +127,6 @@ class Emailpost_Controller extends Action_Controller
 		else
 		{
 			// Load the PM details
-			$pm_info = array();
 			$pm_info = query_load_message($email_message->message_type, $email_message->message_id, $pbe);
 			if (empty($pm_info))
 			{
@@ -151,7 +153,7 @@ class Emailpost_Controller extends Action_Controller
 		}
 
 		// Allow for new topics to be started via a email subject change
-		if (!empty($modSettings['maillist_newtopic_change']))
+		if (!empty($modSettings['maillist_newtopic_change']) && ($email_message->message_type === 'm'))
 		{
 			$subject = str_replace($pbe['response_prefix'], '', pbe_clean_email_subject($email_message->subject));
 			$current_subject = str_replace($pbe['response_prefix'], '', $topic_info['subject']);
@@ -169,7 +171,7 @@ class Emailpost_Controller extends Action_Controller
 			$result = pbe_create_post($pbe, $email_message, $topic_info);
 		// Must be a PM then
 		elseif ($email_message->message_type === 'p')
-			$result = pbe_create_pm($pbe, $email_message, $topic_info);
+			$result = pbe_create_pm($pbe, $email_message, $pm_info);
 
 		if (!empty($result))
 		{
@@ -185,14 +187,16 @@ class Emailpost_Controller extends Action_Controller
 
 	/**
 	 * New Topic posting controller, reads, parses, checks and posts a new topic
+	 *
+	 * What it does:
 	 * - New topics do not have security keys in them so they are subject to spoofing
 	 * - It must be from the email of a registered user
 	 * - It must have been sent to an email ID that has been set to post new topics
-	 * Accessed through emailtopic.
+	 * - Accessed through emailtopic.
 	 *
-	 * @param string $data used to supply a full body+headers email
+	 * @param string|null $data used to supply a full body+headers email
 	 */
-	function action_pbe_topic($data = null)
+	public function action_pbe_topic($data = null)
 	{
 		global $modSettings, $user_info, $maintenance;
 
@@ -205,7 +209,6 @@ class Emailpost_Controller extends Action_Controller
 		require_once(SUBSDIR . '/Emailpost.subs.php');
 
 		// Init
-		$pbe = array();
 		loadLanguage('Maillist');
 		setMemoryLimit('256M');
 
@@ -269,14 +272,16 @@ class Emailpost_Controller extends Action_Controller
 
 	/**
 	 * Used to preview a failed email from the ACP
-	 *  - Called from ManageMaillist.controller, which checks topic/message permission for viewing
-	 *  - Calls pbe_load_text to prepare text for the preview
-	 *  - Returns an array of values for use in the template
+	 *
+	 * What it does:
+	 * - Called from ManageMaillist.controller, which checks topic/message permission for viewing
+	 * - Calls pbe_load_text to prepare text for the preview
+	 * - Returns an array of values for use in the template
 	 *
 	 * @param string $data raw email string, including headers
 	 * @return boolean
 	 */
-	function action_pbe_preview($data = null)
+	public function action_pbe_preview($data)
 	{
 		global $txt, $modSettings;
 
@@ -299,16 +304,6 @@ class Emailpost_Controller extends Action_Controller
 		$html = $email_message->html_found;
 		$email_message->load_address();
 		$email_message->load_key();
-
-		// Any reason to avoid using the html version since it helps with formatting
-		if ($html && preg_match_all('~<table.*?>~i', $email_message->body, $matches) >= 2)
-		{
-			// Some mobile responses wrap everything in a table structure
-			$text = $email_message->plain_body;
-			$html = false;
-		}
-		else
-			$text = $email_message->body;
 
 		// Convert to BBC and Format for the preview
 		$text = pbe_load_text($html, $email_message, $pbe);
@@ -333,13 +328,16 @@ class Emailpost_Controller extends Action_Controller
 
 /**
  * Attempts to create a reply post on the forum
- *  - Checks if the user has permissions to post/reply/postby email
- *  - Calls pbe_load_text to prepare text for the post
- *  - returns true if successful or false for any number of failures
  *
- * @param array $pbe array of all pbe user_info values
- * @param string $email_message
- * @param array $topic_info
+ * What it does:
+ * - Checks if the user has permissions to post/reply/postby email
+ * - Calls pbe_load_text to prepare text for the post
+ * - returns true if successful or false for any number of failures
+ *
+ * @package Maillist
+ * @param mixed[] $pbe array of all pbe user_info values
+ * @param Email_Parse $email_message
+ * @param mixed[] $topic_info
  */
 function pbe_create_post($pbe, $email_message, $topic_info)
 {
@@ -429,16 +427,20 @@ function pbe_create_post($pbe, $email_message, $topic_info)
 
 /**
  * Attempts to create a PM (reply) on the forum
- *  - Checks if the user has permissions
- *  - Calls pbe_load_text to prepare text for the pm
- *  - Calls query_mark_pms to mark things as read
- *  - Uses sendpm to do the actual "sending"
- *  - Returns true if successful or false for any number of failures
  *
- * @param array $pbe array of pbe 'user_info' values
- * @param string $email_message
-*/
-function pbe_create_pm($pbe, $email_message)
+ * What it does
+ * - Checks if the user has permissions
+ * - Calls pbe_load_text to prepare text for the pm
+ * - Calls query_mark_pms to mark things as read
+ * - Uses sendpm to do the actual "sending"
+ * - Returns true if successful or false for any number of failures
+ *
+ * @package Maillist
+ * @param mixed[] $pbe array of pbe 'user_info' values
+ * @param Email_Parse $email_message
+ * @param mixed[] $pm_info
+ */
+function pbe_create_pm($pbe, $email_message, $pm_info)
 {
 	global $modSettings, $txt;
 
@@ -477,19 +479,21 @@ function pbe_create_pm($pbe, $email_message)
 }
 
 /**
- * Called by
- *  - pbe_topic to create a new topic
- *  - pbe_main to create a new topic via a subject change
- * Checks posting permissions, but requires email validation checks are complete
- *  - Calls pbe_load_text to prepare text for the post
- *  - Uses createPost to do the actual "posting"
- *  - Calls sendNotifications to announce the new post
- *  - Calls query_update_member_stats to show they did something
- * Requires pbe and email_message to be populated.
+ * Create a new topic by email
  *
- * @param array $pbe array of pbe 'user_info' values
- * @param string $email_message
- * @param array $board_info
+ * What it does:
+ * - Called by pbe_topic to create a new topic or by pbe_main to create a new topic via a subject change
+ * - checks posting permissions, but requires all email validation checks are complete
+ * - Calls pbe_load_text to prepare text for the post
+ * - Uses createPost to do the actual "posting"
+ * - Calls sendNotifications to announce the new post
+ * - Calls query_update_member_stats to show they did something
+ * - Requires the pbe, email_message and board_info arrays to be populated.
+ *
+ * @package Maillist
+ * @param mixed[] $pbe array of pbe 'user_info' values
+ * @param Email_Parse $email_message
+ * @param mixed[] $board_info
  */
 function pbe_create_topic($pbe, $email_message, $board_info)
 {
@@ -593,11 +597,16 @@ function pbe_create_topic($pbe, $email_message, $board_info)
 /**
  * Calls the necessary functions to extract and format the message so its ready for posting
  *
+ * What it does:
+ * - Converts an email response (text or html) to a BBC equivalant via pbe_Email_to_bbc
+ * - Formats the email response so it looks structured and not chopped up (via pbe_fix_email_body)
+ *
+ * @package Maillist
  * @param boolean $html
- * @param object $email_message
- * @param array $pbe
+ * @param Email_Parse $email_message
+ * @param mixed[] $pbe
  */
-function pbe_load_text($html, $email_message, $pbe)
+function pbe_load_text(&$html, $email_message, $pbe)
 {
 	if ($html && preg_match_all('~<table.*?>~i', $email_message->body, $matches) >= 2)
 	{
@@ -614,7 +623,7 @@ function pbe_load_text($html, $email_message, $pbe)
 	$text = pbe_fix_email_body($text, $html, $pbe['profile']['real_name'], (empty($email_message->_converted_utf8) ? $email_message->headers['x-parameters']['content-type']['charset'] : 'UTF-8'));
 
 	// Do we even have a message left to post?
-	$text = Util::htmltrim($text, ENT_QUOTES);
+	$text = Util::htmltrim($text);
 	if (empty($text))
 		return;
 

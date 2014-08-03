@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -68,6 +68,9 @@ class Reminder_Controller extends Action_Controller
 		createToken('remind');
 
 		require_once(SUBSDIR . '/Auth.subs.php');
+
+		// No where params just yet
+		$where_params = array();
 
 		// Coming with a known ID?
 		if (!empty($_REQUEST['uid']))
@@ -235,11 +238,14 @@ class Reminder_Controller extends Action_Controller
 		validatePasswordFlood($_POST['u'], $member['passwd_flood'], true);
 
 		// User validated.  Update the database!
-		updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => sha1(strtolower($member['member_name']) . $_POST['passwrd1'])));
+		require_once(SUBSDIR . '/Auth.subs.php');
+		$sha_passwd = $_POST['passwrd1'];
+		updateMemberData($_POST['u'], array('validation_code' => '', 'passwd' => validateLoginPassword($sha_passwd, '', $member['member_name'], true)));
 
 		call_integration_hook('integrate_reset_pass', array($member['member_name'], $member['member_name'], $_POST['passwrd1']));
 
 		loadTemplate('Login');
+		loadJavascriptFile('sha256.js', array('defer' => true));
 		$context += array(
 			'page_title' => $txt['reminder_password_set'],
 			'sub_template' => 'login',
@@ -306,12 +312,15 @@ class Reminder_Controller extends Action_Controller
 			fatal_lang_error('profile_error_password_' . $passwordError, false);
 
 		// Alright, so long as 'yer sure.
-		updateMemberData($member['id_member'], array('passwd' => sha1(strtolower($member['member_name']) . $_POST['passwrd1'])));
+		require_once(SUBSDIR . '/Auth.subs.php');
+		$sha_passwd = $_POST['passwrd1'];
+		updateMemberData($member['id_member'], array('passwd' => validateLoginPassword($sha_passwd, '', $member['member_name'], true)));
 
 		call_integration_hook('integrate_reset_pass', array($member['member_name'], $member['member_name'], $_POST['passwrd1']));
 
 		// Tell them it went fine.
 		loadTemplate('Login');
+		loadJavascriptFile('sha256.js', array('defer' => true));
 		$context += array(
 			'page_title' => $txt['reminder_password_set'],
 			'sub_template' => 'login',

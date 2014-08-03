@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -34,6 +34,7 @@ class ManageSmileys_Controller extends Action_Controller
 
 	/**
 	 * Contextual information about smiley sets.
+	 * @var mixed[]
 	 */
 	private $_smiley_context = array();
 
@@ -65,17 +66,11 @@ class ManageSmileys_Controller extends Action_Controller
 			'install' => array($this, 'action_install', 'permission' => 'manage_smileys')
 		);
 
-		call_integration_hook('integrate_manage_smileys', array(&$subActions));
+		// Action controller
+		$action = new Action('manage_smileys');
 
 		// Set the smiley context.
 		$this->_initSmileyContext();
-
-		// Default the sub-action to 'edit smiley settings'.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'editsets';
-
-		// Set up template stuff
-		$context['page_title'] = $txt['smileys_manage'];
-		$context['sub_action'] = $subAction;
 
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -104,6 +99,13 @@ class ManageSmileys_Controller extends Action_Controller
 			),
 		);
 
+		// Default the sub-action to 'edit smiley settings'. call integrate_sa_manage_smileys
+		$subAction = $action->initialize($subActions, 'editsets');
+
+		// Set up the template
+		$context['page_title'] = $txt['smileys_manage'];
+		$context['sub_action'] = $subAction;
+
 		// Some settings may not be enabled, disallow these from the tabs as appropriate.
 		if (empty($modSettings['messageIcons_enable']))
 			$context[$context['admin_menu_name']]['tab_data']['tabs']['editicons']['disabled'] = true;
@@ -116,8 +118,6 @@ class ManageSmileys_Controller extends Action_Controller
 		}
 
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'editsets');
 		$action->dispatch($subAction);
 	}
 
@@ -134,10 +134,8 @@ class ManageSmileys_Controller extends Action_Controller
 
 		$config_vars = $this->_smileySettings->settings();
 
-		call_integration_hook('integrate_modify_smiley_settings');
-
 		// For the basics of the settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 		require_once(SUBSDIR . '/Smileys.subs.php');
 		$context['sub_template'] = 'show_settings';
 
@@ -178,7 +176,7 @@ class ManageSmileys_Controller extends Action_Controller
 	private function _initSmileySettingsForm()
 	{
 		// This is really quite wanting.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_smileySettings = new Settings_Form();
@@ -194,7 +192,7 @@ class ManageSmileys_Controller extends Action_Controller
 	 */
 	private function _settings()
 	{
-		global $txt, $modSettings;
+		global $txt, $modSettings, $context;
 
 		// The directories...
 		$context['smileys_dir'] = empty($modSettings['smileys_dir']) ? BOARDDIR . '/smileys' : $modSettings['smileys_dir'];
@@ -215,6 +213,8 @@ class ManageSmileys_Controller extends Action_Controller
 				// Message icons.
 				array('check', 'messageIcons_enable', 'subtext' => $txt['setting_messageIcons_enable_note']),
 		);
+
+		call_integration_hook('integrate_modify_smiley_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -431,6 +431,7 @@ class ManageSmileys_Controller extends Action_Controller
 					'data' => array(
 						'function' => create_function('$rowData', '
 							global $settings;
+
 							return $rowData[\'selected\'] ? \'<img src="\' . $settings[\'images_url\'] . \'/icons/field_valid.png" alt="*" class="icon" />\' : \'\';
 						'),
 						'class' => 'centertext',
@@ -501,14 +502,15 @@ class ManageSmileys_Controller extends Action_Controller
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
+					'class' => 'submitbutton',
 					'value' => '
 						<input type="submit" name="delete_set" value="' . $txt['smiley_sets_delete'] . '" onclick="return confirm(\'' . $txt['smiley_sets_confirm'] . '\');" class="right_submit" />
-						<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=smileys;sa=modifyset">' . $txt['smiley_sets_add'] . '</a> ',
+						<a class="linkbutton" href="' . $scripturl . '?action=admin;area=smileys;sa=modifyset">' . $txt['smiley_sets_add'] . '</a> ',
 				),
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 
@@ -1052,7 +1054,7 @@ class ManageSmileys_Controller extends Action_Controller
 					}',
 			);
 
-			require_once(SUBSDIR . '/List.class.php');
+			require_once(SUBSDIR . '/GenericList.class.php');
 			createList($listOptions);
 
 			// The list is the only thing to show, so make it the main template.
@@ -1210,10 +1212,11 @@ class ManageSmileys_Controller extends Action_Controller
 		}
 
 		$context[$context['admin_menu_name']]['current_subsection'] = 'editicons';
-
+		$token = createToken('admin-sort');
 		$listOptions = array(
 			'id' => 'message_icon_list',
 			'title' => $txt['icons_edit_message_icons'],
+			'sortable' => true,
 			'base_href' => $scripturl . '?action=admin;area=smileys;sa=editicons',
 			'get_items' => array(
 				'function' => array($this, 'list_fetchMessageIconsDetails'),
@@ -1292,18 +1295,36 @@ class ManageSmileys_Controller extends Action_Controller
 			),
 			'form' => array(
 				'href' => $scripturl . '?action=admin;area=smileys;sa=editicons',
+				'hidden_fields' => array(
+					'icons_save' => 1,
+				)
 			),
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
+					'class' => 'submitbutton',
 					'value' => '
 						<input type="submit" name="delete" value="' . $txt['quickmod_delete_selected'] . '" class="right_submit" />
-						<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=smileys;sa=editicon">' . $txt['icons_add_new'] . '</a>',
+						<a class="linkbutton" href="' . $scripturl . '?action=admin;area=smileys;sa=editicon">' . $txt['icons_add_new'] . '</a>',
+				),
+				array(
+					'position' => 'after_title',
+					'value' => $txt['icons_reorder_note'],
 				),
 			),
+			'javascript' => '
+				$().elkSortable({
+					sa: "messageiconorder",
+					error: "' . $txt['admin_order_error'] . '",
+					title: "' . $txt['admin_order_title'] . '",
+					placeholder: "ui-state-highlight",
+					href: "?action=admin;area=smileys;sa=editicons",
+					token: {token_var: "' . $token['admin-sort_token_var'] . '", token_id: "' . $token['admin-sort_token'] . '"}
+				});
+			',
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		// If we're adding/editing an icon we'll need a list of boards
@@ -1409,7 +1430,7 @@ class ManageSmileys_Controller extends Action_Controller
 	/**
 	 * Install a smiley set.
 	 */
-	function action_install()
+	public function action_install()
 	{
 		global $modSettings, $scripturl, $context, $txt, $user_info;
 
@@ -1425,6 +1446,8 @@ class ManageSmileys_Controller extends Action_Controller
 
 		// Installing unless proven otherwise
 		$testing = false;
+		$destination = '';
+		$name = '';
 
 		if (isset($_REQUEST['set_gz']))
 		{
@@ -1479,15 +1502,22 @@ class ManageSmileys_Controller extends Action_Controller
 		}
 
 		$extracted = read_tgz_file($destination, BOARDDIR . '/packages/temp');
-		if (!$extracted) // @todo needs to change the URL in the next line ;)
+
+		// @todo needs to change the URL in the next line ;)
+		if (!$extracted)
 			fatal_lang_error('packageget_unable', false, array('http://custom.elkarte.net/index.php?action=search;type=12;basic_search=' . $name));
+
 		if ($extracted && !file_exists(BOARDDIR . '/packages/temp/package-info.xml'))
+		{
 			foreach ($extracted as $file)
+			{
 				if (basename($file['filename']) == 'package-info.xml')
 				{
 					$base_path = dirname($file['filename']) . '/';
 					break;
 				}
+			}
+		}
 
 		if (!isset($base_path))
 			$base_path = '';
@@ -1503,7 +1533,7 @@ class ManageSmileys_Controller extends Action_Controller
 		if (isSmileySetInstalled($smileyInfo['id']))
 			fata_lang_error('package_installed_warning1');
 
-		// Everything is fine, now it's time to do something
+		// Everything is fine, now it's time to do something, first we test
 		$actions = parsePackageInfo($smileyInfo['xml'], true, 'install');
 
 		$context['post_url'] = $scripturl . '?action=admin;area=smileys;sa=install;package=' . $base_name;
@@ -1511,12 +1541,10 @@ class ManageSmileys_Controller extends Action_Controller
 		$context['actions'] = array();
 		$context['ftp_needed'] = false;
 
-		$has_readme = false;
 		foreach ($actions as $action)
 		{
 			if ($action['type'] == 'readme' || $action['type'] == 'license')
 			{
-				$has_readme = true;
 				$type = 'package_' . $action['type'];
 				if (file_exists(BOARDDIR . '/packages/temp/' . $base_path . $action['filename']))
 					$context[$type] = htmlspecialchars(trim(file_get_contents(BOARDDIR . '/packages/temp/' . $base_path . $action['filename']), "\n\r"), ENT_COMPAT, 'UTF-8');

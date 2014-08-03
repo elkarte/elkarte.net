@@ -9,10 +9,20 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the user profile
  */
+
+$(document).ready(function() {
+	// Profile options changing karma
+	$('#karma_good, #karma_bad').keyup(function() {
+		var good = parseInt($('#karma_good').val()),
+			bad = parseInt($('#karma_bad').val());
+
+		$('#karmaTotal').text((isNaN(good) ? 0 : good) - (isNaN(bad) ? 0 : bad));
+	});
+});
 
 /**
  * Function to detect the time offset and populate the offset box
@@ -40,30 +50,6 @@ function autoDetectTimeOffset(currentTime)
 	diff %= 24;
 
 	return diff;
-}
-
-/**
- * Prevent Chrome from auto completing fields when viewing/editing other members profiles
- */
-function disableAutoComplete()
-{
-	if (document.addEventListener)
-		document.addEventListener("DOMContentLoaded", disableAutoCompleteNow, false);
-}
-
-/**
- * Once DOMContentLoaded is triggered, call the function
- */
-function disableAutoCompleteNow()
-{
-	for (var i = 0, n = document.forms.length; i < n; i++)
-	{
-		var die = document.forms[i].elements;
-		for (var j = 0, m = die.length; j < m; j++)
-			// Only bother with text/password fields?
-			if (die[j].type === "text" || die[j].type === "password")
-				die[j].setAttribute("autocomplete", "off");
-	}
 }
 
 /**
@@ -211,6 +197,33 @@ function changeSel(selected)
 	}
 }
 
+function init_avatars()
+{
+	var avatar = document.getElementById("avatar");
+
+	// If we are using an avatar from the gallery, let's load it
+	if (avatar !== null)
+		changeSel(selavatar);
+
+	// And now show the proper interface for the selected avatar type
+	swap_avatar();
+}
+
+// Show the right avatar based on what radio button they just selected
+function swap_avatar()
+{
+	$('#avatar_choices input').each(function() {
+		var choice_id = $(this).attr('id');
+
+		if ($(this).is(':checked'))
+			$('#' + choice_id.replace('_choice', '')).css({display: ''});
+		else
+			$('#' + choice_id.replace('_choice', '')).css({display: 'none'});
+	});
+
+	return true;
+}
+
 /**
  * Updates the avatar img preview with the selected one
  */
@@ -223,7 +236,6 @@ function showAvatar()
 
 	oAvatar.src = avatardir + file.options[file.selectedIndex].value;
 	oAvatar.alt = file.options[file.selectedIndex].text;
-	oAvatar.alt += file.options[file.selectedIndex].text === size ? "!" : "";
 	oAvatar.style.width = "";
 	oAvatar.style.height = "";
 }
@@ -232,123 +244,21 @@ function showAvatar()
  * Allows for the previewing of an externally stored avatar
  *
  * @param {string} src
- * @param {string} sid
  */
-function previewExternalAvatar(src, sid)
+function previewExternalAvatar(src)
 {
-	sid = (typeof(sid) === 'undefined') ? "avatar" : sid;
+	var oSid = document.getElementById("external");
 
-	if (!document.getElementById(sid))
-		return;
+	// Assign the source to the image tag
+	oSid.src = src;
 
-	var tempImage = new Image();
-
-	tempImage.src = src;
-	if (maxWidth !== 0 && tempImage.width > maxWidth)
-	{
-		document.getElementById(sid).style.height = parseInt((maxWidth * tempImage.height) / tempImage.width) + "px";
-		document.getElementById(sid).style.width = maxWidth + "px";
-	}
-	else if (maxHeight !== 0 && tempImage.height > maxHeight)
-	{
-		document.getElementById(sid).style.width = parseInt((maxHeight * tempImage.width) / tempImage.height) + "px";
-		document.getElementById(sid).style.height = maxHeight + "px";
-	}
-	document.getElementById(sid).src = src;
-}
-
-/**
- * Sets the warning bar based on user +/- button click
- * Also responds to mousedown/move/click events inside the warning bar to set the level
- * Determines the right color for the bar and sets it
- * Sets the warning level notification text
- *
- * @param {object} curEvent
- * @param {boolean} isMove
- * @param {int} changeAmount
- */
-function setWarningBarPos(curEvent, isMove, changeAmount)
-{
-	// Are we passing the amount to change it by?
-	if (changeAmount)
-	{
-		if (document.getElementById('warning_level').value === 'SAME')
-			percent = currentLevel + changeAmount;
+	// Create an in-memory element to measure the real size of the image
+	$('<img />').load(function() {
+		if (refuse_too_large && ((maxWidth !== 0 && this.width > maxWidth) || (maxHeight !== 0 && this.height > maxHeight)))
+			$('#avatar_external').addClass('error');
 		else
-			percent = parseInt(document.getElementById('warning_level').value) + changeAmount;
-	}
-	// If not then it's a mouse thing.
-	else
-	{
-		if (!curEvent)
-			curEvent = window.event;
-
-		// If it's a movement check the button state first!
-		if (isMove)
-		{
-			if (!curEvent.button || curEvent.button !== 1)
-				return false;
-		}
-
-		// Get the position of the container.
-		contain = document.getElementById('warning_progress');
-		position = 0;
-		while (contain !== null)
-		{
-			position += contain.offsetLeft;
-			contain = contain.offsetParent;
-		}
-
-		// Where is the mouse?
-		if (curEvent.pageX)
-		{
-			mouse = curEvent.pageX;
-		}
-		else
-		{
-			mouse = curEvent.clientX;
-			mouse += document.documentElement.scrollLeft !== "undefined" ? document.documentElement.scrollLeft : document.body.scrollLeft;
-		}
-
-		// Is this within bounds?
-		if (mouse < position || mouse > position + barWidth)
-			return;
-
-		percent = Math.round(((mouse - position) / barWidth) * 100);
-
-		// Round percent to the nearest 5 - by kinda cheating!
-		percent = Math.round(percent / 5) * 5;
-	}
-
-	// What are the limits?
-	percent = Math.max(percent, minLimit);
-	percent = Math.min(percent, maxLimit);
-
-	// Set up the warning progress bar
-	size = barWidth * (percent / 100);
-	document.getElementById('warning_text').innerHTML = percent + "%";
-	document.getElementById('warning_level').value = percent;
-	document.getElementById('warning_progress').style.width = size + "px";
-
-	// Get the right color.
-	var key;
-	for (key in colors)
-	{
-		if (percent >= key)
-			color = colors[key];
-	}
-
-	document.getElementById('warning_progress').style.backgroundColor = color;
-	document.getElementById('warning_progress').style.backgroundImage = "none";
-
-	// Set the right text so its clear what the level will restrict
-	for (key in effectTexts)
-	{
-		if (percent >= key)
-			effectText = effectTexts[key];
-	}
-
-	document.getElementById('cur_level_div').innerHTML = effectText;
+			$('#avatar_external').removeClass('error');
+	}).attr('src', src);
 }
 
 /**
@@ -357,12 +267,51 @@ function setWarningBarPos(curEvent, isMove, changeAmount)
  */
 function modifyWarnNotify()
 {
-	disable = !document.getElementById('warn_notify').checked;
+	var disable = !document.getElementById('warn_notify').checked;
+
 	document.getElementById('warn_sub').disabled = disable;
 	document.getElementById('warn_body').disabled = disable;
 	document.getElementById('warn_temp').disabled = disable;
 	document.getElementById('new_template_link').style.display = disable ? 'none' : '';
 	document.getElementById('preview_button').style.display = disable ? 'none' : '';
+
+	$("#preview_button").click(function() {
+		$.ajax({
+			type: "POST",
+			url: elk_scripturl + "?action=xmlpreview;xml",
+			data: {
+				item: "warning_preview",
+				title: $("#warn_sub").val(),
+				body: $("#warn_body").val(),
+				issuing: true
+			},
+			context: document.body
+		})
+		.done(function(request) {
+			$("#box_preview").show();
+			$("#body_preview").html($(request).find('body').text());
+
+			if ($(request).find("error").text() !== '')
+			{
+				$("#profile_error").show();
+				var errors_html = '<span>' + $("#profile_error").find("span").html() + '</span>' + '<ul class="list_errors">';
+				var errors = $(request).find('error').each(function() {
+					errors_html += '<li>' + $(this).text() + '</li>';
+				});
+				errors_html += '</ul>';
+
+				$("#profile_error").html(errors_html);
+			}
+			else
+			{
+				$("#profile_error").hide();
+				$("#error_list").html('');
+			}
+
+			return false;
+		});
+		return false;
+	});
 }
 
 /**
@@ -371,9 +320,44 @@ function modifyWarnNotify()
  *
  * @param {int} amount
  */
-function changeWarnLevel(amount)
+function initWarnSlider(sliderID, levelID, levels)
 {
-	setWarningBarPos(false, false, amount);
+	$("#" + sliderID).slider({
+		range: "min",
+		min: 0,
+		max: 100,
+		slide: function(event, ui) {
+			$("#" + levelID).val(ui.value);
+
+			$(this).removeClass("watched moderated muted");
+
+			if (ui.value >= levels[3])
+				$(this).addClass("muted");
+			else if (ui.value >= levels[2])
+				$(this).addClass("moderated");
+			else if (ui.value >= levels[1])
+				$(this).addClass("watched");
+		},
+		change: function(event, ui) {
+			$("#" + levelID).val(ui.value);
+
+			$(this).removeClass("watched moderated muted");
+
+			if (ui.value >= levels[3])
+				$(this).addClass("muted");
+			else if (ui.value >= levels[2])
+				$(this).addClass("moderated");
+			else if (ui.value >= levels[1])
+				$(this).addClass("watched");
+		}
+	}).slider("value", $("#" + levelID).val());
+
+	// Just in case someone wants to type, let's keep the two in synch
+	$("#" + levelID).keyup(function() {
+		var val = Math.max(0, Math.min(100, $(this).val()));
+
+		$("#" + sliderID).slider("value", val);
+	});
 }
 
 /**
@@ -381,8 +365,9 @@ function changeWarnLevel(amount)
  */
 function populateNotifyTemplate()
 {
-	// no selection means no template
-	index = document.getElementById('warn_temp').value;
+	var index = document.getElementById('warn_temp').value;
+
+	// No selection means no template
 	if (index === -1)
 		return false;
 

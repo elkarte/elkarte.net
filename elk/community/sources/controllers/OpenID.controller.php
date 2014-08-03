@@ -11,7 +11,7 @@
  * copyright:	2012 Simple Machines Forum contributors (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -37,7 +37,7 @@ class OpenID_Controller extends Action_Controller
 	/**
 	 * Callback action handler for OpenID
 	 */
-	function action_openidreturn()
+	public function action_openidreturn()
 	{
 		global $modSettings, $context, $user_settings;
 
@@ -48,6 +48,7 @@ class OpenID_Controller extends Action_Controller
 		if (empty($modSettings['enableOpenID']))
 			fatal_lang_error('no_access', false);
 
+		// The OpenID provider did not respond with the OpenID mode? Throw an error..
 		if (!isset($_GET['openid_mode']))
 			fatal_lang_error('openid_return_no_mode', false);
 
@@ -66,6 +67,7 @@ class OpenID_Controller extends Action_Controller
 		if (!empty($_GET['openid_invalidate_handle']))
 			$openID->removeAssociation($_GET['openid_invalidate_handle']);
 
+		// Get the OpenID server info.
 		$server_info = $openID->getServerInfo($_GET['openid_identity']);
 
 		// Get the association data.
@@ -74,14 +76,15 @@ class OpenID_Controller extends Action_Controller
 			fatal_lang_error('openid_no_assoc');
 
 		$secret = base64_decode($assoc['secret']);
-
 		$signed = explode(',', $_GET['openid_signed']);
 		$verify_str = '';
+
 		foreach ($signed as $sign)
 			$verify_str .= $sign . ':' . strtr($_GET['openid_' . str_replace('.', '_', $sign)], array('&amp;' => '&')) . "\n";
 
-		$verify_str = base64_encode(sha1_hmac($verify_str, $secret));
+		$verify_str = base64_encode(hash_hmac('sha1', $verify_str, $secret, true));
 
+		// Verify the OpenID signature.
 		if ($verify_str != $_GET['openid_sig'])
 			fatal_lang_error('openid_sig_invalid', 'critical');
 
@@ -156,6 +159,7 @@ class OpenID_Controller extends Action_Controller
 		{
 			$user_settings = $member_found;
 
+			// @Todo: this seems outdated?
 			$user_settings['passwd'] = sha1(strtolower($user_settings['member_name']) . $secret);
 			$user_settings['password_salt'] = substr(md5(mt_rand()), 0, 4);
 
@@ -169,9 +173,11 @@ class OpenID_Controller extends Action_Controller
 
 			require_once(CONTROLLERDIR . '/Auth.controller.php');
 
+			// Activation required?
 			if (!checkActivation())
 				return;
 
+			// Finally do the login.
 			doLogin();
 		}
 	}
@@ -181,16 +187,16 @@ class OpenID_Controller extends Action_Controller
 	 */
 	public function action_xrds()
 	{
-		global $scripturl, $modSettings, $context;
+		global $scripturl, $modSettings;
 
-		ob_end_clean();
+		@ob_end_clean();
 		if (!empty($modSettings['enableCompressedOutput']))
-			@ob_start('ob_gzhandler');
+			ob_start('ob_gzhandler');
 		else
 			ob_start();
 
 		header('Content-Type: application/xrds+xml');
-		echo '<?xml version="1.0" encoding="', $context['character_set'], '"?' . '>';
+		echo '<?xml version="1.0" encoding="UTF-8"?' . '>';
 		// Generate the XRDS data for OpenID 2.0, YADIS discovery..
 		echo '
 <xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">

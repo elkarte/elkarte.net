@@ -2,6 +2,7 @@
 
 /**
  * Implementation of PHP's session API.
+ * 
  * What it does:
  *  - it handles the session data in the database (more scalable.)
  *  - it uses the databaseSession_lifetime setting for garbage collection.
@@ -15,7 +16,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -27,7 +28,7 @@ if (!defined('ELK'))
  */
 function loadSession()
 {
-	global $modSettings, $boardurl, $sc;
+	global $modSettings, $boardurl, $sc, $cache_accelerator;
 
 	// Attempt to change a few PHP settings.
 	@ini_set('session.use_cookies', true);
@@ -62,7 +63,7 @@ function loadSession()
 			$_POST[session_name()] = $session_id;
 		}
 
-		// Use database sessions? (they don't work in 4.1.x!)
+		// Use database sessions?
 		if (!empty($modSettings['databaseSession_enable']))
 		{
 			@ini_set('session.serialize_handler', 'php');
@@ -76,6 +77,7 @@ function loadSession()
 		if (empty($modSettings['databaseSession_enable']) && !empty($modSettings['cache_enable']) && php_sapi_name() != 'cli')
 		{
 			call_integration_hook('integrate_session_handlers');
+
 			// @todo move these to a plugin.
 			if (function_exists('mmcache_set_session_handlers'))
 				mmcache_set_session_handlers();
@@ -83,7 +85,13 @@ function loadSession()
 				eaccelerator_set_session_handlers();
 		}
 
+		// Start the session
 		session_start();
+
+		// APC destroys static class members before sessions can be written.  To work around this we
+		// explicitly call session_write_close on script end/exit bugs.php.net/bug.php?id=60657
+		if (!empty($modSettings['cache_enable']) && $cache_accelerator === 'apc')
+			register_shutdown_function('session_write_close');
 
 		// Change it so the cache settings are a little looser than default.
 		if (!empty($modSettings['databaseSession_loose']))
@@ -101,8 +109,10 @@ function loadSession()
 }
 
 /**
- * Implementation of sessionOpen() replacing the standard open handler.
- * It simply returns true.
+ * Implementation of sessionOpen()
+ *
+ * - executed when the session is being opened with db sessions
+ * - It simply returns true.
  *
  * @param string $save_path
  * @param string $session_name
@@ -114,8 +124,10 @@ function sessionOpen($save_path, $session_name)
 }
 
 /**
- * Implementation of sessionClose() replacing the standard close handler.
- * It simply returns true.
+ * Implementation of sessionClose()
+ *
+ * - executed after the session write callback has been called
+ * - It simply returns true.
  *
  * @return boolean
  */
@@ -125,7 +137,11 @@ function sessionClose()
 }
 
 /**
- * Implementation of sessionRead() replacing the standard read handler.
+ * Implementation of sessionRead()
+ *
+ * - Called when the session starts or when session_start() is called
+ * - Must always return a session encoded (serialized) string, or an empty string
+ * if there is no data to read.
  *
  * @param string $session_id
  * @return string
@@ -155,7 +171,9 @@ function sessionRead($session_id)
 }
 
 /**
- * Implementation of sessionWrite() replacing the standard write handler.
+ * Implementation of sessionWrite().
+ *
+ * - Called when the session needs to be saved and closed.
  *
  * @param string $session_id
  * @param string $data
@@ -194,7 +212,10 @@ function sessionWrite($session_id, $data)
 }
 
 /**
- * Implementation of sessionDestroy() replacing the standard destroy handler.
+ * Implementation of sessionDestroy()
+ *
+ * - This callback is executed when a session is destroyed with session_destroy()
+ * or with session_regenerate_id(true).
  *
  * @param string $session_id
  * @return boolean
@@ -218,8 +239,10 @@ function sessionDestroy($session_id)
 }
 
 /**
- * Implementation of sessionGC() replacing the standard gc handler.
- * Callback for garbage collection.
+ * Implementation of sessionGC()
+ *
+ * - The garbage collector callback is invoked internally by PHP periodically
+ * in order to purge old session data.
  *
  * @param int $max_lifetime
  * @return boolean

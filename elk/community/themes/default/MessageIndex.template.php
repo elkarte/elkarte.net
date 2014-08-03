@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -24,7 +24,7 @@ function template_MessageIndex_init()
 }
 
 /**
- * Used to display child boards.
+ * Used to display sub-boards.
  */
 function template_display_child_boards_above()
 {
@@ -43,7 +43,10 @@ function template_display_child_boards_above()
 }
 
 /**
- * Header bar and extra details above topic listing.
+ * Header bar and extra details above topic listing
+ *  - board description
+ *  - who is viewing
+ *  - sort container
  */
 function template_topic_listing_above()
 {
@@ -54,79 +57,67 @@ function template_topic_listing_above()
 
 	template_pagesection('normal_buttons', 'right');
 
-	if (!empty($context['description']) || !empty($context['moderators']))
-	{
-		echo '
+	echo '
 		<div id="description_board">
-			<h2 class="category_header">', $context['name'];
-
-		if (!empty($context['moderators']))
-			echo '
-				<span class="moderators">(', count($context['moderators']) === 1 ? $txt['moderator'] : $txt['moderators'], ': ', implode(', ', $context['link_moderators']), '.)</span>';
-
-		echo '
-			</h2>';
-
-		echo '
+			<h2 class="category_header">', $context['name'], '</h2>
 			<div class="generalinfo">';
 
-		// Sort topics mumbo-jumbo
+	// Show the board description
+	if (!empty($context['description']))
 		echo '
-				<ul id="sort_by" class="topic_sorting">';
-		if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] == 1)
-			echo '
-					<li class="listlevel1 quickmod_select_all">
-						<input type="checkbox" onclick="invertAll(this, document.getElementById(\'quickModForm\'), \'topics[]\');" class="input_check" />
-					</li>';
-
-		$current_header = $context['topics_headers'][$context['sort_by']];
-		echo '
-					<li class="listlevel1 topic_sorting_row">
-						<a href="', $current_header['url'], '">', $current_header['sort_dir_img'], '</a>
-					</li>';
-
-		echo '
-					<li class="listlevel1 topic_sorting_row">', $txt['sort_by'], ': <a href="', $current_header['url'], '">', $txt[$context['sort_by']], '</a>
-						<ul class="menulevel2" id="sortby">';
-		foreach ($context['topics_headers'] as $key => $value)
-			echo '
-							<li class="listlevel2 sort_by_item" id="sort_by_item_', $key, '"><a href="', $value['url'], '" class="linklevel2">', $txt[$key], ' ', $value['sort_dir_img'], '</a></li>';
-		echo '
-						</ul>';
-
-		echo '
-					</li>
-				</ul>';
-
-		if (!empty($context['description']))
-			echo '
 				<div id="boarddescription">
 					', $context['description'], '
 				</div>';
 
-		// @todo - Thought the who is stuff was better here. Presentation still WIP.
-		if (!empty($settings['display_who_viewing']))
-		{
-			echo '
+	if (!empty($context['moderators']))
+		echo '
+				<div class="moderators">', count($context['moderators']) === 1 ? $txt['moderator'] : $txt['moderators'], ': ', implode(', ', $context['link_moderators']), '.</div>';
+
+	echo '
 				<div id="whoisviewing">';
 
-			if ($settings['display_who_viewing'] == 1)
-				echo count($context['view_members']), ' ', count($context['view_members']) === 1 ? $txt['who_member'] : $txt['members'];
-			else
-				echo empty($context['view_members_list']) ? '0 ' . $txt['members'] : implode(', ', $context['view_members_list']) . (empty($context['view_num_hidden']) || $context['can_moderate_forum'] ? '' : ' (+ ' . $context['view_num_hidden'] . ' ' . $txt['hidden'] . ')');
+	// If we are showing who is viewing this topic, build it out
+	if (!empty($settings['display_who_viewing']))
+	{
+		if ($settings['display_who_viewing'] == 1)
+			echo count($context['view_members']), ' ', count($context['view_members']) === 1 ? $txt['who_member'] : $txt['members'];
+		else
+			echo empty($context['view_members_list']) ? '0 ' . $txt['members'] : implode(', ', $context['view_members_list']) . (empty($context['view_num_hidden']) || $context['can_moderate_forum'] ? '' : ' (+ ' . $context['view_num_hidden'] . ' ' . $txt['hidden'] . ')');
 
-			echo $txt['who_and'], $context['view_num_guests'], ' ', $context['view_num_guests'] == 1 ? $txt['guest'] : $txt['guests'], $txt['who_viewing_board'];
-
-			echo '
-				</div>';
-		}
-
-		echo '
-			</div>';
-
-		echo '
-		</div>';
+		echo $txt['who_and'], $context['view_num_guests'], ' ', $context['view_num_guests'] == 1 ? $txt['guest'] : $txt['guests'], $txt['who_viewing_board'];
 	}
+
+	// Sort topics mumbo-jumbo
+	echo '
+					<ul id="sort_by" class="topic_sorting">';
+
+	if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] == 1)
+		echo '
+						<li class="listlevel1 quickmod_select_all">
+							<input type="checkbox" onclick="invertAll(this, document.getElementById(\'quickModForm\'), \'topics[]\');" class="input_check" />
+						</li>';
+
+	$current_header = $context['topics_headers'][$context['sort_by']];
+	echo '
+						<li class="listlevel1 topic_sorting_row">
+							<a class="sort topicicon img_sort', $context['sort_direction'], '" href="', $current_header['url'], '" title="', $context['sort_title'], '"></a>
+						</li>';
+
+	echo '
+						<li class="listlevel1 topic_sorting_row">', $txt['sort_by'], ': <a href="', $current_header['url'], '">', $txt[$context['sort_by']], '</a>
+							<ul class="menulevel2" id="sortby">';
+
+	foreach ($context['topics_headers'] as $key => $value)
+		echo '
+								<li class="listlevel2 sort_by_item" id="sort_by_item_', $key, '"><a href="', $value['url'], '" class="linklevel2">', $txt[$key], ' ', $value['sort_dir_img'], '</a></li>';
+
+	echo '
+							</ul>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>';
 }
 
 /**
@@ -138,31 +129,34 @@ function template_topic_listing()
 
 	if (!$context['no_topic_listing'])
 	{
+		// We know how to sprite these
+		$message_icon_sprite = array('clip' => '', 'lamp' => '', 'poll' => '', 'question' => '', 'xx' => '', 'moved' => '', 'exclamation' => '', 'thumbup' => '', 'thumbdown' => '');
+
 		// If Quick Moderation is enabled start the form.
 		if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] > 0 && !empty($context['topics']))
 			echo '
 	<form action="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], '" method="post" accept-charset="UTF-8" class="clear" name="quickModForm" id="quickModForm">';
 
+		// If this person can approve items and we have some awaiting approval tell them.
+		if (!empty($context['unapproved_posts_message']))
+			echo '
+		<div class="warningbox">', $context['unapproved_posts_message'], '</div>';
+
 		echo '
-		<ul class="topic_listing" id="messageindex">
-			<li class="topic_sorting_row">';
+		<ul class="topic_listing" id="messageindex">';
 
 		// No topics.... just say, "sorry bub".
 		if (empty($context['topics']))
 			echo '
-				<strong>', $txt['topic_alert_none'], '</strong>';
-
-		echo '
-			</li>';
-
-		// If this person can approve items and we have some awaiting approval tell them.
-		if (!empty($context['unapproved_posts_message']))
-		{
-			echo '
 			<li class="basic_row">
-				<div class="warningbox" style="margin-bottom:0">! ', $context['unapproved_posts_message'], '</div>
+				<div class="topic_info">
+					<div class="topic_name">
+						<h4>
+							<strong>', $txt['topic_alert_none'], '</strong>
+						</h4>
+					</div>
+				</div>
 			</li>';
-		}
 
 		foreach ($context['topics'] as $topic)
 		{
@@ -185,9 +179,14 @@ function template_topic_listing()
 			echo '
 			<li class="', $color_class, '">
 				<div class="topic_info">
-					<p class="topic_icons">
-						<img src="', $topic['first_post']['icon_url'], '" alt="" />
-						', $topic['is_posted_in'] ? '<img src="' . $settings['images_url'] . '/icons/profile_sm.png" alt="" class="fred" />' : '', '
+					<p class="topic_icons', isset($message_icon_sprite[$topic['first_post']['icon']]) ? ' topicicon img_' . $topic['first_post']['icon'] : '', '">';
+
+			if (!isset($message_icon_sprite[$topic['first_post']['icon']]))
+				echo '
+						<img src="', $topic['first_post']['icon_url'], '" alt="" />';
+
+			echo '
+						', $topic['is_posted_in'] ? '<span class="fred topicicon img_profile"></span>' : '', '
 					</p>
 					<div class="topic_name" ', (!empty($topic['quick_mod']['modify']) ? 'id="topic_' . $topic['first_post']['id'] . '"  ondblclick="oQuickModifyTopic.modify_topic(\'' . $topic['id'] . '\', \'' . $topic['first_post']['id'] . '\');"' : ''), '>
 						<h4>';
@@ -197,24 +196,28 @@ function template_topic_listing()
 				echo '
 							<a class="new_posts" href="', $topic['new_href'], '" id="newicon' . $topic['first_post']['id'] . '">' . $txt['new'] . '</a>';
 
+			// Is this an unapproved topic and they can approve it?
+			if ($context['can_approve_posts'] && !$topic['approved'])
+				echo '<span class="require_approval">' . $txt['awaiting_approval'] . '</span>';
+
 			echo '
-							', $topic['is_sticky'] ? '<strong>' : '', '<span class="preview" title="', $topic[(!empty($settings['message_index_preview']) && $settings['message_index_preview'] == 2 ? 'last_post' : 'first_post')]['preview'], '"><span id="msg_' . $topic['first_post']['id'] . '">', $topic['first_post']['link'], ($context['can_approve_posts'] && !$topic['approved'] ? '&nbsp;&nbsp;<em><img src="' . $settings['images_url'] . '/admin/post_moderation_moderate.png" style="width:16px" alt="' . $txt['awaiting_approval'] . '" title="' . $txt['awaiting_approval'] . '" />(' . $txt['awaiting_approval'] . ')</em>' : ''), '</span></span>', $topic['is_sticky'] ? '</strong>' : '', '
+							', $topic['is_sticky'] ? '<strong>' : '', '<span class="preview" title="', $topic['default_preview'], '"><span id="msg_' . $topic['first_post']['id'] . '">', $topic['first_post']['link'], '</span></span>', $topic['is_sticky'] ? '</strong>' : '', '
 						</h4>
 					</div>
 					<div class="topic_starter">
-						', $txt['started_by'], ' ', $topic['first_post']['member']['link'], !empty($topic['pages']) ? '
+						', sprintf($txt['topic_started_by'], $topic['first_post']['member']['link']), !empty($topic['pages']) ? '
 						<ul class="small_pagelinks" id="pages' . $topic['first_post']['id'] . '" role="menubar">' . $topic['pages'] . '</ul>' : '', '
 					</div>
 				</div>
 				<div class="topic_latest">
 					<p class="topic_stats">
-					', $topic['replies'], ' ', $txt['replies'], '
-					<br />
+					', $topic['replies'], ' ', $txt['replies'], '<br />
 					', $topic['views'], ' ', $txt['views'];
 
 			// Show likes?
 			if (!empty($modSettings['likes_enabled']))
-				echo ' / ', $topic['likes'], ' ', $txt['likes'];
+				echo '<br />
+					', $topic['likes'], ' ', $txt['likes'];
 
 			echo '
 					</p>
@@ -222,10 +225,10 @@ function template_topic_listing()
 
 			if (!empty($settings['avatars_on_indexes']))
 				echo '
-						<span class="board_avatar"><a href="', $topic['last_post']['member']['href'], '">', $topic['last_post']['member']['avatar']['image'], '</a></span>';
-	
+						<span class="board_avatar"><a href="', $topic['last_post']['member']['href'], '"><img class="avatar" src="', $topic['last_post']['member']['avatar']['href'], '" alt="" /></a></span>';
+
 			echo '
-						<a href="', $topic['last_post']['href'], '"><img src="', $settings['images_url'], '/icons/last_post.png" alt="', $txt['last_post'], '" title="', $txt['last_post'], '" /></a>
+						<a class="topicicon img_last_post', '" href="', $topic['last_post']['href'], '" title="', $txt['last_post'], '"></a>
 						', $topic['last_post']['html_time'], '<br />
 						', $txt['by'], ' ', $topic['last_post']['member']['link'], '
 					</p>
@@ -244,19 +247,19 @@ function template_topic_listing()
 				{
 					// Check permissions on each and show only the ones they are allowed to use.
 					if ($topic['quick_mod']['remove'])
-						echo '<a href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions[', $topic['id'], ']=remove;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');"><img src="', $settings['images_url'], '/icons/quick_remove.png" style="width:16px;" alt="', $txt['remove_topic'], '" title="', $txt['remove_topic'], '" /></a>';
+						echo '<a class="topicicon img_remove" href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions%5B', $topic['id'], '%5D=remove;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');" title="', $txt['remove_topic'], '"></a>';
 
 					if ($topic['quick_mod']['lock'])
-						echo '<a href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions[', $topic['id'], ']=lock;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');"><img src="', $settings['images_url'], '/icons/quick_lock.png" style="width:16px" alt="', $txt['set_lock'], '" title="', $txt['set_lock'], '" /></a>';
+						echo '<a class="topicicon img_locked" href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions%5B', $topic['id'], '%5D=lock;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');" title="', $txt['set_lock'], '"></a>';
 
 					if ($topic['quick_mod']['lock'] || $topic['quick_mod']['remove'])
 						echo '<br />';
 
 					if ($topic['quick_mod']['sticky'])
-						echo '<a href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions[', $topic['id'], ']=sticky;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');"><img src="', $settings['images_url'], '/icons/quick_sticky.png" style="width:16px" alt="', $txt['set_sticky'], '" title="', $txt['set_sticky'], '" /></a>';
+						echo '<a class="topicicon img_sticky" href="', $scripturl, '?action=quickmod;board=', $context['current_board'], '.', $context['start'], ';actions%5B', $topic['id'], '%5D=sticky;', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['quickmod_confirm'], '\');" title="', $txt['set_sticky'], '"></a>';
 
 					if ($topic['quick_mod']['move'])
-						echo '<a href="', $scripturl, '?action=movetopic;current_board=', $context['current_board'], ';board=', $context['current_board'], '.', $context['start'], ';topic=', $topic['id'], '.0"><img src="', $settings['images_url'], '/icons/quick_move.png" style="width:16px" alt="', $txt['move_topic'], '" title="', $txt['move_topic'], '" /></a>';
+						echo '<a class="topicicon img_move" href="', $scripturl, '?action=movetopic;current_board=', $context['current_board'], ';board=', $context['current_board'], '.', $context['start'], ';topic=', $topic['id'], '.0" title="', $txt['move_topic'], '"></a>';
 				}
 
 				echo '
@@ -267,10 +270,13 @@ function template_topic_listing()
 			</li>';
 		}
 
+		echo '
+		</ul>';
+
 		if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] == 1 && !empty($context['topics']))
 		{
 			echo '
-			<li class="qaction_row">
+			<div class="qaction_row">
 				<select class="qaction" name="qaction"', $context['can_move'] ? ' onchange="this.form.move_to.disabled = (this.options[this.selectedIndex].value != \'move\');"' : '', '>
 					<option value="">&nbsp;</option>';
 
@@ -288,12 +294,9 @@ function template_topic_listing()
 				<span id="quick_mod_jump_to">&nbsp;</span>';
 
 			echo '
-				<input type="submit" value="', $txt['quick_mod_go'], '" onclick="return document.forms.quickModForm.qaction.value != \'\' &amp;&amp; confirm(\'', $txt['quickmod_confirm'], '\');" class="button_submit submitgo" />
-			</li>';
+				<input type="submit" value="', $txt['quick_mod_go'], '" onclick="return document.forms.quickModForm.qaction.value != \'\' &amp;&amp; confirm(\'', $txt['quickmod_confirm'], '\');" class="button_submit" />
+			</div>';
 		}
-
-		echo '
-		</ul>';
 
 		// Finish off the form - again.
 		if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] > 0 && !empty($context['topics']))
@@ -308,7 +311,7 @@ function template_topic_listing()
  */
 function template_topic_listing_below()
 {
-	global $modSettings, $context, $txt, $options, $settings;
+	global $context, $txt, $options;
 
 	if ($context['no_topic_listing'])
 		return;
@@ -320,21 +323,17 @@ function template_topic_listing_below()
 
 	echo '
 	<div id="topic_icons" class="description">
-		<p class="floatright" id="message_index_jump_to">&nbsp;</p>';
+		<div class="floatright" id="message_index_jump_to">&nbsp;</div>';
 
 	if (!$context['no_topic_listing'])
-		echo '
-		<p class="floatleft">', !empty($modSettings['enableParticipation']) && $context['user']['is_logged'] ? '
-			<img src="' . $settings['images_url'] . '/icons/profile_sm.png" alt="" class="centericon" /> ' . $txt['participation_caption'] : '<img src="' . $settings['images_url'] . '/post/xx.png" alt="" class="centericon" /> ' . $txt['normal_topic'], '<br />
-			' . ($modSettings['pollMode'] == '1' ? '<img src="' . $settings['images_url'] . '/topic/normal_poll.png" alt="" class="centericon" /> ' . $txt['poll'] : '') . '
-		</p>
-		<p>
-			<img src="' . $settings['images_url'] . '/icons/quick_lock.png" alt="" class="centericon" /> ' . $txt['locked_topic'] . '<br />' . ($modSettings['enableStickyTopics'] == '1' ? '
-			<img src="' . $settings['images_url'] . '/icons/quick_sticky.png" alt="" class="centericon" /> ' . $txt['sticky_topic'] . '<br />' : '') . '
-		</p>';
+		template_basicicons_legend();
 
 	echo '
 			<script><!-- // --><![CDATA[';
+
+	if (!empty($context['using_relative_time']))
+		echo '
+				$(\'.topic_latest\').addClass(\'relative\');';
 
 	if (!empty($context['can_quick_mod']) && $options['display_quick_mod'] == 1 && !empty($context['topics']) && $context['can_move'])
 		echo '
@@ -372,10 +371,10 @@ function template_topic_listing_below()
 
 	// Javascript for inline editing.
 	echo '
-<script><!-- // --><![CDATA[
-	var oQuickModifyTopic = new QuickModifyTopic({
-		aHidePrefixes: Array("lockicon", "stickyicon", "pages", "newicon"),
-		bMouseOnDiv: false,
-	});
-// ]]></script>';
+	<script><!-- // --><![CDATA[
+		var oQuickModifyTopic = new QuickModifyTopic({
+			aHidePrefixes: Array("lockicon", "stickyicon", "pages", "newicon"),
+			bMouseOnDiv: false,
+		});
+	// ]]></script>';
 }

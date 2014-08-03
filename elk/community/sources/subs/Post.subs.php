@@ -15,7 +15,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,12 +23,14 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Takes a message and parses it, returning nothing.
- * Cleans up links (javascript, etc.) and code/quote sections.
- * Won't convert \n's and a few other things if previewing is true.
+ * Takes a message and parses it, returning the prepared message as a referance.
  *
- * @param $message
- * @param $previewing
+ * - Cleans up links (javascript, etc.) and code/quote sections.
+ * - Won't convert \n's and a few other things if previewing is true.
+ *
+ * @package Posts
+ * @param string $message
+ * @param boolean $previewing
  */
 function preparsecode(&$message, $previewing = false)
 {
@@ -38,7 +40,7 @@ function preparsecode(&$message, $previewing = false)
 	$message = preg_replace('~&amp;#(\d{4,5}|[2-9]\d{2,4}|1[2-9]\d);~', '&#$1;', $message);
 
 	// Clean up after nobbc ;).
-	$message = preg_replace_callback('~\[nobbc\](.+?)\[/nobbc\]~i', create_function('$m', ' return "[nobbc]" . strtr("$m[1]", array("[" => "&#91;", "]" => "&#93;", ":" => "&#58;", "@" => "&#64;")) . "[/nobbc]";'), $message);
+	$message = preg_replace_callback('~\[nobbc\](.+?)\[/nobbc\]~i', 'preparsecode_nobbc_callback', $message);
 
 	// Remove \r's... they're evil!
 	$message = strtr($message, array("\r" => ''));
@@ -115,7 +117,7 @@ function preparsecode(&$message, $previewing = false)
 			if (!$previewing && strpos($parts[$i], '[html]') !== false)
 			{
 				if (allowedTo('admin_forum'))
-					$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~is', create_function('$m', 'return "[html]" . strtr(un_htmlspecialchars("$m[1]"), array("\n" => \'&#13;\', \'  \' => \' &#32;\', \'[\' => \'&#91;\', \']\' => \'&#93;\')) . "[/html]";'), $parts[$i]);
+					$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~is', 'preparsecode_html_callback', $parts[$i]);
 				// We should edit them out, or else if an admin edits the message they will get shown...
 				else
 				{
@@ -124,15 +126,8 @@ function preparsecode(&$message, $previewing = false)
 				}
 			}
 
-			// Let's look at the time tags...
-			$parts[$i] = preg_replace_callback('~\[time(?:=(absolute))*\](.+?)\[/time\]~i', create_function('$m', 'global $modSettings, $user_info; return "[time]" . (is_numeric("$m[2]") || @strtotime("$m[2]") == 0 ? "$m[2]" : strtotime("$m[2]") - ("$m[1]" == "absolute" ? 0 : (($modSettings["time_offset"] + $user_info["time_offset"]) * 3600))) . "[/time]";'), $parts[$i]);
-
-			// Change the color specific tags to [color=the color].
-			$parts[$i] = preg_replace('~\[(black|blue|green|red|white)\]~', '[color=$1]', $parts[$i]);  // First do the opening tags.
-			$parts[$i] = preg_replace('~\[/(black|blue|green|red|white)\]~', '[/color]', $parts[$i]);   // And now do the closing tags
-
 			// Make sure all tags are lowercase.
-			$parts[$i] = preg_replace_callback('~\[([/]?)(list|li|table|tr|td)((\s[^\]]+)*)\]~i', create_function('$m', ' return "[$m[1]" . strtolower("$m[2]") . "$m[3]]";'), $parts[$i]);
+			$parts[$i] = preg_replace_callback('~\[([/]?)(list|li|table|tr|td|th)((\s[^\]]+)*)\]~i', 'preparsecode_lowertags_callback', $parts[$i]);
 
 			$list_open = substr_count($parts[$i], '[list]') + substr_count($parts[$i], '[list ');
 			$list_close = substr_count($parts[$i], '[/list]');
@@ -144,14 +139,14 @@ function preparsecode(&$message, $previewing = false)
 			$mistake_fixes = array(
 				// Find [table]s not followed by [tr].
 				'~\[table\](?![\s' . $non_breaking_space . ']*\[tr\])~su' => '[table][tr]',
-				// Find [tr]s not followed by [td].
-				'~\[tr\](?![\s' . $non_breaking_space . ']*\[td\])~su' => '[tr][td]',
-				// Find [/td]s not followed by something valid.
-				'~\[/td\](?![\s' . $non_breaking_space . ']*(?:\[td\]|\[/tr\]|\[/table\]))~su' => '[/td][/tr]',
+				// Find [tr]s not followed by [td] or [th]
+				'~\[tr\](?![\s' . $non_breaking_space . ']*\[t[dh]\])~su' => '[tr][td]',
+				// Find [/td] and [/th]s not followed by something valid.
+				'~\[/t([dh])\](?![\s' . $non_breaking_space . ']*(?:\[t[dh]\]|\[/tr\]|\[/table\]))~su' => '[/t$1][/tr]',
 				// Find [/tr]s not followed by something valid.
 				'~\[/tr\](?![\s' . $non_breaking_space . ']*(?:\[tr\]|\[/table\]))~su' => '[/tr][/table]',
-				// Find [/td]s incorrectly followed by [/table].
-				'~\[/td\][\s' . $non_breaking_space . ']*\[/table\]~su' => '[/td][/tr][/table]',
+				// Find [/td] [/th]s incorrectly followed by [/table].
+				'~\[/t([dh])\][\s' . $non_breaking_space . ']*\[/table\]~su' => '[/t$1][/tr][/table]',
 				// Find [table]s, [tr]s, and [/td]s (possibly correctly) followed by [td].
 				'~\[(table|tr|/td)\]([\s' . $non_breaking_space . ']*)\[td\]~su' => '[$1]$2[_td_]',
 				// Now, any [td]s left should have a [tr] before them.
@@ -185,71 +180,23 @@ function preparsecode(&$message, $previewing = false)
 				'~\[_(li|/li|td|tr|/tr)_\]~' => '[$1]',
 				// Images with no real url.
 				'~\[img\]https?://.{0,7}\[/img\]~' => '',
+				// Font tags with multiple fonts (copy&paste in the WYSIWYG by some browsers).
+				'~\[font=\\\'?(.*?)\\\'?(?=\,).*\](.*?(?:\[/font\]))~' => '[font=$1]$2',
 			);
 
 			// Fix up some use of tables without [tr]s, etc. (it has to be done more than once to catch it all.)
 			for ($j = 0; $j < 3; $j++)
 				$parts[$i] = preg_replace(array_keys($mistake_fixes), $mistake_fixes, $parts[$i]);
 
-			// Now we're going to do full scale table checking...
-			$table_check = $parts[$i];
-			$table_offset = 0;
-			$table_array = array();
-			$table_order = array(
-				'table' => 'td',
-				'tr' => 'table',
-				'td' => 'tr',
-			);
-			while (preg_match('~\[(/)*(table|tr|td)\]~', $table_check, $matches) != false)
-			{
-				// Keep track of where this is.
-				$offset = strpos($table_check, $matches[0]);
-				$remove_tag = false;
-
-				// Is it opening?
-				if ($matches[1] != '/')
-				{
-					// If the previous table tag isn't correct simply remove it.
-					if ((!empty($table_array) && $table_array[0] != $table_order[$matches[2]]) || (empty($table_array) && $matches[2] != 'table'))
-						$remove_tag = true;
-					// Record this was the last tag.
-					else
-						array_unshift($table_array, $matches[2]);
-				}
-				// Otherwise is closed!
-				else
-				{
-					// Only keep the tag if it's closing the right thing.
-					if (empty($table_array) || ($table_array[0] != $matches[2]))
-						$remove_tag = true;
-					else
-						array_shift($table_array);
-				}
-
-				// Removing?
-				if ($remove_tag)
-				{
-					$parts[$i] = substr($parts[$i], 0, $table_offset + $offset) . substr($parts[$i], $table_offset + strlen($matches[0]) + $offset);
-					// We've lost some data.
-					$table_offset -= strlen($matches[0]);
-				}
-
-				// Remove everything up to here.
-				$table_offset += $offset + strlen($matches[0]);
-				$table_check = substr($table_check, $offset + strlen($matches[0]));
-			}
-
-			// Close any remaining table tags.
-			foreach ($table_array as $tag)
-				$parts[$i] .= '[/' . $tag . ']';
-
 			// Remove empty bbc from the sections outside the code tags
 			$parts[$i] = preg_replace('~\[[bisu]\]\s*\[/[bisu]\]~', '', $parts[$i]);
 			$parts[$i] = preg_replace('~\[quote\]\s*\[/quote\]~', '', $parts[$i]);
+
+			// Fix color tags of many forms so they parse properly
 			$parts[$i] = preg_replace('~\[color=(?:#[\da-fA-F]{3}|#[\da-fA-F]{6}|[A-Za-z]{1,20}|rgb\(\d{1,3}, ?\d{1,3}, ?\d{1,3}\))\]\s*\[/color\]~', '', $parts[$i]);
 		}
 
-		call_integration_hook('integrate_preparse_code', array(&$parts[$i]));
+		call_integration_hook('integrate_preparse_code', array(&$parts[$i], $i, $previewing));
 	}
 
 	// Put it back together!
@@ -258,14 +205,125 @@ function preparsecode(&$message, $previewing = false)
 	else
 		$message = strtr(implode('', $parts), array('  ' => '&nbsp; ', "\xC2\xA0" => '&nbsp;'));
 
+	// Now we're going to do full scale table checking...
+	$message = preparsetable($message);
+
 	// Now let's quickly clean up things that will slow our parser (which are common in posted code.)
 	$message = strtr($message, array('[]' => '&#91;]', '[&#039;' => '&#91;&#039;'));
 }
 
 /**
+ * Validates and corrects table structure
+ *
+ * What it does
+ * - Checks tables for correct tag order / nesting
+ * - Adds in missing closing tags, removes excess closing tags
+ * - Although it prevents markup error, it can mess-up the intended (abiet wrong) layout
+ * driving the post author in to a furious rage
+ *
+ * @param string $message
+ */
+function preparsetable($message)
+{
+	$table_check = $message;
+	$table_offset = 0;
+	$table_array = array();
+
+	// Define the allowable tags after a give tag
+	$table_order = array(
+		'table' => 'td',
+		'table' => 'th',
+		'tr' => 'table',
+		'td' => 'tr',
+		'th' => 'tr',
+	);
+
+	// Find all closing tags (/table /tr /td etc)
+	while (preg_match('~\[(/)*(table|tr|td|th)\]~', $table_check, $matches) != false)
+	{
+		// Keep track of where this is.
+		$offset = strpos($table_check, $matches[0]);
+		$remove_tag = false;
+
+		// Is it opening?
+		if ($matches[1] != '/')
+		{
+			// If the previous table tag isn't correct simply remove it.
+			if ((!empty($table_array) && $table_array[0] != $table_order[$matches[2]]) || (empty($table_array) && $matches[2] != 'table'))
+				$remove_tag = true;
+			// Record this was the last tag.
+			else
+				array_unshift($table_array, $matches[2]);
+		}
+		// Otherwise is closed!
+		else
+		{
+			// Only keep the tag if it's closing the right thing.
+			if (empty($table_array) || ($table_array[0] != $matches[2]))
+				$remove_tag = true;
+			else
+				array_shift($table_array);
+		}
+
+		// Removing?
+		if ($remove_tag)
+		{
+			$message = substr($message, 0, $table_offset + $offset) . substr($message, $table_offset + strlen($matches[0]) + $offset);
+
+			// We've lost some data.
+			$table_offset -= strlen($matches[0]);
+		}
+
+		// Remove everything up to here.
+		$table_offset += $offset + strlen($matches[0]);
+		$table_check = substr($table_check, $offset + strlen($matches[0]));
+	}
+
+	// Close any remaining table tags.
+	foreach ($table_array as $tag)
+		$message .= '[/' . $tag . ']';
+
+	return $message;
+}
+
+/**
+ * Ensure tags inside of nobbc do not get parsed by converting the markers to html entities
+ *
+ * @package Posts
+ * @param string[] $matches
+ */
+function preparsecode_nobbc_callback($matches)
+{
+	return '[nobbc]' . strtr($matches[1], array('[' => '&#91;', ']' => '&#93;', ':' => '&#58;', '@' => '&#64;')) . '[/nobbc]';
+}
+
+/**
+ * Prepares text inside of html tags to make them safe for display and prevent bbc rendering
+ *
+ * @package Posts
+ * @param string[] $matches
+ */
+function preparsecode_html_callback($matches)
+{
+	return '[html]' . strtr(un_htmlspecialchars($matches[1]), array("\n" => '&#13;', '  ' => ' &#32;', '[' => '&#91;', ']' => '&#93;')) . '[/html]';
+}
+
+/**
+ * Takes a tag and lowercases it
+ *
+ * @package Posts
+ * @param string[] $matches
+ */
+function preparsecode_lowertags_callback($matches)
+{
+	return '[' . $matches[1] . strtolower($matches[2]) . $matches[3] . ']';
+}
+
+/**
  * This is very simple, and just removes things done by preparsecode.
  *
- * @param $message
+ * @package Posts
+ * @param string $message
  */
 function un_preparsecode($message)
 {
@@ -276,12 +334,7 @@ function un_preparsecode($message)
 	{
 		// If $i is a multiple of four (0, 4, 8, ...) then it's not a code section...
 		if ($i % 4 == 0)
-		{
-			$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~i', create_function('$m', 'return "[html]" . strtr(htmlspecialchars("$m[1]", ENT_QUOTES, "UTF-8"), array("\\&quot;" => "&quot;", "&amp;#13;" => "<br />", "&amp;#32;" => " ", "&amp;#91;" => "[", "&amp;#93;" => "]")) . "[/html]";'), $parts[$i]);
-
-			// Attempt to un-parse the time to something less awful.
-			$parts[$i] = preg_replace_callback('~\[time\](\d{0,10})\[/time\]~i', create_function('$m', ' return "[time]" . timeformat("$m[1]", false) . "[/time]";'), $parts[$i]);
-		}
+			$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~i', 'preparsecode_unhtml_callback', $parts[$i]);
 
 		call_integration_hook('integrate_unpreparse_code', array(&$message, &$parts, &$i));
 	}
@@ -291,9 +344,22 @@ function un_preparsecode($message)
 }
 
 /**
- * Fix any URLs posted - ie. remove 'javascript:'.
- * Used by preparsecode, fixes links in message and returns nothing.
+ * Reverses what was done by preparsecode to html tags
  *
+ * @package Posts
+ * @param string[] $matches
+ */
+function preparsecode_unhtml_callback($matches)
+{
+	return '[html]' . strtr(htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8'), array('\\&quot;' => '&quot;', '&amp;#13;' => '<br />', '&amp;#32;' => ' ', '&amp;#91;' => '[', '&amp;#93;' => ']')) . '[/html]';
+}
+
+/**
+ * Fix any URLs posted - ie. remove 'javascript:'.
+ *
+ * - Used by preparsecode, fixes links in message and returns nothing.
+ *
+ * @package Posts
  * @param string $message
  */
 function fixTags(&$message)
@@ -340,37 +406,16 @@ function fixTags(&$message)
 			'embeddedUrl' => true,
 			'hasEqualSign' => true,
 		),
-		// [ftp]ftp://...[/ftp]
-		array(
-			'tag' => 'ftp',
-			'protocols' => array('ftp', 'ftps'),
-			'embeddedUrl' => true,
-			'hasEqualSign' => false,
-		),
-		// [ftp=ftp://...]name[/ftp]
-		array(
-			'tag' => 'ftp',
-			'protocols' => array('ftp', 'ftps'),
-			'embeddedUrl' => true,
-			'hasEqualSign' => true,
-		),
-		// [flash]http://...[/flash]
-		array(
-			'tag' => 'flash',
-			'protocols' => array('http', 'https'),
-			'embeddedUrl' => false,
-			'hasEqualSign' => false,
-			'hasExtra' => true,
-		),
 	);
 
 	call_integration_hook('integrate_fixtags', array(&$fixArray, &$message));
+
 	// Fix each type of tag.
 	foreach ($fixArray as $param)
 		fixTag($message, $param['tag'], $param['protocols'], $param['embeddedUrl'], $param['hasEqualSign'], !empty($param['hasExtra']));
 
 	// Now fix possible security problems with images loading links automatically...
-	$message = preg_replace_callback('~(\[img.*?\])(.+?)\[/img\]~is', create_function('$m', 'return "$m[1]" . preg_replace("~action(=|%3d)(?!dlattach)~i", "action-", "$m[2]") . "[/img]";'), $message);
+	$message = preg_replace_callback('~(\[img.*?\])(.+?)\[/img\]~is', 'fixTags_img_callback', $message);
 
 	// Limit the size of images posted?
 	if (!empty($modSettings['max_image_width']) || !empty($modSettings['max_image_height']))
@@ -378,9 +423,22 @@ function fixTags(&$message)
 }
 
 /**
- * Fix a specific class of tag - ie. url with =.
- * Used by fixTags, fixes a specific tag's links.
+ * Ensure image tags do not load anything by themselfs (security)
  *
+ * @package Posts
+ * @param string[] $matches
+ */
+function fixTags_img_callback($matches)
+{
+	return $matches[1] . preg_replace('~action(=|%3d)(?!dlattach)~i', 'action-', $matches[2]) . '[/img]';
+}
+
+/**
+ * Fix a specific class of tag - ie. url with =.
+ *
+ * - Used by fixTags, fixes a specific tag's links.
+ *
+ * @package Posts
  * @param string $message
  * @param string $myTag - the tag
  * @param string $protocols - http or ftp
@@ -461,8 +519,10 @@ function fixTag(&$message, $myTag, $protocols, $embeddedUrl = false, $hasEqualSi
 
 /**
  * Updates BBC img tags in a message so that the width / height respect the forum settings.
- * Will add the width/height attrib if needed, or update existing ones if they break the rules
  *
+ * - Will add the width/height attrib if needed, or update existing ones if they break the rules
+ *
+ * @package Posts
  * @param string $message
  */
 function resizeBBCImages(&$message)
@@ -532,14 +592,16 @@ function resizeBBCImages(&$message)
 
 /**
  * Create a post, either as new topic (id_topic = 0) or in an existing one.
+ *
  * The input parameters of this function assume:
  * - Strings have been escaped.
  * - Integers have been cast to integer.
  * - Mandatory parameters are set.
  *
- * @param array $msgOptions
- * @param array $topicOptions
- * @param array $posterOptions
+ * @package Posts
+ * @param mixed[] $msgOptions
+ * @param mixed[] $topicOptions
+ * @param mixed[] $posterOptions
  */
 function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 {
@@ -579,7 +641,7 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 		$db->free_result($request);
 	}
 
-	// If nothing was filled in as name/e-mail address, try the member table.
+	// If nothing was filled in as name/email address, try the member table.
 	if (!isset($posterOptions['name']) || $posterOptions['name'] == '' || (empty($posterOptions['email']) && !empty($posterOptions['id'])))
 	{
 		if (empty($posterOptions['id']))
@@ -631,7 +693,7 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 	);
 
 	// What if we want to do anything with posts?
-	call_integration_hook('integrate_create_post', array(&$msgOptions, &$topicOptions, &$posterOptions, &$message_columns, &$message_parameters));
+	call_integration_hook('integrate_before_create_post', array(&$msgOptions, &$topicOptions, &$posterOptions, &$message_columns, &$message_parameters));
 
 	// Insert the post.
 	$db->insert('',
@@ -659,7 +721,7 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 		);
 
 	// What if we want to export new posts out to a CMS?
-	call_integration_hook('integrate_after_create_post', array($msgOptions, $topicOptions, $posterOptions, $message_columns, $message_parameters));
+	call_integration_hook('integrate_create_post', array($msgOptions, $topicOptions, $posterOptions, $message_columns, $message_parameters));
 
 	// Insert a new topic (if the topicID was left empty.)
 	if ($new_topic)
@@ -733,7 +795,7 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 			'id_topic' => $topicOptions['id'],
 			'counter_increment' => 1,
 		);
-		$topics_columns = array();
+
 		if ($msgOptions['approved'])
 			$topics_columns = array(
 				'id_member_updated = {int:poster_id}',
@@ -744,16 +806,14 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 			$topics_columns = array(
 				'unapproved_posts = unapproved_posts + {int:counter_increment}',
 			);
-		if ($topicOptions['lock_mode'] !== null)
-			$topics_columns = array(
-				'locked = {int:locked}',
-			);
-		if ($topicOptions['sticky_mode'] !== null)
-			$topics_columns = array(
-				'is_sticky = {int:is_sticky}',
-			);
 
-		call_integration_hook('integrate_modify_topic', array(&$topics_columns, &$update_parameters, &$msgOptions, &$topicOptions, &$posterOptions));
+		if ($topicOptions['lock_mode'] !== null)
+			$topics_columns[] = 'locked = {int:locked}';
+
+		if ($topicOptions['sticky_mode'] !== null)
+			$topics_columns[] = 'is_sticky = {int:locked}';
+
+		call_integration_hook('integrate_before_modify_topic', array(&$topics_columns, &$update_parameters, &$msgOptions, &$topicOptions, &$posterOptions));
 
 		// Update the number of replies and the lock/sticky status.
 		$db->query('', '
@@ -769,6 +829,8 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 	}
 
 	// Creating is modifying...in a way.
+	// @todo id_msg_modified needs to be set when you create a post, now this query is
+	// the only place it does get set for post creation.  Why not set it on the insert?
 	$db->query('', '
 		UPDATE {db_prefix}messages
 		SET id_msg_modified = {int:id_msg}
@@ -879,9 +941,10 @@ function createPost(&$msgOptions, &$topicOptions, &$posterOptions)
 /**
  * Modifying a post...
  *
- * @param array $msgOptions
- * @param array $topicOptions
- * @param array $posterOptions
+ * @package Posts
+ * @param mixed[] $msgOptions
+ * @param mixed[] $topicOptions
+ * @param mixed[] $posterOptions
  */
 function modifyPost(&$msgOptions, &$topicOptions, &$posterOptions)
 {
@@ -930,7 +993,7 @@ function modifyPost(&$msgOptions, &$topicOptions, &$posterOptions)
 		'id_msg' => $msgOptions['id'],
 	);
 
-	call_integration_hook('integrate_modify_post', array(&$messages_columns, &$update_parameters, &$msgOptions, &$topicOptions, &$posterOptions, &$messageInts));
+	call_integration_hook('integrate_before_modify_post', array(&$messages_columns, &$update_parameters, &$msgOptions, &$topicOptions, &$posterOptions, &$messageInts));
 
 	foreach ($messages_columns as $var => $val)
 	{
@@ -1027,7 +1090,8 @@ function modifyPost(&$msgOptions, &$topicOptions, &$posterOptions)
 /**
  * Approve (or not) some posts... without permission checks...
  *
- * @param array $msgs - array of message ids
+ * @package Posts
+ * @param int[] $msgs - array of message ids
  * @param bool $approve = true
  */
 function approvePosts($msgs, $approve = true)
@@ -1265,12 +1329,14 @@ function approvePosts($msgs, $approve = true)
 
 /**
  * Takes an array of board IDs and updates their last messages.
- * If the board has a parent, that parent board is also automatically updated.
- * The columns updated are id_last_msg and last_updated.
- * Note that id_last_msg should always be updated using this function,
+ *
+ * - If the board has a parent, that parent board is also automatically updated.
+ * - The columns updated are id_last_msg and last_updated.
+ * - Note that id_last_msg should always be updated using this function,
  * and is not automatically updated upon other changes.
  *
- * @param array $setboards
+ * @package Posts
+ * @param int[]|int $setboards
  * @param int $id_msg = 0
  */
 function updateLastMessages($setboards, $id_msg = 0)
@@ -1285,6 +1351,8 @@ function updateLastMessages($setboards, $id_msg = 0)
 
 	if (!is_array($setboards))
 		$setboards = array($setboards);
+
+	$lastMsg = array();
 
 	// If we don't know the id_msg we need to find it.
 	if (!$id_msg)
@@ -1301,7 +1369,6 @@ function updateLastMessages($setboards, $id_msg = 0)
 				'approved' => 1,
 			)
 		);
-		$lastMsg = array();
 		while ($row = $db->fetch_assoc($request))
 			$lastMsg[$row['id_board']] = $row['id_msg'];
 		$db->free_result($request);
@@ -1318,7 +1385,7 @@ function updateLastMessages($setboards, $id_msg = 0)
 	// Keep track of last modified dates.
 	$lastModified = $lastMsg;
 
-	// Get all the child boards for the parents, if they have some...
+	// Get all the sub-boards for the parents, if they have some...
 	foreach ($setboards as $id_board)
 	{
 		if (!isset($lastMsg[$id_board]))
@@ -1347,7 +1414,7 @@ function updateLastMessages($setboards, $id_msg = 0)
 	}
 
 	// Note to help understand what is happening here. For parents we update the timestamp of the last message for determining
-	// whether there are child boards which have not been read. For the boards themselves we update both this and id_last_msg.
+	// whether there are sub-boards which have not been read. For the boards themselves we update both this and id_last_msg.
 	$board_updates = array();
 	$parent_updates = array();
 
@@ -1404,8 +1471,10 @@ function updateLastMessages($setboards, $id_msg = 0)
 
 /**
  * Get the latest post made on the system
+ *
  * - respects approved, recycled, and board permissions
  *
+ * @package Posts
  * @return array
  */
 function lastPost()
@@ -1446,7 +1515,7 @@ function lastPost()
 	return array(
 		'topic' => $row['id_topic'],
 		'subject' => $row['subject'],
-		'short_subject' => shorten_text($row['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24),
+		'short_subject' => shorten_text($row['subject'], $modSettings['subject_length']),
 		'preview' => $row['body'],
 		'time' => standardTime($row['poster_time']),
 		'html_time' => htmlTime($row['poster_time']),
@@ -1458,11 +1527,14 @@ function lastPost()
 
 /**
  * Prepares a post subject for the post form
- * Will add the approriate Re: to the post subject if its a reply to an existing post
- * If quoting a post, or editing a post, this function also prepares the message body
  *
+ * - Will add the approriate Re: to the post subject if its a reply to an existing post
+ * - If quoting a post, or editing a post, this function also prepares the message body
+ * - if editing is true, returns $message|$message[errors], else returns array($subject, $message)
+ *
+ * @package Posts
  * @param boolean $editing
- * @param int $topic
+ * @param int|null|false $topic
  * @param string $first_subject
  */
 function getFormMsgSubject($editing, $topic, $first_subject = '')
@@ -1531,7 +1603,7 @@ function getFormMsgSubject($editing, $topic, $first_subject = '')
 				{
 					// It goes 0 = outside, 1 = begin tag, 2 = inside, 3 = close tag, repeat.
 					if ($i % 4 == 0)
-						$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~is', create_function('$m', ' return "[html]" . preg_replace(\'~<br\s?/?' . '>~i\', \'&lt;br /&gt;<br />\', "$m[1]") . "[/html]";'), $parts[$i]);
+						$parts[$i] = preg_replace_callback('~\[html\](.+?)\[/html\]~is', 'getFormMsgSubject_br_callback', $parts[$i]);
 				}
 				$form_message = implode('', $parts);
 			}
@@ -1571,10 +1643,24 @@ function getFormMsgSubject($editing, $topic, $first_subject = '')
 }
 
 /**
- * Update topic subject.
- * If $all is true, for all messages in the topic, otherwise only the first message.
+ * Converts br's to entity safe versions <br /> => $lt;br /&gt;<br /> so messages
+ * with bbc html tags can be edited
  *
- * @param array $topic_info topic information as returned by getTopicInfo()
+ * @package Posts
+ * @param string[] $matches
+ */
+function getFormMsgSubject_br_callback($matches)
+{
+	return '[html]' . preg_replace('~<br\s?/?' . '>~i', '&lt;br /&gt;<br />', $matches[1]) . '[/html]';
+}
+
+/**
+ * Update topic subject.
+ *
+ * - If $all is true, for all messages in the topic, otherwise only the first message.
+ *
+ * @package Posts
+ * @param mixed[] $topic_info topic information as returned by getTopicInfo()
  * @param string $custom_subject
  * @param string $response_prefix = ''
  * @param bool $all = false

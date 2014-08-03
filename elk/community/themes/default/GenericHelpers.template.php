@@ -5,7 +5,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -70,7 +70,8 @@ function template_select_boards($name, $label = '', $extra = '', $all = false)
 	<select name="', $name, '" id="', $name, '" ', $extra, ' >';
 
 	if ($all)
-		echo '<option value="">', $txt['icons_edit_icons_all_boards'], '</option>';
+		echo '
+		<option value="">', $txt['icons_edit_icons_all_boards'], '</option>';
 
 	foreach ($context['categories'] as $category)
 	{

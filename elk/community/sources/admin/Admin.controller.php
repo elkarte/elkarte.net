@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,21 +22,30 @@ if (!defined('ELK'))
 
 /**
  * Admin controller class.
- * This class handles the first general admin screens: home,
- * also admin search actions and end admin session.
+ *
+ * What it does:
+ * - This class handles the first general admin screens: home,
+ * - Handles admin area search actions and end admin session.
+ *
+ * @package Admin
  */
 class Admin_Controller extends Action_Controller
 {
 	/**
 	 * The main admin handling function.
-	 * It initialises all the basic context required for the admin center.
-	 * It passes execution onto the relevant admin section.
-	 * If the passed section is not found it shows the admin home page.
-	 * Accessed by ?action=admin.
+	 *
+	 * What it does:
+	 * - It initialises all the basic context required for the admin center.
+	 * - It passes execution onto the relevant admin section.
+	 * - If the passed section is not found it shows the admin home page.
+	 * - Accessed by ?action=admin.
 	 */
 	public function action_index()
 	{
 		global $txt, $context, $scripturl, $modSettings, $settings;
+
+		// Make sure the administrator has a valid session...
+		validateSession();
 
 		// Load the language and templates....
 		loadLanguage('Admin');
@@ -49,6 +58,7 @@ class Admin_Controller extends Action_Controller
 		// No indexing evil stuff.
 		$context['robot_no_index'] = true;
 
+		// Need these to do much
 		require_once(SUBSDIR . '/Menu.subs.php');
 		require_once(SUBSDIR . '/Action.class.php');
 
@@ -116,6 +126,8 @@ class Admin_Controller extends Action_Controller
 							'installed' => array($txt['installed_packages']),
 							'perms' => array($txt['package_file_perms']),
 							'options' => array($txt['package_settings']),
+							'servers' => array($txt['download_packages']),
+							'upload' => array($txt['upload_packages']),
 						),
 					),
 					'packageservers' => array(
@@ -126,10 +138,7 @@ class Admin_Controller extends Action_Controller
 						'permission' => array('admin_forum'),
 						'icon' => 'transparent.png',
 						'class' => 'admin_img_packages',
-						'subsections' => array(
-							'servers' => array($txt['download_packages']),
-							'upload' => array($txt['upload_packages']),
-						),
+						'hidden' => true,
 					),
 					'search' => array(
 						'controller' => 'Admin_Controller',
@@ -172,9 +181,9 @@ class Admin_Controller extends Action_Controller
 							'pmsettings' => array($txt['personal_messages']),
 							'karma' => array($txt['karma'], 'enabled' => in_array('k', $context['admin_features'])),
 							'likes' => array($txt['likes'], 'enabled' => in_array('l', $context['admin_features'])),
+							'mention' => array($txt['mention']),
 							'sig' => array($txt['signature_settings_short']),
 							'profile' => array($txt['custom_profile_shorttitle'], 'enabled' => in_array('cp', $context['admin_features'])),
-							'mention' => array($txt['mention']),
 						),
 					),
 					'serversettings' => array(
@@ -255,10 +264,6 @@ class Admin_Controller extends Action_Controller
 						'class' => 'admin_img_modifications',
 						'subsections' => array(
 							'general' => array($txt['mods_cat_modifications_misc']),
-							// @deprecated: do not rely on this line, use the appropriate hook and tools provided
-							// Addon Authors for a "ADD AFTER" on this line. Ensure you end your change with a comma. For example:
-							// 'shout' => array($txt['shout']),
-							// Note the comma!! The setting with automatically appear with the first mod to be added.
 						),
 					),
 				),
@@ -565,13 +570,7 @@ class Admin_Controller extends Action_Controller
 		// Any files to include for administration?
 		call_integration_include_hook('integrate_admin_include');
 
-		// Make sure the administrator has a valid session...
-		validateSession();
-
-		$menuOptions = array('default_include_dir' => ADMINDIR);
-
-		// Let them add Admin areas easily.
-		call_integration_hook('integrate_admin_areas', array(&$admin_areas, &$menuOptions));
+		$menuOptions = array('hook' => 'admin', 'default_include_dir' => ADMINDIR);
 
 		// Actually create the menu!
 		$admin_include_data = createMenu($admin_areas, $menuOptions);
@@ -615,18 +614,19 @@ class Admin_Controller extends Action_Controller
 
 	/**
 	 * The main administration section.
-	 * It prepares all the data necessary for the administration front page.
-	 * It uses the Admin template along with the admin sub template.
-	 * It requires the moderate_forum, manage_membergroups, manage_bans,
+	 *
+	 * What it does:
+	 * - It prepares all the data necessary for the administration front page.
+	 * - It uses the Admin template along with the admin sub template.
+	 * - It requires the moderate_forum, manage_membergroups, manage_bans,
 	 * admin_forum, manage_permissions, manage_attachments, manage_smileys,
 	 * manage_boards, edit_news, or send_mail permission.
-	 * It uses the index administrative area.
-	 *
-	 * It can be found by going to ?action=admin.
+	 * - It uses the index administrative area.
+	 * - Accessed by ?action=admin.
 	 */
 	public function action_home()
 	{
-		global $forum_version, $txt, $scripturl, $context, $user_info;
+		global $forum_version, $txt, $scripturl, $context, $user_info, $settings;
 
 		// We need a little help
 		require_once(SUBSDIR . '/Membergroups.subs.php');
@@ -670,7 +670,7 @@ class Admin_Controller extends Action_Controller
 			'help' => '',
 			'description' => '
 				<strong>' . $txt['hello_guest'] . ' ' . $context['user']['name'] . '!</strong>
-				' . sprintf($txt['admin_main_welcome'], $txt['admin_center'], $txt['help'], $txt['help']),
+				' . sprintf($txt['admin_main_welcome'], $txt['admin_center'], $txt['help'], $settings['images_url']),
 		);
 
 		// Load in the admin quick tasks
@@ -680,7 +680,10 @@ class Admin_Controller extends Action_Controller
 	/**
 	 * The credits section in admin panel.
 	 *
-	 * Accessed by ?action=admin;area=credits
+	 * What it does:
+	 * - Determines the current level of support functions from the server, such as
+	 * current level of caching engine or graphics librayrs installed.
+	 * - Accessed by ?action=admin;area=credits
 	 */
 	public function action_credits()
 	{
@@ -776,7 +779,7 @@ class Admin_Controller extends Action_Controller
 		else
 		{
 			$action = new Action();
-			$action->initialize($subActions, 'log');
+			$subAction = $action->initialize($subActions, 'internal');
 			$action->dispatch($subAction);
 		}
 	}
@@ -957,17 +960,18 @@ class Admin_Controller extends Action_Controller
 		global $context;
 
 		require_once(ADMINDIR . '/ManageMembers.controller.php');
-		$_REQUEST['sa'] = 'query';
 
+		$_REQUEST['sa'] = 'query';
 		$_POST['membername'] = un_htmlspecialchars($context['search_term']);
 		$_POST['types'] = '';
 
-		action_index();
+		$managemembers = new ManageMembers_Controller();
+		$managemembers->action_index();
 	}
 
 	/**
 	 * This file allows the user to search the wiki documentation
-	 *  for a little help.
+	 * for a little help.
 	 */
 	public function action_search_doc()
 	{

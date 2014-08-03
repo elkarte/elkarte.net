@@ -13,50 +13,99 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
 if (!defined('ELK'))
 	die('No access...');
 
-// This defines two version types for checking the API's are compatible with this version of the software.
-$GLOBALS['search_versions'] = array(
-	// This is the forum version but is repeated due to some people rewriting $forum_version.
-	'forum_version' => 'ElkArte 1.0 Beta',
-	// This is the minimum version of ElkArte that an API could have been written for to work. (strtr to stop accidentally updating version on release)
-	'search_version' => strtr('ElkArte 1+0=Alpha', array('+' => '.', '=' => ' ')),
-);
-
 /**
  * Search_Controller class, it handle all of the searching
+ *
+ * @package Search
  */
 class Search_Controller extends Action_Controller
 {
 	/**
+	 * Weighing factor each area, ie frequncy, age, sticky, ec
+	 * @var array
+	 */
+	private $_weight = array();
+
+	/**
+	 * Holds the total of all weight factors, should be 100
+	 *
+	 * @var int
+	 */
+	private $_weight_total = 0;
+
+	/**
+	 * Holds array of search result relevancy weigh factors
+	 *
+	 * @var array
+	 */
+	private $_weight_factors = array();
+
+	/**
+	 * Called before any other action method in this class.
+	 *
+	 * - If coming from the quick reply allows to route to the proper action
+	 * - if needed (for example external search engine or members search
+	 */
+	public function pre_dispatch()
+	{
+		global $modSettings, $scripturl;
+
+		// Coming from quick search box and going to some custome place?
+		if (isset($_REQUEST['search_selection']) && !empty($modSettings['additional_search_engines']))
+		{
+			$engines = prepareSearchEngines();
+			if (isset($engines[$_REQUEST['search_selection']]))
+			{
+				$engine = $engines[$_REQUEST['search_selection']];
+				redirectexit($engine['url'] . urlencode(implode($engine['separator'], explode(' ', $_REQUEST['search']))));
+			}
+		}
+
+		// if comming from the quick search box, and we want to search on members, well we need to do that ;)
+		if (isset($_REQUEST['search_selection']) && $_REQUEST['search_selection'] === 'members')
+			redirectexit($scripturl . '?action=memberlist;sa=search;fields=name,email;search=' . urlencode($_REQUEST['search']));
+
+		// If load balancing is on and the load is high, no need to even show the form.
+		if (!empty($modSettings['loadavg_search']) && $modSettings['current_load'] >= $modSettings['loadavg_search'])
+			fatal_lang_error('loadavg_search_disabled', false);
+
+	}
+
+	/**
 	 * Intended entry point for this class.
+	 *
+	 * - The default action for no sub-action is... present the search screen
 	 *
 	 * @see Action_Controller::action_index()
 	 */
 	public function action_index()
 	{
 		// Call the right method.
+		$this->action_search();
 	}
 
 	/**
 	 * Ask the user what they want to search for.
+	 *
 	 * What it does:
-	 * - shows the screen to search forum posts (action=search), and uses the simple version if the simpleSearch setting is enabled.
+	 * - shows the screen to search forum posts (action=search),
 	 * - uses the main sub template of the Search template.
 	 * - uses the Search language file.
 	 * - requires the search_posts permission.
 	 * - decodes and loads search parameters given in the URL (if any).
-	 * - the form redirects to index.php?action=search2.
+	 * - the form redirects to index.php?action=search;sa=results.
 	 *
 	 * @uses Search language file and Errors language when needed
 	 * @uses Search template, searchform sub template
 	 */
-	public function action_plushsearch1()
+	public function action_search()
 	{
 		global $txt, $scripturl, $modSettings, $user_info, $context;
 
@@ -97,7 +146,7 @@ class Search_Controller extends Action_Controller
 			$context['visual_verification_id'] = $verificationOptions['id'];
 		}
 
-		// If you got back from search2 by using the linktree, you get your original search parameters back.
+		// If you got back from search;sa=results by using the linktree, you get your original search parameters back.
 		if (isset($_REQUEST['params']))
 		{
 			// Due to IE's 2083 character limit, we have to compress long search strings
@@ -153,8 +202,10 @@ class Search_Controller extends Action_Controller
 
 		require_once(SUBSDIR . '/Boards.subs.php');
 		$context += getBoardList(array('not_redirection' => true));
-		foreach ($context['categories'] as &$category)
+		$context['boards_in_category'] = array();
+		foreach ($context['categories'] as $cat => &$category)
 		{
+			$context['boards_in_category'][$cat] = count($category['boards']);
 			$category['child_ids'] = array_keys($category['boards']);
 			foreach ($category['boards'] as &$board)
 				$board['selected'] = (empty($context['search_params']['brd']) && (empty($modSettings['recycle_enable']) || $board['id'] != $modSettings['recycle_board']) && !in_array($board['id'], $user_info['ignoreboards'])) || (!empty($context['search_params']['brd']) && in_array($board['id'], $context['search_params']['brd']));
@@ -180,15 +231,19 @@ class Search_Controller extends Action_Controller
 			$context['search_topic']['link'] = '<a href="' . $context['search_topic']['href'] . '">' . $context['search_topic']['subject'] . '</a>';
 		}
 
-		// Simple or not?
-		$context['simple_search'] = isset($context['search_params']['advanced']) ? empty($context['search_params']['advanced']) : !empty($modSettings['simpleSearch']) && !isset($_REQUEST['advanced']);
 		$context['page_title'] = $txt['set_parameters'];
+		$context['search_params'] = $this->_fill_default_search_params($context['search_params']);
+
+		// Start guest off collapsed
+		if ($context['user']['is_guest'] && !isset($context['minmax_preferences']['asearch']))
+			$context['minmax_preferences']['asearch'] = 1;
 
 		call_integration_hook('integrate_search');
 	}
 
 	/**
 	 * Gather the results and show them.
+	 *
 	 * What it does:
 	 * - checks user input and searches the messages table for messages matching the query.
 	 * - requires the search_posts permission.
@@ -197,7 +252,7 @@ class Search_Controller extends Action_Controller
 	 * - stores the results into the search cache.
 	 * - show the results of the search query.
 	 */
-	public function action_plushsearch2()
+	public function action_results()
 	{
 		global $scripturl, $modSettings, $txt;
 		global $user_info, $context, $options, $messages_request, $boards_can;
@@ -207,72 +262,15 @@ class Search_Controller extends Action_Controller
 		$db = database();
 		$db_search = db_search();
 
-		// if coming from the quick search box, and we want to search on members, well we need to do that ;)
-		// Coming from quick search box and going to some custome place?
-		if (isset($_REQUEST['search_selection']) && !empty($modSettings['additional_search_engines']))
-		{
-			$engines = prepareSearchEngines();
-			if (isset($engines[$_REQUEST['search_selection']]))
-			{
-				$engine = $engines[$_REQUEST['search_selection']];
-				redirectexit($engine['url'] . urlencode(implode($engine['separator'], explode(' ', $_REQUEST['search']))));
-			}
-		}
-
-		// if comming from the quick search box, and we want to search on members, well we need to do that ;)
-		if (isset($_REQUEST['search_selection']) && $_REQUEST['search_selection'] === 'members')
-			redirectexit($scripturl . '?action=memberlist;sa=search;fields=name,email;search=' . urlencode($_REQUEST['search']));
-
-		if (!empty($modSettings['loadavg_search']) && $modSettings['current_load'] >= $modSettings['loadavg_search'])
-			fatal_lang_error('loadavg_search_disabled', false);
-
 		// No, no, no... this is a bit hard on the server, so don't you go prefetching it!
 		if (isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch')
 		{
-			ob_end_clean();
+			@ob_end_clean();
 			header('HTTP/1.1 403 Forbidden');
 			die;
 		}
 
-		$weight_factors = array(
-			'frequency' => array(
-				'search' => 'COUNT(*) / (MAX(t.num_replies) + 1)',
-				'results' => '(t.num_replies + 1)',
-			),
-			'age' => array(
-				'search' => 'CASE WHEN MAX(m.id_msg) < {int:min_msg} THEN 0 ELSE (MAX(m.id_msg) - {int:min_msg}) / {int:recent_message} END',
-				'results' => 'CASE WHEN t.id_first_msg < {int:min_msg} THEN 0 ELSE (t.id_first_msg - {int:min_msg}) / {int:recent_message} END',
-			),
-			'length' => array(
-				'search' => 'CASE WHEN MAX(t.num_replies) < {int:huge_topic_posts} THEN MAX(t.num_replies) / {int:huge_topic_posts} ELSE 1 END',
-				'results' => 'CASE WHEN t.num_replies < {int:huge_topic_posts} THEN t.num_replies / {int:huge_topic_posts} ELSE 1 END',
-			),
-			'subject' => array(
-				'search' => 0,
-				'results' => 0,
-			),
-			'first_message' => array(
-				'search' => 'CASE WHEN MIN(m.id_msg) = MAX(t.id_first_msg) THEN 1 ELSE 0 END',
-			),
-			'sticky' => array(
-				'search' => 'MAX(t.is_sticky)',
-				'results' => 't.is_sticky',
-			),
-		);
-
-		call_integration_hook('integrate_search_weights', array(&$weight_factors));
-
-		$weight = array();
-		$weight_total = 0;
-		foreach ($weight_factors as $weight_factor => $value)
-		{
-			$weight[$weight_factor] = empty($modSettings['search_weight_' . $weight_factor]) ? 0 : (int) $modSettings['search_weight_' . $weight_factor];
-			$weight_total += $weight[$weight_factor];
-		}
-
-		// Zero weight.  Weightless :P.
-		if (empty($weight_total))
-			fatal_lang_error('search_invalid_weights');
+		$this->_setup_weight_factors();
 
 		// These vars don't require an interface, they're just here for tweaking.
 		$recentPercentage = 0.30;
@@ -738,110 +736,9 @@ class Search_Controller extends Action_Controller
 			}
 		}
 
-		// *** Spell checking
-		$context['show_spellchecking'] = !empty($modSettings['enableSpellChecking']) && function_exists('pspell_new');
-		if ($context['show_spellchecking'])
-		{
-			// Windows fix.
-			ob_start();
-			$old = error_reporting(0);
-
-			pspell_new('en');
-			$pspell_link = pspell_new($txt['lang_dictionary'], $txt['lang_spelling'], '', 'utf-8', PSPELL_FAST | PSPELL_RUN_TOGETHER);
-
-			if (!$pspell_link)
-				$pspell_link = pspell_new('en', '', '', '', PSPELL_FAST | PSPELL_RUN_TOGETHER);
-
-			error_reporting($old);
-			ob_end_clean();
-
-			$did_you_mean = array('search' => array(), 'display' => array());
-			$found_misspelling = false;
-			foreach ($searchArray as $word)
-			{
-				if (empty($pspell_link))
-					continue;
-
-				// Don't check phrases.
-				if (preg_match('~^\w+$~', $word) === 0)
-				{
-					$did_you_mean['search'][] = '"' . $word . '"';
-					$did_you_mean['display'][] = '&quot;' . Util::htmlspecialchars($word) . '&quot;';
-					continue;
-				}
-				// For some strange reason spell check can crash PHP on decimals.
-				elseif (preg_match('~\d~', $word) === 1)
-				{
-					$did_you_mean['search'][] = $word;
-					$did_you_mean['display'][] = Util::htmlspecialchars($word);
-					continue;
-				}
-				elseif (pspell_check($pspell_link, $word))
-				{
-					$did_you_mean['search'][] = $word;
-					$did_you_mean['display'][] = Util::htmlspecialchars($word);
-					continue;
-				}
-
-				$suggestions = pspell_suggest($pspell_link, $word);
-				foreach ($suggestions as $i => $s)
-				{
-					// Search is case insensitive.
-					if (Util::strtolower($s) == Util::strtolower($word))
-						unset($suggestions[$i]);
-					// Plus, don't suggest something the user thinks is rude!
-					elseif ($suggestions[$i] != censorText($s))
-						unset($suggestions[$i]);
-				}
-
-				// Anything found?  If so, correct it!
-				if (!empty($suggestions))
-				{
-					$suggestions = array_values($suggestions);
-					$did_you_mean['search'][] = $suggestions[0];
-					$did_you_mean['display'][] = '<em><strong>' . Util::htmlspecialchars($suggestions[0]) . '</strong></em>';
-					$found_misspelling = true;
-				}
-				else
-				{
-					$did_you_mean['search'][] = $word;
-					$did_you_mean['display'][] = Util::htmlspecialchars($word);
-				}
-			}
-
-			if ($found_misspelling)
-			{
-				// Don't spell check excluded words, but add them still...
-				$temp_excluded = array('search' => array(), 'display' => array());
-				foreach ($excludedWords as $word)
-				{
-					if (preg_match('~^\w+$~', $word) == 0)
-					{
-						$temp_excluded['search'][] = '-"' . $word . '"';
-						$temp_excluded['display'][] = '-&quot;' . Util::htmlspecialchars($word) . '&quot;';
-					}
-					else
-					{
-						$temp_excluded['search'][] = '-' . $word;
-						$temp_excluded['display'][] = '-' . Util::htmlspecialchars($word);
-					}
-				}
-
-				$did_you_mean['search'] = array_merge($did_you_mean['search'], $temp_excluded['search']);
-				$did_you_mean['display'] = array_merge($did_you_mean['display'], $temp_excluded['display']);
-
-				$temp_params = $search_params;
-				$temp_params['search'] = implode(' ', $did_you_mean['search']);
-				if (isset($temp_params['brd']))
-					$temp_params['brd'] = implode(',', $temp_params['brd']);
-
-				$context['params'] = array();
-				foreach ($temp_params as $k => $v)
-					$context['did_you_mean_params'][] = $k . '|\'|' . $v;
-				$context['did_you_mean_params'] = base64_encode(implode('|"|', $context['did_you_mean_params']));
-				$context['did_you_mean'] = implode(' ', $did_you_mean['display']);
-			}
-		}
+		// *** Spell checking?
+		if (!empty($modSettings['enableSpellChecking']) && function_exists('pspell_new'))
+			$this->_load_suggestions($search_params, $searchArray);
 
 		// Let the user adjust the search query, should they wish?
 		$context['search_params'] = $search_params;
@@ -849,6 +746,12 @@ class Search_Controller extends Action_Controller
 			$context['search_params']['search'] = Util::htmlspecialchars($context['search_params']['search']);
 		if (isset($context['search_params']['userspec']))
 			$context['search_params']['userspec'] = Util::htmlspecialchars($context['search_params']['userspec']);
+		if (empty($context['search_params']['minage']))
+			$context['search_params']['minage'] = 0;
+		if (empty($context['search_params']['maxage']))
+			$context['search_params']['maxage'] = 9999;
+
+		$context['search_params'] = $this->_fill_default_search_params($context['search_params']);
 
 		// Do we have captcha enabled?
 		if ($user_info['is_guest'] && !empty($modSettings['search_enable_captcha']) && empty($_SESSION['ss_vv_passed']) && (empty($_SESSION['last_ss']) || $_SESSION['last_ss'] != $search_params['search']))
@@ -903,9 +806,13 @@ class Search_Controller extends Action_Controller
 			'name' => $txt['search']
 		);
 		$context['linktree'][] = array(
-			'url' => $scripturl . '?action=search2;params=' . $context['params'],
+			'url' => $scripturl . '?action=search;sa=results;params=' . $context['params'],
 			'name' => $txt['search_results']
 		);
+
+		// Start guest off collapsed
+		if ($context['user']['is_guest'] && !isset($context['minmax_preferences']['asearch']))
+			$context['minmax_preferences']['asearch'] = 1;
 
 		// *** A last error check
 		call_integration_hook('integrate_search_errors');
@@ -914,7 +821,7 @@ class Search_Controller extends Action_Controller
 		if (!empty($context['search_errors']))
 		{
 			$_REQUEST['params'] = $context['params'];
-			return $this->action_plushsearch1();
+			return $this->action_search();
 		}
 
 		// Spam me not, Spam-a-lot?
@@ -938,7 +845,6 @@ class Search_Controller extends Action_Controller
 			$searchArray = array();
 			$num_results = $searchAPI->searchQuery($query_params, $searchWords, $excludedIndexWords, $participants, $searchArray);
 		}
-
 		// Update the cache if the current search term is not yet cached.
 		else
 		{
@@ -947,8 +853,10 @@ class Search_Controller extends Action_Controller
 			{
 				// Increase the pointer...
 				$modSettings['search_pointer'] = empty($modSettings['search_pointer']) ? 0 : (int) $modSettings['search_pointer'];
+
 				// ...and store it right off.
 				updateSettings(array('search_pointer' => $modSettings['search_pointer'] >= 255 ? 0 : $modSettings['search_pointer'] + 1));
+
 				// As long as you don't change the parameters, the cache result is yours.
 				$_SESSION['search_cache'] = array(
 					'id_search' => $modSettings['search_pointer'],
@@ -1006,9 +914,8 @@ class Search_Controller extends Action_Controller
 						if (!empty($userQuery))
 						{
 							if ($subject_query['from'] != '{db_prefix}messages AS m')
-							{
 								$subject_query['inner_join'][] = '{db_prefix}messages AS m ON (m.id_topic = t.id_topic)';
-							}
+
 							$subject_query['where'][] = $userQuery;
 						}
 						if (!empty($search_params['topic']))
@@ -1022,9 +929,7 @@ class Search_Controller extends Action_Controller
 						if (!empty($excludedPhrases))
 						{
 							if ($subject_query['from'] != '{db_prefix}messages AS m')
-							{
 								$subject_query['inner_join'][] = '{db_prefix}messages AS m ON (m.id_msg = t.id_first_msg)';
-							}
 
 							$count = 0;
 							foreach ($excludedPhrases as $phrase)
@@ -1037,17 +942,17 @@ class Search_Controller extends Action_Controller
 
 						// Build the search relevance query
 						$relevance = '1000 * (';
-						foreach ($weight_factors as $type => $value)
+						foreach ($this->_weight_factors as $type => $value)
 						{
 							if (isset($value['results']))
 							{
-								$relevance .= $weight[$type];
+								$relevance .= $this->_weight[$type];
 								if (!empty($value['results']))
 									$relevance .= ' * ' . $value['results'];
 								$relevance .= ' + ';
 							}
 						}
-						$relevance = substr($relevance, 0, -3) . ') / ' . $weight_total . ' AS relevance';
+						$relevance = substr($relevance, 0, -3) . ') / ' . $this->_weight_total . ' AS relevance';
 
 						$ignoreRequest = $db_search->search_query('insert_log_search_results_subject',
 							($db->support_ignore() ? '
@@ -1139,7 +1044,7 @@ class Search_Controller extends Action_Controller
 						$main_query['select']['id_topic'] = 't.id_topic';
 						$main_query['select']['id_msg'] = 'MAX(m.id_msg) AS id_msg';
 						$main_query['select']['num_matches'] = 'COUNT(*) AS num_matches';
-						$main_query['weights'] = $weight_factors;
+						$main_query['weights'] = $this->_weight_factors;
 						$main_query['group_by'][] = 't.id_topic';
 					}
 					else
@@ -1443,7 +1348,8 @@ class Search_Controller extends Action_Controller
 						{
 							$context['search_errors']['query_not_specific_enough'] = true;
 							$_REQUEST['params'] = $context['params'];
-							return $this->action_plushsearch1();
+
+							return $this->action_search();
 						}
 						elseif (!empty($indexedResults))
 						{
@@ -1511,11 +1417,11 @@ class Search_Controller extends Action_Controller
 						$new_weight_total = 0;
 						foreach ($main_query['weights'] as $type => $value)
 						{
-							$relevance .= $weight[$type];
+							$relevance .= $this->_weight[$type];
 							if (!empty($value['search']))
 								$relevance .= ' * ' . $value['search'];
 							$relevance .= ' + ';
-							$new_weight_total += $weight[$type];
+							$new_weight_total += $this->_weight[$type];
 						}
 						$main_query['select']['relevance'] = substr($relevance, 0, -3) . ') / ' . $new_weight_total . ' AS relevance';
 
@@ -1576,15 +1482,15 @@ class Search_Controller extends Action_Controller
 					if ($_SESSION['search_cache']['num_results'] < $modSettings['search_max_results'] && $numSubjectResults !== 0)
 					{
 						$relevance = '1000 * (';
-						foreach ($weight_factors as $type => $value)
+						foreach ($this->_weight_factors as $type => $value)
 							if (isset($value['results']))
 							{
-								$relevance .= $weight[$type];
+								$relevance .= $this->_weight[$type];
 								if (!empty($value['results']))
 									$relevance .= ' * ' . $value['results'];
 								$relevance .= ' + ';
 							}
-						$relevance = substr($relevance, 0, -3) . ') / ' . $weight_total . ' AS relevance';
+						$relevance = substr($relevance, 0, -3) . ') / ' . $this->_weight_total . ' AS relevance';
 
 						$usedIDs = array_flip(empty($inserts) ? array() : array_keys($inserts));
 						$ignoreRequest = $db_search->search_query('insert_log_search_results_sub_only', ($db->support_ignore() ? ( '
@@ -1759,7 +1665,7 @@ class Search_Controller extends Action_Controller
 		}
 
 		// Now that we know how many results to expect we can start calculating the page numbers.
-		$context['page_index'] = constructPageIndex($scripturl . '?action=search2;params=' . $context['params'], $_REQUEST['start'], $num_results, $modSettings['search_results_per_page'], false);
+		$context['page_index'] = constructPageIndex($scripturl . '?action=search;sa=results;params=' . $context['params'], $_REQUEST['start'], $num_results, $modSettings['search_results_per_page'], false);
 
 		// Consider the search complete!
 		if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
@@ -1783,6 +1689,7 @@ class Search_Controller extends Action_Controller
 
 	/**
 	 * Callback to return messages - saves memory.
+	 *
 	 * @todo Fix this, update it, whatever... from Display.controller.php mainly.
 	 * Note that the call to loadAttachmentContext() doesn't work:
 	 * this function doesn't fulfill the pre-condition to fill $attachments global...
@@ -1792,8 +1699,8 @@ class Search_Controller extends Action_Controller
 	 * - callback function for the results sub template.
 	 * - loads the necessary contextual data to show a search result.
 	 *
-	 * @param $reset = false
-	 * @return array
+	 * @param boolean $reset = false
+	 * @return array of messages that match the search
 	 */
 	public function prepareSearchContext_callback($reset = false)
 	{
@@ -1922,15 +1829,17 @@ class Search_Controller extends Action_Controller
 			'id' => $message['id_topic'],
 			'is_sticky' => !empty($modSettings['enableStickyTopics']) && !empty($message['is_sticky']),
 			'is_locked' => !empty($message['locked']),
-			'is_poll' => $modSettings['pollMode'] == '1' && $message['id_poll'] > 0,
+			'is_poll' => !empty($modSettings['pollMode']) && $message['id_poll'] > 0,
 			'is_hot' => !empty($modSettings['useLikesNotViews']) ? $message['num_likes'] >= $modSettings['hotTopicPosts'] : $message['num_replies'] >= $modSettings['hotTopicPosts'],
 			'is_very_hot' => !empty($modSettings['useLikesNotViews']) ? $message['num_likes'] >= $modSettings['hotTopicVeryPosts'] : $message['num_replies'] >= $modSettings['hotTopicVeryPosts'],
 			'posted_in' => !empty($participants[$message['id_topic']]),
 			'views' => $message['num_views'],
 			'replies' => $message['num_replies'],
-			'can_reply' => in_array($message['id_board'], $boards_can['post_reply_any']) || in_array(0, $boards_can['post_reply_any']),
-			'can_quote' => (in_array($message['id_board'], $boards_can['post_reply_any']) || in_array(0, $boards_can['post_reply_any'])) && $quote_enabled,
-			'can_mark_notify' => in_array($message['id_board'], $boards_can['mark_any_notify']) || in_array(0, $boards_can['mark_any_notify']) && !$context['user']['is_guest'],
+			'tests' => array(
+				'can_reply' => in_array($message['id_board'], $boards_can['post_reply_any']) || in_array(0, $boards_can['post_reply_any']),
+				'can_quote' => (in_array($message['id_board'], $boards_can['post_reply_any']) || in_array(0, $boards_can['post_reply_any'])) && $quote_enabled,
+				'can_mark_notify' => in_array($message['id_board'], $boards_can['mark_any_notify']) || in_array(0, $boards_can['mark_any_notify']) && !$context['user']['is_guest'],
+			),
 			'first_post' => array(
 				'id' => $message['first_msg'],
 				'time' => standardTime($message['first_poster_time']),
@@ -2012,10 +1921,10 @@ class Search_Controller extends Action_Controller
 		{
 			// Fix the international characters in the keyword too.
 			$query = un_htmlspecialchars($query);
-			$query = trim($query, "\*+");
+			$query = trim($query, '\*+');
 			$query = strtr(Util::htmlspecialchars($query), array('\\\'' => '\''));
 
-			$body_highlighted = preg_replace_callback('/((<[^>]*)|' . preg_quote(strtr($query, array('\'' => '&#039;')), '/') . ')/iu', create_function('$m', 'return isset($m[2]) && "$m[2]" == "$m[1]" ? stripslashes("$m[1]") : "<strong class=\"highlight\">$m[1]</strong>";'), $body_highlighted);
+			$body_highlighted = preg_replace_callback('/((<[^>]*)|' . preg_quote(strtr($query, array('\'' => '&#039;')), '/') . ')/iu', array($this, '_highlighted_callback'), $body_highlighted);
 			$subject_highlighted = preg_replace('/(' . preg_quote($query, '/') . ')/iu', '<strong class="highlight">$1</strong>', $subject_highlighted);
 		}
 
@@ -2045,14 +1954,269 @@ class Search_Controller extends Action_Controller
 		);
 		$counter++;
 
+		if (!$context['compact'])
+		{
+			$output['buttons'] = array(
+				// Can we request notification of topics?
+				'notify' => array(
+					'href' => $scripturl . '?action=notify;topic=' . $output['id'] . '.msg' . $message['id_msg'],
+					'text' => $txt['notify'],
+					'test' => 'can_mark_notify',
+				),
+				// If they *can* reply?
+				'reply' => array(
+					'href' => $scripturl . '?action=post;topic=' . $output['id'] . '.msg' . $message['id_msg'],
+					'text' => $txt['reply'],
+					'test' => 'can_reply',
+				),
+				// If they *can* quote?
+				'quote' => array(
+					'href' => $scripturl . '?action=post;topic=' . $output['id'] . '.msg' . $message['id_msg'] . ';quote=' . $message['id_msg'],
+					'text' => $txt['quote'],
+					'test' => 'can_quote',
+				),
+			);
+		}
+
 		call_integration_hook('integrate_search_message_context', array($counter, &$output));
 
 		return $output;
+	}
+
+	/**
+	 * Used to highlight body text with strings that match the search term
+	 *
+	 * Callback function used in $body_highlighted
+	 *
+	 * @param string[] $matches
+	 */
+	private function _highlighted_callback($matches)
+	{
+		return isset($matches[2]) && $matches[2] == $matches[1] ? stripslashes($matches[1]) : '<strong class="highlight">' . $matches[1] . '</strong>';
+	}
+
+	/**
+	 * Prepares the weighting factors and
+	 */
+	private function _setup_weight_factors()
+	{
+		global $user_info, $modSettings;
+
+		$default_factors = $this->_weight_factors = array(
+			'frequency' => array(
+				'search' => 'COUNT(*) / (MAX(t.num_replies) + 1)',
+				'results' => '(t.num_replies + 1)',
+			),
+			'age' => array(
+				'search' => 'CASE WHEN MAX(m.id_msg) < {int:min_msg} THEN 0 ELSE (MAX(m.id_msg) - {int:min_msg}) / {int:recent_message} END',
+				'results' => 'CASE WHEN t.id_first_msg < {int:min_msg} THEN 0 ELSE (t.id_first_msg - {int:min_msg}) / {int:recent_message} END',
+			),
+			'length' => array(
+				'search' => 'CASE WHEN MAX(t.num_replies) < {int:huge_topic_posts} THEN MAX(t.num_replies) / {int:huge_topic_posts} ELSE 1 END',
+				'results' => 'CASE WHEN t.num_replies < {int:huge_topic_posts} THEN t.num_replies / {int:huge_topic_posts} ELSE 1 END',
+			),
+			'subject' => array(
+				'search' => 0,
+				'results' => 0,
+			),
+			'first_message' => array(
+				'search' => 'CASE WHEN MIN(m.id_msg) = MAX(t.id_first_msg) THEN 1 ELSE 0 END',
+			),
+			'sticky' => array(
+				'search' => 'MAX(t.is_sticky)',
+				'results' => 't.is_sticky',
+			),
+		);
+
+		// These are fallback weights in case of errors somewhere.
+		// Not intended to be passed to the hook
+		$default_weights = array(
+			'search_weight_frequency' => '30',
+			'search_weight_age' => '25',
+			'search_weight_length' => '20',
+			'search_weight_subject' => '15',
+			'search_weight_first_message' => '10',
+		);
+
+		call_integration_hook('integrate_search_weights', array(&$this->_weight_factors));
+
+		// Set the weight factors for each area (frequency, age, etc) as defined in the ACP
+		foreach ($this->_weight_factors as $weight_factor => $value)
+		{
+			$this->_weight[$weight_factor] = empty($modSettings['search_weight_' . $weight_factor]) ? 0 : (int) $modSettings['search_weight_' . $weight_factor];
+			$this->_weight_total += $this->_weight[$weight_factor];
+		}
+
+		// Zero weight.  Weightless :P.
+		if (empty($this->_weight_total))
+		{
+			// Admins can be bothered with a failure
+			if ($user_info['is_admin'])
+				fatal_lang_error('search_invalid_weights');
+
+			// Even if users will get an answer, the admin should know something is broken
+			log_lang_error('search_invalid_weights');
+
+			// Instead is better to give normal users and guests some kind of result
+			// using our defaults.
+			// Using a different variable here because it may be the hook is screwing
+			// things up
+			foreach ($default_factors as $weight_factor => $value)
+			{
+				$this->_weight[$weight_factor] = empty($default_weights['search_weight_' . $weight_factor]) ? 0 : (int) $default_weights['search_weight_' . $weight_factor];
+				$this->_weight_total += $this->_weight[$weight_factor];
+			}
+		}
+	}
+
+	/**
+	 * Fills the empty spaces in an array with the default values for search params
+	 *
+	 * @param mixed[] $array
+	 */
+	private function _fill_default_search_params($array)
+	{
+		if (empty($array['search']))
+			$array['search'] = '';
+		if (empty($array['userspec']))
+			$array['userspec'] = '*';
+		if (empty($array['searchtype']))
+			$array['searchtype'] = 0;
+		if (!isset($array['show_complete']))
+			$array['show_complete'] = 0;
+		else
+			$array['show_complete'] = (int) $array['show_complete'];
+		if (!isset($array['subject_only']))
+			$array['subject_only'] = 0;
+		else
+			$array['subject_only'] = (int) $array['subject_only'];
+		if (empty($array['minage']))
+			$array['minage'] = 0;
+		if (empty($array['maxage']))
+			$array['maxage'] = 9999;
+		if (empty($array['sort']))
+			$array['sort'] = 'relevance';
+
+		return $array;
+	}
+
+	/**
+	 * Setup spellchecking suggestions and load them into $context
+	 *
+	 * @param string[] $search_params the search parameters
+	 * @param string[] $searchArray an array of terms
+	 */
+	private function _load_suggestions($search_params, $searchArray = array())
+	{
+		global $txt, $context;
+
+		// Windows fix.
+		ob_start();
+		$old = error_reporting(0);
+
+		pspell_new('en');
+		$pspell_link = pspell_new($txt['lang_dictionary'], $txt['lang_spelling'], '', 'utf-8', PSPELL_FAST | PSPELL_RUN_TOGETHER);
+
+		if (!$pspell_link)
+			$pspell_link = pspell_new('en', '', '', '', PSPELL_FAST | PSPELL_RUN_TOGETHER);
+
+		error_reporting($old);
+		@ob_end_clean();
+
+		$did_you_mean = array('search' => array(), 'display' => array());
+		$found_misspelling = false;
+		foreach ($searchArray as $word)
+		{
+			if (empty($pspell_link))
+				continue;
+
+			// Don't check phrases.
+			if (preg_match('~^\w+$~', $word) === 0)
+			{
+				$did_you_mean['search'][] = '"' . $word . '"';
+				$did_you_mean['display'][] = '&quot;' . Util::htmlspecialchars($word) . '&quot;';
+				continue;
+			}
+			// For some strange reason spell check can crash PHP on decimals.
+			elseif (preg_match('~\d~', $word) === 1)
+			{
+				$did_you_mean['search'][] = $word;
+				$did_you_mean['display'][] = Util::htmlspecialchars($word);
+				continue;
+			}
+			elseif (pspell_check($pspell_link, $word))
+			{
+				$did_you_mean['search'][] = $word;
+				$did_you_mean['display'][] = Util::htmlspecialchars($word);
+				continue;
+			}
+
+			$suggestions = pspell_suggest($pspell_link, $word);
+			foreach ($suggestions as $i => $s)
+			{
+				// Search is case insensitive.
+				if (Util::strtolower($s) == Util::strtolower($word))
+					unset($suggestions[$i]);
+				// Plus, don't suggest something the user thinks is rude!
+				elseif ($suggestions[$i] != censorText($s))
+					unset($suggestions[$i]);
+			}
+
+			// Anything found?  If so, correct it!
+			if (!empty($suggestions))
+			{
+				$suggestions = array_values($suggestions);
+				$did_you_mean['search'][] = $suggestions[0];
+				$did_you_mean['display'][] = '<em><strong>' . Util::htmlspecialchars($suggestions[0]) . '</strong></em>';
+				$found_misspelling = true;
+			}
+			else
+			{
+				$did_you_mean['search'][] = $word;
+				$did_you_mean['display'][] = Util::htmlspecialchars($word);
+			}
+		}
+
+		if ($found_misspelling)
+		{
+			// Don't spell check excluded words, but add them still...
+			$temp_excluded = array('search' => array(), 'display' => array());
+			if (!empty($excludedWords))
+			{
+				foreach ($excludedWords as $word)
+				{
+					if (preg_match('~^\w+$~', $word) == 0)
+					{
+						$temp_excluded['search'][] = '-"' . $word . '"';
+						$temp_excluded['display'][] = '-&quot;' . Util::htmlspecialchars($word) . '&quot;';
+					}
+					else
+					{
+						$temp_excluded['search'][] = '-' . $word;
+						$temp_excluded['display'][] = '-' . Util::htmlspecialchars($word);
+					}
+				}
+			}
+
+			$did_you_mean['search'] = array_merge($did_you_mean['search'], $temp_excluded['search']);
+			$did_you_mean['display'] = array_merge($did_you_mean['display'], $temp_excluded['display']);
+
+			$search_params['search'] = implode(' ', $did_you_mean['search']);
+			if (isset($search_params['brd']))
+				$search_params['brd'] = implode(',', $search_params['brd']);
+
+			$context['params'] = array();
+			foreach ($search_params as $k => $v)
+				$context['did_you_mean_params'][] = $k . '|\'|' . $v;
+			$context['did_you_mean_params'] = base64_encode(implode('|"|', $context['did_you_mean_params']));
+			$context['did_you_mean'] = implode(' ', $did_you_mean['display']);
+		}
 	}
 }
 
 /**
  * This function compares the length of two strings plus a little.
+ *
  * What it does:
  * - callback function for usort used to sort the fulltext results.
  * - passes sorting duty to the current API.

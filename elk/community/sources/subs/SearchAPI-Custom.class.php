@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 
 /**
  * SearchAPI-Custom.class.php, Custom Search API class .. used when custom ElkArte index is used
+ *
+ * @package Search
  */
 class Custom_Search
 {
@@ -30,7 +32,7 @@ class Custom_Search
 	 *This is the last version of ElkArte that this was tested on, to protect against API changes.
 	 * @var string
 	 */
-	public $version_compatible = 'ElkArte 1.0 Beta';
+	public $version_compatible = 'ElkArte 1.0 RC 1';
 
 	/**
 	 *This won't work with versions of ElkArte less than this.
@@ -95,8 +97,8 @@ class Custom_Search
 	 * Check whether the search can be performed by this API.
 	 *
 	 * @param string $methodName
-	 * @param string $query_params
-	 * @return boolean
+	 * @param string|null $query_params
+	 * @return boolean|null
 	 */
 	public function supportsMethod($methodName, $query_params = null)
 	{
@@ -129,7 +131,7 @@ class Custom_Search
 	}
 
 	/**
-	 * callback function for usort used to sort the fulltext results.
+	 * Callback function for usort used to sort the fulltext results.
 	 * the order of sorting is: large words, small words, large words that
 	 * are excluded from the search, small words that are excluded.
 	 *
@@ -151,8 +153,8 @@ class Custom_Search
 	 * Do we have to do some work with the words we are searching for to prepare them?
 	 *
 	 * @param string $word
-	 * @param array $wordsSearch
-	 * @param array $wordsExclude
+	 * @param mixed[] $wordsSearch
+	 * @param string[] $wordsExclude
 	 * @param boolean $isExcluded
 	 */
 	public function prepareIndexes($word, &$wordsSearch, &$wordsExclude, $isExcluded)
@@ -184,8 +186,8 @@ class Custom_Search
 	/**
 	 * Search for indexed words.
 	 *
-	 * @param array $words
-	 * @param array $search_data
+	 * @param mixed[] $words
+	 * @param mixed[] $search_data
 	 */
 	public function indexedWordQuery($words, $search_data)
 	{
@@ -279,9 +281,9 @@ class Custom_Search
 	/**
 	 * After a post is made, we update the search index database
 	 *
-	 * @param array $msgOptions
-	 * @param array $topicOptions
-	 * @param array $posterOptions
+	 * @param mixed[] $msgOptions
+	 * @param mixed[] $topicOptions
+	 * @param mixed[] $posterOptions
 	 */
 	public function postCreated($msgOptions, $topicOptions, $posterOptions)
 	{
@@ -307,9 +309,9 @@ class Custom_Search
 	/**
 	 * After a post is modified, we update the search index database.
 	 *
-	 * @param array $msgOptions
-	 * @param array $topicOptions
-	 * @param array $posterOptions
+	 * @param mixed[] $msgOptions
+	 * @param mixed[] $topicOptions
+	 * @param mixed[] $posterOptions
 	 */
 	public function postModified($msgOptions, $topicOptions, $posterOptions)
 	{
@@ -323,7 +325,7 @@ class Custom_Search
 			$stopwords = empty($modSettings['search_stopwords']) ? array() : explode(',', $modSettings['search_stopwords']);
 			$old_body = isset($msgOptions['old_body']) ? $msgOptions['old_body'] : '';
 
-			// Create thew new and old index
+			// Create the new and old index
 			$old_index = text2words($old_body, $customIndexSettings['bytes_per_word'], true);
 			$new_index = text2words($msgOptions['body'], $customIndexSettings['bytes_per_word'], true);
 

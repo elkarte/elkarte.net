@@ -13,7 +13,8 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
+ *
  */
 
 if (!defined('ELK'))
@@ -22,6 +23,7 @@ if (!defined('ELK'))
 /**
  * Gets all of the files in a directory and its chidren directories
  *
+ * @package AddonSettings
  * @param string $dir_path
  * @return array
  */
@@ -49,9 +51,12 @@ function get_files_recursive($dir_path)
 
 /**
  * Callback function for the integration hooks list (list_integration_hooks)
- * Gets all of the hooks in the system and their status
- * Would be better documented if Ema was not lazy
  *
+ * What it does:
+ * - Gets all of the hooks in the system and their status
+ * - Would be better documented if Ema was not lazy
+ *
+ * @package AddonSettings
  * @param int $start
  * @param int $per_page
  * @param string $sort
@@ -59,7 +64,9 @@ function get_files_recursive($dir_path)
  */
 function list_integration_hooks_data($start, $per_page, $sort)
 {
-	global $settings, $txt, $context, $scripturl, $modSettings;
+	global $txt, $context, $scripturl, $modSettings;
+
+	require_once(SUBSDIR . '/Package.subs.php');
 
 	$hooks = $temp_hooks = get_integration_hooks();
 	$hooks_data = $temp_data = $hook_status = array();
@@ -93,12 +100,17 @@ function list_integration_hooks_data($start, $per_page, $sort)
 							$function = $hook_name;
 						}
 
-						$function = explode(':', $function);
+						$function = explode('|', $function);
 						$function = $function[0];
 
 						if (substr($hook, -8) === '_include')
 						{
-							$hook_status[$hook][$function]['exists'] = file_exists(strtr(trim($function), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR, '$themedir' => $settings['theme_dir'])));
+							$real_path = parse_path(trim($hook_name));
+
+							if ($real_path == $hook_name)
+								$hook_status[$hook][$hook_name]['exists'] = false;
+							else
+								$hook_status[$hook][$hook_name]['exists'] = file_exists(parse_path(ltrim($real_path, '|')));
 
 							// I need to know if there is at least one function called in this file.
 							$temp_data['include'][basename($function)] = array('hook' => $hook, 'function' => $function);
@@ -149,10 +161,9 @@ function list_integration_hooks_data($start, $per_page, $sort)
 
 	foreach ($hooks as $hook => $functions)
 	{
-		$hooks_filters[] = '<option ' . ($context['current_filter'] == $hook ? 'selected="selected" ' : '') . 'onclick="window.location = \'' . $scripturl . '?action=admin;area=addonsettings;sa=hooks;filter=' . $hook . '\';">' . $hook . '</option>';
+		$hooks_filters[] = '<option ' . ($context['current_filter'] == $hook ? 'selected="selected" ' : '') . ' value="">' . $hook . '</option>';
 		foreach ($functions as $function)
 		{
-			$enabled = strstr($function, ']') === false;
 			$function = str_replace(']', '', $function);
 
 			// This is a not an include and the function is included in a certain file (if not it doesn't exists so don't care)
@@ -166,20 +177,19 @@ function list_integration_hooks_data($start, $per_page, $sort)
 				foreach ($temp_data['function'][$hook_status[$hook][$function]['in_file']] as $func)
 					$enabled = $enabled || strstr($func, ']') !== false;
 
-				if (!$enabled &&  !empty($current_hook))
+				if (!$enabled && !empty($current_hook))
 					$hook_status[$current_hook['hook']][$current_hook['function']]['enabled'] = true;
 			}
 		}
 	}
 
-	if (!empty($hooks_filters))
 		addInlineJavascript('
 			var hook_name_header = document.getElementById(\'header_list_integration_hooks_hook_name\');
 			hook_name_header.innerHTML += ' . JavaScriptEscape('
-				<select style="margin-left:15px;">
+				<select onchange="window.location = \'' . $scripturl . '?action=admin;area=maintain;sa=hooks\' + (this.value ? \';filter=\' + this.value : \'\');">
 					<option>---</option>
-					<option onclick="window.location = \'' . $scripturl . '?action=admin;area=addonsettings;sa=hooks\';">' . $txt['hooks_reset_filter'] . '</option>' . implode('', $hooks_filters) . '
-				</select>'). ';', true);
+					<option value="">' . $txt['hooks_reset_filter'] . '</option>' . implode('', $hooks_filters) . '</select>' . '
+				</select>') . ';', true);
 
 	$temp_data = array();
 	$id = 0;
@@ -201,14 +211,14 @@ function list_integration_hooks_data($start, $per_page, $sort)
 					$function = $function[1];
 				}
 
-				$exploded = explode(':', $function);
+				$exploded = explode('|', $function);
 
 				$temp_data[] = array(
 					'id' => 'hookid_' . $id++,
 					'hook_name' => $hook,
 					'function_name' => $function,
 					'real_function' => $exploded[0],
-					'included_file' => isset($exploded[1]) ? strtr(trim($exploded[1]), array('BOARDDIR' => BOARDDIR, 'SOURCEDIR' => SOURCEDIR, '$themedir' => $settings['theme_dir'])) : '',
+					'included_file' => isset($exploded[1]) ? parse_path(trim($exploded[1])) : '',
 					'file_name' => (isset($hook_status[$hook][$function]['in_file']) ? $hook_status[$hook][$function]['in_file'] : ''),
 					'hook_exists' => $hook_exists,
 					'status' => $hook_exists ? ($enabled ? 'allow' : 'moderate') : 'deny',
@@ -240,8 +250,12 @@ function list_integration_hooks_data($start, $per_page, $sort)
 
 /**
  * Simply returns the total count of integration hooks
- * (used by createList() callbacks)
  *
+ * What it does:
+ * - used by createList() as a callback to determine the number of hooks in
+ * use in the system
+ *
+ * @package AddonSettings
  * @param boolean $filter
  */
 function integration_hooks_count($filter = false)
@@ -260,8 +274,11 @@ function integration_hooks_count($filter = false)
 
 /**
  * Parses modSettings to create integration hook array
- * (used by createList() callbacks)
  *
+ * What it does:
+ * - used by createList() callbacks
+ *
+ * @package AddonSettings
  * @staticvar type $integration_hooks
  * @return array
  */

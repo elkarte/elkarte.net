@@ -2,7 +2,7 @@
 
 /**
  * This class implements a standard way of displaying lists.
- * 
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditio
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -57,7 +57,7 @@ class Generic_List
 	 * Makes sure the passed list contains the miniumn needed options to create a list
 	 * Loads the options in to this instance
 	 *
-	 * @param array $listOptions
+	 * @param mixed[] $listOptions
 	 */
 	public function __construct($listOptions)
 	{
@@ -77,7 +77,7 @@ class Generic_List
 	/**
 	 * Validate the options sent
 	 *
-	 * @param array $listOptions
+	 * @param mixed[] $listOptions
 	 */
 	protected function _validateListOptions($listOptions)
 	{
@@ -245,8 +245,13 @@ class Generic_List
 				if (!empty($column['data']['comma_format']))
 					$cur_data['value'] = comma_format($cur_data['value']);
 				elseif (!empty($column['data']['timeformat']))
-					$cur_data['value'] = standardTime($cur_data['value']);
-
+				{
+					// Maybe we need a relative time?
+					if ($column['data']['timeformat'] == 'html_time')
+						$cur_data['value'] = htmlTime($cur_data['value']);
+					else
+						$cur_data['value'] = standardTime($cur_data['value']);
+				}
 				// Set a style class for this column?
 				if (isset($column['data']['class']))
 					$cur_data['class'] = $column['data']['class'];
@@ -358,11 +363,11 @@ class Generic_List
 /**
  * This function creates a new GenericList from all the passed options.
  *
- * @param array $listOptions
+ * @param mixed[] $listOptions associative array of option => value
  */
 function createList($listOptions)
 {
-	call_integration_hook('integrate_' . $listOptions['id'], array($listOptions));
+	call_integration_hook('integrate_list_' . $listOptions['id'], array($listOptions));
 
 	$list = new Generic_List($listOptions);
 

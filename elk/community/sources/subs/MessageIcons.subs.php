@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -68,9 +68,9 @@ function fetchMessageIconsDetails()
 /**
  * Delete a message icon.
  *
- * @param array $icons
+ * @param int[] $icons
  */
-function deleteMessageIcon($icons)
+function deleteMessageIcons($icons)
 {
 	$db = database();
 
@@ -87,7 +87,7 @@ function deleteMessageIcon($icons)
 /**
  * Updates a message icon.
  *
- * @param array $icon array of values to use in the $db->insert
+ * @param mixed[] $icon array of values to use in the $db->insert
  */
 function updateMessageIcon($icon)
 {
@@ -104,7 +104,7 @@ function updateMessageIcon($icon)
 /**
  * Adds a new message icon.
  *
- * @param array $icon
+ * @param mixed[] $icon associative array to use in the insert
  */
 function addMessageIcon($icon)
 {
@@ -121,7 +121,7 @@ function addMessageIcon($icon)
 /**
  * Sort the message icons table.
  *
- * @deprecated the ordering is done in the query, probably not needed
+ * @deprecated since 1.0 - the ordering is done in the query, probably not needed
  */
 function sortMessageIconTable()
 {

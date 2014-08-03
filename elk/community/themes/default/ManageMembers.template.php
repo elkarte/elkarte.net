@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -159,7 +159,7 @@ function template_search_members()
 			</div>
 			<h3 class="category_header">', $txt['member_part_of_these_membergroups'], '</h3>
 			<div class="flow_hidden">
-				<table style="width:49%" class="table_grid floatleft">
+				<table style="width: 49%;" class="table_grid floatleft">
 					<thead>
 						<tr class="table_head">
 							<th scope="col">', $txt['membergroups'], '</th>
@@ -196,7 +196,7 @@ function template_search_members()
 					</tbody>
 				</table>
 
-				<table style="width:49%" class="table_grid floatright">
+				<table style="width: 49%;" class="table_grid floatright">
 					<thead>
 						<tr class="table_head">
 							<th scope="col">
@@ -213,7 +213,7 @@ function template_search_members()
 							<td>
 								', $postgroup['name'], '
 							</td>
-							<td style="width:40px" class="centertext">
+							<td style="width: 40px;" class="centertext">
 								<input type="checkbox" name="postgroups[]" value="', $postgroup['id'], '" checked="checked" class="input_check" />
 							</td>
 						</tr>';
@@ -282,16 +282,16 @@ function template_admin_browse()
 				<div class="content">
 					<dl class="settings">
 						<dt>
-							', $txt['admin_browse_outstanding_days_1'], ':
+							<label for="time_passed">', $txt['admin_browse_outstanding_days_1'], '</label>:
 						</dt>
 						<dd>
-							<input type="text" name="time_passed" value="14" maxlength="4" size="3" class="input_text" /> ', $txt['admin_browse_outstanding_days_2'], '.
+							<input type="text" id="time_passed" name="time_passed" value="14" maxlength="4" size="3" class="input_text" /> ', $txt['admin_browse_outstanding_days_2'], '.
 						</dd>
 						<dt>
-							', $txt['admin_browse_outstanding_perform'], ':
+							<label for="todo">', $txt['admin_browse_outstanding_perform'], '</label>:
 						</dt>
 						<dd>
-							<select name="todo">
+							<select id="todo" name="todo">
 								', $context['browse_type'] == 'activate' ? '
 								<option value="ok">' . $txt['admin_browse_w_activate'] . '</option>' : '', '
 								<option value="okemail">', $context['browse_type'] == 'approve' ? $txt['admin_browse_w_approve'] : $txt['admin_browse_w_activate'], ' ', $txt['admin_browse_w_email'], '</option>', $context['browse_type'] == 'activate' ? '' : '

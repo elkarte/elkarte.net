@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -18,7 +18,7 @@ if (!defined('ELK'))
  * Converts a string of HTML to BBC
  *
  * Initiate
- *    $bbc_converter = new Convert_BBC($html);
+ *    $bbc_converter = new Html_2_BBC($html);
  *    where $html is a string of html we want to convert to bbc
  *
  * Override
@@ -29,45 +29,53 @@ if (!defined('ELK'))
  *    $bbc = $bbc_converter->get_bbc();
  *
  */
-class Convert_BBC
+class Html_2_BBC
 {
 	/**
 	 * The value that will hold our dom object
+	 * @var object
 	 */
 	public $doc;
 
 	/**
 	 * The value that will hold if we are using the internal or external parser
+	 * @var boolean
 	 */
 	private $_parser;
 
 	/**
 	 * Line end character
+	 * @var string
 	 */
 	public $line_end = "\n";
 
 	/**
 	 * Line break character
+	 * @var string
 	 */
-	public $line_break = "[br]";
+	public $line_break = '[br]';
 
 	/**
 	 * Font numbers to pt size
+	 * @var string[]
 	 */
 	public $sizes_equivalence = array(1 => '8pt', '10pt', '12pt', '14pt', '18pt', '24pt', '36pt');
 
 	/**
 	 * Holds block elements, its intentionally not complete and is used to prevent adding extra br's
+	 * @var string[]
 	 */
 	public $block_elements = array('p', 'div', 'ol', 'ul', 'pre', 'table', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6');
 
 	/**
 	 * Used to strip newlines inside of 'p' and 'div' elements
+	 * @var boolean|null
 	 */
 	public $strip_newlines = null;
 
 	/**
 	 * Holds any html tags that would normally be convert to bbc but are instead skipped
+	 * @var string[]
 	 */
 	protected $_skip_tags = array();
 
@@ -108,7 +116,7 @@ class Convert_BBC
 	/**
 	 * If we want to skip over some tags (that would normally be converted)
 	 *
-	 * @param array $tags
+	 * @param string[] $tags
 	 */
 	public function skip_tags($tags = array())
 	{
@@ -127,7 +135,7 @@ class Convert_BBC
 	public function get_bbc()
 	{
 		// For this html node, find all child elements and convert
-		$body = ($this->_parser) ? $this->doc->getElementsByTagName("body")->item(0) : $this->doc->root;
+		$body = ($this->_parser) ? $this->doc->getElementsByTagName('body')->item(0) : $this->doc->root;
 
 		// Convert all the nodes that we know how to
 		$this->_convert_childNodes($body);
@@ -205,7 +213,7 @@ class Convert_BBC
 	 */
 	private function _convert_childNodes($node)
 	{
-		if (self::_has_parent_code($node, $this->_parser))
+		if (empty($node) || self::_has_parent_code($node, $this->_parser))
 			return;
 
 		// Keep traversing till we are at the base of this node
@@ -400,7 +408,7 @@ class Convert_BBC
 	 * Converts <abbr> tags to bbc
 	 *
 	 * html: <abbr title="Hyper Text Markup Language">HTML</abbr>
-	 * bbc:	[abbr=Hyper Text Markup Language]HTML[/abbr]
+	 * bbc:  [abbr=Hyper Text Markup Language]HTML[/abbr]
 	 *
 	 * @param object $node
 	 */
@@ -431,7 +439,6 @@ class Convert_BBC
 
 		$href = htmlentities($node->getAttribute('href'));
 		$id = htmlentities($node->getAttribute('id'));
-		$title = $node->getAttribute('title');
 		$value = $this->_get_value($node);
 
 		// An anchor link
@@ -440,7 +447,7 @@ class Convert_BBC
 		elseif (!empty($href) && $href[0] === '#')
 			$bbc = '[url=' . $href . ']' . $value . '[/url]';
 		// Maybe an email link
-		elseif (substr($href, 0, 7) === "mailto:")
+		elseif (substr($href, 0, 7) === 'mailto:')
 		{
 			if ($href != 'mailto:' . (isset($modSettings['maillist_sitename_address']) ? $modSettings['maillist_sitename_address'] : ''))
 				$href = substr($href, 7);
@@ -611,7 +618,6 @@ class Convert_BBC
 		$style = $node->getAttribute('style');
 
 		$size = '';
-		$styles = array();
 
 		// Do the basic things first, title/alt
 		if (!empty($title) && empty($alt))
@@ -709,6 +715,7 @@ class Convert_BBC
 						break;
 					case 'color':
 							$bbc = '[color=' . $value . ']' . $bbc . '[/color]';
+					// These tags all mean the same thing as far as BBC is concerned
 					case 'float':
 					case 'text-align':
 					case 'align':
@@ -825,6 +832,7 @@ class Convert_BBC
 	 * Gets the inner html of a node
 	 *
 	 * @param object $node
+	 * @return string
 	 */
 	private function _get_innerHTML($node)
 	{
@@ -854,7 +862,8 @@ class Convert_BBC
 		if (preg_match_all('~.*?:.*?(;|$)~', $style, $matches, PREG_SET_ORDER))
 		{
 			foreach ($matches as $match)
-			{	if (strpos($match[0], ':'))
+			{
+				if (strpos($match[0], ':'))
 				{
 					list ($key, $value) = explode(':', trim($match[0], ';'));
 					$key = trim($key);

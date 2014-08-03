@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -24,6 +24,8 @@ if (!defined('ELK'))
 /**
  * ManageSecurity controller handles the Security and Moderation
  * pages in admin panel.
+ *
+ * @package Security
  */
 class ManageSecurity_Controller extends Action_Controller
 {
@@ -70,14 +72,8 @@ class ManageSecurity_Controller extends Action_Controller
 			'moderation' => array($this, 'action_moderationSettings_display', 'enabled' => in_array('w', $context['admin_features']), 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_modify_security', array(&$subActions));
-
-		// By default do the basic settings.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'general';
-
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['admin_security_moderation'];
-		$context['sub_template'] = 'show_settings';
+		// Action control
+		$action = new Action('modify_security');
 
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -98,15 +94,22 @@ class ManageSecurity_Controller extends Action_Controller
 			),
 		);
 
+		// By default do the basic settings, call integrate_sa_modify_security
+		$subAction = $action->initialize($subActions, 'general');
+
+		// Last pieces of the puzzle
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['admin_security_moderation'];
+		$context['sub_template'] = 'show_settings';
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'general');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Handle settings regarding general security of the site.
-	 * Uses a settings form for security options.
+	 *
+	 * - Uses a settings form for security options.
 	 */
 	public function action_securitySettings_display()
 	{
@@ -143,7 +146,7 @@ class ManageSecurity_Controller extends Action_Controller
 	private function _initSecuritySettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_securitySettings = new Settings_Form();
@@ -156,7 +159,8 @@ class ManageSecurity_Controller extends Action_Controller
 
 	/**
 	 * Allows to display and eventually change the moderation settings of the forum.
-	 * Uses the moderation settings form.
+	 *
+	 * - Uses the moderation settings form.
 	 */
 	public function action_moderationSettings_display()
 	{
@@ -173,12 +177,14 @@ class ManageSecurity_Controller extends Action_Controller
 			unset($config_vars['moderate']);
 
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Saving?
 		if (isset($_GET['save']))
 		{
 			checkSession();
+
+			call_integration_hook('integratesave_moderation_settings', array(&$config_vars));
 
 			// Make sure these don't have an effect.
 			if ($modSettings['warning_settings'][0] != 1)
@@ -196,13 +202,12 @@ class ManageSecurity_Controller extends Action_Controller
 
 			// Fix the warning setting array!
 			$_POST['warning_settings'] = '1,' . min(100, (int) $_POST['user_limit']) . ',' . min(100, (int) $_POST['warning_decrement']);
-			$save_vars = $config_vars;
-			$save_vars[] = array('text', 'warning_settings');
-			unset($save_vars['rem1'], $save_vars['rem2']);
+			$config_vars[] = array('text', 'warning_settings');
+			unset($config_vars['rem1'], $config_vars['rem2']);
 
-			call_integration_hook('integrate_save_moderation_settings', array(&$save_vars));
+			call_integration_hook('integrate_save_moderation_settings');
 
-			Settings_Form::save_db($save_vars);
+			Settings_Form::save_db($config_vars);
 			redirectexit('action=admin;area=securitysettings;sa=moderation');
 		}
 
@@ -211,6 +216,7 @@ class ManageSecurity_Controller extends Action_Controller
 
 		$context['post_url'] = $scripturl . '?action=admin;area=securitysettings;save;sa=moderation';
 		$context['settings_title'] = $txt['moderation_settings'];
+		$context['settings_message'] = $txt['warning_enable'];
 
 		Settings_Form::prepare_db($config_vars);
 	}
@@ -218,12 +224,12 @@ class ManageSecurity_Controller extends Action_Controller
 	/**
 	 * Initialize moderation settings form with the current configuration options.
 	 *
-	 * @return array
+	 * @return mixed[] config var settings array
 	 */
 	private function _initModerationSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_moderationSettings = new Settings_Form();
@@ -236,7 +242,8 @@ class ManageSecurity_Controller extends Action_Controller
 
 	/**
 	 * Handles admin security spam settings.
-	 * Displays a page with settings and eventually allows the admin to change them.
+	 *
+	 * - Displays a page with settings and eventually allows the admin to change them.
 	 */
 	public function action_spamSettings_display()
 	{
@@ -260,15 +267,14 @@ class ManageSecurity_Controller extends Action_Controller
 			if (empty($_POST['posts_require_captcha']) && !empty($_POST['guests_require_captcha']))
 				$_POST['posts_require_captcha'] = -1;
 
-			$save_vars = $config_vars;
-			unset($save_vars['pm1'], $save_vars['pm2'], $save_vars['pm3'], $save_vars['guest_verify']);
+			unset($config_vars['pm1'], $config_vars['pm2'], $config_vars['pm3'], $config_vars['guest_verify']);
 
-			$save_vars[] = array('text', 'pm_spam_settings');
+			$config_vars[] = array('text', 'pm_spam_settings');
 
-			call_integration_hook('integrate_save_spam_settings', array(&$save_vars));
+			call_integration_hook('integrate_save_spam_settings');
 
 			// Now save.
-			Settings_Form::save_db($save_vars);
+			Settings_Form::save_db($config_vars);
 			cache_put_data('verificationQuestionIds', null, 300);
 			redirectexit('action=admin;area=securitysettings;sa=spam');
 		}
@@ -295,7 +301,7 @@ class ManageSecurity_Controller extends Action_Controller
 	private function _initSpamSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 		require_once(SUBSDIR . '/VerificationControls.class.php');
 
 		// Instantiate the form
@@ -396,12 +402,13 @@ class ManageSecurity_Controller extends Action_Controller
 
 	/**
 	 * Retrieves and returns the configuration settings for Bad Behavior.
-	 * Initializes bbSettings form.
+	 *
+	 * - Initializes bbSettings form.
 	 */
 	private function _initBBSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_bbSettings = new Settings_Form();
@@ -421,15 +428,15 @@ class ManageSecurity_Controller extends Action_Controller
 
 		$config_vars = array(
 			// Warning system?
-			array('int', 'warning_watch', 'subtext' => $txt['setting_warning_watch_note'], 'help' => 'warning_enable'),
-			'moderate' => array('int', 'warning_moderate', 'subtext' => $txt['setting_warning_moderate_note']),
-			array('int', 'warning_mute', 'subtext' => $txt['setting_warning_mute_note']),
-			'rem1' => array('int', 'user_limit', 'subtext' => $txt['setting_user_limit_note']),
+			array('int', 'warning_watch', 'subtext' => $txt['setting_warning_watch_note'], 'help' => 'watch_enable'),
+			'moderate' => array('int', 'warning_moderate', 'subtext' => $txt['setting_warning_moderate_note'], 'help' => 'moderate_enable'),
+			array('int', 'warning_mute', 'subtext' => $txt['setting_warning_mute_note'], 'help' => 'mute_enable'),
+			'rem1' => array('int', 'user_limit', 'subtext' => $txt['setting_user_limit_note'], 'help' => 'perday_limit'),
 			'rem2' => array('int', 'warning_decrement', 'subtext' => $txt['setting_warning_decrement_note']),
 			array('select', 'warning_show', 'subtext' => $txt['setting_warning_show_note'], array($txt['setting_warning_show_mods'], $txt['setting_warning_show_user'], $txt['setting_warning_show_all'])),
 		);
 
-		call_integration_hook('integrate_moderation_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_moderation_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -451,8 +458,6 @@ class ManageSecurity_Controller extends Action_Controller
 
 		// Set up the config array for use
 		$config_vars = array(
-				array('check', 'make_email_viewable'),
-			'',
 				array('int', 'failed_login_threshold'),
 				array('int', 'loginHistoryDays'),
 			'',
@@ -516,7 +521,7 @@ class ManageSecurity_Controller extends Action_Controller
 
 		foreach ($known_verifications as $verification)
 		{
-			$class_name = 'Control_Verification_' . ucfirst($verification);
+			$class_name = 'Verification_Controls_' . ucfirst($verification);
 			$current_instance = new $class_name();
 
 			$new_settings = $current_instance->settings();
@@ -558,7 +563,6 @@ class ManageSecurity_Controller extends Action_Controller
 				array('check', 'badbehavior_strict', 'postinput' => $txt['badbehavior_default_off']),
 				array('check', 'badbehavior_offsite_forms', 'postinput' => $txt['badbehavior_default_off']),
 				array('check', 'badbehavior_eucookie', 'postinput' => $txt['badbehavior_default_off']),
-				array('check', 'badbehavior_display_stats', 'postinput' => $txt['badbehavior_default_off']),
 			'',
 				array('check', 'badbehavior_reverse_proxy', 'postinput' => $txt['badbehavior_default_off']),
 				array('text', 'badbehavior_reverse_proxy_header', 30, 'postinput' => $txt['badbehavior_reverse_proxy_header_desc']),

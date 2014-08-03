@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -24,7 +24,8 @@ if (!defined('ELK'))
 /**
  * Mark a board or multiple boards read.
  *
- * @param array $boards
+ * @package Boards
+ * @param int[]|int $boards
  * @param bool $unread = false
  * @param bool $resetTopics = false
  */
@@ -179,6 +180,7 @@ function markBoardsRead($boards, $unread = false, $resetTopics = false)
 /**
  * Get the id_member associated with the specified message ID.
  *
+ * @package Boards
  * @param int $messageID message ID
  * @return int the member id
  */
@@ -192,10 +194,12 @@ function getMsgMemberID($messageID)
 
 /**
  * Modify the settings and position of a board.
- * Used by ManageBoards.controller.php to change the settings of a board.
  *
+ * - Used by ManageBoards.controller.php to change the settings of a board.
+ *
+ * @package Boards
  * @param int $board_id
- * @param array $boardOptions
+ * @param mixed[] $boardOptions
  */
 function modifyBoard($board_id, &$boardOptions)
 {
@@ -209,9 +213,6 @@ function modifyBoard($board_id, &$boardOptions)
 	// Make sure given boards and categories exist.
 	if (!isset($boards[$board_id]) || (isset($boardOptions['target_board']) && !isset($boards[$boardOptions['target_board']])) || (isset($boardOptions['target_category']) && !isset($cat_tree[$boardOptions['target_category']])))
 		fatal_lang_error('no_board');
-
-	$id = $board_id;
-	call_integration_hook('integrate_pre_modify_board', array($id, &$boardOptions));
 
 	// All things that will be updated in the database will be in $boardUpdates.
 	$boardUpdates = array();
@@ -390,12 +391,11 @@ function modifyBoard($board_id, &$boardOptions)
 		$boardUpdateParameters['num_posts'] = (int) $boardOptions['num_posts'];
 	}
 
-	$id = $board_id;
-	call_integration_hook('integrate_modify_board', array($id, &$boardUpdates, &$boardUpdateParameters));
+	call_integration_hook('integrate_modify_board', array($board_id, $boardOptions, &$boardUpdates, &$boardUpdateParameters));
 
 	// Do the updates (if any).
 	if (!empty($boardUpdates))
-		$request = $db->query('', '
+		$db->query('', '
 			UPDATE {db_prefix}boards
 			SET
 				' . implode(',
@@ -483,11 +483,13 @@ function modifyBoard($board_id, &$boardOptions)
 
 /**
  * Create a new board and set its properties and position.
- * Allows (almost) the same options as the modifyBoard() function.
- * With the option inherit_permissions set, the parent board permissions
+ *
+ * - Allows (almost) the same options as the modifyBoard() function.
+ * - With the option inherit_permissions set, the parent board permissions
  * will be inherited.
  *
- * @param array $boardOptions
+ * @package Boards
+ * @param mixed[] $boardOptions
  * @return int The new board id
  */
 function createBoard($boardOptions)
@@ -523,8 +525,6 @@ function createBoard($boardOptions)
 		$boardOptions['target_category'], $boardOptions['board_name'] , '', 0,
 		'-1,0', '',
 	);
-
-	call_integration_hook('integrate_create_board', array(&$boardOptions, &$board_columns, &$board_parameters));
 
 	// Insert a board, the settings are dealt with later.
 	$db->insert('',
@@ -574,15 +574,17 @@ function createBoard($boardOptions)
 
 /**
  * Remove one or more boards.
- * Allows to move the children of the board before deleting it
- * if moveChildrenTo is set to null, the child boards will be deleted.
- * Deletes:
+ *
+ * - Allows to move the children of the board before deleting it
+ * - if moveChildrenTo is set to null, the sub-boards will be deleted.
+ * - Deletes:
  *   - all topics that are on the given boards;
  *   - all information that's associated with the given boards;
- * updates the statistics to reflect the new situation.
+ * - updates the statistics to reflect the new situation.
  *
- * @param array $boards_to_remove
- * @param array $moveChildrenTo = null
+ * @package Boards
+ * @param int[] $boards_to_remove
+ * @param int|null $moveChildrenTo = null
  */
 function deleteBoards($boards_to_remove, $moveChildrenTo = null)
 {
@@ -601,7 +603,7 @@ function deleteBoards($boards_to_remove, $moveChildrenTo = null)
 	// If $moveChildrenTo is set to null, include the children in the removal.
 	if ($moveChildrenTo === null)
 	{
-		// Get a list of the child boards that will also be removed.
+		// Get a list of the sub-boards that will also be removed.
 		$child_boards_to_remove = array();
 		foreach ($boards_to_remove as $board_to_remove)
 			recursiveBoards($child_boards_to_remove, $boards[$board_to_remove]['tree']);
@@ -721,9 +723,10 @@ function deleteBoards($boards_to_remove, $moveChildrenTo = null)
 
 /**
  * Put all boards in the right order and sorts the records of the boards table.
- * Used by modifyBoard(), deleteBoards(), modifyCategory(), and deleteCategories() functions
  *
- * @deprecated the ordering is done in the query, probably not needed
+ * - Used by modifyBoard(), deleteBoards(), modifyCategory(), and deleteCategories() functions
+ *
+ * @deprecated since 1.0 - the ordering is done in the query, probably not needed
  */
 function reorderBoards()
 {
@@ -762,8 +765,10 @@ function reorderBoards()
 
 /**
  * Fixes the children of a board by setting their child_levels to new values.
- * Used when a board is deleted or moved, to affect its children.
  *
+ * - Used when a board is deleted or moved, to affect its children.
+ *
+ * @package Boards
  * @param int $parent
  * @param int $newLevel
  * @param int $newParent
@@ -805,10 +810,13 @@ function fixChildren($parent, $newLevel, $newParent)
 
 /**
  * Load a lot of useful information regarding the boards and categories.
- * The information retrieved is stored in globals:
- *  $boards		properties of each board.
- *  $boardList	a list of boards grouped by category ID.
- *  $cat_tree	properties of each category.
+ *
+ * - The information retrieved is stored in globals:
+ *   $boards:    properties of each board.
+ *   $boardList: a list of boards grouped by category ID.
+ *   $cat_tree:  properties of each category.
+ *
+ * @package Boards
  */
 function getBoardTree()
 {
@@ -926,9 +934,11 @@ function getBoardTree()
 
 /**
  * Generates the query to determine the list of available boards for a user
- * Executes the query and returns the list
  *
- * @param array $boardListOptions
+ * - Executes the query and returns the list
+ *
+ * @package Boards
+ * @param mixed[] $boardListOptions
  * @param boolean $simple if true a simple array is returned containing some basic
  *                informations regarding the board (id_board, board_name, child_level, id_cat, cat_name)
  *                if false the boards are returned in an array subdivided by categories including also
@@ -1015,7 +1025,7 @@ function getBoardList($boardListOptions = array(), $simple = false)
 			LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)' . (empty($join) ? '' : implode(' ', $join)) . (empty($where) ? '' : '
 		WHERE ' . implode('
 			AND ', $where)) . '
-		ORDER BY board_order',
+		ORDER BY c.cat_order, b.board_order',
 		$where_parameters
 	);
 
@@ -1117,10 +1127,12 @@ function getBoardList($boardListOptions = array(), $simple = false)
 
 /**
  * Recursively get a list of boards.
- * Used by getBoardTree
  *
- * @param array $_boardList
- * @param array $_tree
+ * - Used by getBoardTree
+ *
+ * @package Boards
+ * @param int[] $_boardList
+ * @param int[] $_tree
  */
 function recursiveBoards(&$_boardList, &$_tree)
 {
@@ -1135,9 +1147,11 @@ function recursiveBoards(&$_boardList, &$_tree)
 }
 
 /**
- * Returns whether the child board id is actually a child of the parent (recursive).
+ * Returns whether the sub-board id is actually a child of the parent (recursive).
+ *
+ * @package Boards
  * @param int $child
- * @param int $parent
+ * @param mixed[]|int $parent
  * @return boolean
  */
 function isChildOf($child, $parent)
@@ -1185,6 +1199,7 @@ function hasBoardNotification($id_member, $id_board)
 /**
  * Set board notification on or off for the given member.
  *
+ * @package Boards
  * @param int $id_member
  * @param int $id_board
  * @param bool $on = false
@@ -1221,18 +1236,18 @@ function setBoardNotification($id_member, $id_board, $on = false)
 /**
  * Reset sent status for board notifications.
  *
+ * This function returns a boolean equivalent with hasBoardNotification().
+ * This is unexpected, but it's done this way to avoid any extra-query is executed on MessageIndex::action_messageindex().
+ * Just ignore the return value for normal use.
+ *
+ * @package Boards
  * @param int $id_member
  * @param int $id_board
  * @param bool $check = true check if the user has notifications enabled for the board
- *
  * @return bool if the board was marked for notifications
  */
 function resetSentBoardNotification($id_member, $id_board, $check = true)
 {
-	// This function returns a boolean equivalent with hasBoardNotification().
-	// This is unexpected, but it's done this way to avoid any extra-query is executed on MessageIndex::action_messageindex().
-	// Just ignore the return value for normal use.
-
 	$db = database();
 
 	// Check if notifications are enabled for this user on the board?
@@ -1250,13 +1265,14 @@ function resetSentBoardNotification($id_member, $id_board, $check = true)
 				'current_member' => $id_member,
 			)
 		);
+		// nothing to do
 		if ($db->num_rows($request) == 0)
-			// nothing to do
 			return false;
 		$sent = $db->fetch_row($request);
 		$db->free_result($request);
+
+		// not sent already? No need to stay around then
 		if (empty($sent))
-			// not sent already? No need to stay around then
 			return true;
 	}
 
@@ -1278,6 +1294,7 @@ function resetSentBoardNotification($id_member, $id_board, $check = true)
 /**
  * Counts the board notification for a given member.
  *
+ * @package Boards
  * @param int $memID
  * @return int
  */
@@ -1308,15 +1325,16 @@ function getBoardNotificationsCount($memID)
 
 /**
  * Returns all the boards accessible to the current user.
- * If $id_parents is given, return only the child boards of those boards.
- * If $id_boards is given, filters the boards to only those accessible.
  *
- * The function doesn't guarantee the boards are properly sorted
+ * - If $id_parents is given, return only the sub-boards of those boards.
+ * - If $id_boards is given, filters the boards to only those accessible.
+ * - The function doesn't guarantee the boards are properly sorted
  *
- * @param array $id_parents array of ints representing board ids
- * @param array $id_boards
+ * @package Boards
+ * @param int[]|null $id_parents array of ints representing board ids
+ * @param int[]|null $id_boards
  */
-function accessibleBoards($id_parents = null, $id_boards = null)
+function accessibleBoards($id_boards = null, $id_parents = null)
 {
 	$db = database();
 
@@ -1369,6 +1387,7 @@ function accessibleBoards($id_parents = null, $id_boards = null)
 /**
  * Returns the boards the current user wants to see.
  *
+ * @package Boards
  * @param string $see_board either 'query_see_board' or 'query_wanna_see_board'
  * @param bool $hide_recycle is tru the recycle bin is not returned
  */
@@ -1403,11 +1422,13 @@ function wantedBoards($see_board, $hide_recycle = true)
 
 /**
  * Returns the post count and name of a board
- *  - if supplied a topic id will also return the message subject
- *  - honors query_see_board to ensure a user can see the information
  *
+ * - if supplied a topic id will also return the message subject
+ * - honors query_see_board to ensure a user can see the information
+ *
+ * @package Boards
  * @param int $board_id
- * @param int $topic_id
+ * @param int|null $topic_id
  */
 function boardInfo($board_id, $topic_id = null)
 {
@@ -1456,6 +1477,7 @@ function boardInfo($board_id, $topic_id = null)
 /**
  * Loads properties from non-standard groups
  *
+ * @package Boards
  * @param int $curBoard
  * @return array
  */
@@ -1496,6 +1518,8 @@ function getOtherGroups($curBoard)
 
 /**
  * Get a list of moderators from a specific board
+ *
+ * @package Boards
  * @param int $idboard
  * @param bool $only_id return only the id of the moderators instead of id and name (default false)
  * @return array
@@ -1541,6 +1565,8 @@ function getBoardModerators($idboard, $only_id = false)
 
 /**
  * Get a list of all the board moderators (every board)
+ *
+ * @package Boards
  * @param bool $only_id return only the id of the moderators instead of id and name (default false)
  * @return array
  */
@@ -1575,6 +1601,8 @@ function allBoardModerators($only_id = false)
 
 /**
  * Get a list of all the board moderated by a certain user
+ *
+ * @package Boards
  * @param int $id_member the id of a member
  * @return array
  */
@@ -1602,6 +1630,8 @@ function boardsModerated($id_member)
 
 /**
  * Get all available themes
+ *
+ * @package Boards
  * @return array
  */
 function getAllThemes()
@@ -1629,6 +1659,8 @@ function getAllThemes()
 
 /**
  * Gets redirect infos and post count from a selected board.
+ *
+ * @package Boards
  * @param int $idboard
  * @return array
  */
@@ -1654,25 +1686,39 @@ function getBoardProperties($idboard)
 
 /**
  * Fetch the number of posts in an array of boards based on board IDs or category IDs
- * @param array $boards an array of board IDs
- * @param array $categories an array of category IDs
+ *
+ * @package Boards
+ * @param int[]|null $boards an array of board IDs
+ * @param int[]|null $categories an array of category IDs
  * @param bool $wanna_see_board if true uses {query_wanna_see_board}, otherwise {query_see_board}
+ * @param bool $include_recycle if false exclues any results from the recycle board (if enabled)
  */
-function boardsPosts($boards, $categories, $wanna_see_board = false)
+function boardsPosts($boards, $categories, $wanna_see_board = false, $include_recycle = true)
 {
+	global $modSettings;
+
 	$db = database();
 
 	$clauses = array();
+	$removals = array();
 	$clauseParameters = array();
+
 	if (!empty($categories))
 	{
 		$clauses[] = 'id_cat IN ({array_int:category_list})';
 		$clauseParameters['category_list'] = $categories;
 	}
+
 	if (!empty($boards))
 	{
 		$clauses[] = 'id_board IN ({array_int:board_list})';
 		$clauseParameters['board_list'] = $boards;
+	}
+
+	if (empty($include_recycle) && (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0))
+	{
+		$removals[] = 'id_board != {int:recycle_board}';
+		$clauseParameters['recycle_board'] = (int) $modSettings['recycle_board'];
 	}
 
 	if (empty($clauses))
@@ -1682,9 +1728,9 @@ function boardsPosts($boards, $categories, $wanna_see_board = false)
 		SELECT b.id_board, b.num_posts
 		FROM {db_prefix}boards AS b
 		WHERE ' . ($wanna_see_board ? '{query_wanna_see_board}' : '{query_see_board}') . '
-			AND b.' . implode(' OR b.', $clauses),
-		array_merge($clauseParameters, array(
-		))
+			AND b.' . implode(' OR b.', $clauses) . (!empty($removals) ? '
+			AND b.' . implode(' AND b.', $removals) : ''),
+		$clauseParameters
 	);
 	$return = array();
 	while ($row = $db->fetch_assoc($request))
@@ -1695,18 +1741,44 @@ function boardsPosts($boards, $categories, $wanna_see_board = false)
 }
 
 /**
+ * Returns the total sum of posts in the boards defined by query_wanna_see_board
+ * Excludes the count of any boards defined as a recycle board from the sum
+ */
+function sumRecentPosts()
+{
+	$db = database();
+
+	global $modSettings;
+
+	$request = $db->query('', '
+		SELECT IFNULL(SUM(num_posts), 0)
+		FROM {db_prefix}boards as b
+		WHERE {query_wanna_see_board}' . (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0 ? '
+			AND b.id_board != {int:recycle_board}' : ''),
+		array(
+			'recycle_board' => $modSettings['recycle_board']
+		)
+	);
+	$result = $db->fetch_row($request);
+	$db->free_result($request);
+
+	return $result;
+}
+
+/**
  * Returns information of a set of boards based on board IDs or category IDs
  *
- * @param mixed $conditions is an associative array that holds the board or the cat IDs
+ * @package Boards
+ * @param mixed[]|string $conditions is an associative array that holds the board or the cat IDs
  *              'categories' => an array of category IDs (it accepts a single ID too)
  *              'boards' => an array of board IDs (it accepts a single ID too)
  *              if conditions is set to 'all' (not an array) all the boards are queried
- * @param array $params is an optional array that allows to control the results returned:
+ * @param mixed[] $params is an optional array that allows to control the results returned:
  *              'sort_by' => (string) defines the sorting of the results (allowed: id_board, name)
  *              'selects' => (string) determines what informations are retrieved and returned
  *                           Allowed values: 'name', 'posts', 'detailed', 'permissions', 'reports';
  *                           default: 'name';
- *                           see the function for detailes on the fields associated to each value
+ *                           see the function for details on the fields associated to each value
  *              'override_permissions' => (bool) if true doesn't use neither {query_wanna_see_board} nor {query_see_board} (default false)
  *              'wanna_see_board' => (bool) if true uses {query_wanna_see_board}, otherwise {query_see_board}
  *              'include_recycle' => (bool) recycle board is included (default true)
@@ -1752,26 +1824,27 @@ function fetchBoardsInfo($conditions = 'all', $params = array())
 
 	$select = $known_selects[empty($params['selects']) || !isset($known_selects[$params['selects']]) ? 'name' : $params['selects']];
 
-	// if $conditions wasn't set or is 'all', get all boards
+	// If $conditions wasn't set or is 'all', get all boards
 	if (!is_array($conditions) && $conditions == 'all')
 	{
 		// id_board, name, id_profile => used in admin/Reports.controller.php
 		$request = $db->query('', '
 			SELECT ' . $select . '
-			FROM {db_prefix}boards AS b',
+			FROM {db_prefix}boards AS b
+			' . $sort_by,
 			array()
 		);
 	}
 	else
 	{
-		// only some categories?
+		// Only some categories?
 		if (!empty($conditions['categories']))
 		{
 			$clauses[] = 'id_cat IN ({array_int:category_list})';
 			$clauseParameters['category_list'] = is_array($conditions['categories']) ? $conditions['categories'] : array($conditions['categories']);
 		}
 
-		// only a few boards, perhaps!
+		// Only a few boards, perhaps!
 		if (!empty($conditions['boards']))
 		{
 			$clauses[] = 'id_board IN ({array_int:board_list})';
@@ -1789,14 +1862,14 @@ function fetchBoardsInfo($conditions = 'all', $params = array())
 			WHERE ' . $security . (!empty($clauses) ? '
 				AND b.' . implode(' OR b.', $clauses) : '') . ($params['include_recycle'] ? '' : '
 				AND b.id_board != {int:recycle_board}') . ($params['include_redirects'] ? '' : '
-				AND b.redirect = {string:empty_string}'),
+				AND b.redirect = {string:empty_string}
+			' . $sort_by),
 			array_merge($clauseParameters, array(
 				'recycle_board' => !empty($modSettings['recycle_board']) ? $modSettings['recycle_board'] : 0,
 				'empty_string' => '',
 			))
 		);
 	}
-
 	$return = array();
 	while ($row = $db->fetch_assoc($request))
 		$return[$row['id_board']] = $row;
@@ -1807,14 +1880,18 @@ function fetchBoardsInfo($conditions = 'all', $params = array())
 }
 
 /**
- * Retrieve the all the child boards of an array of boards
- * and add the ids to the same array
- * @param mixed $boards an array of board IDs (it accepts a single board too
+ * Retrieve the all the sub-boards of an array of boards and add the ids to the same array
+ *
+ * @package Boards
+ * @param int[]|int $boards an array of board IDs (it accepts a single board too
  *              The param is passed by ref and the result it returned through the param itself
  */
 function addChildBoards(&$boards)
 {
 	$db = database();
+
+	if (empty($boards))
+		return;
 
 	if (!is_array($boards))
 		$boards = array($boards);
@@ -1841,8 +1918,9 @@ function addChildBoards(&$boards)
 /**
  * Increment a board stat field, for example num_posts.
  *
+ * @package Boards
  * @param int $id_board
- * @param mixed $values an array of index => value of a string representing the index to increment
+ * @param mixed[]|string $values an array of index => value of a string representing the index to increment
  */
 function incrementBoard($id_board, $values)
 {
@@ -1884,8 +1962,9 @@ function incrementBoard($id_board, $values)
 /**
  * Decrement a board stat field, for example num_posts.
  *
+ * @package Boards
  * @param int $id_board
- * @param mixed $values an array of index => value of a string representing the index to decrement
+ * @param mixed[] $values an array of index => value of a string representing the index to decrement
  */
 function decrementBoard($id_board, $values)
 {
@@ -1925,11 +2004,13 @@ function decrementBoard($id_board, $values)
 }
 
 /**
- * Retrieve all the boards the user can see,
- * and their notification status: if they're subscribed
- * to notifications for new topics in each of them or they're not.
- * (used by createList() callbacks)
+ * Retrieve all the boards the user can see and their notification status:
  *
+ * - if they're subscribed to notifications for new topics in each of them
+ * or they're not.
+ * - (used by createList() callbacks)
+ *
+ * @package Boards
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1961,7 +2042,7 @@ function boardNotifications($start, $items_per_page, $sort, $memID)
 	while ($row = $db->fetch_assoc($request))
 		$notification_boards[] = array(
 			'id' => $row['id_board'],
-			'name' =>  $row['name'],
+			'name' => $row['name'],
 			'href' => $scripturl . '?board=' . $row['id_board'] . '.0',
 			'link' => '<a href="' . $scripturl . '?board=' . $row['id_board'] . '.0"><strong>' . $row['name'] . '</strong></a>',
 			'new' => $row['board_read'] < $row['id_msg_updated'],
@@ -2002,11 +2083,12 @@ function boardNotifications($start, $items_per_page, $sort, $memID)
 /**
  * Count boards all or specific depending on argument, redirect boards excluded by default.
  *
- * @param mixed $conditions is an associative array that holds the board or the cat IDs
+ * @package Boards
+ * @param mixed[]|string $conditions is an associative array that holds the board or the cat IDs
  *              'categories' => an array of category IDs (it accepts a single ID too)
  *              'boards' => an array of board IDs (it accepts a single ID too)
  *              if conditions is set to 'all' (not an array) all the boards are queried
- * @param array $params is an optional array that allows to control the results returned if $conditions is not set to 'all':
+ * @param mixed[]|null $params is an optional array that allows to control the results returned if $conditions is not set to 'all':
  *              'wanna_see_board' => (bool) if true uses {query_wanna_see_board}, otherwise {query_see_board}
  *              'include_recycle' => (bool) recycle board is included (default true)
  *              'include_redirects' => (bool) redirects are included (default true)

@@ -2,7 +2,7 @@
 
 /**
  * The admin screen to change the search settings.  Aloows for the creation \
- * of seach indexes and search weights
+ * of search indexes and search weights
  *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 
 /**
  * ManageSearch controller admin class.
+ *
+ * @package Search
  */
 class ManageSearch_Controller extends Action_Controller
 {
@@ -34,15 +36,16 @@ class ManageSearch_Controller extends Action_Controller
 
 	/**
 	 * Main entry point for the admin search settings screen.
-	 * It checks permissions, and it forwards to the appropriate function based on
+	 *
+	 * What it does:
+	 * - It checks permissions, and it forwards to the appropriate function based on
 	 * the given sub-action.
-	 * Defaults to sub-action 'settings'.
-	 * Called by ?action=admin;area=managesearch.
-	 * Requires the admin_forum permission.
+	 * - Defaults to sub-action 'settings'.
+	 * - Called by ?action=admin;area=managesearch.
+	 * - Requires the admin_forum permission.
 	 *
 	 * @uses ManageSearch template.
 	 * @uses Search language file.
-	 *
 	 * @see Action_Controller::action_index()
 	 */
 	public function action_index()
@@ -61,15 +64,11 @@ class ManageSearch_Controller extends Action_Controller
 			'removefulltext' => array($this, 'action_edit', 'permission' => 'admin_forum'),
 			'createmsgindex' => array($this, 'action_create', 'permission' => 'admin_forum'),
 			'managesphinx' => array($this, 'action_managesphinx', 'permission' => 'admin_forum'),
+			'managesphinxql' => array($this, 'action_managesphinx', 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_search', array(&$subActions));
-
-		// Default the sub-action to 'edit search settings'.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'weights';
-
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['search_settings_title'];
+		// Control for actions
+		$action = new Action('manage_search');
 
 		// Create the tabs for the template.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -77,11 +76,11 @@ class ManageSearch_Controller extends Action_Controller
 			'help' => 'search',
 			'description' => $txt['search_settings_desc'],
 			'tabs' => array(
-				'weights' => array(
-					'description' => $txt['search_weights_desc'],
-				),
 				'method' => array(
 					'description' => $txt['search_method_desc'],
+				),
+				'weights' => array(
+					'description' => $txt['search_weights_desc'],
 				),
 				'settings' => array(
 					'description' => $txt['search_settings_desc'],
@@ -89,16 +88,22 @@ class ManageSearch_Controller extends Action_Controller
 			),
 		);
 
+		// Default the sub-action to 'edit search method'.  Call integrate_sa_manage_search
+		$subAction = $action->initialize($subActions, 'method');
+
+		// Final bits
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['search_settings_title'];
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions);
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Edit some general settings related to the search function.
-	 * Called by ?action=admin;area=managesearch;sa=settings.
-	 * Requires the admin_forum permission.
+	 *
+	 * - Called by ?action=admin;area=managesearch;sa=settings.
+	 * - Requires the admin_forum permission.
 	 *
 	 * @uses ManageSearch template, 'modify_settings' sub-template.
 	 */
@@ -113,8 +118,6 @@ class ManageSearch_Controller extends Action_Controller
 
 		if (!isset($context['settings_post_javascript']))
 			$context['settings_post_javascript'] = '';
-
-		call_integration_hook('integrate_modify_search_settings', array(&$config_vars));
 
 		// Perhaps the search method wants to add some settings?
 		require_once(SUBSDIR . '/Search.subs.php');
@@ -184,7 +187,7 @@ class ManageSearch_Controller extends Action_Controller
 	private function _initSearchSettingsForm()
 	{
 		// This is really quite wanting.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_searchSettings = new Settings_Form();
@@ -207,7 +210,6 @@ class ManageSearch_Controller extends Action_Controller
 				// Permission...
 				array('permissions', 'search_posts'),
 				// Some simple settings.
-				array('check', 'simpleSearch'),
 				array('check', 'search_dropdown'),
 				array('int', 'search_results_per_page'),
 				array('int', 'search_max_results', 'subtext' => $txt['search_max_results_disable']),
@@ -217,6 +219,9 @@ class ManageSearch_Controller extends Action_Controller
 				array('title', 'additional_search_engines'),
 				array('callback', 'external_search_engines'),
 		);
+
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_search_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -231,8 +236,9 @@ class ManageSearch_Controller extends Action_Controller
 
 	/**
 	 * Edit the relative weight of the search factors.
-	 * Called by ?action=admin;area=managesearch;sa=weights.
-	 * Requires the admin_forum permission.
+	 *
+	 * - Called by ?action=admin;area=managesearch;sa=weights.
+	 * - Requires the admin_forum permission.
 	 *
 	 * @uses ManageSearch template, 'modify_weights' sub-template.
 	 */
@@ -280,11 +286,13 @@ class ManageSearch_Controller extends Action_Controller
 
 	/**
 	 * Edit the search method and search index used.
-	 * Calculates the size of the current search indexes in use.
-	 * Allows to create and delete a fulltext index on the messages table.
-	 * Allows to delete a custom index (that action_create() created).
-	 * Called by ?action=admin;area=managesearch;sa=method.
-	 * Requires the admin_forum permission.
+	 *
+	 * What it does:
+	 * - Calculates the size of the current search indexes in use.
+	 * - Allows to create and delete a fulltext index on the messages table.
+	 * - Allows to delete a custom index (that action_create() created).
+	 * - Called by ?action=admin;area=managesearch;sa=method.
+	 * - Requires the admin_forum permission.
 	 *
 	 * @uses ManageSearch template, 'select_search_method' sub-template.
 	 */
@@ -400,17 +408,19 @@ class ManageSearch_Controller extends Action_Controller
 
 	/**
 	 * Create a custom search index for the messages table.
-	 * Called by ?action=admin;area=managesearch;sa=createmsgindex.
-	 * Linked from the action_edit screen.
-	 * Requires the admin_forum permission.
-	 * Depending on the size of the message table, the process is divided in steps.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=managesearch;sa=createmsgindex.
+	 * - Linked from the action_edit screen.
+	 * - Requires the admin_forum permission.
+	 * - Depending on the size of the message table, the process is divided in steps.
 	 *
 	 * @uses ManageSearch template, 'create_index', 'create_index_progress', and 'create_index_done'
-	 *  sub-templates.
+	 * sub-templates.
 	 */
 	public function action_create()
 	{
-		global $modSettings, $context, $txt;
+		global $modSettings, $context, $txt, $db_show_debug;
 
 		// Scotty, we need more time...
 		@set_time_limit(600);
@@ -439,6 +449,7 @@ class ManageSearch_Controller extends Action_Controller
 			),
 		);
 
+		// Resume building an index that was not completed
 		if (isset($_REQUEST['resume']) && !empty($modSettings['search_custom_index_resume']))
 		{
 			$context['index_settings'] = unserialize($modSettings['search_custom_index_resume']);
@@ -454,7 +465,7 @@ class ManageSearch_Controller extends Action_Controller
 			$context['start'] = isset($_REQUEST['start']) ? (int) $_REQUEST['start'] : 0;
 			$context['step'] = isset($_REQUEST['step']) ? (int) $_REQUEST['step'] : 0;
 
-			// admin timeouts are painful when building these long indexes
+			// Admin timeouts are painful when building these long indexes
 			if ($_SESSION['admin_time'] + 3300 < time() && $context['step'] >= 1)
 				$_SESSION['admin_time'] = time();
 		}
@@ -467,6 +478,10 @@ class ManageSearch_Controller extends Action_Controller
 			$context['sub_template'] = 'create_index';
 
 		require_once(SUBSDIR . '/ManageSearch.subs.php');
+
+		// Logging may cause session issues with many queries
+		$old_db_show_debug = $db_show_debug;
+		$db_show_debug = false;
 
 		// Step 1: insert all the words.
 		if ($context['step'] === 1)
@@ -482,7 +497,7 @@ class ManageSearch_Controller extends Action_Controller
 				$context['step'] = 3;
 			else
 			{
-				list ($context['start'], $complete) = removeCommonWordsFromIndex($context['start'], $index_properties[$context['index_settings']['bytes_per_word']]['step_size']);
+				list ($context['start'], $complete) = removeCommonWordsFromIndex($context['start'], $index_properties[$context['index_settings']['bytes_per_word']]);
 				if ($complete)
 					$context['step'] = 3;
 
@@ -491,6 +506,9 @@ class ManageSearch_Controller extends Action_Controller
 				$context['percentage'] = 80 + round($context['start'] / $index_properties[$context['index_settings']['bytes_per_word']]['max_size'], 3) * 20;
 			}
 		}
+
+		// Restore previous debug state
+		$db_show_debug = $old_db_show_debug;
 
 		// Step 3: everything done.
 		if ($context['step'] === 3)
@@ -504,7 +522,8 @@ class ManageSearch_Controller extends Action_Controller
 
 	/**
 	 * Edit settings related to the sphinx or sphinxQL search function.
-	 * Called by ?action=admin;area=managesearch;sa=sphinx.
+	 *
+	 * - Called by ?action=admin;area=managesearch;sa=sphinx.
 	 */
 	public function action_managesphinx()
 	{
@@ -573,7 +592,7 @@ class ManageSearch_Controller extends Action_Controller
 			{
 				if (!empty($modSettings['sphinx_searchd_server']) && !empty($modSettings['sphinxql_searchd_port']))
 				{
-					$result = mysql_connect(($modSettings['sphinx_searchd_server'] === 'localhost' ? '127.0.0.1' : $modSettings['sphinx_searchd_server']) . ':' . (int) $modSettings['sphinxql_searchd_port']);
+					$result = @mysql_connect(($modSettings['sphinx_searchd_server'] === 'localhost' ? '127.0.0.1' : $modSettings['sphinx_searchd_server']) . ':' . (int) $modSettings['sphinxql_searchd_port']);
 					if ($result === false)
 					{
 						$context['settings_message'][] = $txt['sphinxql_test_connect_failed'];
@@ -605,17 +624,17 @@ class ManageSearch_Controller extends Action_Controller
 		createToken('admin-mssphinx');
 	}
 
-
 	/**
 	 * Get the installed Search API implementations.
-	 * This function checks for patterns in comments on top of the Search-API files!
-	 * In addition to filenames pattern.
-	 * It loads the search API classes if identified.
-	 * This function is used by action_edit to list all installed API implementations.
+	 *
+	 * - This function checks for patterns in comments on top of the Search-API files!
+	 * - In addition to filenames pattern.
+	 * - It loads the search API classes if identified.
+	 * - This function is used by action_edit to list all installed API implementations.
 	 */
 	private function loadSearchAPIs()
 	{
-		global $txt;
+		global $txt, $scripturl;
 
 		$apis = array();
 		$dh = opendir(SUBSDIR);
@@ -646,8 +665,8 @@ class ManageSearch_Controller extends Action_Controller
 							'filename' => $file,
 							'setting_index' => $index_name,
 							'has_template' => in_array($index_name, array('custom', 'fulltext', 'standard')),
-							'label' => $index_name && isset($txt['search_index_' . $index_name]) ? $txt['search_index_' . $index_name] : '',
-							'desc' => $index_name && isset($txt['search_index_' . $index_name . '_desc']) ? $txt['search_index_' . $index_name . '_desc'] : '',
+							'label' => $index_name && isset($txt['search_index_' . $index_name]) ? str_replace('{managesearch_url}', $scripturl . '?action=admin;area=managesearch;sa=manage' . $index_name, $txt['search_index_' . $index_name]) : '',
+							'desc' => $index_name && isset($txt['search_index_' . $index_name . '_desc']) ? str_replace('{managesearch_url}', $scripturl . '?action=admin;area=managesearch;sa=manage' . $index_name, $txt['search_index_' . $index_name . '_desc']) : '',
 						);
 					}
 				}

@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,11 +22,13 @@ if (!defined('ELK'))
 
 /**
  * Dumps the database.
- * It writes all of the database to standard output.
- * It uses gzip compression if compress is set in the URL/post data.
- * It may possibly time out, and mess up badly if you were relying on it. :P
- * The data dumped depends on whether "struct" and "data" are passed.
- * It is called from ManageMaintenance.controller.php.
+ *
+ * What it does:
+ * - It writes all of the database to standard output.
+ * - It uses gzip compression if compress is set in the URL/post data.
+ * - It may possibly time out, and mess up badly if you were relying on it. :P
+ * - The data dumped depends on whether "struct" and "data" are passed.
+ * - It is called from ManageMaintenance.controller.php.
  */
 function DumpDatabase2()
 {
@@ -94,13 +96,6 @@ function DumpDatabase2()
 	// This should turn off the session URL parser.
 	$scripturl = '';
 
-	// If this database is flat file and has a handler function pass it to that.
-	if (method_exists($database, 'db_get_backup'))
-	{
-		$database->db_get_backup();
-		exit;
-	}
-
 	// Send the proper headers to let them download this file.
 	header('Content-Disposition: attachment; filename="' . $db_name . '-' . (empty($_REQUEST['struct']) ? 'data' : (empty($_REQUEST['data']) ? 'structure' : 'complete')) . '_' . strftime('%Y-%m-%d') . $extension . '"');
 	header('Cache-Control: private');
@@ -119,14 +114,11 @@ function DumpDatabase2()
 		'-- ==========================================================' . $crlf .
 		$crlf;
 
-	// Get all tables in the database....
-	if (preg_match('~^`(.+?)`\.(.+?)$~', $db_prefix, $match) != 0)
-		$dbp = str_replace('_', '\_', $match[2]);
-	else
-		$dbp = $db_prefix;
+	// Get all tables in the database....for our installation
+	$real_prefix = preg_match('~^(`?)(.+?)\\1\\.(.*?)$~', $db_prefix, $match) === 1 ? $match[3] : $db_prefix;
+	$tables = $database->db_list_tables(false, $real_prefix . '%');
 
 	// Dump each table.
-	$tables = $database->db_list_tables(false, $db_prefix . '%');
 	foreach ($tables as $tableName)
 	{
 		// Are we dumping the structures?

@@ -1,8 +1,6 @@
 <?php
 // Version: 1.0; Stats
 
-global $context;
-
 $txt['most_online'] = 'Most Online';
 
 $txt['stats_center'] = 'Statistics Center';
@@ -29,7 +27,7 @@ $txt['average_posts'] = 'Average posts per day';
 $txt['average_topics'] = 'Average topics per day';
 $txt['average_online'] = 'Average online per day';
 $txt['users_online'] = 'Users Online';
-$txt['gender_ratio'] = 'Male to Female Ratio';
+$txt['emails_sent'] = 'Average Emails per day';
 $txt['users_online_today'] = 'Online Today';
 $txt['num_hits'] = 'Total page views';
 $txt['average_hits'] = 'Average page views per day';
@@ -38,4 +36,4 @@ $txt['ssi_comment'] = 'comment';
 $txt['ssi_comments'] = 'comments';
 $txt['ssi_write_comment'] = 'Write Comment';
 $txt['ssi_no_guests'] = 'You cannot specify a board that doesn\'t allow guests.  Please check the board ID before trying again.';
-$txt['xml_rss_desc'] = 'Live information from ' . $context['forum_name'];
+$txt['xml_rss_desc'] = 'Live information from {forum_name}';

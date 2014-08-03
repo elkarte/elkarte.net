@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -73,7 +73,7 @@ class Action
 	/**
 	 * Constructor!
 	 *
-	 * @param string $name
+	 * @param string|null $name
 	 */
 	public function __construct($name = null)
 	{
@@ -85,13 +85,14 @@ class Action
 	 * Sub-actions have to be in the format expected for Action::_subActions array,
 	 * indexed by sa.
 	 *
-	 * @param array $subactions array of know subactions
+	 * @param mixed[] $subactions array of know subactions
 	 * @param string $default default action if unknown sa is requested
+	 * @return string
 	 */
 	public function initialize($subactions, $default = '')
 	{
 		if ($this->_name !== null)
-			call_integration_hook('integrate_' . $this->_name, array(&$subactions));
+			call_integration_hook('integrate_sa_' . $this->_name, array(&$subactions));
 
 		$this->_subActions = array();
 

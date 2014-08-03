@@ -15,7 +15,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -44,7 +44,6 @@ class ProfileOptions_Controller extends Action_Controller
 
 	/**
 	 * Show all the users buddies, as well as a add/delete interface.
-	 *
 	 */
 	public function action_editBuddyIgnoreLists()
 	{
@@ -127,6 +126,7 @@ class ProfileOptions_Controller extends Action_Controller
 			// Redirect off the page because we don't like all this ugly query stuff to stick in the history.
 			redirectexit('action=profile;area=lists;sa=buddies;u=' . $memID);
 		}
+		// Or adding a new one
 		elseif (isset($_POST['new_buddy']))
 		{
 			checkSession();
@@ -214,7 +214,7 @@ class ProfileOptions_Controller extends Action_Controller
 		$context['buddies'] = array();
 		foreach ($buddies as $buddy)
 		{
-			loadMemberContext($buddy);
+			loadMemberContext($buddy, true);
 			$context['buddies'][$buddy] = $memberContext[$buddy];
 		}
 
@@ -382,7 +382,7 @@ class ProfileOptions_Controller extends Action_Controller
 			loadCustomFields($memID, 'forumprofile');
 
 		$context['sub_template'] = 'edit_options';
-		$context['page_desc'] = $txt['forumProfile_info'];
+		$context['page_desc'] = replaceBasicActionUrl($txt['forumProfile_info']);
 		$context['show_preview_button'] = true;
 
 		setupProfileContext(
@@ -458,7 +458,6 @@ class ProfileOptions_Controller extends Action_Controller
 	 * Changing authentication method?
 	 * Only appropriate for people using OpenID.
 	 *
-	 * @param int $memID id_member
 	 * @param bool $saving = false
 	 */
 	public function action_authentication($saving = false)
@@ -499,13 +498,15 @@ class ProfileOptions_Controller extends Action_Controller
 					call_integration_hook('integrate_reset_pass', array($cur_profile['member_name'], $cur_profile['member_name'], $_POST['passwrd1']));
 
 					// Go then.
-					$passwd = sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd1']));
+					require_once(SUBSDIR . '/Auth.subs.php');
+					$new_pass = $_POST['passwrd1'];
+					$passwd = validateLoginPassword($new_pass, '', $cur_profile['member_name'], true);
 
 					// Do the important bits.
 					updateMemberData($memID, array('openid_uri' => '', 'passwd' => $passwd));
 					if ($context['user']['is_owner'])
 					{
-						setLoginCookie(60 * $modSettings['cookieTime'], $memID, sha1(sha1(strtolower($cur_profile['member_name']) . un_htmlspecialchars($_POST['passwrd2'])) . $cur_profile['password_salt']));
+						setLoginCookie(60 * $modSettings['cookieTime'], $memID, hash('sha256', $new_pass . $cur_profile['password_salt']));
 						redirectexit('action=profile;area=authentication;updated');
 					}
 					else
@@ -559,7 +560,7 @@ class ProfileOptions_Controller extends Action_Controller
 		$memID = currentMemberID();
 
 		// Going to need this for the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		require_once(SUBSDIR . '/Boards.subs.php');
 		require_once(SUBSDIR . '/Topic.subs.php');
 
@@ -585,7 +586,7 @@ class ProfileOptions_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$board', '
-							global $settings, $txt;
+							global $txt;
 
 							$link = $board[\'link\'];
 
@@ -672,7 +673,7 @@ class ProfileOptions_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$topic', '
-							global $settings, $txt;
+							global $txt;
 
 							$link = $topic[\'link\'];
 
@@ -776,11 +777,11 @@ class ProfileOptions_Controller extends Action_Controller
 	 * Retrieve topic notifications count.
 	 *
 	 * @param int $memID id_member
-	 * @return string
+	 * @return integer
 	 */
-	function list_getTopicNotificationCount($memID)
+	public function list_getTopicNotificationCount($memID)
 	{
-		// topic notifications count, for the list
+		// Topic notifications count, for the list
 		return topicNotificationCount($memID);
 	}
 
@@ -791,9 +792,9 @@ class ProfileOptions_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param int $memID id_member
-	 * @return array
+	 * @return mixed array of topic notifications
 	 */
-	function list_getTopicNotifications($start, $items_per_page, $sort, $memID)
+	public function list_getTopicNotifications($start, $items_per_page, $sort, $memID)
 	{
 		// topic notifications, for the list
 		return topicNotifications($start, $items_per_page, $sort, $memID);
@@ -806,9 +807,9 @@ class ProfileOptions_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param int $memID id_member
-	 * @return array
+	 * @return mixed[] array of board notifications
 	 */
-	function list_getBoardNotifications($start, $items_per_page, $sort, $memID)
+	public function list_getBoardNotifications($start, $items_per_page, $sort, $memID)
 	{
 		// return boards you see and their notification status for the list
 		return boardNotifications($start, $items_per_page, $sort, $memID);
@@ -836,8 +837,11 @@ class ProfileOptions_Controller extends Action_Controller
 		$context += getBoardList(array('not_redirection' => true, 'ignore' => !empty($cur_profile['ignore_boards']) ? explode(',', $cur_profile['ignore_boards']) : array()));
 
 		// Include a list of boards per category for easy toggling.
-		foreach ($context['categories'] as &$category)
+		foreach ($context['categories'] as $cat => &$category)
+		{
+			$context['boards_in_category'][$cat] = count($category['boards']);
 			$category['child_ids'] = array_keys($category['boards']);
+		}
 
 		loadThemeOptions($memID);
 	}
@@ -950,9 +954,9 @@ class ProfileOptions_Controller extends Action_Controller
 	/**
 	 * This function actually makes all the group changes
 	 *
-	 * @return mixed
+	 * @return string
 	 */
-	function action_groupMembership2()
+	public function action_groupMembership2()
 	{
 		global $context, $user_profile, $modSettings, $scripturl, $language;
 

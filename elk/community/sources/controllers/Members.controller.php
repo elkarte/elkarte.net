@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -43,11 +43,9 @@ class Members_Controller extends Action_Controller
 		);
 
 		// I don't think we know what to do... throw dies?
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'none';
-		$context['sub_action'] = $subAction;
-
 		$action = new Action();
-		$action->initialize($subActions, 'add');
+		$subAction = $action->initialize($subActions, 'none');
+		$context['sub_action'] = $subAction;
 		$action->dispatch($subAction);
 	}
 
@@ -138,8 +136,7 @@ class Members_Controller extends Action_Controller
 	 * Called by index.php?action=findmember.
 	 * This function result is used as a popup for searching members.
 	 *
-	 * @todo This function is "deprecated" and will be remove from 1.1
-	 * @depreciated
+	 * @deprecated since 1.0
 	 * @uses sub template find_members of the Members template.
 	 */
 	public function action_findmember()
@@ -194,7 +191,7 @@ class Members_Controller extends Action_Controller
 			);
 			$context['page_index'] = constructPageIndex($scripturl . '?action=findmember;search=' . $context['last_search'] . ';' . $context['session_var'] . '=' . $context['session_id'] . ';input=' . $context['input_box_name'] . ($context['quote_results'] ? ';quote=1' : '') . ($context['buddy_search'] ? ';buddies' : ''), $_REQUEST['start'], $total_results, 7);
 
-			// Determine the navigation context (especially useful for the wireless template).
+			// Determine the navigation context
 			$base_url = $scripturl . '?action=findmember;search=' . urlencode($context['last_search']) . (empty($_REQUEST['u']) ? '' : ';u=' . $_REQUEST['u']) . ';' . $context['session_var'] . '=' . $context['session_id'];
 			$context['links'] += array(
 				'prev' => $_REQUEST['start'] >= 7 ? $base_url . ';start=' . ($_REQUEST['start'] - 7) : '',

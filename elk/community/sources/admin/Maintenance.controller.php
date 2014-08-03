@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,12 +23,16 @@ if (!defined('ELK'))
 /**
  * Entry point class for all of the maintance ,routine, members, database,
  * attachments, topics and hooks
+ *
+ * @package Maintenance
  */
 class Maintenance_Controller extends Action_Controller
 {
 	/**
 	 * Main dispatcher, the maintenance access point.
-	 * This, as usual, checks permissions, loads language files,
+	 *
+	 * What it does:
+	 * - This, as usual, checks permissions, loads language files,
 	 * and forwards to the actual workers.
 	 *
 	 * @see Action_Controller::action_index()
@@ -102,7 +106,7 @@ class Maintenance_Controller extends Action_Controller
 			),
 			'hooks' => array(
 				'controller' => $this,
-				'function' => 'action_hooks'
+				'function' => 'action_hooks',
 			),
 			'attachments' => array(
 				'file' => 'ManageAttachments.controller.php',
@@ -111,12 +115,13 @@ class Maintenance_Controller extends Action_Controller
 			),
 		);
 
-		call_integration_hook('integrate_manage_maintenance', array(&$subActions));
+		// Set up the action handeler
+		$action = new Action('manage_maintenance');
 
-		// Yep, sub-action time!
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'routine';
+		// Yep, sub-action time and call integrate_sa_manage_maintenance as well
+		$subAction = $action->initialize($subActions, 'routine');
 
-		// Doing something special?
+		// Doing something special, does it exist?
 		if (isset($_REQUEST['activity']) && isset($subActions[$subAction]['activities'][$_REQUEST['activity']]))
 			$activity = $_REQUEST['activity'];
 
@@ -126,11 +131,9 @@ class Maintenance_Controller extends Action_Controller
 		$context['sub_action'] = $subAction;
 
 		// Finally fall through to what we are doing.
-		$action = new Action();
-		$action->initialize($subActions, 'routine');
 		$action->dispatch($subAction);
 
-		// Any special activity?
+		// Any special activity defined, then go to it.
 		if (isset($activity))
 		{
 			if (method_exists($this, $subActions[$subAction]['activities'][$activity]))
@@ -153,7 +156,7 @@ class Maintenance_Controller extends Action_Controller
 		// We need this, really..
 		require_once(SUBSDIR . '/Maintenance.subs.php');
 
-		// set up the sub-template
+		// Set up the sub-template
 		$context['sub_template'] = 'maintain_database';
 
 		if ($db_type == 'mysql')
@@ -167,23 +170,27 @@ class Maintenance_Controller extends Action_Controller
 		// Check few things to give advices before make a backup
 		// If safe mod is enable the external tool is *always* the best (and probably the only) solution
 		$context['safe_mode_enable'] = @ini_get('safe_mode');
+
 		// This is just a...guess
 		$messages = countMessages();
 
 		// 256 is what we use in the backup script
 		setMemoryLimit('256M');
 		$memory_limit = memoryReturnBytes(ini_get('memory_limit')) / (1024 * 1024);
+
 		// Zip limit is set to more or less 1/4th the size of the available memory * 1500
 		// 1500 is an estimate of the number of messages that generates a database of 1 MB (yeah I know IT'S AN ESTIMATION!!!)
 		// Why that? Because the only reliable zip package is the one sent out the first time,
 		// so when the backup takes 1/5th (just to stay on the safe side) of the memory available
 		$zip_limit = $memory_limit * 1500 / 5;
+
 		// Here is more tricky: it depends on many factors, but the main idea is that
 		// if it takes "too long" the backup is not reliable. So, I know that on my computer it take
 		// 20 minutes to backup 2.5 GB, of course my computer is not representative, so I'll multiply by 4 the time.
 		// I would consider "too long" 5 minutes (I know it can be a long time, but let's start with that):
 		// 80 minutes for a 2.5 GB and a 5 minutes limit means 160 MB approx
 		$plain_limit = 240000;
+
 		// Last thing: are we able to gain time?
 		$current_time_limit = ini_get('max_execution_time');
 		@set_time_limit(159); //something strange just to be sure
@@ -213,6 +220,8 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Supporting function for the routine maintenance area.
+	 *
+	 * @uses sub template maintain_routine, Template file Maintenance
 	 */
 	public function action_routine()
 	{
@@ -290,12 +299,15 @@ class Maintenance_Controller extends Action_Controller
 		// Get all membergroups - for deleting members and the like.
 		$context['membergroups'] = getBasicMembergroupData(array('all'));
 
-		if (isset($_GET['done']) && $_GET['done'] == 'recountposts')
-			$context['maintenance_finished'] = $txt['maintain_recountposts'];
+		// Show that we completed this action
+		if (isset($_REQUEST['done']) && $_REQUEST['done'] == 'recountposts')
+			$context['maintenance_finished'] = array(
+				'errors' => array(sprintf($txt['maintain_done'], $txt['maintain_recountposts'])),
+			);
 
-		loadJavascriptFile('suggest.js', array('defer' => true));
+		loadJavascriptFile('suggest.js');
 
-		// set up the sub-template
+		// Set up the sub-template
 		$context['sub_template'] = 'maintain_members';
 	}
 
@@ -307,21 +319,27 @@ class Maintenance_Controller extends Action_Controller
 		global $context, $txt;
 
 		require_once(SUBSDIR . '/Boards.subs.php');
+
 		// Let's load up the boards in case they are useful.
 		$context += getBoardList(array('not_redirection' => true));
 
 		if (isset($_GET['done']) && $_GET['done'] == 'purgeold')
-			$context['maintenance_finished'] = $txt['maintain_old'];
+			$context['maintenance_finished'] = array(
+				'errors' => array(sprintf($txt['maintain_done'], $txt['maintain_old'])),
+			);
 		elseif (isset($_GET['done']) && $_GET['done'] == 'massmove')
-			$context['maintenance_finished'] = $txt['move_topics_maintenance'];
+			$context['maintenance_finished'] = array(
+				'errors' => array(sprintf($txt['maintain_done'], $txt['move_topics_maintenance'])),
+			);
 
-		// set up the sub-template
+		// Set up the sub-template
 		$context['sub_template'] = 'maintain_topics';
 	}
 
 	/**
 	 * Find and try to fix all errors on the forum.
-	 * Forwards to repair boards controller.
+	 *
+	 * - Forwards to repair boards controller.
 	 */
 	public function action_repair_display()
 	{
@@ -329,14 +347,16 @@ class Maintenance_Controller extends Action_Controller
 		validateToken('admin-maint');
 
 		require_once(ADMINDIR . '/RepairBoards.controller.php');
+
 		$controller = new RepairBoards_Controller();
 		$controller->action_repairboards();
 	}
 
 	/**
 	 * Wipes the current cache entries as best it can.
-	 * This only applies to our own cache entries, opcache and data.
-	 * This action, like other maintenance tasks, may be called automatically
+	 *
+	 * - This only applies to our own cache entries, opcache and data.
+	 * - This action, like other maintenance tasks, may be called automatically
 	 * by the task scheduler or manually by the admin in Maintenance area.
 	 */
 	public function action_cleancache_display()
@@ -356,7 +376,8 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Empties all uninmportant logs.
-	 * This action may be called periodically, by the tasks scheduler,
+	 *
+	 * - This action may be called periodically, by the tasks scheduler,
 	 * or manually by the admin in Maintenance area.
 	 */
 	public function action_logs_display()
@@ -379,12 +400,16 @@ class Maintenance_Controller extends Action_Controller
 	}
 
 	/**
-	 * Convert the column "body" of the table {db_prefix}messages from TEXT to MEDIUMTEXT and vice versa.
-	 * It requires the admin_forum permission.
-	 * This is needed only for MySQL.
-	 * During the convertion from MEDIUMTEXT to TEXT it check if any of the posts exceed the TEXT length and if so it aborts.
-	 * This action is linked from the maintenance screen (if it's applicable).
-	 * Accessed by ?action=admin;area=maintain;sa=database;activity=convertmsgbody.
+	 * Convert the column "body" of the table {db_prefix}messages from TEXT to
+	 * MEDIUMTEXT and vice versa.
+	 *
+	 * What it does:
+	 * - It requires the admin_forum permission.
+	 * - This is needed only for MySQL.
+	 * - During the convertion from MEDIUMTEXT to TEXT it check if any of the
+	 * posts exceed the TEXT length and if so it aborts.
+	 * - This action is linked from the maintenance screen (if it's applicable).
+	 * - Accessed by ?action=admin;area=maintain;sa=database;activity=convertmsgbody.
 	 *
 	 * @uses the convert_msgbody sub template of the Admin template.
 	 */
@@ -400,8 +425,13 @@ class Maintenance_Controller extends Action_Controller
 
 		$colData = getMessageTableColumns();
 		foreach ($colData as $column)
+		{
 			if ($column['name'] == 'body')
+			{
 				$body_type = $column['type'];
+				break;
+			}
+		}
 
 		$context['convert_to'] = $body_type == 'text' ? 'mediumtext' : 'text';
 
@@ -427,11 +457,11 @@ class Maintenance_Controller extends Action_Controller
 			$context['convert_to_suggest'] = ($body_type != 'text' && !empty($modSettings['max_messageLength']) && $modSettings['max_messageLength'] < 65536);
 
 			return;
-			redirectexit('action=admin;area=maintain;sa=database');
 		}
 		elseif ($body_type != 'text' && (!isset($_POST['do_conversion']) || isset($_POST['cont'])))
 		{
 			checkSession();
+
 			if (empty($_REQUEST['start']))
 				validateToken('admin-maint');
 			else
@@ -462,13 +492,14 @@ class Maintenance_Controller extends Action_Controller
 						<input type="hidden" name="' . $context['admin-convertMsg_token_var'] . '" value="' . $context['admin-convertMsg_token'] . '" />
 						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
 						<input type="hidden" name="id_msg_exceeding" value="' . implode(',', $id_msg_exceeding) . '" />';
-
 					$context['continue_get_data'] = '?action=admin;area=maintain;sa=database;activity=convertmsgbody;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round(100 * $_REQUEST['start'] / $max_msgs);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
 			}
+
 			createToken('admin-maint');
 			$context['page_title'] = $txt[$context['convert_to'] . '_title'];
 			$context['sub_template'] = 'convert_msgbody';
@@ -490,12 +521,12 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Optimizes all tables in the database and lists how much was saved.
-	 * It requires the admin_forum permission.
-	 * It shows as the maintain_forum admin area.
-	 * It is accessed from ?action=admin;area=maintain;sa=database;activity=optimize.
-	 * It also updates the optimize scheduled task such that the tables are not automatically optimized again too soon.
-
-	 * @uses the rawdata sub template (built in.)
+	 *
+	 * What it does:
+	 * - It requires the admin_forum permission.
+	 * - It shows as the maintain_forum admin area.
+	 * - It is accessed from ?action=admin;area=maintain;sa=database;activity=optimize.
+	 * - It also updates the optimize scheduled task such that the tables are not automatically optimized again too soon.
 	 */
 	public function action_optimize_display()
 	{
@@ -503,6 +534,7 @@ class Maintenance_Controller extends Action_Controller
 
 		isAllowedTo('admin_forum');
 
+		// Some validation
 		checkSession('post');
 		validateToken('admin-maint');
 
@@ -545,8 +577,12 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Recount many forum totals that can be recounted automatically without harm.
-	 * it requires the admin_forum permission.
-	 * It shows the maintain_forum admin area.
+	 *
+	 * What it does:
+	 * - it requires the admin_forum permission.
+	 * - It shows the maintain_forum admin area.
+	 * - The function redirects back to ?action=admin;area=maintain when complete.
+	 * - It is accessed via ?action=admin;area=maintain;sa=database;activity=recount.
 	 *
 	 * Totals recounted:
 	 * - fixes for topics with wrong num_replies.
@@ -555,25 +591,24 @@ class Maintenance_Controller extends Action_Controller
 	 * - repairs messages pointing to boards with topics pointing to other boards.
 	 * - updates the last message posted in boards and children.
 	 * - updates member count, latest member, topic count, and message count.
-	 *
-	 * The function redirects back to ?action=admin;area=maintain when complete.
-	 * It is accessed via ?action=admin;area=maintain;sa=database;activity=recount.
 	 */
 	public function action_recount_display()
 	{
 		global $txt, $context, $modSettings, $time_start;
 
 		isAllowedTo('admin_forum');
-		checkSession('request');
+		checkSession();
 
+		// Functions
 		require_once(SUBSDIR . '/Maintenance.subs.php');
 
-		// validate the request or the loop
+		// Validate the request or the loop
 		if (!isset($_REQUEST['step']))
 			validateToken('admin-maint');
 		else
 			validateToken('admin-boardrecount');
 
+		// For the loop template
 		$context['page_title'] = $txt['not_done_title'];
 		$context['continue_post_data'] = '';
 		$context['continue_countdown'] = 3;
@@ -606,10 +641,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=0;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=0;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((100 * $_REQUEST['start'] / $max_topics) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -633,10 +670,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=1;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=1;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((200 + 100 * $_REQUEST['start'] / $max_topics) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -659,10 +698,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=2;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=2;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((300 + 100 * $_REQUEST['start'] / $max_topics) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -686,10 +727,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=3;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=3;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((400 + 100 * $_REQUEST['start'] / $max_topics) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -712,10 +755,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=4;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=4;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((500 + 100 * $_REQUEST['start'] / $max_topics) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -732,10 +777,12 @@ class Maintenance_Controller extends Action_Controller
 			if (microtime(true) - $time_start > 3)
 			{
 				createToken('admin-boardrecount');
-				$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-				$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=6;start=0;' . $context['session_var'] . '=' . $context['session_id'];
+				$context['continue_post_data'] = '
+					<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+					<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+				$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=6;start=0';
 				$context['continue_percent'] = round(700 / $total_steps);
+				$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 				return;
 			}
@@ -753,10 +800,12 @@ class Maintenance_Controller extends Action_Controller
 				if (microtime(true) - $time_start > 3)
 				{
 					createToken('admin-boardrecount');
-					$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />';
-
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=6;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['admin-boardrecount_token_var'] . '" value="' . $context['admin-boardrecount_token'] . '" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=routine;activity=recount;step=6;start=' . $_REQUEST['start'];
 					$context['continue_percent'] = round((700 + 100 * $_REQUEST['start'] / $modSettings['maxMsgID']) / $total_steps);
+					$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
 
 					return;
 				}
@@ -781,18 +830,20 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Perform a detailed version check.  A very good thing ;).
-	 * The function parses the comment headers in all files for their version information,
-	 * and outputs that for some javascript to check with simplemachines.org.
-	 * It does not connect directly with elkarte.net, but rather expects the client to.
 	 *
-	 * It requires the admin_forum permission.
-	 * Uses the view_versions admin area.
-	 * Accessed through ?action=admin;area=maintain;sa=routine;activity=version.
+	 * What it does
+	 * - The function parses the comment headers in all files for their version information,
+	 * and outputs that for some javascript to check with simplemachines.org.
+	 * - It does not connect directly with elkarte.net, but rather expects the client to.
+	 * - It requires the admin_forum permission.
+	 * - Uses the view_versions admin area.
+	 * - Accessed through ?action=admin;area=maintain;sa=routine;activity=version.
+	 *
 	 * @uses Admin template, view_versions sub-template.
 	 */
 	public function action_version_display()
 	{
-		global $forum_version, $txt, $context;
+		global $forum_version, $txt, $context, $modSettings;
 
 		isAllowedTo('admin_forum');
 
@@ -823,6 +874,8 @@ class Maintenance_Controller extends Action_Controller
 
 		$context['sub_template'] = 'view_versions';
 		$context['page_title'] = $txt['admin_version_check'];
+		// @deprecated since 1.0 - remember to remove from 1.1 this is here just to avoid errors from not using upgrade.php
+		$context['detailed_version_url'] = !empty($modSettings['detailed-version.js']) ? $modSettings['detailed-version.js'] : 'https://elkarte.github.io/Elkarte/site/detailed-version.js';
 	}
 
 	/**
@@ -834,9 +887,9 @@ class Maintenance_Controller extends Action_Controller
 
 		checkSession();
 
+		// Start by doing some data checking
 		require_once(SUBSDIR . '/DataValidator.class.php');
 		$validator = new Data_Validator();
-
 		$validator->sanitation_rules(array('posts' => 'empty', 'type' => 'trim', 'from_email' => 'trim', 'from_name' => 'trim', 'to' => 'trim'));
 		$validator->validation_rules(array('from_email' => 'valid_email', 'from_name' => 'required', 'to' => 'required', 'type' => 'contains[name,email]'));
 		$validator->validate($_POST);
@@ -848,6 +901,7 @@ class Maintenance_Controller extends Action_Controller
 			require_once(SUBSDIR . '/Auth.subs.php');
 			$members = findMembers($validator->to);
 
+			// No members, no further
 			if (empty($members))
 				fatal_lang_error('reattribute_cannot_find_member');
 
@@ -882,8 +936,9 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Handling function for the backup stuff.
-	 * It requires an administrator and the session hash by post.
-	 * This method simply forwards to DumpDatabase2().
+	 *
+	 * - It requires an administrator and the session hash by post.
+	 * - This method simply forwards to DumpDatabase2().
 	 */
 	public function action_backup_display()
 	{
@@ -910,21 +965,24 @@ class Maintenance_Controller extends Action_Controller
 		validateToken('admin-maint');
 
 		require_once(SUBSDIR . '/DataValidator.class.php');
+
+		// Start with checking and cleaning what was sent
 		$validator = new Data_Validator();
 		$validator->sanitation_rules(array('maxdays' => 'intval'));
 		$validator->validation_rules(array('maxdays' => 'required', 'groups' => 'isarray', 'del_type' => 'required'));
 
+		// Validator says, you can pass or not
 		if ($validator->validate($_POST))
 		{
+			require_once(SUBSDIR . '/Maintenance.subs.php');
+			require_once(SUBSDIR . '/Members.subs.php');
+
 			$groups = array();
 			foreach ($validator->groups as $id => $dummy)
 				$groups[] = (int) $id;
+
 			$time_limit = (time() - ($validator->maxdays * 24 * 3600));
-
-			require_once(SUBSDIR . '/Maintenance.subs.php');
 			$members = purgeMembers($validator->type, $groups, $time_limit);
-
-			require_once(SUBSDIR . '/Members.subs.php');
 			deleteMembers($members);
 
 			$context['maintenance_finished'] = array(
@@ -957,6 +1015,8 @@ class Maintenance_Controller extends Action_Controller
 	 */
 	public function action_olddrafts_display()
 	{
+		global $context, $txt;
+
 		validateToken('admin-maint');
 
 		require_once(SUBSDIR . '/Drafts.subs.php');
@@ -965,6 +1025,11 @@ class Maintenance_Controller extends Action_Controller
 		// If we have old drafts, remove them
 		if (count($drafts) > 0)
 			deleteDrafts($drafts, -1, false);
+
+		// Errors?  no errors, only success !
+		$context['maintenance_finished'] = array(
+			'errors' => array(sprintf($txt['maintain_done'], $txt['maintain_old_drafts'])),
+		);
 	}
 
 	/**
@@ -974,13 +1039,13 @@ class Maintenance_Controller extends Action_Controller
 	 */
 	public function action_massmove_display()
 	{
-		global $context, $txt;
+		global $context, $txt, $time_start;
 
 		// Only admins.
 		isAllowedTo('admin_forum');
 
-		checkSession('request');
-		validateToken('admin-maint');
+		// And valid requests
+		checkSession();
 
 		// Set up to the context.
 		$context['page_title'] = $txt['not_done_title'];
@@ -989,7 +1054,6 @@ class Maintenance_Controller extends Action_Controller
 		$context['continue_get_data'] = '';
 		$context['sub_template'] = 'not_done';
 		$context['start'] = empty($_REQUEST['start']) ? 0 : (int) $_REQUEST['start'];
-		$context['start_time'] = time();
 
 		// First time we do this?
 		$id_board_from = isset($_POST['id_board_from']) ? (int) $_POST['id_board_from'] : (int) $_REQUEST['id_board_from'];
@@ -999,45 +1063,50 @@ class Maintenance_Controller extends Action_Controller
 		if (empty($id_board_from) || empty($id_board_to))
 			return;
 
-		// How many topics are we converting?
+		// These will be needed
+		require_once(SUBSDIR . '/Maintenance.subs.php');
+		require_once(SUBSDIR . '/Topic.subs.php');
+
+		// How many topics are we moving?
 		if (!isset($_REQUEST['totaltopics']))
 			$total_topics = countTopicsFromBoard($id_board_from);
-
 		else
+		{
 			$total_topics = (int) $_REQUEST['totaltopics'];
-
-		// Seems like we need this here.
-		$context['continue_get_data'] = '?action=admin;area=maintain;sa=topics;activity=massmove;id_board_from=' . $id_board_from . ';id_board_to=' . $id_board_to . ';totaltopics=' . $total_topics . ';start=' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+			validateToken('admin_movetopics');
+		}
 
 		// We have topics to move so start the process.
 		if (!empty($total_topics))
 		{
 			while ($context['start'] <= $total_topics)
 			{
-				// Lets get the topics.
+				// Lets get the next 10 topics.
 				$topics = getTopicsToMove($id_board_from);
 
 				// Just return if we don't have any topics left to move.
 				if (empty($topics))
-				{
-					cache_put_data('board-' . $id_board_from, null, 120);
-					cache_put_data('board-' . $id_board_to, null, 120);
-					redirectexit('action=admin;area=maintain;sa=topics;done=massmove');
-				}
+					break;
 
 				// Lets move them.
-				require_once(SUBSDIR . '/Topic.subs.php');
 				moveTopics($topics, $id_board_to);
 
-				// We've done at least ten more topics.
+				// Increase the counter
 				$context['start'] += 10;
 
-				// Lets wait a while.
-				if (time() - $context['start_time'] > 3)
+				// If this is really taking some time, show the pause screen
+				if (microtime(true) - $time_start > 3)
 				{
+					createToken('admin_movetopics');
+
 					// What's the percent?
 					$context['continue_percent'] = round(100 * ($context['start'] / $total_topics), 1);
-					$context['continue_get_data'] = '?action=admin;area=maintain;sa=topics;activity=massmove;id_board_from=' . $id_board_from . ';id_board_to=' . $id_board_to . ';totaltopics=' . $total_topics . ';start=' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
+
+					// Set up for the form
+					$context['continue_get_data'] = '?action=admin;area=maintain;sa=topics;activity=massmove;id_board_from=' . $id_board_from . ';id_board_to=' . $id_board_to . ';totaltopics=' . $total_topics . ';start=' . $context['start'];
+					$context['continue_post_data'] = '
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+						<input type="hidden" name="' . $context['admin_movetopics_token_var'] . '" value="' . $context['admin_movetopics_token'] . '" />';
 
 					// Let the template system do it's thang.
 					return;
@@ -1054,8 +1123,9 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Generates a list of integration hooks for display
-	 * Accessed through ?action=admin;area=maintain;sa=hooks;
-	 * Allows for removal or disabing of selected hooks
+	 *
+	 * - Accessed through ?action=admin;area=maintain;sa=hooks;
+	 * - Allows for removal or disabing of selected hooks
 	 */
 	public function action_hooks()
 	{
@@ -1132,7 +1202,7 @@ class Maintenance_Controller extends Action_Controller
 					'data' => array(
 						'db' => 'hook_name',
 					),
-					'sort' =>  array(
+					'sort' => array(
 						'default' => 'hook_name',
 						'reverse' => 'hook_name DESC',
 					),
@@ -1151,7 +1221,7 @@ class Maintenance_Controller extends Action_Controller
 								return $data[\'real_function\'];
 						'),
 					),
-					'sort' =>  array(
+					'sort' => array(
 						'default' => 'function_name',
 						'reverse' => 'function_name DESC',
 					),
@@ -1163,7 +1233,7 @@ class Maintenance_Controller extends Action_Controller
 					'data' => array(
 						'db' => 'file_name',
 					),
-					'sort' =>  array(
+					'sort' => array(
 						'default' => 'file_name',
 						'reverse' => 'file_name DESC',
 					),
@@ -1187,7 +1257,7 @@ class Maintenance_Controller extends Action_Controller
 						'),
 						'class' => 'centertext',
 					),
-					'sort' =>  array(
+					'sort' => array(
 						'default' => 'status',
 						'reverse' => 'status DESC',
 					),
@@ -1242,7 +1312,7 @@ class Maintenance_Controller extends Action_Controller
 			);
 		}
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($list_options);
 
 		$context['page_title'] = $txt['maintain_sub_hooks_list'];
@@ -1252,8 +1322,9 @@ class Maintenance_Controller extends Action_Controller
 
 	/**
 	 * Recalculate all members post counts
-	 * it requires the admin_forum permission.
 	 *
+	 * What it does:
+	 * - it requires the admin_forum permission.
 	 * - recounts all posts for members found in the message table
 	 * - updates the members post count record in the members table
 	 * - honors the boards post count flag
@@ -1261,33 +1332,34 @@ class Maintenance_Controller extends Action_Controller
 	 * - zeros post counts for all members with no posts in the message table
 	 * - runs as a delayed loop to avoid server overload
 	 * - uses the not_done template in Admin.template
-	 *
-	 * The function redirects back to action=admin;area=maintain;sa=members when complete.
-	 * It is accessed via ?action=admin;area=maintain;sa=members;activity=recountposts
+	 * - redirects back to action=admin;area=maintain;sa=members when complete.
+	 * - accessed via ?action=admin;area=maintain;sa=members;activity=recountposts
 	 */
 	public function action_recountposts_display()
 	{
 		global $txt, $context;
 
-		// You have to be allowed in here
-		isAllowedTo('admin_forum');
-		checkSession('request');
+		// Check the session
+		checkSession();
 
-		// Set up to the context.
+		// Set up to the context for the pause screen
 		$context['page_title'] = $txt['not_done_title'];
 		$context['continue_countdown'] = 3;
 		$context['continue_get_data'] = '';
 		$context['sub_template'] = 'not_done';
 
-		// init
+		// Init, do 200 members in a bunch
 		$increment = 200;
 		$_REQUEST['start'] = !isset($_REQUEST['start']) ? 0 : (int) $_REQUEST['start'];
 
 		// Ask for some extra time, on big boards this may take a bit
 		@set_time_limit(600);
 
+		// The functions here will come in handy
+		require_once(SUBSDIR . '/Maintenance.subs.php');
+
 		// Only run this query if we don't have the total number of members that have posted
-		if (!isset($_SESSION['total_members']))
+		if (!isset($_SESSION['total_members']) || $_REQUEST['start'] == 0)
 		{
 			validateToken('admin-maint');
 			$_SESSION['total_members'] = countContributors();
@@ -1295,30 +1367,33 @@ class Maintenance_Controller extends Action_Controller
 		else
 			validateToken('admin-recountposts');
 
-		// Lets get a group of members and determine their post count (from the boards that have post count enabled of course).
+		// Lets get the next group of members and determine their post count
+		// (from the boards that have post count enabled of course).
 		$total_rows = updateMembersPostCount($_REQUEST['start'], $increment);
 
 		// Continue?
 		if ($total_rows == $increment)
 		{
-			$_REQUEST['start'] += $increment;
-			$context['continue_get_data'] = '?action=admin;area=maintain;sa=members;activity=recountposts;start=' . $_REQUEST['start'] . ';' . $context['session_var'] . '=' . $context['session_id'];
-			$context['continue_percent'] = round(100 * $_REQUEST['start'] / $_SESSION['total_members']);
-
 			createToken('admin-recountposts');
-			$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-recountposts_token_var'] . '" value="' . $context['admin-recountposts_token'] . '" />';
+
+			$_REQUEST['start'] += $increment;
+			$context['continue_get_data'] = '?action=admin;area=maintain;sa=members;activity=recountposts;start=' . $_REQUEST['start'];
+			$context['continue_percent'] = round(100 * $_REQUEST['start'] / $_SESSION['total_members']);
+			$context['not_done_title'] = $txt['not_done_title'] . ' (' . $context['continue_percent'] . '%)';
+			$context['continue_post_data'] = '<input type="hidden" name="' . $context['admin-recountposts_token_var'] . '" value="' . $context['admin-recountposts_token'] . '" />
+					<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />';
 
 			if (function_exists('apache_reset_timeout'))
 				apache_reset_timeout();
+
 			return;
 		}
 
 		// No countable posts? set posts counter to 0
 		updateZeroPostMembers();
 
-		// all done
+		// All done, clean up and go back to maintainance
 		unset($_SESSION['total_members']);
-		$context['maintenance_finished'] = $txt['maintain_recountposts'];
 		redirectexit('action=admin;area=maintain;sa=members;done=recountposts');
 	}
 
@@ -1328,7 +1403,7 @@ class Maintenance_Controller extends Action_Controller
 	 *
 	 * @return int
 	 */
-	function list_getIntegrationHooksCount()
+	public function list_getIntegrationHooksCount()
 	{
 		global $context;
 
@@ -1346,7 +1421,7 @@ class Maintenance_Controller extends Action_Controller
 	 * @param int $per_page
 	 * @param string $sort
 	 */
-	function list_getIntegrationHooks($start, $per_page, $sort)
+	public function list_getIntegrationHooks($start, $per_page, $sort)
 	{
 		return list_integration_hooks_data($start, $per_page, $sort);
 	}

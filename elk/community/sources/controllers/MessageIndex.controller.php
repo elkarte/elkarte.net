@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -38,7 +38,7 @@ class MessageIndex_Controller extends Action_Controller
 	}
 
 	/**
-	 * Show the list of topics in this board, along with any child boards.
+	 * Show the list of topics in this board, along with any sub-boards.
 	 * @uses MessageIndex template topic_listing sub template
 	 */
 	public function action_messageindex()
@@ -46,7 +46,7 @@ class MessageIndex_Controller extends Action_Controller
 		global $txt, $scripturl, $board, $modSettings, $context;
 		global $options, $settings, $board_info, $user_info;
 
-		// Fairly often, we'll work with boards. Current board, child boards.
+		// Fairly often, we'll work with boards. Current board, sub-boards.
 		require_once(SUBSDIR . '/Boards.subs.php');
 
 		// If this is a redirection board head off.
@@ -100,9 +100,10 @@ class MessageIndex_Controller extends Action_Controller
 
 		// Make sure the starting place makes sense and construct the page index.
 		if (isset($_REQUEST['sort']))
-			$context['page_index'] = constructPageIndex($scripturl . '?board=' . $board . '.%1$d;sort=' . $_REQUEST['sort'] . (isset($_REQUEST['desc']) ? ';desc' : ''), $_REQUEST['start'], $board_info['total_topics'], $maxindex, true);
+			$sort_string = ';sort=' . $_REQUEST['sort'] . (isset($_REQUEST['desc']) ? ';desc' : '');
 		else
-			$context['page_index'] = constructPageIndex($scripturl . '?board=' . $board . '.%1$d', $_REQUEST['start'], $board_info['total_topics'], $maxindex, true);
+			$sort_string = '';
+		$context['page_index'] = constructPageIndex($scripturl . '?board=' . $board . '.%1$d' . $sort_string, $_REQUEST['start'], $board_info['total_topics'], $maxindex, true);
 
 		$context['start'] = &$_REQUEST['start'];
 
@@ -132,8 +133,6 @@ class MessageIndex_Controller extends Action_Controller
 		{
 			foreach ($board_info['moderators'] as $mod)
 				$context['link_moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $mod['id'] . '" title="' . $txt['board_moderator'] . '">' . $mod['name'] . '</a>';
-
-			$context['linktree'][count($context['linktree']) - 1]['extra_after'] = '<span class="board_moderators"> (' . (count($context['link_moderators']) == 1 ? $txt['moderator'] : $txt['moderators']) . ': ' . implode(', ', $context['link_moderators']) . ')</span>';
 		}
 
 		// Mark current and parent boards as seen.
@@ -142,7 +141,7 @@ class MessageIndex_Controller extends Action_Controller
 			// We can't know they read it if we allow prefetches.
 			if (isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch')
 			{
-				ob_end_clean();
+				@ob_end_clean();
 				header('HTTP/1.1 403 Prefetch Forbidden');
 				die;
 			}
@@ -183,12 +182,12 @@ class MessageIndex_Controller extends Action_Controller
 		// Set the variables up for the template.
 		$context['can_mark_notify'] = allowedTo('mark_notify') && !$user_info['is_guest'];
 		$context['can_post_new'] = allowedTo('post_new') || ($modSettings['postmod_active'] && allowedTo('post_unapproved_topics'));
-		$context['can_post_poll'] = $modSettings['pollMode'] == '1' && allowedTo('poll_post') && $context['can_post_new'];
+		$context['can_post_poll'] = !empty($modSettings['pollMode']) && allowedTo('poll_post') && $context['can_post_new'];
 		$context['can_moderate_forum'] = allowedTo('moderate_forum');
 		$context['can_approve_posts'] = allowedTo('approve_posts');
 
-		// Prepare child boards for display.
-		require_once(SUBSDIR . '/BoardIndex.subs.php');
+		// Prepare sub-boards for display.
+		require_once(SUBSDIR . '/BoardsList.class.php');
 		$boardIndexOptions = array(
 			'include_categories' => false,
 			'base_level' => $board_info['child_level'] + 1,
@@ -196,7 +195,8 @@ class MessageIndex_Controller extends Action_Controller
 			'set_latest_post' => false,
 			'countChildPosts' => !empty($modSettings['countChildPosts']),
 		);
-		$context['boards'] = getBoardIndex($boardIndexOptions);
+		$boardlist = new Boards_List($boardIndexOptions);
+		$context['boards'] = $boardlist->getBoards();
 
 		// Nosey, nosey - who's viewing this board?
 		if (!empty($settings['display_who_viewing']))
@@ -215,18 +215,18 @@ class MessageIndex_Controller extends Action_Controller
 		if (!isset($_REQUEST['sort']) || !isset($sort_methods[$_REQUEST['sort']]))
 		{
 			$context['sort_by'] = 'last_post';
-			$sort_column = 'id_last_msg';
 			$ascending = isset($_REQUEST['asc']);
 		}
 		// Otherwise default to ascending.
 		else
 		{
 			$context['sort_by'] = $_REQUEST['sort'];
-			$sort_column = $sort_methods[$_REQUEST['sort']];
 			$ascending = !isset($_REQUEST['desc']);
 		}
+		$sort_column = $sort_methods[$context['sort_by']];
 
 		$context['sort_direction'] = $ascending ? 'up' : 'down';
+		$context['sort_title'] = $ascending ? $txt['sort_desc'] : $txt['sort_asc'];
 
 		// Trick
 		$txt['starter'] = $txt['started_by'];
@@ -234,7 +234,7 @@ class MessageIndex_Controller extends Action_Controller
 		foreach ($sort_methods as $key => $val)
 			$context['topics_headers'][$key] = array(
 				'url' => $scripturl . '?board=' . $context['current_board'] . '.' . $context['start'] . ';sort=' . $key . ($context['sort_by'] == $key && $context['sort_direction'] == 'up' ? ';desc' : ''),
-				'sort_dir_img' => $context['sort_by'] == $key ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '',
+				'sort_dir_img' => $context['sort_by'] == $key ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" title="' . $context['sort_title'] . '" />' : '',
 			);
 
 		// Calculate the fastest way to get the topics.
@@ -259,7 +259,7 @@ class MessageIndex_Controller extends Action_Controller
 		$indexOptions = array(
 			'include_sticky' => !empty($modSettings['enableStickyTopics']),
 			'only_approved' => $modSettings['postmod_active'] && !allowedTo('approve_posts'),
-			'previews' => !empty($settings['message_index_preview']) ? (empty($modSettings['preview_characters']) ? 128 : $modSettings['preview_characters']) : 0,
+			'previews' => !empty($modSettings['message_index_preview']) ? (empty($modSettings['preview_characters']) ? -1 : $modSettings['preview_characters']) : 0,
 			'include_avatars' => !empty($settings['avatars_on_indexes']),
 			'ascending' => $ascending,
 			'fake_ascending' => $fake_ascending
@@ -276,20 +276,23 @@ class MessageIndex_Controller extends Action_Controller
 		// Begin 'printing' the message index for current board.
 		foreach ($topics_info as $row)
 		{
-			if ($row['id_poll'] > 0 && $modSettings['pollMode'] == '0')
-				continue;
-
 			$topic_ids[] = $row['id_topic'];
 
-			// Does the theme support message previews?
-			if (!empty($settings['message_index_preview']))
+			// Do they want message previews?
+			if (!empty($modSettings['message_index_preview']))
 			{
 				// Limit them to $modSettings['preview_characters'] characters
-				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], $row['first_smileys'], $row['id_first_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
+				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], false, $row['id_first_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
 				$row['first_body'] = shorten_text($row['first_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
 
-				$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], $row['last_smileys'], $row['id_last_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
-				$row['last_body'] = shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+				// No reply then they are the same, no need to process it again
+				if ($row['num_replies'] == 0)
+					$row['last_body'] == $row['first_body'];
+				else
+				{
+					$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], false, $row['id_last_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
+					$row['last_body'] = shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+				}
 
 				// Censor the subject and message preview.
 				censorText($row['first_subject']);
@@ -324,11 +327,7 @@ class MessageIndex_Controller extends Action_Controller
 			{
 				// We can't pass start by reference.
 				$start = -1;
-				$pages = constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d', $start, $row['num_replies'] + 1, $context['messages_per_page'], true, array('prev_next' => false));
-
-				// If we can use all, show all.
-				if (!empty($modSettings['enableAllMessages']) && $row['num_replies'] + 1 < $modSettings['enableAllMessages'])
-					$pages .= ' &nbsp;<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.0;all">' . $txt['all'] . '</a>';
+				$pages = constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d', $start, $row['num_replies'] + 1, $context['messages_per_page'], true, array('prev_next' => false, 'all' => !empty($modSettings['enableAllMessages']) && $row['num_replies'] + 1 < $modSettings['enableAllMessages']));
 			}
 			else
 				$pages = '';
@@ -389,12 +388,13 @@ class MessageIndex_Controller extends Action_Controller
 					'preview' => trim($row['last_body']),
 					'icon' => $row['last_icon'],
 					'icon_url' => $settings[$context['icon_sources'][$row['last_icon']]] . '/post/' . $row['last_icon'] . '.png',
-					'href' => $scripturl . '?topic=' . $row['id_topic'] . ($user_info['is_guest'] ? ('.' . (!empty($options['view_newest_first']) ? 0 : ((int) (($row['num_replies']) / $context['pageindex_multiplier'])) * $context['pageindex_multiplier']) . '#msg' . $row['id_last_msg']) : (($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . '#new')),
-					'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . ($user_info['is_guest'] ? ('.' . (!empty($options['view_newest_first']) ? 0 : ((int) (($row['num_replies']) / $context['pageindex_multiplier'])) * $context['pageindex_multiplier']) . '#msg' . $row['id_last_msg']) : (($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . '#new')) . '" ' . ($row['num_replies'] == 0 ? '' : 'rel="nofollow"') . '>' . $row['last_subject'] . '</a>'
+					'href' => $scripturl . '?topic=' . $row['id_topic'] . ($user_info['is_guest'] ? ('.' . (((int) (($row['num_replies']) / $context['pageindex_multiplier'])) * $context['pageindex_multiplier']) . '#msg' . $row['id_last_msg']) : (($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . '#new')),
+					'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . ($user_info['is_guest'] ? ('.' . (((int) (($row['num_replies']) / $context['pageindex_multiplier'])) * $context['pageindex_multiplier']) . '#msg' . $row['id_last_msg']) : (($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . '#new')) . '" ' . ($row['num_replies'] == 0 ? '' : 'rel="nofollow"') . '>' . $row['last_subject'] . '</a>'
 				),
+				'default_preview' => trim($row[!empty($modSettings['message_index_preview']) && $modSettings['message_index_preview'] == 2 ? 'last_body' : 'first_body']),
 				'is_sticky' => !empty($modSettings['enableStickyTopics']) && !empty($row['is_sticky']),
 				'is_locked' => !empty($row['locked']),
-				'is_poll' => $modSettings['pollMode'] == '1' && $row['id_poll'] > 0,
+				'is_poll' => !empty($modSettings['pollMode']) && $row['id_poll'] > 0,
 				'is_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicPosts'] : $row['num_replies'] >= $modSettings['hotTopicPosts'],
 				'is_very_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicVeryPosts'] : $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
 				'is_posted_in' => false,
@@ -546,8 +546,8 @@ class MessageIndex_Controller extends Action_Controller
 			$_SESSION['move_to_topic'] = array(
 				'move_to' => $_REQUEST['move_to'],
 				// And remember the last expiry period too.
-				'redirect_topic' => (int) $_REQUEST['redirect_topic'],
-				'redirect_expires' => (int) $_REQUEST['redirect_expires'],
+				'redirect_topic' => !empty($_REQUEST['redirect_topic']) ? (int) $_REQUEST['redirect_topic'] : 0,
+				'redirect_expires' => !empty($_REQUEST['redirect_expires']) ? (int) $_REQUEST['redirect_expires'] : 0,
 			);
 		}
 
@@ -798,8 +798,6 @@ class MessageIndex_Controller extends Action_Controller
 
 				if (!empty($topicRecounts))
 				{
-					$members = array();
-
 					// Get all the members who have posted in the moved topics.
 					$posters = topicsPosters(array_keys($topicRecounts));
 					foreach ($posters as $id_member => $topics)

@@ -9,27 +9,30 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * Handle the JavaScript surrounding the admin and moderation center.
  */
 
 /**
- * 	Admin index class with the following methods
- * 	elk_AdminIndex(oOptions)
- * 	{
- * 		public init()
- * 		public loadAdminIndex()
- * 		public setAnnouncements()
- * 		public showCurrentVersion()
- * 		public checkUpdateAvailable()
- * 	}
+ * Admin index class with the following methods
+ * elk_AdminIndex(oOptions)
+ * {
+ *		public init()
+ *		public loadAdminIndex()
+ *		public setAnnouncements()
+ *		public showCurrentVersion()
+ *		public checkUpdateAvailable()
+ * }
  *
  * @param {object} oOptions
  */
 function elk_AdminIndex(oOptions)
 {
 	this.opt = oOptions;
+	this.announcements = [];
+	this.current = {};
+	this.init_news = false;
 	this.init();
 }
 
@@ -37,53 +40,171 @@ function elk_AdminIndex(oOptions)
 elk_AdminIndex.prototype.init = function ()
 {
 	window.adminIndexInstanceRef = this;
+
 	var fHandlePageLoaded = function () {
 		window.adminIndexInstanceRef.loadAdminIndex();
 	};
+
 	addLoadEvent(fHandlePageLoaded);
 };
 
 elk_AdminIndex.prototype.loadAdminIndex = function ()
 {
-	// Load the text box containing the latest news items.
-	if (this.opt.bLoadAnnouncements)
-		this.setAnnouncements();
-
 	// Load the current master and your version numbers.
 	if (this.opt.bLoadVersions)
 		this.showCurrentVersion();
 
-	// Load the text box that sais there's a new version available.
+	// Load the text box that says there's a new version available.
 	if (this.opt.bLoadUpdateNotification)
 		this.checkUpdateAvailable();
 };
 
 // Update the announcement container with news
-elk_AdminIndex.prototype.setAnnouncements = function ()
+elk_AdminIndex.prototype.setAnnouncement = function (announcement)
 {
-	if (!('ourAnnouncements' in window) || !('length' in window.ourAnnouncements))
-		return;
+	var oElem = document.getElementById(this.opt.sAnnouncementContainerId),
+		sMessages = this.init_news ? oElem.innerHTML : '',
+		sMessage = '';
 
-	var sMessages = '';
-	for (var i = 0; i < window.ourAnnouncements.length; i++)
-		sMessages += this.opt.sAnnouncementMessageTemplate.replace('%href%', window.ourAnnouncements[i].href).replace('%subject%', window.ourAnnouncements[i].subject).replace('%time%', window.ourAnnouncements[i].time).replace('%message%', window.ourAnnouncements[i].message);
+	sMessage = this.opt.sAnnouncementMessageTemplate.replace('%href%', announcement.html_url).replace('%subject%', announcement.name).replace('%time%', announcement.published_at.replace(/[TZ]/g, ' ')).replace('%message%', announcement.body);
 
-	document.getElementById(this.opt.sAnnouncementContainerId).innerHTML = this.opt.sAnnouncementTemplate.replace('%content%', sMessages);
+	oElem.innerHTML = sMessages + this.opt.sAnnouncementTemplate.replace('%content%', sMessage);
+	this.init_news = true;
 };
 
-// Updates the current version container with the current version found in current-version.js
+// Updates the current version container with the current version found in the repository
 elk_AdminIndex.prototype.showCurrentVersion = function ()
 {
-	if (!('elkVersion' in window))
-		return;
+	var oElkVersionContainer = document.getElementById(this.opt.slatestVersionContainerId),
+		oinstalledVersionContainer = document.getElementById(this.opt.sinstalledVersionContainerId),
+		sCurrentVersion = oinstalledVersionContainer.innerHTML,
+		adminIndex = this,
+		elkVersion = '???',
+		verCompare = new elk_ViewVersions();
 
-	var oElkVersionContainer = document.getElementById(this.opt.sOurVersionContainerId),
-		oYourVersionContainer = document.getElementById(this.opt.sYourVersionContainerId),
-		sCurrentVersion = oYourVersionContainer.innerHTML;
+	$.getJSON('https://api.github.com/repos/elkarte/Elkarte/releases', {format: "json"},
+	function(data, textStatus, jqXHR) {
+		var mostRecent = {},
+			previous = {};
+		adminIndex.current = adminIndex.normalizeVersion(sCurrentVersion);
 
-	oElkVersionContainer.innerHTML = window.elkVersion;
-	if (sCurrentVersion !== window.elkVersion)
-		oYourVersionContainer.innerHTML = this.opt.sVersionOutdatedTemplate.replace('%currentVersion%', sCurrentVersion);
+		$.each(data, function(idx, elem) {
+			// No drafts, thank you
+			if (elem.draft)
+				return;
+
+			var release = adminIndex.normalizeVersion(elem.tag_name);
+
+			if (!previous.hasOwnProperty('major') || verCompare.compareVersions(sCurrentVersion, elem.tag_name.replace('-', '').substring(1)))
+			{
+				// Using a preprelease? Then you may need to know a new one is out!
+				if ((elem.prerelease && adminIndex.current.prerelease) || (!elem.prerelease))
+				{
+					previous = release;
+					mostRecent = elem;
+				}
+			}
+
+			// Load the text box containing the latest news items.
+			if (adminIndex.opt.bLoadAnnouncements)
+				adminIndex.setAnnouncement(elem);
+		});
+		elkVersion = mostRecent.name.replace(/elkarte/i, '').trim();
+
+		oElkVersionContainer.innerHTML = elkVersion;
+		if (verCompare.compareVersions(sCurrentVersion, elkVersion))
+			oinstalledVersionContainer.innerHTML = adminIndex.opt.sVersionOutdatedTemplate.replace('%currentVersion%', sCurrentVersion);
+	});
+};
+
+// Compare two different versions and return true if the firs is higher than the second
+elk_AdminIndex.prototype.compareVersion = function (curVer, refVer)
+{
+	if (curVer.major > refVer.major)
+		return true;
+	else if (curVer.major < refVer.major)
+		return false;
+
+	if (curVer.minor > refVer.minor)
+		return true;
+	else if (curVer.minor < refVer.minor)
+		return false;
+
+	if (curVer.micro > refVer.micro)
+		return true;
+	else if (curVer.micro < refVer.micro)
+		return false;
+
+	if (curVer.prerelease)
+	{
+		if (curVer.nano > refVer.nano)
+			return true;
+		else if (curVer.nano < refVer.nano)
+			return false;
+	}
+
+	return false;
+};
+
+// Split a string representing a version number into an object
+elk_AdminIndex.prototype.normalizeVersion = function (sVersion)
+{
+	var splitVersion = sVersion.split(/[\s-]/),
+	normalVersion = {
+		major: 0,
+		minor: 0,
+		micro: 0,
+		prerelease: false,
+		status: 0,
+		nano: 0
+	},
+	prerelease = false,
+	aDevConvert = {'dev': 0, 'alpha': 1, 'beta': 2, 'rc': 3, 'stable': 4};
+
+	for (var i = 0; i < splitVersion.length; i++)
+	{
+		if (splitVersion[i].toLowerCase() === 'elkarte')
+			continue;
+
+		if (splitVersion[i].substring(0, 3).toLowerCase() === 'dev' || splitVersion[i].substring(0, 5).toLowerCase() === 'alpha' || splitVersion[i].substring(0, 4).toLowerCase() === 'beta' || splitVersion[i].substring(0, 2).toLowerCase() === 'rc')
+		{
+			normalVersion.prerelease = true;
+			prerelease = true;
+
+			// the tag name comes with the number attached to the beta/rc
+			if (splitVersion[i].indexOf('.') > 0)
+			{
+				var splitPre = splitVersion[i].split('.');
+				normalVersion.nano = parseFloat(splitPre[1]);
+				normalVersion.nano = parseFloat(splitVersion[i].substr(splitVersion[i].indexOf('.') + 1));
+				normalVersion.status = aDevConvert[splitVersion[i].substr(0, splitVersion[i].indexOf('.')).toLowerCase()];
+			}
+		}
+
+		// If we have passed a "beta" or an "RC" string, no need to go further
+		if (prerelease)
+		{
+			// Only numbers and dots means a number
+			if (splitVersion[i].replace(/[\d\.]/g, '') === '')
+				normalVersion.nano = parseFloat(splitVersion[i]);
+
+			continue;
+		}
+
+		// Likely from the tag
+		if (splitVersion[i].substring(0, 1) === 'v')
+			splitVersion[i] = splitVersion[i].substring(1);
+
+		// Only numbers and dots means a number
+		if (splitVersion[i].replace(/[\d\.]/g, '') === '')
+		{
+			var ver = splitVersion[i].split('.');
+			normalVersion.major = parseInt(ver[0]);
+			normalVersion.minor = parseInt(ver[1]);
+			normalVersion.micro = ver.length > 2 ? parseInt(ver[2]) : 0;
+		}
+	}
+	return normalVersion;
 };
 
 // Checks if a new version of ElkArte is available and if so updates the admin info box
@@ -167,13 +288,14 @@ elk_ViewVersions.prototype.compareVersions = function (sCurrent, sTarget)
 {
 	var aVersions = [],
 		aParts = [],
-		aCompare = new Array(sCurrent, sTarget);
+		aCompare = new Array(sCurrent, sTarget),
+		aDevConvert = {'dev': 0, 'alpha': 1, 'beta': 2, 'rc': 3};
 
 	for (var i = 0; i < 2; i++)
 	{
 		// Clean the version and extract the version parts.
-		var sClean = aCompare[i].toLowerCase().replace(/ /g, '');
-		aParts = sClean.match(/(\d+)(?:\.(\d+|))?(?:\.)?(\d+|)(?:(alpha|beta|rc)(\d+|)(?:\.)?(\d+|))?(?:(dev))?(\d+|)/);
+		var sClean = aCompare[i].toLowerCase().replace(/ /g, '').replace(/release candidate/g, 'rc');
+		aParts = sClean.match(/(\d+)(?:\.(\d+|))?(?:\.)?(\d+|)(?:(alpha|beta|rc)\.*(\d+|)(?:\.)?(\d+|))?(?:(dev))?(\d+|)/);
 
 		// No matches?
 		if (aParts === null)
@@ -184,7 +306,7 @@ elk_ViewVersions.prototype.compareVersions = function (sCurrent, sTarget)
 			aParts[1] > 0 ? parseInt(aParts[1]) : 0,
 			aParts[2] > 0 ? parseInt(aParts[2]) : 0,
 			aParts[3] > 0 ? parseInt(aParts[3]) : 0,
-			typeof(aParts[4]) === 'undefined' ? 'stable' : aParts[4],
+			typeof(aParts[4]) === 'undefined' ? 'stable' : aDevConvert[aParts[4]],
 			aParts[5] > 0 ? parseInt(aParts[5]) : 0,
 			aParts[6] > 0 ? parseInt(aParts[6]) : 0,
 			typeof(aParts[7]) !== 'undefined' ? 'dev' : ''
@@ -222,7 +344,7 @@ elk_ViewVersions.prototype.determineVersions = function ()
 		controllers: '??',
 		database: '??',
 		subs: '??',
-		defaults: '??',
+		'default': '??',
 		Languages: '??',
 		Templates: '??'
 	};
@@ -232,7 +354,7 @@ elk_ViewVersions.prototype.determineVersions = function ()
 		controllers: '??',
 		database: '??',
 		subs: '??',
-		defaults: '??',
+		'default': '??',
 		Languages: '??',
 		Templates: '??'
 	};
@@ -242,7 +364,7 @@ elk_ViewVersions.prototype.determineVersions = function ()
 		controllers: false,
 		database: false,
 		subs: false,
-		defaults: false,
+		'default': false,
 		Languages: false,
 		Templates: false
 	};
@@ -253,20 +375,26 @@ elk_ViewVersions.prototype.determineVersions = function ()
 		'controllers',
 		'database',
 		'subs',
-		'defaults',
+		'default',
 		'Languages',
 		'Templates'
 	];
 
+	var sCurVersionType = '',
+		sinstalledVersion,
+		oSection,
+		oSectionLink;
+
 	for (var i = 0, n = sSections.length; i < n; i++)
 	{
 		// Collapse all sections.
-		var oSection = document.getElementById(sSections[i]);
+		oSection = document.getElementById(sSections[i]);
+
 		if (typeof(oSection) === 'object' && oSection !== null)
 			oSection.style.display = 'none';
 
 		// Make all section links clickable.
-		var oSectionLink = document.getElementById(sSections[i] + '-link');
+		oSectionLink = document.getElementById(sSections[i] + '-link');
 		if (typeof(oSectionLink) === 'object' && oSectionLink !== null)
 		{
 			oSectionLink.instanceRef = this;
@@ -284,39 +412,45 @@ elk_ViewVersions.prototype.determineVersions = function ()
 	// for each file in the detailed-version.js
 	for (var sFilename in window.ourVersions)
 	{
+		sCurVersionType = '';
+
 		if (!document.getElementById('our' + sFilename))
 			continue;
 
-		var sYourVersion = document.getElementById('your' + sFilename).innerHTML,
-			sCurVersionType;
+		sinstalledVersion = document.getElementById('your' + sFilename).innerHTML;
 
 		for (var sVersionType in oLowVersion)
+		{
 			if (sFilename.substr(0, sVersionType.length) === sVersionType)
 			{
 				sCurVersionType = sVersionType;
 				break;
 			}
+		}
+
+		if (sCurVersionType === '')
+			continue;
 
 		// use compareVersion to determine which version is >< the other
 		if (typeof(sCurVersionType) !== 'undefined')
 		{
-			if ((this.compareVersions(oHighYour[sCurVersionType], sYourVersion) || oHighYour[sCurVersionType] === '??') && !oLowVersion[sCurVersionType])
-				oHighYour[sCurVersionType] = sYourVersion;
+			if ((this.compareVersions(oHighYour[sCurVersionType], sinstalledVersion) || oHighYour[sCurVersionType] === '??') && !oLowVersion[sCurVersionType])
+				oHighYour[sCurVersionType] = sinstalledVersion;
 
 			if (this.compareVersions(oHighCurrent[sCurVersionType], ourVersions[sFilename]) || oHighCurrent[sCurVersionType] === '??')
 				oHighCurrent[sCurVersionType] = ourVersions[sFilename];
 
-			if (this.compareVersions(sYourVersion, ourVersions[sFilename]))
+			if (this.compareVersions(sinstalledVersion, ourVersions[sFilename]))
 			{
-				oLowVersion[sCurVersionType] = sYourVersion;
+				oLowVersion[sCurVersionType] = sinstalledVersion;
 				document.getElementById('your' + sFilename).style.color = 'red';
 			}
 		}
-		else if (this.compareVersions(sYourVersion, ourVersions[sFilename]))
-			oLowVersion[sCurVersionType] = sYourVersion;
+		else if (this.compareVersions(sinstalledVersion, ourVersions[sFilename]))
+			oLowVersion[sCurVersionType] = sinstalledVersion;
 
 		document.getElementById('our' + sFilename).innerHTML = ourVersions[sFilename];
-		document.getElementById('your' + sFilename).innerHTML = sYourVersion;
+		document.getElementById('your' + sFilename).innerHTML = sinstalledVersion;
 	}
 
 	if (!('ourLanguageVersions' in window))
@@ -331,53 +465,34 @@ elk_ViewVersions.prototype.determineVersions = function ()
 
 			document.getElementById('our' + sFilename + this.opt.aKnownLanguages[i]).innerHTML = ourLanguageVersions[sFilename];
 
-			sYourVersion = document.getElementById('your' + sFilename + this.opt.aKnownLanguages[i]).innerHTML;
-			document.getElementById('your' + sFilename + this.opt.aKnownLanguages[i]).innerHTML = sYourVersion;
+			sinstalledVersion = document.getElementById('your' + sFilename + this.opt.aKnownLanguages[i]).innerHTML;
+			document.getElementById('your' + sFilename + this.opt.aKnownLanguages[i]).innerHTML = sinstalledVersion;
 
-			if ((this.compareVersions(oHighYour.Languages, sYourVersion) || oHighYour.Languages === '??') && !oLowVersion.Languages)
-				oHighYour.Languages = sYourVersion;
+			if ((this.compareVersions(oHighYour.Languages, sinstalledVersion) || oHighYour.Languages === '??') && !oLowVersion.Languages)
+				oHighYour.Languages = sinstalledVersion;
 
 			if (this.compareVersions(oHighCurrent.Languages, ourLanguageVersions[sFilename]) || oHighCurrent.Languages === '??')
 				oHighCurrent.Languages = ourLanguageVersions[sFilename];
 
-			if (this.compareVersions(sYourVersion, ourLanguageVersions[sFilename]))
+			if (this.compareVersions(sinstalledVersion, ourLanguageVersions[sFilename]))
 			{
-				oLowVersion.Languages = sYourVersion;
+				oLowVersion.Languages = sinstalledVersion;
 				document.getElementById('your' + sFilename + this.opt.aKnownLanguages[i]).style.color = 'red';
 			}
 		}
 	}
 
 	// Set the column titles based on the files each contain
-	document.getElementById('yoursources').innerHTML = oLowVersion.sources ? oLowVersion.sources : oHighYour.sources;
-	document.getElementById('oursources').innerHTML = oHighCurrent.sources;
-	if (oLowVersion.sources)
-		document.getElementById('yoursources').style.color = 'red';
+	for (var i = 0, n = sSections.length; i < n; i++)
+	{
+		if (sSections[i] == 'Templates')
+			continue;
 
-	document.getElementById('youradmin').innerHTML = oLowVersion.sources ? oLowVersion.sources : oHighYour.sources;
-	document.getElementById('ouradmin').innerHTML = oHighCurrent.sources;
-	if (oLowVersion.sources)
-		document.getElementById('youradmin').style.color = 'red';
-
-	document.getElementById('yourcontrollers').innerHTML = oLowVersion.sources ? oLowVersion.sources : oHighYour.sources;
-	document.getElementById('ourcontrollers').innerHTML = oHighCurrent.sources;
-	if (oLowVersion.sources)
-		document.getElementById('yourcontrollers').style.color = 'red';
-
-	document.getElementById('yourdatabase').innerHTML = oLowVersion.sources ? oLowVersion.sources : oHighYour.sources;
-	document.getElementById('ourdatabase').innerHTML = oHighCurrent.sources;
-	if (oLowVersion.sources)
-		document.getElementById('yourdatabase').style.color = 'red';
-
-	document.getElementById('yoursubs').innerHTML = oLowVersion.sources ? oLowVersion.sources : oHighYour.sources;
-	document.getElementById('oursubs').innerHTML = oHighCurrent.sources;
-	if (oLowVersion.sources)
-		document.getElementById('yoursubs').style.color = 'red';
-
-	document.getElementById('yourdefault').innerHTML = oLowVersion.defaults ? oLowVersion.defaults : oHighYour.defaults;
-	document.getElementById('ourdefault').innerHTML = oHighCurrent.defaults;
-	if (oLowVersion.defaults)
-		document.getElementById('yourdefaults').style.color = 'red';
+		document.getElementById('your' + sSections[i]).innerHTML = oLowVersion[sSections[i]] ? oLowVersion[sSections[i]] : oHighYour[sSections[i]];
+		document.getElementById('our' + sSections[i]).innerHTML = oHighCurrent[sSections[i]];
+		if (oLowVersion[sSections[i]])
+			document.getElementById('your' + sSections[i]).style.color = 'red';
+	}
 
 	// Custom theme in use?
 	if (document.getElementById('Templates'))
@@ -388,11 +503,6 @@ elk_ViewVersions.prototype.determineVersions = function ()
 		if (oLowVersion.Templates)
 			document.getElementById('yourTemplates').style.color = 'red';
 	}
-
-	document.getElementById('yourLanguages').innerHTML = oLowVersion.Languages ? oLowVersion.Languages : oHighYour.Languages;
-	document.getElementById('ourLanguages').innerHTML = oHighCurrent.Languages;
-	if (oLowVersion.Languages)
-		document.getElementById('yourLanguages').style.color = 'red';
 };
 
 /**
@@ -400,7 +510,7 @@ elk_ViewVersions.prototype.determineVersions = function ()
  */
 function addNewWord()
 {
-	setOuterHTML(document.getElementById('moreCensoredWords'), '<div class="censorWords"><input type="text" name="censor_vulgar[]" size="30" class="input_text" /> => <input type="text" name="censor_proper[]" size="30" class="input_text" /><' + '/div><div id="moreCensoredWords"><' + '/div>');
+	setOuterHTML(document.getElementById('moreCensoredWords'), '<div class="censorWords"><input type="text" name="censor_vulgar[]" size="30" class="input_text" /> <i class="fa  fa-arrow-circle-right"></i> <input type="text" name="censor_proper[]" size="30" class="input_text" /><' + '/div><div id="moreCensoredWords"><' + '/div>');
 }
 
 /**
@@ -411,7 +521,8 @@ function addNewWord()
  */
 function toggleBBCDisabled(section, disable)
 {
-	elems = document.getElementById(section).getElementsByTagName('*');
+	var elems = document.getElementById(section).getElementsByTagName('*');
+
 	for (var i = 0; i < elems.length; i++)
 	{
 		if (typeof(elems[i].name) === "undefined" || (elems[i].name.substr((section.length + 1), (elems[i].name.length - 2 - (section.length + 1))) !== "enabledTags") || (elems[i].name.indexOf(section) !== 0))
@@ -428,23 +539,44 @@ function toggleBBCDisabled(section, disable)
  */
 function updateInputBoxes()
 {
-	curType = document.getElementById("field_type").value;
-	privStatus = document.getElementById("private").value;
-	document.getElementById("max_length_dt").style.display = curType === "text" || curType === "textarea" ? "" : "none";
-	document.getElementById("max_length_dd").style.display = curType === "text" || curType === "textarea" ? "" : "none";
+	var curType = document.getElementById("field_type").value,
+		privStatus = document.getElementById("private").value,
+		stdText = ['text', 'textarea', 'email', 'url', 'color', 'date'],
+		stdInput = ['text', 'email', 'url', 'color', 'date'];
+
+	var bIsStd = (stdInput.indexOf(curType) !== -1) ? true : false,
+		bIsText = (stdText.indexOf(curType) !== -1) ? true : false;
+
+	// Only Text like fields can see a max length input
+	document.getElementById("max_length_dt").style.display = bIsText ? "" : "none";
+	document.getElementById("max_length_dd").style.display = bIsText ? "" : "none";
+
+	// Textareas can get a row/col definition
 	document.getElementById("dimension_dt").style.display = curType === "textarea" ? "" : "none";
 	document.getElementById("dimension_dd").style.display = curType === "textarea" ? "" : "none";
-	document.getElementById("bbc_dt").style.display = curType === "text" || curType === "textarea" ? "" : "none";
-	document.getElementById("bbc_dd").style.display = curType === "text" || curType === "textarea" ? "" : "none";
+
+	// Text like fields can be styled with bbc
+	document.getElementById("bbc_dt").style.display = bIsText ? "" : "none";
+	document.getElementById("bbc_dd").style.display = bIsText ? "" : "none";
+
+	// Selects and radio can support a list of options
 	document.getElementById("options_dt").style.display = curType === "select" || curType === "radio" ? "" : "none";
 	document.getElementById("options_dd").style.display = curType === "select" || curType === "radio" ? "" : "none";
+
+	// Checkboxes can have a default
 	document.getElementById("default_dt").style.display = curType === "check" ? "" : "none";
 	document.getElementById("default_dd").style.display = curType === "check" ? "" : "none";
-	document.getElementById("mask_dt").style.display = curType === "text" ? "" : "none";
-	document.getElementById("mask").style.display = curType === "text" ? "" : "none";
-	document.getElementById("can_search_dt").style.display = curType === "text" || curType === "textarea" ? "" : "none";
-	document.getElementById("can_search_dd").style.display = curType === "text" || curType === "textarea" ? "" : "none";
-	document.getElementById("regex_div").style.display = curType === "text" && document.getElementById("mask").value === "regex" ? "" : "none";
+
+	// Normal input boxes can use a validation mask as well
+	document.getElementById("mask_dt").style.display = bIsStd ? "" : "none";
+	document.getElementById("mask").style.display = bIsStd ? "" : "none";
+
+	// And text like fields can be searchable
+	document.getElementById("can_search_dt").style.display = bIsText ? "" : "none";
+	document.getElementById("can_search_dd").style.display = bIsText ? "" : "none";
+
+	// Using regex in the mask, give them a place to supply the regex
+	document.getElementById("regex_div").style.display = bIsStd && document.getElementById("mask").value === "regex" ? "" : "none";
 	document.getElementById("display").disabled = false;
 
 	// Cannot show this on the topic
@@ -698,6 +830,7 @@ function swap_database_changes()
 {
 	db_vis = !db_vis;
 	database_changes_area.style.display = db_vis ? "" : "none";
+
 	return false;
 }
 
@@ -718,7 +851,7 @@ function testFTP()
 	};
 
 	var sPostData = "";
-	for (i = 0; i < 5; i++)
+	for (var i = 0; i < 5; i++)
 		sPostData = sPostData + (sPostData.length === 0 ? "" : "&") + oPostData[i] + "=" + escape(document.getElementById(oPostData[i]).value);
 
 	// Post the data out.
@@ -776,7 +909,7 @@ function testFTPResults(oXMLDoc)
 	// Results show we were a success
 	if (results.length > 0)
 	{
-		if (results[0].getAttribute('success') === 1)
+		if (parseInt(results[0].getAttribute('success')) === 1)
 			wasSuccess = true;
 		message = results[0].firstChild.nodeValue;
 	}
@@ -788,7 +921,8 @@ function testFTPResults(oXMLDoc)
 }
 
 /**
- * Part of package manager, expands a folders contents to show permission levels of files it contains
+ * Part of package manager, expands a folders contents to show
+ * permission levels of files it contains.
  * Will use an ajax call to get any permissions it has not loaded
  *
  * @param {type} folderIdent
@@ -837,16 +971,13 @@ function dynamicExpandFolder()
 /**
  * Used when edit the boards and groups access to them
  *
- * @param {type} cat_id
- * @param {type} elem
+ * @param {type} operation
  * @param {type} brd_list
  */
-function select_in_category(cat_id, elem, brd_list)
+function select_in_category(operation, brd_list)
 {
 	for (var brd in brd_list)
-		document.getElementById(elem.value + '_brd' + brd_list[brd]).checked = true;
-
-	elem.selectedIndex = 0;
+		document.getElementById(operation + '_brd' + brd_list[brd]).checked = true;
 }
 
 /**
@@ -904,6 +1035,40 @@ function toggleCache ()
 }
 
 /**
+ * Hides local / subdomain cookie options in the ACP based on selected choices
+ * area=serversettings;sa=cookie
+ */
+function hideGlobalCookies()
+{
+	var bUseLocal = document.getElementById("localCookies").checked,
+		bUseGlobal = !bUseLocal && document.getElementById("globalCookies").checked;
+
+	// Show/Hide the areas based on what they have chosen
+	if (!bUseLocal)
+	{
+		$("#setting_globalCookies").parent().slideDown();
+		$("#globalCookies").parent().slideDown();
+	}
+	else
+	{
+		$("#setting_globalCookies").parent().slideUp();
+		$("#globalCookies").parent().slideUp();
+	}
+
+	// Global selected means we need to reveil the domain input box
+	if (bUseGlobal)
+	{
+		$("#setting_globalCookiesDomain").closest("dt").slideDown();
+		$("#globalCookiesDomain").closest("dd").slideDown();
+	}
+	else
+	{
+		$("#setting_globalCookiesDomain").closest("dt").slideUp();
+		$("#globalCookiesDomain").closest("dd").slideUp();
+	}
+}
+
+/**
  * Attachments Settings
  */
 function toggleSubDir ()
@@ -942,9 +1107,7 @@ function toggleBaseDir ()
 		dir_elem = document.getElementById('basedirectory_for_attachments');
 
 	if (auto_attach.selectedIndex === 0)
-	{
 		dir_elem.disabled = 1;
-	}
 	else
 		dir_elem.disabled = !sub_dir.checked;
 }
@@ -972,6 +1135,8 @@ function swapMembers()
 		if (membersForm.elements[i].type.toLowerCase() === "checkbox")
 			membersForm.elements[i].checked = !membersSwap;
 	}
+
+	return false;
 }
 
 /**
@@ -1042,7 +1207,97 @@ function swapRot()
 }
 
 /**
- * Used in manageMembergroups to enabel disable form elements based on allowable choices
+ * Enable/disable fields when transfering attachments
+ *
+ * @returns {undefined}
+ */
+function transferAttachOptions()
+{
+	var autoSelect = document.getElementById("auto"),
+		autoValue = parseInt(autoSelect.options[autoSelect.selectedIndex].value, 10),
+		toSelect = document.getElementById("to"),
+		toValue = parseInt(toSelect.options[toSelect.selectedIndex].value, 10);
+
+		toSelect.disabled = autoValue !== 0 ? true : false;
+		autoSelect.disabled = toValue !== 0 ?  true : false;
+}
+
+/**
+ * Updates the move confirmation text so its descriptive for the current items
+ * being moved.
+ *
+ * @param {string} confirmText
+ */
+function confirmMoveTopics(confirmText)
+{
+	var from = document.getElementById('id_board_from'),
+		to = document.getElementById('id_board_to');
+
+	if (from.options[from.selectedIndex].disabled || from.options[to.selectedIndex].disabled)
+		return false;
+
+	return confirm(confirmText.replace(/%board_from%/, from.options[from.selectedIndex].text.replace(/^\u2003+\u27A4/, '')).replace(/%board_to%/, to.options[to.selectedIndex].text.replace(/^\u2003+\u27A4/, '')));
+}
+
+/**
+ * Hide the search methods area if using sphinx(ql) search
+ */
+function showhideSearchMethod()
+{
+	var searchSphinxQl = document.getElementById('search_index_sphinxql').checked,
+		searchSphinx = document.getElementById('search_index_sphinx').checked,
+		searchhide = searchSphinxQl || searchSphinx,
+		searchMethod = $('#search_method');
+
+	if (searchhide)
+		searchMethod.slideUp();
+	else
+		searchMethod.slideDown();
+}
+
+/**
+ * Used in manageFeatures to show / hide custom level input elements based on the checkbox choices
+ * Will show or hide the jquery and jqueryui custom input fields for admins that like to roll the dice
+ *
+ * @param {boolean} isChecked
+ */
+function showhideJqueryOptions()
+{
+	var jqBase = document.getElementById('jquery_default').checked,
+		jqUi = document.getElementById('jqueryui_default').checked,
+		jqBase_val = $('#jquery_version'),
+		jqUi_val = $('#jqueryui_version');
+
+	// Show the jquery custom level box only if the option has been selected
+	// yes the dt dd stuff makes it this ugly
+	if (jqBase === false)
+	{
+		// dd and the dt
+		jqBase_val.parent().slideUp();
+		jqBase_val.parent().prev().slideUp();
+	}
+	else
+	{
+		jqBase_val.parent().slideDown();
+		jqBase_val.parent().prev().slideDown();
+	}
+
+	// And the same for the UI areas as well
+	if (jqUi === false)
+	{
+		// The parent is the dd and the sibling is its dt
+		jqUi_val.parent().slideUp();
+		jqUi_val.parent().prev().slideUp();
+	}
+	else
+	{
+		jqUi_val.parent().slideDown();
+		jqUi_val.parent().prev().slideDown();
+	}
+}
+
+/**
+ * Used in manageMembergroups to enable disable form elements based on allowable choices
  * If post based group is selected, it will disable moderation selection, visability, group description
  * and enable post count input box
  *
@@ -1073,6 +1328,47 @@ function swapPostGroup(isChecked)
 }
 
 /**
+ * Handles the AJAX preview of the warning templates
+ */
+function ajax_getTemplatePreview()
+{
+	$.ajax({
+		type: "POST",
+		url: elk_scripturl + '?action=xmlpreview;xml',
+		data: {
+			item: "warning_preview",
+			title: $("#template_title").val(),
+			body: $("#template_body").val(),
+			user: $('input[name="u"]').attr("value")
+		},
+		context: document.body
+	})
+	.done(function(request) {
+		$("#box_preview").css({display:""});
+		$("#template_preview").html($(request).find('body').text());
+		if ($(request).find("error").text() !== '')
+		{
+			$("#errors").css({display:""});
+			var errors_html = '',
+				errors = $(request).find('error').each(function() {
+				errors_html += $(this).text() + '<br />';
+			});
+
+			$(document).find("#error_list").html(errors_html);
+		}
+		else
+		{
+			$("#errors").css({display:"none"});
+			$("#error_list").html('');
+		}
+
+		return false;
+	});
+
+	return false;
+}
+
+/**
  * Sets up all the js events for edit and save board-specific permission
  * profiles
  */
@@ -1083,7 +1379,8 @@ function initEditProfileBoards()
 
 		$('.edit_board').click();
 	});
-	$('.edit_board').show().click(function(e) {
+
+	$('.edit_board').show().on('click.elkarte', function(e) {
 		var $icon = $(this),
 			board_id = $icon.data('boardid'),
 			board_profile = $icon.data('boardprofile'),
@@ -1096,11 +1393,11 @@ function initEditProfileBoards()
 							$icon.addClass('nochanges').removeClass('changed');
 						else
 							$icon.addClass('changed').removeClass('nochanges');
-					})
+					});
 				});
 
 		e.preventDefault();
-		$(permission_profiles).each(function(key, value) {   
+		$(permission_profiles).each(function(key, value) {
 			var $opt = $('<option />').attr('value', value.id).text(value.name);
 
 			if (value.id == board_profile)
@@ -1116,5 +1413,393 @@ function initEditProfileBoards()
 			.attr('name', 'save_changes')
 			.attr('value', txt_save)
 		);
+		$icon.off('click.elkarte').click(function(e) {
+			e.preventDefault();
+			if ($(this).hasClass('changed'))
+				$('input[name="save_changes"]').click();
+		});
 	});
+}
+
+/**
+ * Creates the image and attach the even to convert the name of the permission
+ * profile into an input to change its name and back.
+ * It also removes the "Rename all" and "Remove Selected" buttons
+ * and the "Delete" column for consistency
+ */
+function initEditPermissionProfiles()
+{
+	// We need a variable to be sure we are going to create only 1 cancel button
+	var run_once = false;
+
+	$('.rename_profile').each(function() {
+		var $this_profile = $(this);
+
+		$this_profile.after($('<a class="js-ed edit_board" />').attr('href', '#').click(function(ev) {
+			ev.preventDefault();
+
+			// If we have already created the cancel let's skip it
+			if (!run_once)
+			{
+				run_once = true;
+				$cancel = $('<a class="js-ed-rm linkbutton" />').click(function(ev) {
+					ev.preventDefault();
+
+					// js-ed is hopefully a class introduced by this function only
+					// Any element with this class will be restored when cancel is clicked
+					$('.js-ed').show();
+
+					// js-ed-rm is again a class introduced by this function
+					// Any element with this class will be removed when cancelling
+					$('.js-ed-rm').remove();
+
+					// The cancel button is removed as well,
+					// so we need to generate it again later (if we need it again)
+					run_once = false;
+
+					$('#rename').val(txt_permissions_profile_rename);
+				}).text(ajax_notification_cancel_text).attr('href', '#');
+			}
+
+			$this_profile.after($('<input type="text" class="js-ed-rm input_text" />')
+				.attr('name', 'rename_profile[' + $this_profile.data('pid') + ']')
+				.val($this_profile.text()));
+
+			// These will have to pop back hitting cancel, so let's prepare them
+			$('#rename').addClass('js-ed').val(txt_permissions_commit).before($cancel);
+			$this_profile.addClass('js-ed').hide();
+			$('#delete').addClass('js-ed').hide();
+			$('.perm_profile_delete').addClass('js-ed').hide();
+			$(this).hide();
+		}));
+	});
+}
+
+/**
+ * Attach the AJAX handling of things to the various themes to remove
+ * Used in ManageThemes (template_list_themes)
+ */
+function initDeleteThemes()
+{
+	$(".delete_theme").bind("click", function (event) {
+		event.preventDefault();
+		var theme_id = $(this).data("theme_id"),
+			base_url = $(this).attr("href"),
+			pattern = new RegExp(elk_session_var + "=" + elk_session_id + ";(.*)$"),
+			tokens = pattern.exec(base_url)[1].split("="),
+			token = tokens[1],
+			token_var = tokens[0];
+
+		if (confirm(txt_theme_remove_confirm))
+		{
+			$.ajax({
+				type: "GET",
+				url: base_url + ";api;xml",
+				beforeSend: ajax_indicator(true)
+			})
+			.done(function(request) {
+				if ($(request).find("error").length === 0)
+				{
+					var new_token = $(request).find("token").text(),
+						new_token_var = $(request).find("token_var").text();
+
+					$(".theme_" + theme_id).slideToggle("slow", function () {
+						$(this).remove();
+					});
+
+					$(".delete_theme").each(function () {
+						$(this).attr("href", $(this).attr("href").replace(token_var + "=" + token, new_token_var + "=" + new_token));
+					});
+				}
+				// @todo improve error handling
+				else
+				{
+					alert($(request).find("text").text());
+					// Redirect to the delete theme page, though it will result in a token verification error
+					window.location = base_url;
+				}
+			})
+			.fail(function(request) {
+				window.location = base_url;
+			})
+			.always(function() {
+				// turn off the indicator
+				ajax_indicator(false);
+			});
+		}
+	});
+}
+
+/**
+ * These two functions (navigatePreview and refreshPreview) are used in ManageThemes
+ * (template_edit_style) to create a preview of the site with the changed stylesheets
+ *
+ * @param {string} url
+ */
+function navigatePreview(url)
+{
+	var myDoc = new XMLHttpRequest();
+
+	myDoc.onreadystatechange = function ()
+	{
+		if (myDoc.readyState !== 4)
+			return;
+
+		if (myDoc.responseText !== null && myDoc.status === 200)
+		{
+			previewData = myDoc.responseText;
+			document.getElementById('css_preview_box').style.display = "";
+
+			// Revert to the theme they actually use ;).
+			var tempImage = new Image();
+			tempImage.src = elk_prepareScriptUrl(elk_scripturl) + 'action=admin;area=theme;sa=edit;theme=' + theme_id + ';preview;' + (new Date().getTime());
+
+			refreshPreviewCache = null;
+			refreshPreview(false);
+		}
+	};
+
+	var anchor = "";
+	if (url.indexOf("#") !== -1)
+	{
+		anchor = url.substr(url.indexOf("#"));
+		url = url.substr(0, url.indexOf("#"));
+	}
+
+	myDoc.open("GET", url + (url.indexOf("?") === -1 ? "?" : ";") + 'theme=', theme_id + anchor, true);
+	myDoc.send(null);
+}
+
+/**
+ * Used when editing a stylesheet.  Allows for the preview to be updated to reflect
+ * changes made to the css in the editor.
+ *
+ * @param {boolean} check
+ */
+function refreshPreview(check)
+{
+	var identical = document.forms.stylesheetForm.entire_file.value == refreshPreviewCache;
+
+	// Don't reflow the whole thing if nothing changed!!
+	if (check && identical)
+		return;
+
+	refreshPreviewCache = document.forms.stylesheetForm.entire_file.value;
+
+	// Replace the paths for images.
+	refreshPreviewCache = refreshPreviewCache.replace(/url\(\.\.\/images/gi, "url(" + elk_images_url);
+
+	// Try to do it without a complete reparse.
+	if (identical)
+	{
+		try
+		{
+			if (is_ie)
+			{
+				var sheets = frames['css_preview_box'].document.styleSheets;
+				for (var j = 0; j < sheets.length; j++)
+				{
+					if (sheets[j].id === 'css_preview_box')
+						sheets[j].cssText = document.forms.stylesheetForm.entire_file.value;
+				}
+			}
+			else
+			{
+				frames['css_preview_box'].document.getElementById("css_preview_sheet").innerHTML = document.forms.stylesheetForm.entire_file.value;
+			}
+		}
+		catch (e)
+		{
+			identical = false;
+		}
+	}
+
+	// This will work most of the time... could be done with an after-apply, maybe.
+	if (!identical)
+	{
+		var data = previewData,
+			preview_sheet = document.forms.stylesheetForm.entire_file.value,
+			stylesheetMatch = new RegExp('<link rel="stylesheet"[^>]+href="[^"]+' + editFilename + '[^>]*>');
+
+		// Replace the paths for images.
+		preview_sheet = preview_sheet.replace(/url\(\.\.\/images/gi, "url(" + elk_images_url);
+		data = data.replace(stylesheetMatch, '<style type="text/css" id="css_preview_sheet">' + preview_sheet + "<" + "/style>");
+
+		iframe = document.getElementById("css_preview_box");
+		iframe.contentWindow.document.open();
+		iframe.contentWindow.document.write(data);
+		iframe.contentWindow.document.close();
+
+		// Next, fix all its links so we can handle them and reapply the new css!
+		iframe.onload = function ()
+		{
+			var fixLinks = frames["css_preview_box"].document.getElementsByTagName("a");
+			for (var i = 0; i < fixLinks.length; i++)
+			{
+				if (fixLinks[i].onclick)
+					continue;
+
+				fixLinks[i].onclick = function ()
+				{
+					window.parent.navigatePreview(this.href);
+					return false;
+				};
+			}
+		};
+	}
+}
+
+/**
+ * Callback (onBeforeUpdate) used by the AutoSuggest, used when adding new bans
+ *
+ * @param {object} oAutoSuggest
+ */
+function onUpdateName(oAutoSuggest)
+{
+	document.getElementById('user_check').checked = true;
+	return true;
+}
+
+/**
+ * Validates that the ban form is filled out properly before submitting
+ * Used when editing bans
+ *
+ * @param {object} aForm this form object to check
+ */
+function confirmBan(aForm)
+{
+	if (aForm.ban_name.value === '')
+	{
+		alert(txt_ban_name_empty);
+		return false;
+	}
+
+	if (aForm.partial_ban.checked && !(aForm.cannot_post.checked || aForm.cannot_register.checked || aForm.cannot_login.checked))
+	{
+		alert(txt_ban_restriction_empty);
+		return false;
+	}
+}
+
+// Enable/disable some fields when working with bans.
+var fUpdateStatus = function ()
+{
+	document.getElementById("expire_date").disabled = !document.getElementById("expires_one_day").checked;
+	document.getElementById("cannot_post").disabled = document.getElementById("full_ban").checked;
+	document.getElementById("cannot_register").disabled = document.getElementById("full_ban").checked;
+	document.getElementById("cannot_login").disabled = document.getElementById("full_ban").checked;
+};
+
+/**
+ * Used when setting up subscriptions, used to toggle the currency code divs
+ * based on which currencys are chosen.
+ */
+function toggleCurrencyOther()
+{
+	var otherOn = document.getElementById("paid_currency").value === 'other',
+		currencydd = document.getElementById("custom_currency_code_div_dd");
+
+	if (otherOn)
+	{
+		document.getElementById("custom_currency_code_div").style.display = "";
+		document.getElementById("custom_currency_symbol_div").style.display = "";
+
+		if (currencydd)
+		{
+			document.getElementById("custom_currency_code_div_dd").style.display = "";
+			document.getElementById("custom_currency_symbol_div_dd").style.display = "";
+		}
+	}
+	else
+	{
+		document.getElementById("custom_currency_code_div").style.display = "none";
+		document.getElementById("custom_currency_symbol_div").style.display = "none";
+
+		if (currencydd)
+		{
+			document.getElementById("custom_currency_symbol_div_dd").style.display = "none";
+			document.getElementById("custom_currency_code_div_dd").style.display = "none";
+		}
+	}
+}
+
+/**
+ * Used to ajax-ively preview the templates of bounced emails (template_bounce_template)
+ */
+function ajax_getEmailTemplatePreview()
+{
+	$.ajax({
+		type: "POST",
+		url: elk_scripturl + "?action=xmlpreview;xml",
+		data: {
+			item: "bounce_preview",
+			title: $("#template_title").val(),
+			body: $("#template_body").val()
+		},
+		context: document.body
+	})
+	.done(function(request) {
+		// Show the preivew section, populated with the response
+		$("#preview_section").css({display: ""});
+		$("#template_preview").html($(request).find('body').text());
+		$("#preview_subject").html($(request).find('subject').text());
+
+		// Any error we need to let them know about?
+		if ($(request).find("error").text() !== '')
+		{
+			var errors_html = '';
+
+			// Build the error string
+			errors = $(request).find('error').each(function() {
+				errors_html += $(this).text() + '<br />';
+			});
+
+			// Add it to the error div, set the class level, and show it
+			$(document).find("#error_list").html(errors_html);
+			$("#errors").css({display: ""});
+			$("#errors").attr('class', parseInt($(request).find('errors').attr('serious')) === 0 ? 'warningbox' : 'errorbox');
+
+			// Navigate to the preview
+			location.hash = '#' + 'preview_section';
+		}
+		else
+		{
+			$("#errors").css({display: "none"});
+			$("#error_list").html('');
+		}
+
+		return false;
+	});
+
+	return false;
+}
+
+/**
+ * Used to ajax-ively preview a word censor
+ * Does no checking, it either gets a result or does nothing
+ */
+function ajax_getCensorPreview()
+{
+	$.ajax({
+		type: 'POST',
+		dataType: 'json',
+		url: elk_scripturl + "?action=admin;area=postsettings;sa=censor;xml",
+		data: {
+			censortest: $("#censortest").val()
+		}
+	})
+	.done(function(request) {
+		if (request.result === true) {
+			// Show the censored text section, populated with the response
+			$("#censor_result").css({display: ""}).html(request.censor);
+
+			// Update the token
+			$("#token").attr({name:request.token_val, value:request.token});
+
+			// Clear the box
+			$('#censortest').attr({value:''}).val('');
+		}
+	});
+
+	return false;
 }

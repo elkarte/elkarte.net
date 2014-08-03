@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -16,6 +16,8 @@ if (!defined('ELK'))
 
 /**
  * Removes the given language from all members..
+ *
+ * @package Languages
  * @param int $lang_id
  */
 function removeLanguageFromMember($lang_id)
@@ -35,7 +37,10 @@ function removeLanguageFromMember($lang_id)
 
 /**
  * How many languages?
- * Callback for the list in action_edit().
+ *
+ * - Callback for the list in action_edit().
+ *
+ * @package Languages
  */
 function list_getNumLanguages()
 {
@@ -44,9 +49,13 @@ function list_getNumLanguages()
 
 /**
  * Fetch the actual language information.
- * Callback for $listOptions['get_items']['function'] in action_edit.
- * Determines which languages are available by looking for the "index.{language}.php" file.
- * Also figures out how many users are using a particular language.
+ *
+ * What it does:
+ * - Callback for $listOptions['get_items']['function'] in action_edit.
+ * - Determines which languages are available by looking for the "index.{language}.php" file.
+ * - Also figures out how many users are using a particular language.
+ *
+ * @package Languages
  */
 function list_getLanguages()
 {
@@ -118,8 +127,9 @@ function list_getLanguages()
 /**
  * This function cleans language entries to/from display.
  *
- * @param $string
- * @param $to_display
+ * @package Languages
+ * @param string $string
+ * @param boolean $to_display
  */
 function cleanLangString($string, $to_display = true)
 {
@@ -138,6 +148,7 @@ function cleanLangString($string, $to_display = true)
 			{
 				// Toggle the escape.
 				$is_escape = !$is_escape;
+
 				// If we're now escaped don't add this string.
 				if ($is_escape)
 					continue;
@@ -212,17 +223,19 @@ function cleanLangString($string, $to_display = true)
 
 			// Actually add the character to the string!
 			$new_string .= $string[$i];
+
 			// If anything was escaped it ain't any longer!
 			$is_escape = false;
 		}
 
-		// Unhtml then rehtml the whole thing!
+		// Un-html then re-html the whole thing!
 		$new_string = Util::htmlspecialchars(un_htmlspecialchars($new_string));
 	}
 	else
 	{
 		// Keep track of what we're doing...
 		$in_string = 0;
+
 		// This is for deciding whether to HTML a quote.
 		$in_html = false;
 		$str_len = strlen($string);
@@ -323,8 +336,10 @@ function cleanLangString($string, $to_display = true)
 
 /**
  * Gets a list of available languages from the mother ship
- * Will return a subset if searching, otherwise all available
  *
+ * - Will return a subset if searching, otherwise all available
+ *
+ * @package Languages
  * @return string
  */
 function list_getLanguagesList()
@@ -369,4 +384,31 @@ function list_getLanguagesList()
 		else
 			return $languages;
 	}
+}
+
+function findPossiblePackages($lang)
+{
+	$db = database();
+
+	$request = $db->query('', '
+		SELECT id_install, filename
+		FROM {db_prefix}log_packages
+		WHERE package_id LIKE {string:contains_lang}
+			AND install_state = {int:installed}',
+		array(
+			'contains_lang' => 'elk_' . $lang . '_contribs:elk_' . $lang . '',
+			'installed' => 1,
+		)
+	);
+
+	if ($db->num_rows($request) > 0)
+	{
+		list ($pid, $file_name) = $db->fetch_row($request);
+	}
+	$db->free_result($request);
+
+	if (!empty($pid))
+		return array($pid, $file_name);
+	else
+		return false;
 }

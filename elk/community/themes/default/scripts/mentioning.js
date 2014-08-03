@@ -3,7 +3,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the mentioning function as it
  * relates to a plain text box (no sceditor invocation) eg quick reply no editor
@@ -16,12 +16,11 @@
  */
 function elk_mentions(oOptions)
 {
-	this.last_call = 0,
-	this.last_query = '',
-	this.names = [],
-	this.cached_names = [],
-	this.cached_queries = [],
-	this.mentions = null,
+	this.last_call = 0;
+	this.names = [];
+	this.cached_names = [];
+	this.cached_queries = [];
+	this.mentions = null;
 	this.$atwho = null;
 
 	this.opt = oOptions;
@@ -66,6 +65,9 @@ elk_mentions.prototype.attachAtWho = function ()
 				// Fine then, you really do need a list so lets request one
 				if (elk_formSubmitted)
 					return [];
+
+				// Well then lets make a find member suggest call
+				_self.names = [];
 				$.ajax({
 					url: elk_scripturl + "?action=suggest;suggest_type=member;search=" + query.php_to8bit().php_urlencode() + ";" + elk_session_var + "=" + elk_session_id + ";xml;time=" + this.current_call,
 					type: "get",
@@ -85,7 +87,6 @@ elk_mentions.prototype.attachAtWho = function ()
 
 				// Save this information so we can reuse it
 				_self.last_call = current_call;
-				_self.last_query = query;
 
 				// Save it to the cache for this mention
 				_self.cached_names[query] = _self.names;
@@ -97,6 +98,33 @@ elk_mentions.prototype.attachAtWho = function ()
 				_self.mentions.append($('<input type="hidden" name="uid[]" />').val($li.data('id')).attr('data-name', $li.data('value')));
 
 				return value;
+			},
+			matcher: function(flag, subtext, should_start_with_space) {
+				var match, regexp;
+
+				flag = flag.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+
+				if (should_start_with_space)
+					flag = '(?:^|\\s)' + flag;
+
+				regexp = new RegExp(flag + '([^ <>&"\'=\\\\\n]*)$|' + flag + '([^\\x00-\\xff]*)$', 'gi');
+				match = regexp.exec(subtext.replace());
+				if (match)
+					return match[2] || match[1];
+				else
+					return null;
+			},
+			highlighter: function(li, query) {
+				var regexp;
+				if (!query)
+					return li;
+
+				// regexp from http://phpjs.org/functions/preg_quote/
+				query = (query + '').replace(new RegExp('[.\\\\+*?\\[\\^\\]$(){}=!<>|:\\-]', 'g'), '\\$&');
+				regexp = new RegExp(">\\s*(\\w*)(" + query.replace("+", "\\+") + ")(\\w*)\\s*<", 'ig');
+				return li.replace(regexp, function(str, $1, $2, $3) {
+					return '> ' + $1 + '<strong>' + $2 + '</strong>' + $3 + ' <';
+				});
 			}
 		}
 	});

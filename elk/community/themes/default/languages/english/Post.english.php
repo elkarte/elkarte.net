@@ -1,80 +1,28 @@
 <?php
 // Version: 1.0; Post
 
-global $context;
-
 $txt['post_reply'] = 'Post reply';
 $txt['message_icon'] = 'Message icon';
 $txt['post_in_board'] = 'Post in the board';
 $txt['subject_not_filled'] = 'The subject field was not filled out. It is required.';
 $txt['message_body_not_filled'] = 'The message body was not filled out. It is required.';
-// Use numeric entities in the below string.
-$txt['add_bbc'] = 'Add BBC tags';
-$txt['bold'] = 'Bold';
-$txt['italic'] = 'Italicized';
-$txt['underline'] = 'Underline';
-$txt['center'] = 'Centered';
-$txt['hyperlink'] = 'Insert Hyperlink';
-$txt['insert_email'] = 'Insert Email';
-$txt['bbc_code'] = 'Insert Code';
+
 // Escape any single quotes in here twice.. 'it\'s' -> 'it\\\'s'.
 $txt['bbc_quote'] = 'Insert Quote';
-$txt['bbc_spoiler'] = 'Insert Spoiler';
-$txt['bbc_footnote'] = 'Insert Footnote';
-$txt['list'] = 'Insert List';
-$txt['list_unordered'] = 'Insert unordered list';
-$txt['list_ordered'] = 'Insert ordered list';
-
-$txt['change_color'] = 'Change color';
-$txt['black'] = 'Black';
-$txt['red'] = 'Red';
-$txt['yellow'] = 'Yellow';
-$txt['pink'] = 'Pink';
-$txt['green'] = 'Green';
-$txt['orange'] = 'Orange';
-$txt['purple'] = 'Purple';
-$txt['blue'] = 'Blue';
-$txt['beige'] = 'Beige';
-$txt['brown'] = 'Brown';
-$txt['teal'] = 'Teal';
-$txt['navy'] = 'Navy';
-$txt['maroon'] = 'Maroon';
-$txt['lime_green'] = 'Lime Green';
-$txt['white'] = 'White';
 $txt['disable_smileys'] = 'Disable smileys';
 $txt['dont_use_smileys'] = 'Don\'t use smileys.';
+
 // Escape any single quotes in here twice.. 'it\'s' -> 'it\\\'s'.
 $txt['posted_on'] = 'Posted on';
 $txt['standard'] = 'Standard';
 $txt['thumbs_up'] = 'Thumb Up';
 $txt['thumbs_down'] = 'Thumb Down';
-$txt['excamation_point'] = 'Exclamation point';
+$txt['exclamation_point'] = 'Exclamation point';
 $txt['question_mark'] = 'Question mark';
 $txt['icon_poll'] = 'Poll';
 $txt['lamp'] = 'Lamp';
 $txt['add_smileys'] = 'Add smileys';
-$txt['flash'] = 'Insert Flash';
-$txt['ftp'] = 'Insert FTP Link';
-$txt['image'] = 'Insert image';
-$txt['table'] = 'Insert table';
-$txt['table_td'] = 'Insert table column';
 $txt['topic_notify_no'] = 'There are no topics with notification.';
-$txt['marquee'] = 'Marquee';
-$txt['teletype'] = 'Teletype';
-$txt['strike'] = 'Strikethrough';
-$txt['glow'] = 'Glow';
-$txt['shadow'] = 'Shadow';
-$txt['preformatted'] = 'Preformatted text';
-$txt['left_align'] = 'Left align';
-$txt['right_align'] = 'Right align';
-$txt['superscript'] = 'Superscript';
-$txt['subscript'] = 'Subscript';
-$txt['table_tr'] = 'Insert table row';
-$txt['horizontal_rule'] = 'Horizontal Rule';
-$txt['font_size'] = 'Font size';
-$txt['font_face'] = 'Font face';
-$txt['toggle_view'] = 'Toggle view';
-$txt['unformat_text'] = 'Remove formatting';
 
 $txt['rich_edit_wont_work'] = 'Your browser does not support Rich Text editing.';
 $txt['rich_edit_function_disabled'] = 'Your browser does not support this function.';
@@ -118,14 +66,15 @@ $txt['reported_by'] = 'has been reported by';
 $txt['board_moderate'] = 'on a board you moderate';
 $txt['report_comment'] = 'The reporter has made the following comment';
 
-$txt['attach_restrict_attachmentPostLimit'] = 'maximum total size %1$d KB';
-$txt['attach_restrict_attachmentSizeLimit'] = 'maximum individual size %1$d KB';
+$txt['attach_drop_files'] = 'Add files by dragging & dropping or <a class="drop_area_fileselect_text" href="#">selecting them</a>';
+$txt['attach_restrict_attachmentPostLimit'] = 'maximum total size %1$s KB';
+$txt['attach_restrict_attachmentSizeLimit'] = 'maximum individual size %1$s KB';
 $txt['attach_restrict_attachmentNumPerPostLimit'] = '%1$d per post';
 $txt['attach_restrictions'] = 'Restrictions:';
 
 $txt['post_additionalopt_attach'] = 'Attachments and other options';
 $txt['post_additionalopt'] = 'Other options';
-$txt['sticky_after'] = 'Sticky this topic.';
+$txt['sticky_after'] = 'Pin this topic.';
 $txt['move_after2'] = 'Move this topic.';
 $txt['back_to_topic'] = 'Return to this topic.';
 $txt['approve_this_post'] = 'Approve this post';
@@ -165,10 +114,10 @@ $txt['more_smileys_title'] = 'Additional smileys';
 $txt['more_smileys_pick'] = 'Pick a smiley';
 $txt['more_smileys_close_window'] = 'Close Window';
 
-$txt['error_new_reply'] = 'Warning - while you were typing a new reply has been posted. You may wish to review your post.';
-$txt['error_new_replies'] = 'Warning - while you were typing %1$d new replies have been posted. You may wish to review your post.';
-$txt['error_new_reply_reading'] = 'Warning - while you were reading a new reply has been posted. You may wish to review your post.';
-$txt['error_new_replies_reading'] = 'Warning - while you were reading %1$d new replies have been posted. You may wish to review your post.';
+$txt['error_new_reply'] = 'while you were typing a new reply has been posted. You may wish to review your post.';
+$txt['error_new_replies'] = 'while you were typing %1$d new replies have been posted. You may wish to review your post.';
+$txt['error_new_reply_reading'] = 'while you were reading a new reply has been posted. You may wish to review your post.';
+$txt['error_new_replies_reading'] = 'while you were reading %1$d new replies have been posted. You may wish to review your post.';
 
 $txt['announce_this_topic'] = 'Send an announcement about this topic to the members:';
 $txt['announce_title'] = 'Send an announcement';
@@ -189,7 +138,7 @@ $txt['digest_new_replies'] = 'Replies have been made in the following topics';
 $txt['digest_new_replies_one'] = '1 reply in "%1$s"';
 $txt['digest_new_replies_many'] = '%1$d replies in "%2$s"';
 $txt['digest_mod_actions'] = 'The following moderation actions have taken place';
-$txt['digest_mod_act_sticky'] = '"%1$s" was stickied';
+$txt['digest_mod_act_sticky'] = '"%1$s" was pinned';
 $txt['digest_mod_act_lock'] = '"%1$s" was locked';
 $txt['digest_mod_act_unlock'] = '"%1$s" was unlocked';
 $txt['digest_mod_act_remove'] = '"%1$s" was removed';
@@ -199,7 +148,7 @@ $txt['digest_mod_act_split'] = '"%1$s" was split';
 
 $txt['attach_error_title'] = 'Error uploading attachments.';
 $txt['attach_warning'] = 'There was a problem during the uploading of <strong>%1$s</strong>.';
-$txt['attach_max_total_file_size'] = 'Sorry, you are out of attachment space. The total attachment size allowed per post is %1$s KB. Space remaining is %2$s kB.';
+$txt['attach_max_total_file_size'] = 'Sorry, you are out of attachment space. The total attachment size allowed per post is %1$s KB. Space remaining is %2$s KB.';
 $txt['attach_folder_warning'] = 'The attachments directory can not be located. Please notify an administrator of this problem.';
 $txt['attach_folder_admin_warning'] = 'The path to the attachments directory (%1$s) is incorrect. Please correct it in the attachment settings area of your admin panel.';
 $txt['attach_limit_nag'] = 'You have reached the maximum number of attachments allowed per post.';
@@ -225,7 +174,7 @@ $txt['error_temp_attachments_flushed'] = 'Please note that any files which had b
 $txt['error_topic_already_announced'] = 'Please note that this topic has already been announced.';
 
 $txt['cant_access_upload_path'] = 'Cannot access attachments upload path!';
-$txt['file_too_big'] = 'Your file is too large. The maximum attachment size allowed is %1$d KB.';
+$txt['file_too_big'] = 'Your file is too large. The maximum attachment size allowed is %1$s KB.';
 $txt['attach_timeout'] = 'Your attachment couldn\'t be saved. This might happen because it took too long to upload or the file is bigger than the server will allow.<br /><br />Please consult your server administrator for more information.';
 $txt['bad_attachment'] = 'Your attachment has failed security checks and cannot be uploaded. Please consult the forum administrator.';
 $txt['ran_out_of_space'] = 'The upload directory is full. Please contact an administrator about this problem.';

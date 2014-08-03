@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,11 +22,14 @@ if (!defined('ELK'))
 
 /**
  * Sets the login cookie and session based on the id_member and password passed.
+ *
+ * What it does:
  * - password should be already encrypted with the cookie salt.
  * - logs the user out if id_member is zero.
  * - sets the cookie and session to last the number of seconds specified by cookie_length.
  * - when logging out, if the globalCookies setting is enabled, attempts to clear the subdomain's cookie too.
  *
+ * @package Authorization
  * @param int $cookie_length
  * @param int $id The id of the member
  * @param string $password = ''
@@ -97,14 +100,17 @@ function setLoginCookie($cookie_length, $id, $password = '')
 		// We need to meddle with the session.
 		require_once(SOURCEDIR . '/Session.php');
 
-		// Backup and remove the old session.
+		// Backup the old session.
 		$oldSessionData = $_SESSION;
+
+		// Remove the old session data and file / db entry
 		$_SESSION = array();
 		session_destroy();
 
 		// Recreate and restore the new session.
 		loadSession();
-		// @todo should we use session_regenerate_id(true); now that we are 5.1+
+
+		// Get a new session id, and load it with the data
 		session_regenerate_id();
 		$_SESSION = $oldSessionData;
 
@@ -114,12 +120,14 @@ function setLoginCookie($cookie_length, $id, $password = '')
 
 /**
  * Get the domain and path for the cookie
+ *
+ * What it does:
  * - normally, local and global should be the localCookies and globalCookies settings, respectively.
  * - uses boardurl to determine these two things.
  *
+ * @package Authorization
  * @param bool $local
  * @param bool $global
- * @return array an array to set the cookie on with domain and path in it, in that order
  */
 function url_parts($local, $global)
 {
@@ -152,10 +160,13 @@ function url_parts($local, $global)
 
 /**
  * Question the verity of the admin by asking for his or her password.
+ *
+ * What it does:
  * - loads Login.template.php and uses the admin_login sub template.
  * - sends data to template so the admin is sent on to the page they
  *   wanted if their password is correct, otherwise they can try again.
  *
+ * @package Authorization
  * @param string $type = 'admin'
  */
 function adminLogin($type = 'admin')
@@ -164,6 +175,7 @@ function adminLogin($type = 'admin')
 
 	loadLanguage('Admin');
 	loadTemplate('Login');
+	loadJavascriptFile('sha256.js', array('defer' => true));
 
 	// Validate what type of session check this is.
 	$types = array();
@@ -202,7 +214,7 @@ function adminLogin($type = 'admin')
 
 	// And title the page something like "Login".
 	if (!isset($context['page_title']))
-		$context['page_title'] = $txt['login'];
+		$context['page_title'] = $txt['admin_login'];
 
 	// The type of action.
 	$context['sessionCheckType'] = $type;
@@ -215,10 +227,13 @@ function adminLogin($type = 'admin')
 
 /**
  * Used by the adminLogin() function.
- * if 'value' is an array, the function is called recursively.
  *
+ * What it does:
+ *  - if 'value' is an array, the function is called recursively.
+ *
+ * @package Authorization
  * @param string $k key
- * @param string $v value
+ * @param string|boolean $v value
  * @return string 'hidden' HTML form fields, containing key-value-pairs
  */
 function adminLogin_outputPostVars($k, $v)
@@ -239,8 +254,9 @@ function adminLogin_outputPostVars($k, $v)
 /**
  * Properly urlencodes a string to be used in a query
  *
- * @param array $get
- * @return our query string
+ * @package Authorization
+ * @param mixed[] $get associative array from $_GET
+ * @return string query string
  */
 function construct_query_string($get)
 {
@@ -277,10 +293,13 @@ function construct_query_string($get)
 
 /**
  * Finds members by email address, username, or real name.
+ *
+ * What it does:
  * - searches for members whose username, display name, or e-mail address match the given pattern of array names.
  * - searches only buddies if buddies_only is set.
  *
- * @param array $names
+ * @package Authorization
+ * @param string[]|string $names
  * @param bool $use_wildcards = false, accepts wildcards ? and * in the patern if true
  * @param bool $buddies_only = false,
  * @param int $max = 500 retrieves a maximum of max members, if passed
@@ -366,14 +385,17 @@ function findMembers($names, $use_wildcards = false, $buddies_only = false, $max
 
 /**
  * Generates a random password for a user and emails it to them.
+ *
+ * What it does:
  * - called by ProfileOptions controller when changing someone's username.
  * - checks the validity of the new username.
  * - generates and sets a new password for the given user.
  * - mails the new password to the email address of the user.
  * - if username is not set, only a new password is generated and sent.
  *
+ * @package Authorization
  * @param int $memID
- * @param string $username = null
+ * @param string|null $username = null
  */
 function resetPassword($memID, $username = null)
 {
@@ -397,8 +419,11 @@ function resetPassword($memID, $username = null)
 	}
 
 	// Generate a random password.
+	require_once(EXTDIR . '/PasswordHash.php');
+	$t_hasher = new PasswordHash(8, false);
 	$newPassword = substr(preg_replace('/\W/', '', md5(mt_rand())), 0, 10);
-	$newPassword_sha1 = sha1(strtolower($user) . $newPassword);
+	$newPassword_sha256 = hash('sha256', strtolower($user) . $newPassword);
+	$db_hash = $t_hasher->HashPassword($newPassword_sha256);
 
 	// Do some checks on the username if needed.
 	if ($username !== null)
@@ -413,10 +438,10 @@ function resetPassword($memID, $username = null)
 			fatal_error($error, $error_severity === null ? false : 'general');
 
 		// Update the database...
-		updateMemberData($memID, array('member_name' => $user, 'passwd' => $newPassword_sha1));
+		updateMemberData($memID, array('member_name' => $user, 'passwd' => $db_hash));
 	}
 	else
-		updateMemberData($memID, array('passwd' => $newPassword_sha1));
+		updateMemberData($memID, array('passwd' => $db_hash));
 
 	call_integration_hook('integrate_reset_pass', array($old_user, $user, $newPassword));
 
@@ -434,13 +459,17 @@ function resetPassword($memID, $username = null)
 /**
  * Checks a username obeys a load of rules
  *
+ * - Returns null if fine
+ *
+ * @package Authorization
  * @param int $memID
  * @param string $username
- * @param boolean $error_context
+ * @param string $error_context
  * @param boolean $check_reserved_name
- * @return string Returns null if fine
+ * @param boolean $fatal pass through to isReservedName
+ * @return string
  */
-function validateUsername($memID, $username, $error_context = 'register', $check_reserved_name = true)
+function validateUsername($memID, $username, $error_context = 'register', $check_reserved_name = true, $fatal = true)
 {
 	global $txt;
 
@@ -464,30 +493,37 @@ function validateUsername($memID, $username, $error_context = 'register', $check
 	if ($check_reserved_name)
 	{
 		require_once(SUBSDIR . '/Members.subs.php');
-		if (isReservedName($username, $memID, false))
+		if (isReservedName($username, $memID, false, $fatal))
 			$errors->addError(array('name_in_use', array(htmlspecialchars($username, ENT_COMPAT, 'UTF-8'))));
 	}
 }
 
 /**
  * Checks whether a password meets the current forum rules
+ *
+ * What it does:
  * - called when registering/choosing a password.
  * - checks the password obeys the current forum settings for password strength.
  * - if password checking is enabled, will check that none of the words in restrict_in appear in the password.
  * - returns an error identifier if the password is invalid, or null.
  *
+ * @package Authorization
  * @param string $password
  * @param string $username
- * @param array $restrict_in = array()
+ * @param string[] $restrict_in = array()
  * @return string an error identifier if the password is invalid
  */
 function validatePassword($password, $username, $restrict_in = array())
 {
-	global $modSettings;
+	global $modSettings, $txt;
 
 	// Perform basic requirements first.
 	if (Util::strlen($password) < (empty($modSettings['password_strength']) ? 4 : 8))
+	{
+		loadLanguage('Errors');
+		$txt['profile_error_password_short'] = sprintf($txt['profile_error_password_short'], empty($modSettings['password_strength']) ? 4 : 8);
 		return 'short';
+	}
 
 	// Is this enough?
 	if (empty($modSettings['password_strength']))
@@ -511,9 +547,67 @@ function validatePassword($password, $username, $restrict_in = array())
 }
 
 /**
+ * Checks whether an entered password is correct for the user
+ *
+ * What it does:
+ * - called when logging in or whenever a password needs to be validated for a user
+ * - used to generate a new hash for the db, used during registration or any password changes
+ * - if a non SHA256 password is sent, will generate one with SHA256(user + password) and return it in password
+ *
+ * @package Authorization
+ * @param string $password user password if not already 64 characters long will be SHA256 with the user name
+ * @param string $hash hash as generated from a SHA256 password
+ * @param string $user user name only required if creating a SHA-256 password
+ * @param boolean $returnhash flag to determine if we are returning a hash suitable for the database
+ */
+function validateLoginPassword(&$password, $hash, $user = '', $returnhash = false)
+{
+	// Our hashing controller
+	require_once(EXTDIR . '/PasswordHash.php');
+
+	// Base-2 logarithm of the iteration count used for password stretching, the
+	// higher the number the more secure and CPU time consuming
+	$hash_cost_log2 = 10;
+
+	// Do we require the hashes to be portable to older systems (less secure)?
+	$hash_portable = false;
+
+	// Get an instance of the hasher
+	$hasher = new PasswordHash($hash_cost_log2, $hash_portable);
+
+	// Guilty until we know otherwise
+	$passhash = false;
+
+	// If the password is not 64 characters, lets make it a (SHA-256)
+	if (strlen($password) !== 64)
+		$password = hash('sha256', Util::strtolower($user) . un_htmlspecialchars($password));
+
+	// They need a password hash, something to save in the db?
+	if ($returnhash)
+	{
+		$passhash = $hasher->HashPassword($password);
+
+		// Something is not right, we can not generate a valid hash thats <20 characters
+		if (strlen($passhash) < 20)
+			$passhash = false;
+	}
+	// Or doing a password check?
+	else
+	 	$passhash = (bool) $hasher->CheckPassword($password, $hash);
+
+	unset($hasher);
+
+	return $passhash;
+}
+
+/**
  * Quickly find out what moderation authority this user has
+ *
+ * What it does:
  * - builds the moderator, group and board level querys for the user
  * - stores the information on the current users moderation powers in $user_info['mod_cache'] and $_SESSION['mc']
+ *
+ * @package Authorization
  */
 function rebuildModCache()
 {
@@ -588,15 +682,16 @@ function rebuildModCache()
 }
 
 /**
- * The same thing as setcookie but gives support for HTTP-Only cookies in PHP < 5.2
+ * The same thing as setcookie but allows for integration hook
  *
+ * @package Authorization
  * @param string $name
  * @param string $value = ''
  * @param int $expire = 0
  * @param string $path = ''
  * @param string $domain = ''
- * @param bool $secure = false
- * @param bool $httponly = null
+ * @param boolean|null $secure = false
+ * @param boolean|null $httponly = null
  */
 function elk_setcookie($name, $value = '', $expire = 0, $path = '', $domain = '', $secure = null, $httponly = null)
 {
@@ -611,27 +706,14 @@ function elk_setcookie($name, $value = '', $expire = 0, $path = '', $domain = ''
 	// Intercept cookie?
 	call_integration_hook('integrate_cookie', array($name, $value, $expire, $path, $domain, $secure, $httponly));
 
-	// This function is pointless if we have PHP >= 5.2.
-	if (version_compare(PHP_VERSION, '5.2', '>='))
-		return setcookie($name, $value, $expire, $path, $domain, $secure, $httponly);
-
-	// $httponly is the only reason I made this function. If it's not being used, use setcookie().
-	if (!$httponly)
-		return setcookie($name, $value, $expire, $path, $domain, $secure);
-
-	// Ugh, looks like we have to resort to using a manual process.
-	header('Set-Cookie: '.rawurlencode($name).'='.rawurlencode($value)
-			.(empty($domain) ? '' : '; Domain='.$domain)
-			.(empty($expire) ? '' : '; Max-Age='.$expire)
-			.(empty($path) ? '' : '; Path='.$path)
-			.(!$secure ? '' : '; Secure')
-			.(!$httponly ? '' : '; HttpOnly'), false);
+	return setcookie($name, $value, $expire, $path, $domain, $secure, $httponly);
 }
 
 /**
  * Set the passed users online or not, in the online log table
  *
- * @param array|int $ids ids of the member(s) to log
+ * @package Authorization
+ * @param int[]|int $ids ids of the member(s) to log
  * @param bool $on = false if true, add the user(s) to online log, if false, remove 'em
  */
 function logOnline($ids, $on = false)
@@ -657,6 +739,7 @@ function logOnline($ids, $on = false)
 /**
  * Delete expired/outdated session from log_online
  *
+ * @package Authorization
  * @param string $session
  */
 function deleteOnline($session)
@@ -675,6 +758,7 @@ function deleteOnline($session)
 /**
  * This functions determines whether this is the first login of the given user.
  *
+ * @package Authorization
  * @param int $id_member the id of the member to check for
  */
 function isFirstLogin($id_member)
@@ -689,8 +773,9 @@ function isFirstLogin($id_member)
 /**
  * Search for a member by given criterias
  *
+ * @package Authorization
  * @param string $where
- * @param string $where_params
+ * @param mixed[] $where_params array of values to used in the where statement
  * @param bool $fatal
  * @return boolean
  */
@@ -739,8 +824,9 @@ function findUser($where, $where_params, $fatal = true)
 /**
  * Find users by their email address.
  *
+ * @package Authorization
  * @param string $email
- * @return int
+ * @return boolean
  */
 function userByEmail($email)
 {
@@ -764,6 +850,8 @@ function userByEmail($email)
 
 /**
  * Generate a random validation code.
+ *
+ * @package Authorization
  */
 function generateValidationCode()
 {
@@ -784,13 +872,12 @@ function generateValidationCode()
 }
 
 /**
- * This function loads many settings of a user given by
- * name or email.
+ * This function loads many settings of a user given by name or email.
  *
+ * @package Authorization
  * @param string $name
  * @param bool $is_id if true it treats $name as a member ID and try to load the data for that ID
- *
- * @return mixed, array or false if nothing is found
+ * @return mixed[]|false false if nothing is found
  */
 function loadExistingMember($name, $is_id = false)
 {
@@ -844,7 +931,10 @@ function loadExistingMember($name, $is_id = false)
 	if ($db->num_rows($request) == 0)
 		$user_settings = false;
 	else
+	{
 		$user_settings = $db->fetch_assoc($request);
+		$user_settings['id_member'] = (int) $user_settings['id_member'];
+	}
 
 	$db->free_result($request);
 

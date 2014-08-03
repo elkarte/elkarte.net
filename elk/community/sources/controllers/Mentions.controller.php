@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -17,6 +17,8 @@ if (!defined('ELK'))
 /**
  * Mentions_Controller Class:  Add mention notificaions for various actions such
  * as liking a post, adding a buddy, @ calling a member in a post
+ *
+ * @package Mentions
  */
 class Mentions_Controller extends Action_Controller
 {
@@ -63,6 +65,20 @@ class Mentions_Controller extends Action_Controller
 	 * @var string
 	 */
 	protected $_type = '';
+
+	/**
+	 * The url of the display mentions button (all, unread, etc)
+	 *
+	 * @var string
+	 */
+	protected $_url_param = '';
+
+	/**
+	 * Used for pagenation, keeps track of the current start point
+	 *
+	 * @var int
+	 */
+	protected $_page = 0;
 
 	/**
 	 * Determine if we are looking only at unread mentions or any kind of
@@ -155,7 +171,7 @@ class Mentions_Controller extends Action_Controller
 		is_not_guest();
 
 		require_once(SUBSDIR . '/Mentions.subs.php');
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		loadLanguage('Mentions');
 
 		$this->_buildUrl();
@@ -226,10 +242,12 @@ class Mentions_Controller extends Action_Controller
 				'log_time' => array(
 					'header' => array(
 						'value' => $txt['mentions_when'],
+						'class' => 'mention_log_time',
 					),
 					'data' => array(
 						'db' => 'log_time',
-						'timeformat' => true,
+						'timeformat' => 'html_time',
+						'class' => 'mention_log_time',
 					),
 					'sort' => array(
 						'default' => 'mtn.log_time DESC',
@@ -239,6 +257,7 @@ class Mentions_Controller extends Action_Controller
 				'action' => array(
 					'header' => array(
 						'value' => $txt['mentions_action'],
+						'class' => 'listaction',
 					),
 					'data' => array(
 						'function' => create_function('$row', '
@@ -247,14 +266,14 @@ class Mentions_Controller extends Action_Controller
 							$opts = \'\';
 
 							if (empty($row[\'status\']))
-								$opts = \'<a href="?action=mentions;sa=updatestatus;mark=read;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_read.png" alt="*" /></a>&nbsp;\';
+								$opts = \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=read;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_read.png" alt="*" /></a>&nbsp;\';
 							else
-								$opts = \'<a href="?action=mentions;sa=updatestatus;mark=unread;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markunread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_unread.png" alt="*" /></a>&nbsp;\';
+								$opts = \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=unread;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markunread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_unread.png" alt="*" /></a>&nbsp;\';
 
-							return $opts . \'<a href="?action=mentions;sa=updatestatus;mark=delete;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'delete\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/delete.png" alt="*" /></a>\';
+							return $opts . \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=delete;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'delete\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/delete.png" alt="*" /></a>\';
 						'),
+						'class' => 'listaction',
 					),
-					'class' => 'listaction',
 				),
 			),
 			'list_menu' => array(
@@ -370,10 +389,10 @@ class Mentions_Controller extends Action_Controller
 	/**
 	 * Callback used to prepare the mention message for mentions, likes, removed likes and buddies
 	 *
-	 * @param array $mentions : Mentions retrieved from the database by getUserMentions
+	 * @param mixed[] $mentions : Mentions retrieved from the database by getUserMentions
 	 * @param string $type : the type of the mention
 	 */
-	function prepareMentionMessage(&$mentions, $type)
+	public function prepareMentionMessage(&$mentions, $type)
 	{
 		global $txt, $scripturl, $context, $modSettings, $user_info;
 
@@ -409,7 +428,7 @@ class Mentions_Controller extends Action_Controller
 		{
 			require_once(SUBSDIR . '/Boards.subs.php');
 
-			$accessibleBoards = accessibleBoards(null, $boards);
+			$accessibleBoards = accessibleBoards($boards);
 
 			foreach ($boards as $key => $board)
 			{
@@ -481,7 +500,7 @@ class Mentions_Controller extends Action_Controller
 	/**
 	 * Sets the specifics of a mention call in this instance
 	 *
-	 * @param array $data must contain uid, type and msg at a minimum
+	 * @param mixed[] $data must contain uid, type and msg at a minimum
 	 */
 	public function setData($data)
 	{
@@ -583,16 +602,13 @@ class Mentions_Controller extends Action_Controller
 		);
 		$validation = array(
 			'id_mention' => 'validate_ownmention',
-			'mark' => 'trim|contains[read,unread,delete]',
+			'mark' => 'contains[read,unread,delete]',
 		);
 
 		$this->_validator->sanitation_rules($sanitization);
 		$this->_validator->validation_rules($validation);
 
-		if (!$this->_validator->validate($this->_data))
-			return false;
-
-		return true;
+		return $this->_validator->validate($this->_data);
 	}
 
 	/**

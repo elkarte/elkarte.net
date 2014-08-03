@@ -2,19 +2,24 @@
 <?php
 
 /**
+ * Handles the creating of new topics by email
+ * 
+ * Note the shebang #!/usr/local/bin/php -q needs to point to the installed
+ * location of php, this is the typical location but yours may be different.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Release Candidate 1
  *
  */
 
-// Only do anything for a pipe and direct calling
+// Only work for a pipe and direct calling
 if (!defined('STDIN'))
 	return;
 
-// Any output here is not good
+// Any output here is not good, it will be bounced as email
 error_reporting(0);
 
 // Need SSI to do much

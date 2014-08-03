@@ -8,7 +8,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains functions for dealing with polls.
  *
@@ -22,7 +22,8 @@
  * If $pollID is passed, the topic is updated to point to the new poll.
  *
  * @param int $topicID the ID of the topic
- * @param int $pollID = null the ID of the poll, if any. If null is passed, it retrieves the current ID.
+ * @param int|null $pollID = null the ID of the poll, if any. If null is passed, it retrieves the current ID.
+ * @return integer
  */
 function associatedPoll($topicID, $pollID = null)
 {
@@ -62,7 +63,7 @@ function associatedPoll($topicID, $pollID = null)
 /**
  * Remove a poll.
  *
- * @param int $pollID
+ * @param int[]|int $pollID
  */
 function removePoll($pollID)
 {
@@ -101,7 +102,7 @@ function removePoll($pollID)
 /**
  * Reset votes for the poll.
  *
- * @param $pollID
+ * @param int $pollID
  */
 function resetVotes($pollID)
 {
@@ -142,24 +143,46 @@ function resetVotes($pollID)
  * Only returns info on the poll, not its options.
  *
  * @param int $id_poll
- *
+ * @param bool $ignore_permissions if true permissions are not checked.
+ *             If false, {query_see_board} boardsAllowedTo('poll_view') and
+ *             $modSettings['postmod_active'] will be considered in the query.
+ *             This param is currently used only in SSI, it may be useful in any
+ *             kind of integration
  * @return array|false array of poll information, or false if no poll is found
  */
-function pollInfo($id_poll)
+function pollInfo($id_poll, $ignore_permissions = true)
 {
+	global $modSettings;
+
 	$db = database();
+
+	$boardsAllowed = array();
+	if ($ignore_permissions === false)
+	{
+		$boardsAllowed = boardsAllowedTo('poll_view');
+
+		if (empty($boardsAllowed))
+			return false;
+	}
 
 	// Read info from the db
 	$request = $db->query('', '
 		SELECT
 			p.question, p.voting_locked, p.hide_results, p.expire_time, p.max_votes, p.change_vote,
-			p.guest_vote, p.id_member, IFNULL(mem.real_name, p.poster_name) AS poster_name, p.num_guest_voters, p.reset_poll
+			p.guest_vote, p.id_member, IFNULL(mem.real_name, p.poster_name) AS poster_name,
+			p.num_guest_voters, p.reset_poll' . ($ignore_permissions ? '' : ',
+			b.id_board') . '
 		FROM {db_prefix}polls AS p
-			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = p.id_member)
-		WHERE p.id_poll = {int:id_poll}
+			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = p.id_member)' . ($ignore_permissions ? '' : '
+			INNER JOIN {db_prefix}boards AS b ON (b.id_board = t.id_board)') . '
+		WHERE p.id_poll = {int:id_poll}' . ($ignore_permissions ? '' : ((in_array(0, $boardsAllowed) ? '' : '
+			AND b.id_board IN ({array_int:boards_allowed_see})') . (!$modSettings['postmod_active'] ? '' : '
+			AND t.approved = {int:is_approved}'))) . '
 		LIMIT 1',
 		array(
 			'id_poll' => $id_poll,
+			'boards_allowed_see' => $boardsAllowed,
+			'is_approved' => 1,
 		)
 	);
 	$poll_info = $db->fetch_assoc($request);
@@ -224,6 +247,42 @@ function pollInfoForTopic($topicID)
 }
 
 /**
+ * Retrieve the id of the topic associated to a poll
+ *
+ * @param int $pollID the topic with an associated poll.
+ * @return array the topic id and the board id, false if no topics found
+ */
+function topicFromPoll($pollID)
+{
+	$db = database();
+
+	// Check if a poll currently exists on this topic, and get the id, question and starter.
+	$request = $db->query('', '
+		SELECT
+			t.id_topic, b.id_board
+		FROM {db_prefix}topics AS t
+			LEFT JOIN {db_prefix}polls AS p ON (p.id_poll = t.id_poll)
+			LEFT JOIN {db_prefix}boards AS b ON (b.id_board = t.id_board)
+		WHERE p.id_poll = {int:current_poll}
+		LIMIT 1',
+		array(
+			'current_poll' => $pollID,
+		)
+	);
+
+	// The topic must exist
+	if ($db->num_rows($request) == 0)
+		$topicID = false;
+	// Get the poll information.
+	else
+		list ($topicID, $boardID) = $db->fetch_row($request);
+
+	$db->free_result($request);
+
+	return array($topicID, $boardID);
+}
+
+/**
  * Return poll options, customized for a given member.
  * The function adds to poll options the information if the user
  * has voted in this poll.
@@ -263,7 +322,7 @@ function pollOptionsForMember($id_poll, $id_member)
  * Returns poll options.
  * It censors the label in the result array.
  *
- * @param $id_poll
+ * @param int $id_poll
  */
 function pollOptions($id_poll)
 {
@@ -295,11 +354,11 @@ function pollOptions($id_poll)
  * @param int $id_member = false The id of the creator
  * @param string $poster_name The name of the poll creator
  * @param int $max_votes = 1 The maximum number of votes you can do
- * @param bool $hide_results = true If the results should be hidden
+ * @param int $hide_results = 1 If the results should be hidden
  * @param int $expire = 0 The time in days that this poll will expire
- * @param bool $can_change_vote = false If you can change your vote
- * @param bool $can_guest_vote = false If guests can vote
- * @param array $options = array() The poll options
+ * @param int $can_change_vote = 0 If you can change your vote
+ * @param int $can_guest_vote = 0 If guests can vote
+ * @param mixed[] $options = array() The poll options
  * @return int the id of the created poll
  */
 function createPoll($question, $id_member, $poster_name, $max_votes = 1, $hide_results = 1, $expire = 0, $can_change_vote = 0, $can_guest_vote = 0, array $options = array())
@@ -336,10 +395,10 @@ function createPoll($question, $id_member, $poster_name, $max_votes = 1, $hide_r
  * @param int $id_poll The id of the poll that should be updated
  * @param string $question The title/question of the poll
  * @param int $max_votes = 1 The maximum number of votes you can do
- * @param bool $hide_results = true If the results should be hidden
+ * @param int $hide_results = 1 If the results should be hidden
  * @param int $expire = 0 The time in days that this poll will expire
- * @param bool $can_change_vote = false If you can change your vote
- * @param bool $can_guest_vote = false If guests can vote
+ * @param int $can_change_vote = 0 If you can change your vote
+ * @param int $can_guest_vote = 0 If guests can vote
  */
 function modifyPoll($id_poll, $question, $max_votes = 1, $hide_results = 1, $expire = 0, $can_change_vote = 0, $can_guest_vote = 0)
 {
@@ -373,7 +432,7 @@ function modifyPoll($id_poll, $question, $max_votes = 1, $hide_results = 1, $exp
  * Add options to an already created poll
  *
  * @param int $id_poll The id of the poll you're adding the options to
- * @param array $options The options to choose from
+ * @param mixed[] $options The options to choose from
  */
 function addPollOptions($id_poll, array $options)
 {
@@ -394,7 +453,7 @@ function addPollOptions($id_poll, array $options)
 /**
  * Insert some options to an already created poll
  *
- * @param array $options An array holding the poll choices
+ * @param mixed[] $options An array holding the poll choices
  */
 function insertPollOptions($options)
 {
@@ -413,7 +472,7 @@ function insertPollOptions($options)
 /**
  * Add a single option to an already created poll
  *
- * @param array $options An array holding the poll choices
+ * @param mixed[] $options An array holding the poll choices
  */
 function modifyPollOption($options)
 {
@@ -437,7 +496,7 @@ function modifyPollOption($options)
  * Delete a bunch of options from a poll
  *
  * @param int $id_poll The id of the poll you're deleting the options from
- * @param array $id_options An array holding the choice id
+ * @param int[] $id_options An array holding the choice id
  */
 function deletePollOptions($id_poll, $id_options)
 {
@@ -552,7 +611,7 @@ function removeVote($id_member, $id_poll)
  * Used to decrease the vote counter for the given poll.
  *
  * @param int $id_poll
- * @param array $options
+ * @param int[] $options
  */
 function decreaseVoteCounter($id_poll, $options)
 {
@@ -576,7 +635,7 @@ function decreaseVoteCounter($id_poll, $options)
  * Increase the vote counter for the given poll.
  *
  * @param int $id_poll
- * @param array $options
+ * @param int[] $options
  */
 function increaseVoteCounter($id_poll, $options)
 {
@@ -597,7 +656,7 @@ function increaseVoteCounter($id_poll, $options)
 /**
  * Add a vote to a poll.
  *
- * @param array $insert
+ * @param mixed[] $insert
  */
 function addVote($insert)
 {
@@ -635,7 +694,7 @@ function increaseGuestVote($id_poll)
  *
  * @param int $id_member
  * @param int $id_poll
- * @return array
+ * @return integer[]
  */
 function determineVote($id_member, $id_poll)
 {
@@ -914,9 +973,9 @@ function loadPollContext($poll_id)
 			'percent' => $bar,
 			'votes' => $option['votes'],
 			'voted_this' => $option['voted_this'] != -1,
-			'bar' => '<span style="white-space: nowrap;"><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'right' : 'left') . '.png" alt="" /><img src="' . $settings['images_url'] . '/poll_middle.png" style="width:' . $barWide . 'px; height: 12px" alt="-" /><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'left' : 'right') . '.png" alt="" /></span>',
+			'bar' => '<span style="white-space: nowrap;"><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'right' : 'left') . '.png" alt="" /><img src="' . $settings['images_url'] . '/poll_middle.png" style="width:' . $barWide . 'px; height: 12px;" alt="-" /><img src="' . $settings['images_url'] . '/poll_' . ($context['right_to_left'] ? 'left' : 'right') . '.png" alt="" /></span>',
 			// Note: IE < 8 requires us to set a width on the container, too.
-			'bar_ndt' => $bar > 0 ? '<div class="bar" style="width: ' . ($bar * 3.5 + 4) . 'px;"><div style="width: ' . $bar * 3.5 . 'px;"></div></div>' : '<div class="bar"></div>',
+			'bar_ndt' => $bar > 0 ? '<div class="bar" style="width: ' . $bar . '%;"><div style="width: ' . $bar . '%;"></div></div>' : '<div class="bar"></div>',
 			'bar_width' => $barWide,
 			'option' => parse_bbc($option['label']),
 			'vote_button' => '<input type="' . ($pollinfo['max_votes'] > 1 ? 'checkbox' : 'radio') . '" name="options[]" id="options-' . $i . '" value="' . $i . '" class="input_' . ($pollinfo['max_votes'] > 1 ? 'check' : 'radio') . '" />'

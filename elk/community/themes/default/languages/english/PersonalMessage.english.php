@@ -1,8 +1,6 @@
 <?php
 // Version: 1.0; PersonalMessage
 
-global $context;
-
 $txt['pm_inbox'] = 'Personal Messages Index';
 $txt['send_message'] = 'Send message';
 $txt['pm_add'] = 'Add';
@@ -45,8 +43,7 @@ $txt['pm_mark_unread'] = 'Mark as Unread';
 
 // Message Pruning.
 $txt['pm_prune'] = 'Prune messages';
-$txt['pm_prune_desc1'] = 'Delete all personal messages older than';
-$txt['pm_prune_desc2'] = 'days.';
+$txt['pm_prune_desc'] = 'Delete all personal messages older than %1$s days.';
 $txt['pm_prune_warning'] = 'Are you sure you wish to prune your personal messages?';
 
 // Actions Drop Down.

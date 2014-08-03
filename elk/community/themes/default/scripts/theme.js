@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the current theme
  */
@@ -17,9 +17,9 @@
 $(document).ready(function() {
 	// Menu drop downs
 	if (use_click_menu)
-		$('#main_menu, ul.admin_menu, ul.sidebar_menu, ul.poster, ul.quickbuttons, #sort_by').superclick({speed: 150, animation: {opacity:'show', height:'toggle'}});
+		$('#main_menu, ul.admin_menu, ul.sidebar_menu, ul.poster, ul.quickbuttons, #sort_by').superclick({speed: 150, animation: {opacity:'show', height:'toggle'}, speedOut: 0, activeClass: 'sfhover'});
 	else
-		$('#main_menu, ul.admin_menu, ul.sidebar_menu, ul.poster, ul.quickbuttons, #sort_by').superfish({delay : 300, speed: 175});
+		$('#main_menu, ul.admin_menu, ul.sidebar_menu, ul.poster, ul.quickbuttons, #sort_by').superfish({delay : 300, speed: 175, hoverClass: 'sfhover'});
 
 	// Smooth scroll to top.
 	$("a[href=#top]").on("click", function(e) {
@@ -57,10 +57,7 @@ $(document).ready(function() {
 		$(this).parent().toggleClass("collapsed");
 	}).each(function () {
 		if ($(this).data('collapsed'))
-		{
-			$(this).siblings().css({display: "none"});
-			$(this).parent().toggleClass("collapsed");
-		}
+			$(this).click();
 	});
 
 	// Spoiler
@@ -75,15 +72,22 @@ $(document).ready(function() {
 			return true;
 
 		$(this).css({'cursor': 'pointer'});
-		$(this).click(function() {
+
+		// Note to addon authors, if you want to enable your own click events to bbc images
+		// you can turn off this namespaced click event with $("img").off("click.elk_bbc")
+		$(this).on( "click.elk_bbc", function() {
 			var $this = $(this);
 
-			// No saved data, then lets set it to autp
+			// No saved data, then lets set it to auto
 			if ($.isEmptyObject($this.data()))
 			{
 				$this.data("bbc_img", {width: $this.css('width'), height: $this.css('height')});
 				$this.css({'width': $this.css('width') === 'auto' ? null : 'auto'});
 				$this.css({'height': $this.css('width') === 'auto' ? null : 'auto'});
+
+				// Overide default css to allow the image to expand fully, add a div to exand in
+				$this.css({'max-width': 'none'});
+				$this.wrap('<div style="overflow: auto"></div>');
 			}
 			else
 			{
@@ -93,6 +97,11 @@ $(document).ready(function() {
 
 				// Remove the data
 				$this.removeData();
+
+				// Remove the div we added to allow the image to overflow expand in
+				$this.unwrap();
+				$this.css({'max-width': '100%'});
+
 			}
 		});
 	});
@@ -130,96 +139,4 @@ function elk_addButton(sButtonStripId, bUseImage, oOptions)
 	oNewButton.innerHTML = '<a class="linklevel1" href="' + oOptions.sUrl + '" ' + ('sCustom' in oOptions ? oOptions.sCustom : '') + '><span class="last"' + ('sId' in oOptions ? ' id="' + oOptions.sId + '_text"': '') + '>' + oOptions.sText + '</span></a>';
 
 	oButtonStripList.appendChild(oNewButton);
-}
-
-function loadAddNewPoll(button, id_board, form_name)
-{
-	if (typeof id_board == 'undefined')
-		return true;
-
-	// Find the form and add poll to the url
-	var $form = $('#post_header').closest("form");
-
-	// change the label
-	if ($(button).val() == poll_add)
-	{
-		$(button).val(poll_remove);
-
-		// We usually like to have the poll icon associated to polls,
-		// but only if the currently selected is the default one
-		if ($('#icon').val() == 'xx')
-			$('#icon').val('poll').change();
-
-		// Add poll to the form action
-		$form.attr('action', $form.attr('action') + ';poll');
-
-		// If the form already exists...just show it back and go out
-		if ($('#poll_main').length > 0)
-		{
-			$('#poll_main, #poll_options').find('input').each(function() {
-				if ($(this).data('required') == 'required')
-					$(this).attr('required', 'required');
-			});
-
-			$('#poll_main, #poll_options').toggle();
-			return false;
-		}
-	}
-	else
-	{
-		if ($('#icon').val() == 'poll')
-			$('#icon').val('xx').change();
-
-		// Remove poll to the form action
-		$form.attr('action', $form.attr('action').replace(';poll', ''));
-
-		$('#poll_main, #poll_options').hide().find('input').each(function() {
-			if ($(this).attr('required') == 'required')
-			{
-				$(this).data('required', 'required')
-				$(this).removeAttr('required');
-			}
-		});
-		$(button).val(poll_add);
-		return false;
-	}
-
-	// Retrieve the poll area
-	$.ajax({
-		url: elk_scripturl + '?action=poll;sa=interface;xml;board=' + id_board,
-		type: "GET",
-		dataType: "html",
-		beforeSend: ajax_indicator(true)
-	})
-	.done(function (data, textStatus, xhr) {
-		// Find the highest tabindex already present
-		var max_tabIndex = 0;
-		for (var i = 0, n = document.forms[form_name].elements.length; i < n; i++)
-			max_tabIndex = Math.max(max_tabIndex, document.forms[form_name].elements[i].tabIndex);
-
-		// Inject the html
-		$('#post_header').after(data);
-
-		$('#poll_main input, #poll_options input').each(function () {
-			$(this).attr('tabindex', ++max_tabIndex);
-		});
-
-		// Repeated collapse/expand of fieldsets as above
-		$('#poll_main legend, #poll_options legend').click(function(){
-			$(this).siblings().slideToggle("fast");
-			$(this).parent().toggleClass("collapsed");
-		}).each(function () {
-			if ($(this).data('collapsed'))
-			{
-				$(this).siblings().css({display: "none"});
-				$(this).parent().toggleClass("collapsed");
-			}
-		});
-	})
-	.always(function() {
-		// turn off the indicator
-		ajax_indicator(false);
-	});
-
-	return false;
 }

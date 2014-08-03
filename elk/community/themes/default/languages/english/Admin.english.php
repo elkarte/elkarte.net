@@ -1,15 +1,13 @@
 <?php
 // Version: 1.0; Admin
 
-global $settings, $scripturl;
-
 $txt['admin_boards'] = 'Boards';
 $txt['admin_back_to'] = 'Back to admin panel';
 $txt['admin_users'] = 'Members';
 $txt['admin_newsletters'] = 'Newsletters';
 $txt['include_these'] = 'Members to include';
 $txt['exclude_these'] = 'Members to exclude';
-$txt['admin_newsletters_select_groups'] = 'Groups to receive';
+$txt['admin_newsletters_select_groups'] = 'Groups to include';
 $txt['admin_newsletters_exclude_groups'] = 'Groups to exclude';
 $txt['admin_edit_news'] = 'News';
 $txt['admin_groups'] = 'Member groups';
@@ -17,7 +15,7 @@ $txt['admin_members'] = 'Manage Members';
 $txt['admin_members_list'] = 'Below is a listing of all the members currently registered with your forum.';
 $txt['admin_next'] = 'Next';
 $txt['admin_censored_words'] = 'Censored Words';
-$txt['admin_censored_where'] = 'Put the word to be censored on the left, and what to change it to on the right.';
+$txt['admin_censored_where'] = 'Enter the word to be censored into the left box and the word to change it to, into the right box. Then select if you want to check the whole word and the case. When you\'re finished with each word, click Save. Multiple entries can be made prior to saving by clicking the \'Add another word\' button.';
 $txt['admin_censored_desc'] = 'Due to the public nature of forums there may be some words that you wish to prohibit being posted by users of your forum. You can enter any words below that you wish to be censored whenever used by a member.<br />Clear a box to remove that word from the censor.';
 $txt['admin_reserved_names'] = 'Reserved Names';
 $txt['admin_template_edit'] = 'Edit your forum template';
@@ -53,7 +51,7 @@ $txt['admin_agreement_select_language'] = 'Language to edit';
 $txt['admin_agreement_select_language_change'] = 'Change';
 $txt['admin_delete_members'] = 'Delete Selected Members';
 $txt['admin_repair'] = 'Repair All boards and topics';
-$txt['admin_main_welcome'] = 'This is your &quot;%1$s&quot;.  From here, you can edit settings, maintain your forum, view logs, install packages, manage themes, and many other things.<br /><br />If you have any trouble, please look at the &quot;Support &amp; Credits&quot; page.  If the information there doesn\'t help you, feel free to <a href="http://www.elkarte.net/index.php" target="_blank" class="new_win">look to us for help</a> with the problem.<br />You may also find answers to your questions or problems by clicking the <img src="' . $settings['images_url'] . '/helptopics.png" alt="%2$s" title="%3$s" /> symbols for more information on the related functions.';
+$txt['admin_main_welcome'] = 'This is your &quot;%1$s&quot;.  From here, you can edit settings, maintain your forum, view logs, install packages, manage themes, and many other things.<br /><br />If you have any trouble, please look at the &quot;Support &amp; Credits&quot; page.  If the information there doesn\'t help you, feel free to <a href="http://www.elkarte.net/index.php" target="_blank" class="new_win">look to us for help</a> with the problem.<br />You may also find answers to your questions or problems by clicking the <img src="%3$s/helptopics.png" alt="%2$s" title="%2$s" /> symbols for more information on the related functions.';
 $txt['admin_news_desc'] = 'Please place one news item per box. BBC tags, such as <span>[b]</span>, <span>[i]</span> and <span>[u]</span> are allowed in your news, as well as smileys. Clear a news item\'s text box to remove it.';
 $txt['administrators'] = 'Forum Administrators';
 $txt['admin_reserved_desc'] = 'Reserved names will keep members from registering certain user names or using these words in their displayed names. Choose the options you wish to use from the bottom before submitting.';
@@ -64,12 +62,12 @@ $txt['admin_check_user'] = 'Check user name.';
 $txt['admin_check_display'] = 'Check display name.';
 $txt['admin_newsletter_send'] = 'You can email anyone from this page. The email addresses of the selected member groups should appear below, but you may remove or add any email addresses you wish. Be sure that each address is separated in this fashion: \'address1; address2\'.';
 $txt['admin_fader_delay'] = 'Fading delay between items for the news fader';
-$txt['admin_bbc'] = 'Show BBC Buttons on Posting and PM Send Pages';
+$txt['admin_bbc'] = 'Show BBC Buttons on Posting and PM Send Pages.';
 $txt['zero_for_no_limit'] = '(0 for no limit)';
 $txt['zero_to_disable'] = '(0 to disable)';
 
 $txt['admin_backup_fail'] = 'Failed to make backup of Settings.php - make sure Settings_bak.php exists and is writable.';
-$txt['modSettings_info'] = 'Change or set options that control how this forum operates.';
+$txt['modSettings_info'] = 'Settings for General features, Karma, Signatures, Likes and much more that control how this forum operates.';
 $txt['database_server'] = 'Database Server';
 $txt['database_user'] = 'Database User';
 $txt['database_password'] = 'Database Password';
@@ -103,8 +101,8 @@ $txt['attachment_files'] = 'Total files remaining';
 
 $txt['attachment_options'] = 'File Attachment Options';
 $txt['attachment_log'] = 'Attachment Log';
-$txt['attachment_remove_old'] = 'Remove attachments older than';
-$txt['attachment_remove_size'] = 'Remove attachments larger than';
+$txt['attachment_remove_old'] = 'Remove attachments older than %1$s days';
+$txt['attachment_remove_size'] = 'Remove attachments larger than %1$s KiB';
 $txt['attachment_name'] = 'Attachment name';
 $txt['attachment_file_size'] = 'File Size';
 $txt['attachmentdir_size_not_set'] = 'No maximum directory size is currently set';
@@ -116,7 +114,7 @@ $txt['remove_all'] = 'Clear Log';
 $txt['approve_new_members'] = 'Admin must approve all new members';
 $txt['agreement_not_writable'] = 'Warning - agreement.txt is not writable, any changes you make will NOT be saved.';
 
-$txt['version_check_desc'] = 'This shows you the versions of your installation\'s files versus those of the latest version. If any of these files are out of date, you should download and upgrade to the latest version at our <a href="https://github.com/elkarte/Elkarte//wiki/downloads" target="_blank" class="new_win">ElkArte Site</a>.';
+$txt['version_check_desc'] = 'This shows you the versions of your installation\'s files versus those of the latest version. If any of these files are out of date, you should download and upgrade to the latest version at our <a href="https://github.com/elkarte/Elkarte/wiki/downloads" target="_blank" class="new_win">ElkArte Site</a>.';
 $txt['version_check_more'] = '(more detailed)';
 
 $txt['lfyi'] = 'You are unable to connect to ElkArte\'s latest news file.';
@@ -125,10 +123,10 @@ $txt['manage_calendar'] = 'Calendar';
 $txt['manage_search'] = 'Search';
 
 $txt['smileys_manage'] = 'Smileys and Message Icons';
-$txt['smileys_manage_info'] = 'Install new smiley sets, add smileys to existing ones, or manage your message icons.';
-$txt['package_info'] = 'Install new features or modify existing ones with this interface.';
-$txt['theme_admin'] = 'Themes and Layout';
-$txt['theme_admin_info'] = 'Setup and manage your themes, and set or reset theme options.';
+$txt['smileys_manage_info'] = 'Install new smiley sets, add smileys to existing sets or manage your message icons.';
+$txt['package_info'] = 'Install, download and upload Modification packages; check File Permissions and FTP settings.';
+$txt['theme_admin'] = 'Theme Management';
+$txt['theme_admin_info'] = 'Install new themes, select themes that are available for your users and set or reset theme options.';
 $txt['registration_center'] = 'Registration';
 $txt['member_center_info'] = 'View the member list, search for members, or manage account approvals and activations.';
 
@@ -144,12 +142,15 @@ $txt['ip_address'] = 'IP address';
 $txt['member_id'] = 'ID';
 
 $txt['unknown'] = 'unknown';
-$txt['security_wrong'] = 'Administration login attempt!' . "\n" . 'Referer: %1$s' . "\n" . 'User agent: %2$s' . "\n" . 'IP: %3$s';
+$txt['security_wrong'] = 'Administration login attempt!
+Referer: %1$s
+User agent: %2$s
+IP: %3$s';
 
 $txt['email_preview_warning'] = 'The preview is not 100% accurate. In order to preserve the functionality of the page only the basic html tags are represented';
 $txt['email_as_html'] = 'Send in HTML format.  (with this you can put normal HTML in the email.)';
 $txt['email_parsed_html'] = 'Add &lt;br /&gt;s and &amp;nbsp;s to this message.';
-$txt['email_variables'] = 'In this message you can use a few &quot;variables&quot;.<a href="' . $scripturl . '?action=quickhelp;help=emailmembers" onclick="return reqOverlayDiv(this.href);" class="help"> Click here for more information</a>.';
+$txt['email_variables'] = 'In this message you can use a few &quot;variables&quot;.<a href="{help_emailmembers}" class="help"> Click here for more information</a>.';
 $txt['email_force'] = 'Send this to members even if they have chosen not to receive announcements.';
 $txt['email_as_pms'] = 'Send this to these groups using personal messages.';
 $txt['email_continue'] = 'Continue';
@@ -161,7 +162,7 @@ $txt['ban_ip'] = 'IP banning: (e.g. 192.168.12.213 or 128.0.*.*) - one entry per
 $txt['ban_email'] = 'Email banning: (e.g. badguy@somewhere.com) - one entry per line';
 $txt['ban_username'] = 'User name banning: (e.g. l33tuser) - one entry per line';
 
-$txt['ban_errors_detected'] = 'The following error or errors occurred while saving or editing the ban group or trigger';
+$txt['ban_errors_detected'] = 'The following error or errors occurred while saving or editing the ban or the trigger';
 $txt['ban_description'] = 'Here you can ban troublesome people either by IP, hostname, user name, or email.';
 $txt['ban_add_new'] = 'Add new ban';
 $txt['ban_banned_entity'] = 'Banned entity';
@@ -230,13 +231,14 @@ $txt['ban_no_triggers'] = 'There are currently no ban triggers.';
 $txt['settings_not_writable'] = 'These settings cannot be changed because Settings.php is read only.';
 
 $txt['maintain_title'] = 'Forum Maintenance';
-$txt['maintain_info'] = 'Optimize tables, make backups, check for errors, and prune boards with these tools.';
+$txt['maintain_info'] = 'Basic forum backups, Database error checking, Clearing the Cache, Integration Hooks and more.';
 $txt['maintain_sub_database'] = 'Database';
 $txt['maintain_sub_routine'] = 'Routine';
 $txt['maintain_sub_members'] = 'Members';
 $txt['maintain_sub_topics'] = 'Topics';
 $txt['maintain_sub_attachments'] = 'Attachments';
 $txt['maintain_done'] = 'The maintenance task \'%1$s\' was executed successfully.';
+$txt['maintain_fail'] = 'The maintenance task \'%1$s\' failed.';
 $txt['maintain_no_errors'] = 'Congratulations, no errors were found.  Thanks for checking.';
 
 $txt['maintain_tasks'] = 'Scheduled Tasks';
@@ -283,13 +285,14 @@ $txt['dvc_default'] = 'Default Templates';
 $txt['dvc_templates'] = 'Current Templates';
 $txt['dvc_languages'] = 'Language Files';
 
-$txt['smileys_default_set_for_theme'] = 'Select default smiley set for this theme';
-$txt['smileys_no_default'] = '(use global default smiley set)';
+$txt['smileys_default_set_for_theme'] = 'Select default smiley set for this theme:';
+$txt['smileys_no_default'] = 'Use default smiley set';
 
-$txt['censor_test'] = 'Test censored words';
+$txt['censor_test'] = 'Test Censored Words';
 $txt['censor_test_save'] = 'Test';
-$txt['censor_case'] = 'Ignore case when censoring';
-$txt['censor_whole_words'] = 'Check only whole words';
+$txt['censor_case'] = 'Ignore case when censoring.';
+$txt['censor_whole_words'] = 'Check only whole words.';
+$txt['censor_allow'] = 'Allow users to turn off word censoring.';
 
 $txt['admin_confirm_password'] = '(confirm)';
 $txt['admin_incorrect_password'] = 'Incorrect Password';
@@ -311,7 +314,7 @@ $txt['membergroups'] = 'Member groups';
 $txt['confirm_delete_members'] = 'Are you sure you want to delete the selected members?';
 
 $txt['support_credits_title'] = 'Support &amp; Credits';
-$txt['support_credits_info'] = 'Links to support for common issues, and version information to give if you have problems.';
+$txt['support_credits_info'] = 'Support links for most common issues, the relevant forum version information you will be asked for when you request help and a list of contributors to the ElkArte project.';
 $txt['support_title'] = 'Support Information';
 $txt['support_versions_current'] = 'Current version';
 $txt['support_versions_forum'] = 'This version';
@@ -322,13 +325,13 @@ $txt['support_versions_gd'] = 'GD version';
 $txt['support_versions_imagick'] = 'Imagick version';
 $txt['support_versions'] = 'Version Information';
 $txt['support_resources'] = 'Support Resources';
-$txt['support_resources_p1'] = 'Our <a href="%1$s">Documentation Wiki</a> provides the main documentation for ElkArte. The ElkArte Online Manual has many documents to help answer support questions and explain <a href="%2$s">Features</a>, <a href="%3$s">Settings</a>, <a href="%4$s">Themes</a>, <a href="%5$s">Packages</a>, etc. The Online Manual documents each area of ElkArte thoroughly and should answer most questions quickly.';
-$txt['support_resources_p2'] = 'If you can\'t find the answers to your questions in the Documentation Wiki, you may want to search our <a href="%1$s">Support Community</a> or ask for assistance in our support boards. The ElkArte Support Community can be used for <a href="%2$s">support</a>, <a href="%3$s">customization</a>, and many other things such as discussing ElkArte, finding a host, and discussing administrative issues with other forum administrators.';
+$txt['support_resources_p1'] = 'Our <a href="%1$s" target="_blank" class="new_win">Documentation Wiki</a> provides the main documentation for ElkArte. The ElkArte Online Manual has many documents to help answer support questions and explain <a href="%2$s" target="_blank" class="new_win">Features</a>, <a href="%3$s" target="_blank" class="new_win">Settings</a>, <a href="%4$s" target="_blank" class="new_win">Themes</a>, <a href="%5$s" target="_blank" class="new_win">Packages</a>, etc. The Online Manual documents each area of ElkArte thoroughly and should answer most questions quickly.';
+$txt['support_resources_p2'] = 'If you can\'t find the answers to your questions in the Documentation Wiki, you may want to search our <a href="%1$s" target="_blank" class="new_win">Support Community</a> or ask for assistance in our support boards. The ElkArte Support Community can be used for <a href="%2$s" target="_blank" class="new_win">support</a>, <a href="%3$s" target="_blank" class="new_win">customization</a>, and many other things such as discussing ElkArte, finding a host, and discussing administrative issues with other forum administrators.';
 
 $txt['support_latest'] = 'Common support &amp; issues';
 $txt['support_latest_fetch'] = 'Retrieving support information...';
 
-$txt['edit_permissions_info'] = 'Change restrictions and available features, globally or in specific boards.';
+$txt['edit_permissions_info'] = 'Use permission settings to manage global and specific board features and what actions that guest, members and moderators can do.';
 $txt['membergroups_members'] = 'Regular Members';
 $txt['membergroups_guests'] = 'Guests';
 $txt['membergroups_add_group'] = 'Add group';
@@ -349,7 +352,7 @@ $txt['attachment_manager_attachments'] = 'Attachments';
 $txt['attachment_manager_thumbs'] = 'Thumbnails';
 $txt['attachment_manager_last_active'] = 'Last Active';
 $txt['attachment_manager_member'] = 'Member';
-$txt['attachment_manager_avatars_older'] = 'Remove avatars from members not active for more than';
+$txt['attachment_manager_avatars_older'] = 'Remove avatars from members not active for more than %1$s days';
 $txt['attachment_manager_total_avatars'] = 'Total avatars';
 
 $txt['attachment_manager_avatars_no_entries'] = 'There are currently no avatars.';
@@ -393,7 +396,7 @@ $txt['attachment_security_settings'] = 'Attachment security settings';
 
 $txt['attach_dir_does_not_exist'] = 'Does Not Exist';
 $txt['attach_dir_not_writable'] = 'Not Writable';
-$txt['attach_dir_files_missing'] = 'Files Missing (<a href="' . $scripturl . '?action=admin;area=manageattachments;sa=repair;%2$s=%1$s">Repair</a>)';
+$txt['attach_dir_files_missing'] = 'Files Missing (<a href="{repair_url}">Repair</a>)';
 $txt['attach_dir_unused'] = 'Unused';
 $txt['attach_dir_empty'] = 'Empty';
 $txt['attach_dir_ok'] = 'OK';
@@ -446,18 +449,18 @@ $txt['use_subdirectories_for_attachments'] = 'Create new directories within a ba
 $txt['use_subdirectories_for_attachments_note'] = 'Otherwise any new directories will be created within the forum\'s main directory.';
 $txt['basedirectory_for_attachments'] = 'Set a base directory for attachments';
 $txt['basedirectory_for_attachments_current'] = 'Current base directory';
-$txt['basedirectory_for_attachments_warning'] = '<div class="smalltext">Please note that the directory is wrong. <br />(<a href="' . $scripturl . '?action=admin;area=manageattachments;sa=attachpaths">Attempt to correct</a>)</div>';
-$txt['attach_current_dir_warning'] = '<div class="smalltext">There seems to be a problem with this directory. <br />(<a href="' . $scripturl . '?action=admin;area=manageattachments;sa=attachpaths">Attempt to correct</a>)</div>';
+$txt['basedirectory_for_attachments_warning'] = '<div class="smalltext">Please note that the directory is wrong. <br />(<a href="{attach_repair_url}">Attempt to correct</a>)</div>';
+$txt['attach_current_dir_warning'] = '<div class="smalltext">There seems to be a problem with this directory. <br />(<a href="{attach_repair_url}">Attempt to correct</a>)</div>';
 
 $txt['attachment_transfer'] = 'Transfer Attachments';
 $txt['attachment_transfer_desc'] = 'Transfer files between directories.';
 $txt['attachment_transfer_select'] = 'Select directory';
 $txt['attachment_transfer_now'] = 'Transfer';
 $txt['attachment_transfer_from'] = 'Transfer files from';
-$txt['attachment_transfer_auto'] = 'Automatically by space or file count';
+$txt['attachment_transfer_auto'] = 'Move them automatically by space or file count';
 $txt['attachment_transfer_auto_select'] = 'Select base directory';
-$txt['attachment_transfer_to'] = 'Or to a specific directory.';
-$txt['attachment_transfer_empty'] = 'Empty the source directory';
+$txt['attachment_transfer_to'] = 'Or move them to a specific directory.';
+$txt['attachment_transfer_empty'] = 'Move all files from the source directory.';
 $txt['attachment_transfer_no_base'] = 'No base directories available.';
 $txt['attachment_transfer_forum_root'] = 'Forum root directory.';
 $txt['attachment_transfer_no_room'] = 'Directory size or file count limit reached.';
@@ -562,6 +565,8 @@ $txt['manageposts_days'] = 'days';
 $txt['manageposts_posts'] = 'posts';
 $txt['manageposts_topics'] = 'topics';
 
+$txt['pollMode'] = 'Enable polls';
+
 $txt['manageposts_settings'] = 'Post Settings';
 $txt['manageposts_settings_description'] = 'Here you can set everything related to posts and posting.';
 
@@ -584,14 +589,11 @@ $txt['mm_emailtemplates'] = 'Templates';
 $txt['mm_emailsettings'] = 'Settings';
 
 $txt['removeNestedQuotes'] = 'Remove nested quotes when quoting';
-$txt['enableEmbeddedFlash'] = 'Embed flash into posts';
-$txt['enableEmbeddedFlash_warning'] = 'may be a security risk!';
 $txt['enableSpellChecking'] = 'Enable spell checking';
 $txt['enableSpellChecking_warning'] = 'this does not work on all servers.';
 $txt['enableSpellChecking_error'] = 'this does not work on your server.';
 $txt['enableVideoEmbeding'] = 'Enable auto-embedding of video links.';
 $txt['enableCodePrettify'] = 'Enable prettifying of code tags';
-$txt['disable_wysiwyg'] = 'Disable WYSIWYG editor';
 $txt['max_messageLength'] = 'Maximum allowed post size';
 $txt['max_messageLength_zero'] = '0 for no max.';
 $txt['convert_to_mediumtext'] = 'Your database is not setup to accept messages longer than 65535 characters. Please use the <a href="%1$s">database maintenance</a> page to convert the database and then come back to increase the maximum allowed post size.';
@@ -602,7 +604,11 @@ $txt['edit_disable_time'] = 'Maximum time after posting to allow edit';
 $txt['edit_disable_time_zero'] = '0 to disable';
 $txt['preview_characters'] = 'Maximum length of last/first post preview';
 $txt['preview_characters_units'] = 'characters';
-$txt['preview_characters_zero'] = '0 to disable';
+$txt['preview_characters_zero'] = '0 to show the entire message';
+$txt['message_index_preview'] = 'Show post previews on the message index';
+$txt['message_index_preview_off'] = 'Do not show the previews';
+$txt['message_index_preview_first'] = 'Show the text of the first post';
+$txt['message_index_preview_last'] = 'Show the text of the last post';
 
 $txt['enableBBC'] = 'Enable bulletin board code (BBC)';
 $txt['enablePostHTML'] = 'Enable <em>basic</em> HTML in posts';
@@ -612,7 +618,7 @@ $txt['bbcTagsToUse'] = 'Enabled BBC tags';
 $txt['bbcTagsToUse_select'] = 'Select the tags allowed to be used';
 $txt['bbcTagsToUse_select_all'] = 'Select all tags';
 
-$txt['enableStickyTopics'] = 'Enable sticky topics';
+$txt['enableStickyTopics'] = 'Enable pinned topics';
 $txt['enableParticipation'] = 'Enable participation icons';
 $txt['enableFollowup'] = 'Enable followups';
 $txt['oldTopicDays'] = 'Time before topic is warned as old on reply';

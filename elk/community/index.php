@@ -1,6 +1,10 @@
 <?php
 
 /**
+ * This, as you have probably guessed, is the crux for all functions.
+ * Everything should start here, so all the setup and security is done
+ * properly.
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
@@ -9,24 +13,23 @@
  *
  * Simple Machines Forum (SMF)
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
- * license:	BSD, See included LICENSE.TXT for terms and conditions.
+ * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Alpha
- *
- * This, as you have probably guessed, is the crux for all functions.
- * Everything should start here, so all the setup and security is done
- * properly.
+ * @version 1.0 Release Candidate 1
  *
  */
 
-$forum_version = 'ELKARTE 1.0-dev20130617';
+$forum_version = 'ElkArte 1.0 RC 1';
 
 // First things first, but not necessarily in that order.
-define('ELKARTE', 1);
+define('ELK', 1);
+
+// Shortcut for the browser cache stale
+define('CACHE_STALE', '?10RC1');
 
 if (function_exists('set_magic_quotes_runtime'))
 	@set_magic_quotes_runtime(0);
-error_reporting(defined('E_STRICT') ? E_ALL | E_STRICT : E_ALL);
+error_reporting(E_ALL | E_STRICT);
 $time_start = microtime(true);
 
 // Turn on output buffering.
@@ -40,10 +43,14 @@ foreach (array('db_character_set', 'cachedir') as $variable)
 // Ready to load the site settings.
 require_once(dirname(__FILE__) . '/Settings.php');
 
+// Directional only script time usage for display
+if (!empty($db_show_debug) && function_exists('getrusage'))
+	$rusage_start = getrusage();
+
 // Make sure the paths are correct... at least try to fix them.
 if (!file_exists($boarddir) && file_exists(dirname(__FILE__) . '/agreement.txt'))
 	$boarddir = dirname(__FILE__);
-if (!file_exists($sourcedir) && file_exists($boarddir . '/sources'))
+if (!file_exists($sourcedir . '/SiteDispatcher.class.php') && file_exists($boarddir . '/sources'))
 	$sourcedir = $boarddir . '/sources';
 
 // Check that directories which didn't exist in past releases are initialized.
@@ -60,7 +67,6 @@ DEFINE('CACHEDIR', $cachedir);
 DEFINE('EXTDIR', $extdir);
 DEFINE('LANGUAGEDIR', $languagedir);
 DEFINE('SOURCEDIR', $sourcedir);
-
 DEFINE('ADMINDIR', $sourcedir . '/admin');
 DEFINE('CONTROLLERDIR', $sourcedir . '/controllers');
 DEFINE('SUBSDIR', $sourcedir . '/subs');
@@ -75,17 +81,18 @@ require_once(SOURCEDIR . '/Logging.php');
 require_once(SOURCEDIR . '/Load.php');
 require_once(SUBSDIR . '/Cache.subs.php');
 require_once(SOURCEDIR . '/Security.php');
-require_once(SOURCEDIR . '/BrowserDetect.class.php');
-require_once(SOURCEDIR . '/Errors.class.php');
+require_once(SOURCEDIR . '/BrowserDetector.class.php');
+require_once(SOURCEDIR . '/ErrorContext.class.php');
 require_once(SUBSDIR . '/Util.class.php');
 require_once(SUBSDIR . '/TemplateLayers.class.php');
+require_once(SOURCEDIR . '/Action.controller.php');
 
 // Forum in extended maintenance mode? Our trip ends here with a bland message.
 if (!empty($maintenance) && $maintenance == 2)
 	display_maintenance_message();
 
-// Create a variable to store some specific functions in.
-$smcFunc = array();
+// Clean the request.
+cleanRequest();
 
 // Initiate the database connection and define some database functions to use.
 loadDatabase();
@@ -93,35 +100,29 @@ loadDatabase();
 // It's time for settings loaded from the database.
 reloadSettings();
 
-// Temporarily, compatibility for access to utility functions through $smcFunc is enabled by default.
-Util::compat_init();
-
-// Clean the request!
-cleanRequest();
-
 // Our good ole' contextual array, which will hold everything
 $context = array();
 
 // Seed the random generator.
-if (empty($modSettings['rand_seed']) || mt_rand(1, 250) == 69)
-	elk_seed_generator();
+elk_seed_generator();
 
 // Before we get carried away, are we doing a scheduled task? If so save CPU cycles by jumping out!
 if (isset($_GET['scheduled']))
 {
-	require_once(SOURCEDIR . '/ScheduledTasks.php');
-	AutoTask();
+	require_once(CONTROLLERDIR . '/ScheduledTasks.controller.php');
+	$controller = new ScheduledTasks_Controller();
+	$controller->action_autotask();
 }
 
 // Check if compressed output is enabled, supported, and not already being done.
 if (!empty($modSettings['enableCompressedOutput']) && !headers_sent())
 {
 	// If zlib is being used, turn off output compression.
-	if (ini_get('zlib.output_compression') >=  1 || ini_get('output_handler') == 'ob_gzhandler')
+	if (ini_get('zlib.output_compression') >= 1 || ini_get('output_handler') == 'ob_gzhandler')
 		$modSettings['enableCompressedOutput'] = 0;
 	else
 	{
-		ob_end_clean();
+		@ob_end_clean();
 		ob_start('ob_gzhandler');
 	}
 }
@@ -151,7 +152,7 @@ obExit(null, null, true);
  */
 function elk_main()
 {
-	global $modSettings, $settings, $user_info, $board, $topic, $board_info, $maintenance;
+	global $modSettings, $user_info, $topic, $board_info, $context;
 
 	// Special case: session keep-alive, output a transparent pixel.
 	if (isset($_GET['action']) && $_GET['action'] == 'keepalive')
@@ -162,6 +163,7 @@ function elk_main()
 
 	// We should set our security headers now.
 	frameOptionsHeader();
+	securityOptionsHeader();
 
 	// Load the user's cookie (or set as guest) and load their settings.
 	loadUserSettings();
@@ -189,7 +191,7 @@ function elk_main()
 	if (!empty($topic) && empty($board_info['cur_topic_approved']) && !allowedTo('approve_posts') && ($user_info['id'] != $board_info['cur_topic_starter'] || $user_info['is_guest']))
 		fatal_lang_error('not_a_topic', false);
 
-	$no_stat_actions = array('dlattach', 'findmember', 'jsoption', 'requestmembers', '.xml', 'xmlhttp', 'verificationcode', 'viewquery', 'viewadminfile');
+	$no_stat_actions = array('dlattach', 'findmember', 'jsoption', 'requestmembers', 'jslocale', 'xmlpreview', 'suggest', '.xml', 'xmlhttp', 'verificationcode', 'viewquery', 'viewadminfile');
 	call_integration_hook('integrate_pre_log_stats', array(&$no_stat_actions));
 
 	// Do some logging, unless this is an attachment, avatar, toggle of editor buttons, theme option, XML feed etc.
@@ -205,7 +207,11 @@ function elk_main()
 	unset($no_stat_actions);
 
 	// What shall we do?
-	require_once(SOURCEDIR . '/Dispatcher.class.php');
+	require_once(SOURCEDIR . '/SiteDispatcher.class.php');
 	$dispatcher = new Site_Dispatcher();
+
+	// Show where we came from, and go
+	$context['site_action'] = $dispatcher->site_action();
+	$context['site_action'] = !empty($context['site_action']) ? $context['site_action'] : (isset($_REQUEST['action']) ? $_REQUEST['action'] : '');
 	$dispatcher->dispatch();
 }

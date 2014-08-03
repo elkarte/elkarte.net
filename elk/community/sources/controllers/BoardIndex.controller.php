@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -38,10 +38,11 @@ class BoardIndex_Controller extends Action_Controller
 
 	/**
 	 * This function shows the board index.
-	 * It uses the BoardIndex template, and main sub template.
-	 * It may use the boardindex subtemplate for wireless support.
-	 * It updates the most online statistics.
-	 * It is accessed by ?action=boardindex.
+	 *
+	 * What it does:
+	 * - It uses the BoardIndex template, and main sub template.
+	 * - It updates the most online statistics.
+	 * - It is accessed by ?action=boardindex.
 	 */
 	public function action_boardindex()
 	{
@@ -58,7 +59,7 @@ class BoardIndex_Controller extends Action_Controller
 			$context['robot_no_index'] = true;
 
 		// Retrieve the categories and boards.
-		require_once(SUBSDIR . '/BoardIndex.subs.php');
+		require_once(SUBSDIR . '/BoardsList.class.php');
 		$boardIndexOptions = array(
 			'include_categories' => true,
 			'base_level' => 0,
@@ -66,7 +67,9 @@ class BoardIndex_Controller extends Action_Controller
 			'set_latest_post' => true,
 			'countChildPosts' => !empty($modSettings['countChildPosts']),
 		);
-		$context['categories'] = getBoardIndex($boardIndexOptions);
+		$boardlist = new Boards_List($boardIndexOptions);
+		$context['categories'] = $boardlist->getBoards();
+		$context['latest_post'] = $boardlist->getLatestPost();
 
 		// Get the user online list.
 		require_once(SUBSDIR . '/MembersOnline.subs.php');
@@ -85,7 +88,7 @@ class BoardIndex_Controller extends Action_Controller
 
 		// Track most online statistics? (subs/Members.subs.phpOnline.php)
 		if (!empty($modSettings['trackStats']))
-			trackStatsUsersOnline($context['num_guests'] + $context['num_spiders'] + $context['num_users_online']);
+			trackStatsUsersOnline($context['num_guests'] + $context['num_users_online']);
 
 		// Retrieve the latest posts if the theme settings require it.
 		if (isset($settings['number_recent_posts']) && $settings['number_recent_posts'] > 1)
@@ -149,7 +152,8 @@ class BoardIndex_Controller extends Action_Controller
 
 	/**
 	 * Collapse or expand a category
-	 * ?action=collapse
+	 *
+	 * - accessed by ?action=collapse
 	 */
 	public function action_collapse()
 	{

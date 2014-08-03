@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * Original module by Mach8 - We'll never forget you.
  */
@@ -76,10 +76,8 @@ class SplitTopics_Controller extends Action_Controller
 		);
 
 		// ?action=splittopics;sa=LETSBREAKIT won't work, sorry.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'index';
-
 		$action = new Action();
-		$action->initialize($subActions, 'index');
+		$subAction = $action->initialize($subActions, 'index');
 		$action->dispatch($subAction);
 	}
 

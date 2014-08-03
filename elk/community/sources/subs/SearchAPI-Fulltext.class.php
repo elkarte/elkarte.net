@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,6 +22,8 @@ if (!defined('ELK'))
 
 /**
  * SearchAPI-Fulltext.class.php, Fulltext API, used when an SQL fulltext index is used
+ *
+ * @package Search
  */
 class Fulltext_Search
 {
@@ -29,7 +31,7 @@ class Fulltext_Search
 	 * This is the last version of ElkArte that this was tested on, to protect against API changes.
 	 * @var string
 	 */
-	public $version_compatible = 'ElkArte 1.0 Beta';
+	public $version_compatible = 'ElkArte 1.0 RC 1';
 
 	/**
 	 * This won't work with versions of ElkArte less than this.
@@ -85,8 +87,7 @@ class Fulltext_Search
 	 * Check whether the method can be performed by this API.
 	 *
 	 * @param string $methodName
-	 * @param mixed $query_params
-	 * @return
+	 * @param mixed[]|null $query_params
 	 */
 	public function supportsMethod($methodName, $query_params = null)
 	{
@@ -138,7 +139,7 @@ class Fulltext_Search
 	}
 
 	/**
-	 * callback function for usort used to sort the fulltext results.
+	 * Callback function for usort used to sort the fulltext results.
 	 * the order of sorting is: large words, small words, large words that
 	 * are excluded from the search, small words that are excluded.
 	 *
@@ -162,9 +163,9 @@ class Fulltext_Search
 	 * Do we have to do some work with the words we are searching for to prepare them?
 	 *
 	 * @param string $word
-	 * @param array $wordsSearch
-	 * @param array $wordsExclude
-	 * @param array $isExcluded
+	 * @param mixed[] $wordsSearch
+	 * @param string[] $wordsExclude
+	 * @param boolean $isExcluded
 	 */
 	public function prepareIndexes($word, &$wordsSearch, &$wordsExclude, $isExcluded)
 	{
@@ -182,14 +183,14 @@ class Fulltext_Search
 				// short which would also be ignored
 				if ((Util::strlen(current($subwords)) < $this->min_word_length) && (Util::strlen(next($subwords)) < $this->min_word_length))
 				{
-					$wordsSearch['words'][] = trim($word, "/*- ");
+					$wordsSearch['words'][] = trim($word, '/*- ');
 					$wordsSearch['complex_words'][] = count($subwords) === 1 ? $word : '"' . $word . '"';
 				}
 			}
-			elseif (Util::strlen(trim($word, "/*- ")) < $this->min_word_length)
+			elseif (Util::strlen(trim($word, '/*- ')) < $this->min_word_length)
 			{
 				// Short words have feelings too
-				$wordsSearch['words'][] = trim($word, "/*- ");
+				$wordsSearch['words'][] = trim($word, '/*- ');
 				$wordsSearch['complex_words'][] = count($subwords) === 1 ? $word : '"' . $word . '"';
 			}
 		}
@@ -205,9 +206,8 @@ class Fulltext_Search
 	 *
 	 * Search for indexed words.
 	 *
-	 * @param array $words
-	 * @param array $search_data
-	 * @return
+	 * @param mixed[] $words
+	 * @param mixed[] $search_data
 	 */
 	public function indexedWordQuery($words, $search_data)
 	{

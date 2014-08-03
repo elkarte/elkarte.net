@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -232,18 +232,13 @@ function template_by_board()
 			<h2 class="category_header">', $txt['permissions_boards'], '</h2>
 			<div class="information">
 				', $txt['permissions_boards_desc'], '
-			</div>
-
-			<h3 id="board_permissions" class="category_header flow_hidden">
-				<span class="perm_name floatleft">', $txt['board_name'], '</span>
-				<span class="perm_profile floatleft">', $txt['permission_profile'], '</span>';
+			</div>';
 
 	if (!$context['edit_all'])
 		echo '
-				<a class="edit_all_board_profiles floatright" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>';
-
-	echo '
-			</h3>';
+			<div class="content submitbutton">
+				<a class="edit_all_board_profiles linkbutton" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>
+			</div>';
 
 	foreach ($context['categories'] as $category)
 	{
@@ -254,7 +249,11 @@ function template_by_board()
 			echo '
 			<div class="windowbg">
 				<div class="content">
-					<ul class="perm_boards flow_hidden">';
+					<ul class="perm_boards flow_hidden">
+						<li class="flow_hidden windowbg">
+				<span class="perm_name floatleft">', $txt['board_name'], '</span>
+				<span class="perm_profile floatleft">', $txt['permission_profile'], '</span>
+						</li>';
 
 		foreach ($category['boards'] as $board)
 		{
@@ -282,7 +281,7 @@ function template_by_board()
 				echo '
 								<a id="edit_board_', $board['id'], '" href="', $scripturl, '?action=admin;area=permissions;sa=index;pid=', $board['profile'], ';', $context['session_var'], '=', $context['session_id'], '"> [', $board['profile_name'], ']</a>
 							</span>
-							<a class="edit_board" style="display: none" data-boardid="', $board['id'], '" data-boardprofile="', $board['profile'], '" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '"></a>';
+							<a class="edit_board" data-boardid="', $board['id'], '" data-boardprofile="', $board['profile'], '" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '"></a>';
 
 			echo '
 						</li>';
@@ -296,14 +295,14 @@ function template_by_board()
 	}
 
 	echo '
-			<div class="content">';
+			<div class="content submitbutton">';
 
 	if ($context['edit_all'])
 		echo '
 				<input type="submit" name="save_changes" value="', $txt['save'], '" class="right_submit" />';
 	else
 		echo '
-				<a class="edit_all_board_profiles linkbutton_right" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>
+				<a class="edit_all_board_profiles linkbutton" href="', $scripturl, '?action=admin;area=permissions;sa=board;edit;', $context['session_var'], '=', $context['session_id'], '">', $txt['permissions_board_all'], '</a>
 				<script><!-- // --><![CDATA[
 					initEditProfileBoards();
 				// ]]></script>';
@@ -332,7 +331,7 @@ function template_edit_profiles()
 					<tr class="table_head">
 						<th>', $txt['permissions_profile_name'], '</th>
 						<th>', $txt['permissions_profile_used_by'], '</th>
-						<th style="width:5%', !empty($context['show_rename_boxes']) ? ';display:none"' : '"', ' >', $txt['delete'], '</th>
+						<th class="perm_profile_delete" style="', !empty($context['show_rename_boxes']) ? ';display:none"' : '"', ' >', $txt['delete'], '</th>
 					</tr>
 				</thead>
 				<tbody>';
@@ -349,14 +348,14 @@ function template_edit_profiles()
 							<input type="text" name="rename_profile[', $profile['id'], ']" value="', $profile['name'], '" class="input_text" />';
 		else
 			echo '
-							<a href="', $scripturl, '?action=admin;area=permissions;sa=index;pid=', $profile['id'], ';', $context['session_var'], '=', $context['session_id'], '">', $profile['name'], '</a>';
+							<a ', $profile['can_edit'] ? 'class="rename_profile" data-pid="' . $profile['id'] . '" ' : '', 'href="', $scripturl, '?action=admin;area=permissions;sa=index;pid=', $profile['id'], ';', $context['session_var'], '=', $context['session_id'], '">', $profile['name'], '</a>';
 
 		echo '
 						</td>
 						<td>
 							', !empty($profile['boards_text']) ? $profile['boards_text'] : $txt['permissions_profile_used_by_none'], '
 						</td>
-						<td class="centertext" ', !empty($context['show_rename_boxes']) ? 'style="display:none"' : '', '>
+						<td class="centertext perm_profile_delete" ', !empty($context['show_rename_boxes']) ? 'style="display:none"' : '', '>
 							<input type="checkbox" name="delete_profile[]" value="', $profile['id'], '" ', $profile['can_delete'] ? '' : 'disabled="disabled"', ' class="input_check" />
 						</td>
 					</tr>';
@@ -372,10 +371,10 @@ function template_edit_profiles()
 
 	if ($context['can_edit_something'])
 		echo '
-				<input type="submit" name="rename" value="', empty($context['show_rename_boxes']) ? $txt['permissions_profile_rename'] : $txt['permissions_commit'], '" class="button_submit" />';
+				<input type="submit" id="rename" name="rename" value="', empty($context['show_rename_boxes']) ? $txt['permissions_profile_rename'] : $txt['permissions_commit'], '" class="button_submit" />';
 
 	echo '
-				<input type="submit" name="delete" value="', $txt['quickmod_delete_selected'], '" class="button_submit" ', !empty($context['show_rename_boxes']) ? ' style="display:none"' : '', '/>
+				<input type="submit" id="delete" name="delete" value="', $txt['quickmod_delete_selected'], '" class="button_submit" ', !empty($context['show_rename_boxes']) ? ' style="display:none"' : '', '/>
 			</div>
 		</form>
 		<br />
@@ -385,16 +384,16 @@ function template_edit_profiles()
 				<div class="content">
 					<dl class="settings">
 						<dt>
-							<strong>', $txt['permissions_profile_name'], ':</strong>
+							<strong><label for="profile_name">', $txt['permissions_profile_name'], '</label>:</strong>
 						</dt>
 						<dd>
-							<input type="text" name="profile_name" value="" class="input_text" />
+							<input type="text" id="profile_name" name="profile_name" value="" class="input_text" />
 						</dd>
 						<dt>
-							<strong>', $txt['permissions_profile_copy_from'], ':</strong>
+							<strong><label for="copy_from">', $txt['permissions_profile_copy_from'], '</label>:</strong>
 						</dt>
 						<dd>
-							<select name="copy_from">';
+							<select id="copy_from" name="copy_from">';
 
 	foreach ($context['profiles'] as $id => $profile)
 		echo '
@@ -411,6 +410,9 @@ function template_edit_profiles()
 				</div>
 			</div>
 		</form>
+		<script><!-- // --><![CDATA[
+			initEditPermissionProfiles();
+		// ]]></script>
 	</div>';
 }
 
@@ -521,7 +523,7 @@ function template_modify_group_classic($type)
 	foreach ($permission_type['columns'] as $column)
 	{
 		echo '
-						<table style="width:49%" class="table_grid perm_classic floatleft">';
+						<table style="width: 49%;" class="table_grid perm_classic floatleft">';
 
 		foreach ($column as $permissionGroup)
 		{
@@ -541,7 +543,7 @@ function template_modify_group_classic($type)
 				{
 					echo '
 							<tr class="table_head">
-								<th class="lefttext" colspan="2" style="width:100%">
+								<th class="lefttext" colspan="2" style="width: 100%;">
 									<strong class="smalltext">', $permissionGroup['name'], '</strong>
 								</th>';
 
@@ -591,14 +593,14 @@ function template_modify_group_classic($type)
 				{
 					echo '
 							<tr class="', $alternate ? 'windowbg' : 'windowbg2', '">
-								<td style="width:10px">
+								<td style="width: 10px;">
 									', $permission['show_help'] ? '<a href="' . $scripturl . '?action=quickhelp;help=permissionhelp_' . $permission['id'] . '" onclick="return reqOverlayDiv(this.href);" class="help"><img src="' . $settings['images_url'] . '/helptopics.png" alt="' . $txt['help'] . '" /></a>' : '', '
 								</td>';
 
 					if ($permission['has_own_any'])
 					{
 						echo '
-								<td class="lefttext" colspan="4" style="width:100%">', $permission['name'], '</td>
+								<td class="lefttext" colspan="4" style="width: 100%;">', $permission['name'], '</td>
 							</tr>
 							<tr class="', $alternate ? 'windowbg' : 'windowbg2', '">';
 
@@ -607,7 +609,7 @@ function template_modify_group_classic($type)
 						{
 							echo '
 								<td></td>
-								<td class="smalltext righttext" style="width:100%">', $permission['own']['name'], ':</td>';
+								<td class="smalltext righttext" style="width: 100%;">', $permission['own']['name'], ':</td>';
 
 							if (empty($modSettings['permission_enable_deny']))
 								echo '
@@ -616,13 +618,13 @@ function template_modify_group_classic($type)
 								</td>';
 							else
 								echo '
-								<td style="width:10px">
+								<td style="width: 10px;">
 									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['own']['id'], ']"', $permission['own']['select'] == 'on' ? ' checked="checked"' : '', ' value="on" id="', $permission['own']['id'], '_on" class="input_radio" ', $disable_field, '/>
 								</td>
-								<td style="width:10px">
+								<td style="width: 10px;">
 									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['own']['id'], ']"', $permission['own']['select'] == 'off' ? ' checked="checked"' : '', ' value="off" class="input_radio" ', $disable_field, '/>
 								</td>
-								<td style="width:10px">
+								<td style="width: 10px;">
 									<input type="radio" name="perm[', $permission_type['id'], '][', $permission['own']['id'], ']"', $permission['own']['select'] == 'denied' ? ' checked="checked"' : '', ' value="deny" class="input_radio" ', $disable_field, '/>
 								</td>';
 
@@ -633,7 +635,7 @@ function template_modify_group_classic($type)
 
 						echo '
 								<td></td>
-								<td class="smalltext righttext" style="width:100%">', $permission['any']['name'], ':</td>';
+								<td class="smalltext righttext" style="width: 100%;">', $permission['any']['name'], ':</td>';
 
 						if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
 							echo '
@@ -658,7 +660,7 @@ function template_modify_group_classic($type)
 					else
 					{
 						echo '
-								<td class="lefttext" style="width:100%">', $permission['name'], '</td>';
+								<td class="lefttext" style="width: 100%;">', $permission['name'], '</td>';
 
 						if (empty($modSettings['permission_enable_deny']) || $context['group']['id'] == -1)
 							echo '
@@ -687,7 +689,7 @@ function template_modify_group_classic($type)
 			if (!$permissionGroup['hidden'] && $has_display_content)
 				echo '
 							<tr class="windowbg2">
-								<td colspan="5" style="width:100%"><!--separator--></td>
+								<td colspan="5" style="width: 100%;"><!--separator--></td>
 							</tr>';
 		}
 		echo '
@@ -794,7 +796,7 @@ function template_postmod_permissions()
 
 	echo '
 					</select>
-					<input type="submit" value="', $txt['go'], '" class="button_submit" />
+					<input type="submit" value="', $txt['go'], '" class="right_submit" />
 				</div>
 				<table class="table_grid">
 				<thead>
@@ -814,7 +816,7 @@ function template_postmod_permissions()
 						</th>
 					</tr>
 					<tr class="secondary_header">
-						<th style="width:30%">
+						<th style="width: 30%;">
 							', $txt['permissions_post_moderation_group'], '
 						</th>
 						<th><img src="', $settings['default_images_url'], '/admin/post_moderation_allow.png" alt="', $txt['permissions_post_moderation_allow'], '" title="', $txt['permissions_post_moderation_allow'], '" /></th>
@@ -837,7 +839,7 @@ function template_postmod_permissions()
 	{
 		echo '
 					<tr>
-						<td style="width:40%" class="windowbg">
+						<td style="width: 40%;" class="windowbg">
 							<span ', ($group['color'] ? 'style="color: ' . $group['color'] . '"' : ''), '>', $group['name'], '</span>';
 
 		if (!empty($group['children']))

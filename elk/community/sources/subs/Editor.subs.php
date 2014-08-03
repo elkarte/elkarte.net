@@ -14,54 +14,12 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
 if (!defined('ELK'))
 	die('No access...');
-
-/**
- * Creates the javascript code for localization of the editor (SCEditor)
- */
-function action_loadlocale()
-{
-	global $txt, $editortxt, $modSettings;
-
-	loadLanguage('Editor');
-
-	Template_Layers::getInstance()->removeAll();
-
-	// Lets make sure we aren't going to output anything nasty.
-	@ob_end_clean();
-	if (!empty($modSettings['enableCompressedOutput']))
-		@ob_start('ob_gzhandler');
-	else
-		@ob_start();
-
-	// If we don't have any locale better avoid broken js
-	if (empty($txt['lang_locale']))
-		die();
-
-	$file_data = '(function ($) {
-	\'use strict\';
-
-	$.sceditor.locale[' . javaScriptEscape($txt['lang_locale']) . '] = {';
-
-	foreach ($editortxt as $key => $val)
-		$file_data .= '
-		' . javaScriptEscape($key) . ': ' . javaScriptEscape($val) . ',';
-
-	$file_data .= '
-		dateFormat: "day.month.year"
-	}
-})(jQuery);';
-
-	// Make sure they know what type of file we are.
-	header('Content-Type: text/javascript');
-	echo $file_data;
-	obExit(false);
-}
 
 /**
  * Retrieves a list of message icons.
@@ -87,7 +45,7 @@ function getMessageIcons($board_id)
 			array('value' => 'xx', 'name' => $txt['standard']),
 			array('value' => 'thumbup', 'name' => $txt['thumbs_up']),
 			array('value' => 'thumbdown', 'name' => $txt['thumbs_down']),
-			array('value' => 'exclamation', 'name' => $txt['excamation_point']),
+			array('value' => 'exclamation', 'name' => $txt['exclamation_point']),
 			array('value' => 'question', 'name' => $txt['question_mark']),
 			array('value' => 'lamp', 'name' => $txt['lamp']),
 			array('value' => 'smiley', 'name' => $txt['icon_smiley']),
@@ -146,11 +104,24 @@ function getMessageIcons($board_id)
 
 /**
  * Creates a box that can be used for richedit stuff like BBC, Smileys etc.
- * @param array $editorOptions
+ * @param mixed[] $editorOptions associative array of options => value
+ *  must contain:
+ *   - id => unique id for the css
+ *   - value => text for the editor or blank
+ *  Optionaly
+ *   - height => height of the intial box
+ *   - width => width of the box (100%)
+ *   - force_rich => force wysiwyg to be enabled
+ *   - disable_smiley_box => boolean to turn off the smiley box
+ *   - labels => array(
+ *       - 'post_button' => $txt['for post button'],
+ *     ),
+ *   - preview_type => 2 how to act on preview click, see template_control_richedit_buttons
  */
 function create_control_richedit($editorOptions)
 {
 	global $txt, $modSettings, $options, $context, $settings, $user_info, $scripturl;
+	static $bbc_tags;
 
 	$db = database();
 
@@ -177,9 +148,11 @@ function create_control_richedit($editorOptions)
 
 		// This really has some WYSIWYG stuff.
 		loadTemplate('GenericControls', 'jquery.sceditor');
+		if (!empty($context['theme_variant']) && file_exists($settings['theme_dir'] . '/css/' . $context['theme_variant'] . '/jquery.sceditor.elk' . $context['theme_variant'] . '.css'))
+			loadCSSFile($context['theme_variant'] . '/jquery.sceditor.elk' . $context['theme_variant'] . '.css');
 
 		// JS makes the editor go round
-		loadJavascriptFile(array('jquery.sceditor.js', 'jquery.sceditor.bbcode.js', 'jquery.sceditor.elkarte.js', 'post.js', 'splittag.plugin.js'));
+		loadJavascriptFile(array('jquery.sceditor.min.js', 'jquery.sceditor.bbcode.min.js', 'jquery.sceditor.elkarte.js', 'post.js', 'splittag.plugin.js', 'dropAttachments.js'));
 		addJavascriptVar(array(
 			'post_box_name' => '"' . $editorOptions['id'] . '"',
 			'elk_smileys_url' => '"' . $settings['smileys_url'] . '"',
@@ -188,9 +161,9 @@ function create_control_richedit($editorOptions)
 			'bbc_search_on' => '"' . addcslashes($txt['search_on'], "'") . '"')
 		);
 
-		// editor language file
-		if (!empty($txt['lang_locale']) && $txt['lang_locale'] != 'en_US')
-			loadJavascriptFile($scripturl . '?action=loadeditorlocale', array(), 'sceditor_language');
+		// Editor language file
+		if (!empty($txt['lang_locale']))
+			loadJavascriptFile($scripturl . '?action=jslocale;sa=sceditor', array('defer' => true), 'sceditor_language');
 
 		// Drafts?
 		if ((!empty($context['drafts_save']) || !empty($context['drafts_pm_save'])) && !empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']))
@@ -198,7 +171,7 @@ function create_control_richedit($editorOptions)
 
 		// Mentions?
 		if (!empty($context['mentions_enabled']))
-			loadJavascriptFile(array('jquery.atwho.js', 'jquery.caret.js', 'mentioning.plugin.js'));
+			loadJavascriptFile(array('jquery.atwho.js', 'jquery.caret.min.js', 'mentioning.plugin.js'));
 
 		// Our not so concise shortcut line
 		$context['shortcuts_text'] = $txt['shortcuts' . (!empty($context['drafts_save']) ? '_drafts' : '') . (isBrowser('is_firefox') ? '_firefox' : '')];
@@ -222,8 +195,7 @@ function create_control_richedit($editorOptions)
 	$context['controls']['richedit'][$editorOptions['id']] = array(
 		'id' => $editorOptions['id'],
 		'value' => $editorOptions['value'],
-		'rich_value' => $editorOptions['value'], // 2.0 editor compatibility
-		'rich_active' => empty($modSettings['disable_wysiwyg']) && (!empty($options['wysiwyg_default']) || !empty($editorOptions['force_rich']) || !empty($_REQUEST[$editorOptions['id'] . '_mode'])),
+		'rich_active' => !empty($options['wysiwyg_default']) || !empty($editorOptions['force_rich']) || !empty($_REQUEST[$editorOptions['id'] . '_mode']),
 		'disable_smiley_box' => !empty($editorOptions['disable_smiley_box']),
 		'columns' => isset($editorOptions['columns']) ? $editorOptions['columns'] : 60,
 		'rows' => isset($editorOptions['rows']) ? $editorOptions['rows'] : 18,
@@ -233,7 +205,7 @@ function create_control_richedit($editorOptions)
 		'bbc_level' => !empty($editorOptions['bbc_level']) ? $editorOptions['bbc_level'] : 'full',
 		'preview_type' => isset($editorOptions['preview_type']) ? (int) $editorOptions['preview_type'] : 1,
 		'labels' => !empty($editorOptions['labels']) ? $editorOptions['labels'] : array(),
-		'locale' => !empty($txt['lang_locale']) && substr($txt['lang_locale'], 0, 5) != 'en_US' ? $txt['lang_locale'] : '',
+		'locale' => !empty($txt['lang_locale']) ? $txt['lang_locale'] : 'en_US',
 	);
 
 	// Switch between default images and back... mostly in case you don't have an PersonalMessage template, but do have a Post template.
@@ -249,271 +221,83 @@ function create_control_richedit($editorOptions)
 		$settings['theme_dir'] = $settings['default_theme_dir'];
 	}
 
-	if (empty($context['bbc_tags']))
+	if (empty($bbc_tags))
 	{
-		// The below array makes it dead easy to add images to this control. Add it to the array and everything else is done for you!
-		/*
-			array(
-				'image' => 'bold',
-				'code' => 'b',
-				'before' => '[b]',
-				'after' => '[/b]',
-				'description' => $txt['bold'],
-			),
-		*/
-		$context['bbc_tags'] = array();
-		$context['bbc_tags'][] = array(
-			array(
-				'code' => 'bold',
-				'description' => $txt['bold'],
-			),
-			array(
-				'code' => 'italic',
-				'description' => $txt['italic'],
-			),
-			array(
-				'code' => 'underline',
-				'description' => $txt['underline']
-			),
-			array(
-				'code' => 'strike',
-				'description' => $txt['strike']
-			),
-			array(
-				'code' => 'superscript',
-				'description' => $txt['superscript']
-			),
-			array(
-				'code' => 'subscript',
-				'description' => $txt['subscript']
-			),
-			array(),
-			array(
-				'code' => 'left',
-				'description' => $txt['left_align']
-			),
-			array(
-				'code' => 'center',
-				'description' => $txt['center']
-			),
-			array(
-				'code' => 'right',
-				'description' => $txt['right_align']
-			),
-			array(
-				'code' => 'pre',
-				'description' => $txt['preformatted']
-			),
-			array(
-				'code' => 'tt',
-				'description' => $txt['teletype']
-			),
+		// The below array is used to show a command button in the editor, the execution
+		// and display details of any added buttons must be defined in the javascript files
+		// see  jquery.sceditor.elkarte.js under the $.sceditor.plugins.bbcode.bbcode area
+		// for examples of how to use the .set command to add codes.  Include your new
+		// JS with addInlineJavascript() or loadJavascriptFile()
+		$bbc_tags['row1'] = array(
+			array('bold', 'italic', 'underline', 'strike', 'superscript', 'subscript'),
+			array('left', 'center', 'right', 'pre', 'tt'),
+			array('font', 'size', 'color'),
 		);
-		$context['bbc_tags'][] = array(
-			array(
-				'code' => 'bulletlist',
-				'description' => $txt['list_unordered']
-			),
-			array(
-				'code' => 'orderedlist',
-				'description' => $txt['list_ordered']
-			),
-			array(
-				'code' => 'horizontalrule',
-				'description' => $txt['horizontal_rule']
-			),
-			array(),
-			array(
-				'code' => 'table',
-				'description' => $txt['table']
-			),
-			array(),
-			array(
-				'code' => 'code',
-				'description' => $txt['bbc_code']
-			),
-			array(
-				'code' => 'quote',
-				'description' => $txt['bbc_quote']
-			),
-			array(
-				'code' => 'spoiler',
-				'description' => $txt['bbc_spoiler']
-			),
-			array(
-				'code' => 'footnote',
-				'description' => $txt['bbc_footnote']
-			),
-			array(),
-			array(
-				'code' => 'image',
-				'description' => $txt['image']
-			),
-			array(
-				'code' => 'link',
-				'description' => $txt['hyperlink']
-			),
-			array(
-				'code' => 'email',
-				'description' => $txt['insert_email']
-			),
-			array(
-				'code' => 'ftp',
-				'description' => $txt['ftp']
-			),
-			array(
-				'code' => 'flash',
-				'description' => $txt['flash']
-			),
-			array(),
-			array(
-				'code' => 'glow',
-				'description' => $txt['glow']
-			),
-			array(
-				'code' => 'shadow',
-				'description' => $txt['shadow']
-			),
-			array(
-				'code' => 'move',
-				'description' => $txt['marquee']
-			),
+		$bbc_tags['row2'] = array(
+			array('quote', 'code', 'table'),
+			array('bulletlist', 'orderedlist', 'horizontalrule'),
+			array('spoiler', 'footnote'),
+			array('image', 'link', 'email'),
 		);
 
-		// Allow mods to modify BBC buttons.
-		call_integration_hook('integrate_bbc_buttons');
+		// Allow mods to add BBC buttons to the toolbar, actions are defined in the JS
+		call_integration_hook('integrate_bbc_buttons', array(&$bbc_tags));
 
-		// Show the toggle?
-		if (empty($modSettings['disable_wysiwyg']))
-		{
-			$context['bbc_tags'][count($context['bbc_tags']) - 1][] = array();
-			$context['bbc_tags'][count($context['bbc_tags']) - 1][] = array(
-				'code' => 'unformat',
-				'description' => $txt['unformat_text'],
-			);
-			$context['bbc_tags'][count($context['bbc_tags']) - 1][] = array(
-				'code' => 'toggle',
-				'description' => $txt['toggle_view'],
-			);
-		}
+		// Show the wysiwyg format and toggle buttons?
+		$bbc_tags['row2'][] = array('removeformat', 'source');
 
-		// Generate a list of buttons that shouldn't be shown - this should be the fastest way to do this.
+		// Generate a list of buttons that shouldn't be shown
 		$disabled_tags = array();
 		if (!empty($modSettings['disabledBBC']))
 			$disabled_tags = explode(',', $modSettings['disabledBBC']);
 
-		if (empty($modSettings['enableEmbeddedFlash']))
-			$disabled_tags[] = 'flash';
+		// Map codes to tags
+		$translate_tags_to_code = array('b' => 'bold', 'i' => 'italic', 'u' => 'underline', 's' => 'strike', 'img' => 'image', 'url' => 'link', 'sup' => 'superscript', 'sub' => 'subscript', 'hr' => 'horizontalrule');
 
+		// Remove the toolbar buttons for any bbc tags that have been turned off in the ACP
 		foreach ($disabled_tags as $tag)
 		{
+			// list is special, its prevents two tags
 			if ($tag === 'list')
 			{
 				$context['disabled_tags']['bulletlist'] = true;
 				$context['disabled_tags']['orderedlist'] = true;
 			}
-			elseif ($tag === 'b')
-				$context['disabled_tags']['bold'] = true;
-			elseif ($tag === 'i')
-				$context['disabled_tags']['italic'] = true;
-			elseif ($tag === 'u')
-				$context['disabled_tags']['underline'] = true;
-			elseif ($tag === 's')
-				$context['disabled_tags']['strike'] = true;
-			elseif ($tag === 'img')
-				$context['disabled_tags']['image'] = true;
-			elseif ($tag === 'url')
-				$context['disabled_tags']['link'] = true;
-			elseif ($tag === 'sup')
-				$context['disabled_tags']['superscript'] = true;
-			elseif ($tag === 'sub')
-				$context['disabled_tags']['subscript'] = true;
-			elseif ($tag === 'hr')
-				$context['disabled_tags']['horizontalrule'] = true;
+			elseif (isset($translate_tags_to_code[$tag]))
+				$context['disabled_tags'][$translate_tags_to_code[$tag]] = true;
 
+			// Tag is the same as the code, like font, color, size etc
 			$context['disabled_tags'][trim($tag)] = true;
 		}
 
-		$bbcodes_styles = '';
-		$context['bbcodes_handlers'] = '';
+		// Build our toolbar, taking in to account any bbc codes from integration
 		$context['bbc_toolbar'] = array();
-
-		// Build our toolbar, taking in to account any custom bbc codes from integration
-		foreach ($context['bbc_tags'] as $row => $tagRow)
+		foreach ($bbc_tags as $row => $tagRow)
 		{
 			if (!isset($context['bbc_toolbar'][$row]))
 				$context['bbc_toolbar'][$row] = array();
 
 			$tagsRow = array();
-			foreach ($tagRow as $tag)
+
+			// For each row of buttons defined, lets build our tags
+			foreach ($tagRow as $tags)
 			{
-				if (!empty($tag))
+				foreach ($tags as $tag)
 				{
-					if (empty($context['disabled_tags'][$tag['code']]))
-					{
-						$tagsRow[] = $tag['code'];
-
-						// Special Image
-						if (isset($tag['image']))
-							$bbcodes_styles .= '
-		.sceditor-button-' . $tag['code'] . ' div {
-			background: url(\'' . $settings['default_theme_url'] . '/images/bbc/' . $tag['image'] . '.png\');
-		}';
-
-						// Special commands
-						if (isset($tag['before']))
-						{
-							$context['bbcodes_handlers'] = '
-				$.sceditor.command.set(
-					' . javaScriptEscape($tag['code']) . ', {
-					exec: function () {
-						this.wysiwygEditorInsertHtml(' . javaScriptEscape($tag['before']) . (isset($tag['after']) ? ', ' . javaScriptEscape($tag['after']) : '') . ');
-					},
-					tooltip:' . javaScriptEscape($tag['description']) . ',
-					txtExec: [' . javaScriptEscape($tag['before']) . (isset($tag['after']) ? ', ' . javaScriptEscape($tag['after']) : '') . '],
-					}
-				);';
-						}
-					}
+					// Just add this code in the existing grouping
+					if (!isset($context['disabled_tags'][$tag]))
+						$tagsRow[] = $tag;
 				}
-				else
-				{
-					$context['bbc_toolbar'][$row][] = implode(',', $tagsRow);
-					$tagsRow = array();
-				}
+
+				// If the row is not empty, and the last added tag is not a space, add a space.
+				if (!empty($tagsRow) && $tagsRow[count($tagsRow) - 1] != 'space')
+					$tagsRow[] = 'space';
 			}
 
-			if ($row === 0)
-			{
-				$context['bbc_toolbar'][$row][] = implode(',', $tagsRow);
-				$tagsRow = array();
-
-				if (!isset($context['disabled_tags']['font']))
-					$tagsRow[] = 'font';
-
-				if (!isset($context['disabled_tags']['size']))
-					$tagsRow[] = 'size';
-
-				if (!isset($context['disabled_tags']['color']))
-					$tagsRow[] = 'color';
-			}
-			elseif ($row === 1 && empty($modSettings['disable_wysiwyg']))
-			{
-				$tmp = array();
-				$tagsRow[] = 'removeformat';
-				$tagsRow[] = 'source';
-				if (!empty($tmp))
-					$tagsRow[] = '|' . implode(',', $tmp);
-			}
-
+			// Build that beautiful button row
 			if (!empty($tagsRow))
 				$context['bbc_toolbar'][$row][] = implode(',', $tagsRow);
 		}
-
-		if (!empty($bbcodes_styles))
-			$context['html_headers'] .= '
-	<style>' . $bbcodes_styles . '
-	</style>';
 	}
 
 	// Initialize smiley array... if not loaded before.
@@ -700,8 +484,8 @@ function create_control_richedit($editorOptions)
 		check_id: "post_subject"
 	});
 
-	var body_err = new errorbox_handler({
-		self: \'body_err\',
+	var body_err_' . $editorOptions['id'] . ' = new errorbox_handler({
+		self: \'body_err_' . $editorOptions['id'] . '\',
 		error_box_id: \'post_error\',
 		error_checks: [{
 			code: \'no_message\',
@@ -715,7 +499,7 @@ function create_control_richedit($editorOptions)
 		editor_id: \'' . $editorOptions['id'] . '\',
 		editor: ' . JavaScriptEscape('
 		(function () {
-			return $("#' . $editorOptions['id'] . '").data("sceditor").val();
+			return $editor_data[\'' . $editorOptions['id'] . '\'].val();
 		});') . '
 	});', true);
 	}

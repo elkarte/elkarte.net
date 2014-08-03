@@ -11,20 +11,20 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
 /**
- * Template to edit bans
+ * Template to edit and add bans
  */
 function template_ban_edit()
 {
-	global $context, $scripturl, $txt, $modSettings;
+	global $context, $scripturl, $txt, $modSettings, $settings;
 
 	echo '
 	<div id="manage_bans">
-		<form id="admin_form_wrapper" action="', $context['form_url'], '" method="post" accept-charset="', $context['character_set'], '" onsubmit="return confirmBan(this);">
+		<form id="admin_form_wrapper" action="', $context['form_url'], '" method="post" accept-charset="UTF-8" onsubmit="return confirmBan(this);">
 			<h2 class="category_header">
 				', $context['ban']['is_new'] ? $txt['ban_add_new'] : $txt['ban_edit'] . ' \'' . $context['ban']['name'] . '\'', '
 			</h2>';
@@ -40,7 +40,7 @@ function template_ban_edit()
 			<div class="content">
 				<dl class="settings">
 					<dt id="ban_name_label">
-						<strong>', $txt['ban_name'], ':</strong>
+						<label for="ban_name">', $txt['ban_name'], '</label>:
 					</dt>
 					<dd>
 						<input type="text" id="ban_name" name="ban_name" value="', $context['ban']['name'], '" size="45" maxlength="60" class="input_text" />
@@ -49,7 +49,7 @@ function template_ban_edit()
 	if (isset($context['ban']['reason']))
 		echo '
 				<dt>
-					<strong><label for="reason">', $txt['ban_reason'], ':</label></strong><br />
+					<label for="reason">', $txt['ban_reason'], ':</label><br />
 					<span class="smalltext">', $txt['ban_reason_desc'], '</span>
 				</dt>
 				<dd>
@@ -59,7 +59,7 @@ function template_ban_edit()
 	if (isset($context['ban']['notes']))
 		echo '
 				<dt>
-					<strong><label for="ban_notes">', $txt['ban_notes'], ':</label></strong><br />
+					<label for="ban_notes">', $txt['ban_notes'], ':</label><br />
 					<span class="smalltext">', $txt['ban_notes_desc'], '</span>
 				</dt>
 				<dd>
@@ -82,7 +82,7 @@ function template_ban_edit()
 					</legend>
 					<input type="radio" name="full_ban" id="full_ban" value="1" onclick="fUpdateStatus();"', $context['ban']['cannot']['access'] ? ' checked="checked"' : '', ' class="input_radio" /> <label for="full_ban">', $txt['ban_full_ban'], '</label><br />
 					<input type="radio" name="full_ban" id="partial_ban" value="0" onclick="fUpdateStatus();"', !$context['ban']['cannot']['access'] ? ' checked="checked"' : '', ' class="input_radio" /> <label for="partial_ban">', $txt['ban_partial_ban'], '</label><br />
-					<input type="checkbox" name="cannot_post" id="cannot_post" value="1"', $context['ban']['cannot']['post'] ? ' checked="checked"' : '', ' class="ban_restriction input_radio" /> <label for="cannot_post">', $txt['ban_cannot_post'], '</label> (<a href="', $scripturl, '?action=helpadmin;help=ban_cannot_post" onclick="return reqOverlayDiv(this.href);">?</a>)<br />
+					<input type="checkbox" name="cannot_post" id="cannot_post" value="1"', $context['ban']['cannot']['post'] ? ' checked="checked"' : '', ' class="ban_restriction input_radio" /> <label for="cannot_post">', $txt['ban_cannot_post'], '</label><a href="', $scripturl, '?action=quickhelp;help=ban_cannot_post" onclick="return reqOverlayDiv(this.href);" class="help">&nbsp;<img src="', $settings['images_url'], '/helptopics.png" class="icon" alt="', $txt['help'], '" /></a><br />
 					<input type="checkbox" name="cannot_register" id="cannot_register" value="1"', $context['ban']['cannot']['register'] ? ' checked="checked"' : '', ' class="ban_restriction input_radio" /> <label for="cannot_register">', $txt['ban_cannot_register'], '</label><br />
 					<input type="checkbox" name="cannot_login" id="cannot_login" value="1"', $context['ban']['cannot']['login'] ? ' checked="checked"' : '', ' class="ban_restriction input_radio" /> <label for="cannot_login">', $txt['ban_cannot_login'], '</label><br />
 				</fieldset>
@@ -127,7 +127,7 @@ function template_ban_edit()
 							<label for="user_check">', $txt['ban_on_username'], '</label>:
 						</dt>
 						<dd>
-							<input type="text" ', isset($context['ban']['from_user']) ? 'readonly="readonly" value="' . $context['ban_suggestions']['member']['name'] . '"' : ' value=""', ' name="user" id="user" size="44" class="input_text" />
+							<input type="text" ', !empty($context['ban']['from_user']) ? 'readonly="readonly" value="' . $context['ban_suggestions']['member']['name'] . '"' : ' value="' . (isset($context['ban_suggestions']['member']['name']) ? $context['ban_suggestions']['member']['name'] : '') . '"', ' name="user" id="user" size="44" class="input_text" />
 						</dd>
 					</dl>';
 
@@ -182,20 +182,12 @@ function template_ban_edit()
 	}
 
 	echo '
-	</div>
-	<script><!-- // --><![CDATA[
-		var fUpdateStatus = function ()
-		{
-			document.getElementById("expire_date").disabled = !document.getElementById("expires_one_day").checked;
-			document.getElementById("cannot_post").disabled = document.getElementById("full_ban").checked;
-			document.getElementById("cannot_register").disabled = document.getElementById("full_ban").checked;
-			document.getElementById("cannot_login").disabled = document.getElementById("full_ban").checked;
-		}
-		addLoadEvent(fUpdateStatus);';
+	</div>';
 
 	// Auto suggest only needed for adding new bans, not editing
-	if ($context['ban']['is_new'] && empty($_REQUEST['u']))
+	if (!empty($context['use_autosuggest']))
 		echo '
+	<script><!-- // --><![CDATA[
 		var oAddMemberSuggest = new smc_AutoSuggest({
 			sSelf: \'oAddMemberSuggest\',
 			sSessionId: elk_session_id,
@@ -207,29 +199,7 @@ function template_ban_edit()
 			bItemList: false
 		});
 
-		function onUpdateName(oAutoSuggest)
-		{
-			document.getElementById(\'user_check\').checked = true;
-			return true;
-		}
-
-		oAddMemberSuggest.registerCallback(\'onBeforeUpdate\', \'onUpdateName\');';
-
-	echo '
-		function confirmBan(aForm)
-		{
-			if (aForm.ban_name.value === \'\')
-			{
-				alert(\'', $txt['ban_name_empty'], '\');
-				return false;
-			}
-
-			if (aForm.partial_ban.checked && !(aForm.cannot_post.checked || aForm.cannot_register.checked || aForm.cannot_login.checked))
-			{
-				alert(\'', $txt['ban_restriction_empty'], '\');
-				return false;
-			}
-		}
+		oAddMemberSuggest.registerCallback(\'onBeforeUpdate\', \'onUpdateName\');
 	// ]]></script>';
 }
 
@@ -311,12 +281,6 @@ function template_ban_edit_trigger()
 			sTextDeleteItem: \'', $txt['autosuggest_delete_item'], '\',
 			bItemList: false
 		});
-
-		function onUpdateName(oAutoSuggest)
-		{
-			document.getElementById(\'user_check\').checked = true;
-			return true;
-		}
 
 		oAddMemberSuggest.registerCallback(\'onBeforeUpdate\', \'onUpdateName\');
 	// ]]></script>';

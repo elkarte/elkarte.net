@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -173,22 +173,9 @@ class MoveTopic_Controller extends Action_Controller
 		if (!allowedTo('move_any'))
 		{
 			if ($topic_info['id_member_started'] == $user_info['id'])
-			{
 				isAllowedTo('move_own');
-				$boards = array_merge(boardsAllowedTo('move_own'), boardsAllowedTo('move_any'));
-			}
 			else
 				isAllowedTo('move_any');
-		}
-		else
-			$boards = boardsAllowedTo('move_any');
-
-		// If this topic isn't approved don't let them move it if they can't approve it!
-		if ($modSettings['postmod_active'] && !$context['is_approved'] && !allowedTo('approve_posts'))
-		{
-			// Only allow them to move it to other boards they can't approve it in.
-			$can_approve = !empty($user_info['mod_cache']['ap']) ? $user_info['mod_cache']['ap'] : boardsAllowedTo('approve_posts');
-			$boards = array_intersect($boards, $can_approve);
 		}
 
 		checkSession();
@@ -265,14 +252,14 @@ class MoveTopic_Controller extends Action_Controller
 			));
 
 			// Auto remove this MOVED redirection topic in the future?
-			$redirect_expires = !empty($_POST['redirect_expires']) ? ((int) ($_POST['redirect_expires'] * 60) + time()) : 0;
+			$redirect_expires = !empty($_POST['redirect_expires']) ? (int) $_POST['redirect_expires'] : 0;
 
 			// Redirect to the MOVED topic from topic list?
 			$redirect_topic = isset($_POST['redirect_topic']) ? $topic : 0;
 
 			// And remember the last expiry period too.
 			$_SESSION['move_to_topic']['redirect_topic'] = $redirect_topic;
-			$_SESSION['move_to_topic']['redirect_expires'] = (int) $_POST['redirect_expires'];
+			$_SESSION['move_to_topic']['redirect_expires'] = $redirect_expires;
 
 			$msgOptions = array(
 				'subject' => $txt['moved'] . ': ' . $board_info['subject'],
@@ -285,7 +272,7 @@ class MoveTopic_Controller extends Action_Controller
 				'board' => $board,
 				'lock_mode' => 1,
 				'mark_as_read' => true,
-				'redirect_expires' => $redirect_expires,
+				'redirect_expires' => ($redirect_expires * 60) + time(),
 				'redirect_topic' => $redirect_topic,
 			);
 

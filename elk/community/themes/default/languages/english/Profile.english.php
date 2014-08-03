@@ -1,8 +1,6 @@
 <?php
 // Version: 1.0; Profile
 
-global $scripturl, $context;
-
 $txt['no_profile_edit'] = 'You are not allowed to change this person\'s profile.';
 $txt['website_title'] = 'Website title';
 $txt['website_url'] = 'Website URL';
@@ -15,16 +13,16 @@ $txt['profile_moderation'] = 'Moderation Information';
 $txt['profile_more'] = 'Signature';
 $txt['profile_attachments'] = 'Recent Attachments';
 $txt['profile_attachments_no'] = 'There are no Attachments from this member';
-$txt['profile_posts'] = 'Recent Posts';
+$txt['profile_recent_posts'] = 'Recent Posts';
 $txt['profile_posts_no'] = 'There are no posts from this member';
 $txt['profile_topics'] = 'Recent Topics';
 $txt['profile_topics_no'] = 'There are no topics from this member';
 $txt['profile_buddies_no'] = 'You have not set any buddies';
 $txt['profile_user_info'] = 'User Info';
-$txt['profile_contact_no'] = 'There is no contact informatin for this member';
+$txt['profile_contact_no'] = 'There is no contact information for this member';
 $txt['profile_signature_no'] = 'There is no signature for this member';
-$txt['profile_additonal_no'] = 'There is no additonal information for this member';
-$txt['profile_user_summary'] = 'Summary';
+$txt['profile_additonal_no'] = 'There is no additional information for this member';
+$txt['profile_user_summary'] = 'Profile';
 $txt['profile_action'] = 'Currently';
 $txt['profile_recent_activity'] = 'Recent Activity';
 $txt['profile_activity'] = 'Activity';
@@ -83,7 +81,6 @@ $txt['secret_ask'] = 'Ask me my question';
 $txt['cant_retrieve'] = 'You can\'t retrieve your password, but you can set a new one by following a link sent to you by email.  You also have the option of setting a new password by answering your secret question.';
 $txt['incorrect_answer'] = 'Sorry, but you did not specify a valid combination of Secret Question and Answer in your profile.  Please click on the back button, and use the default method of obtaining your password.';
 $txt['enter_new_password'] = 'Please enter the answer to your question, and the password you would like to use.  Your password will be changed to the one you select provided you answer the question correctly.';
-$txt['password_success'] = 'Your password was changed successfully.<br /><a href="' . $scripturl . '?action=login">Click here to login</a>.';
 $txt['secret_why_blank'] = 'why is this blank?';
 
 $txt['authentication_reminder'] = 'Authentication Reminder';
@@ -98,7 +95,7 @@ $txt['reminder_openid_is'] = 'The OpenID identity associated with your account i
 $txt['reminder_continue'] = 'Continue';
 
 $txt['current_theme'] = 'Current Theme';
-$txt['change'] = 'change';
+$txt['change'] = 'Change Theme';
 $txt['theme_preferences'] = 'Theme preferences';
 $txt['theme_forum_default'] = 'Forum or Board Default';
 $txt['theme_forum_default_desc'] = 'This is the default theme, which means your theme will change along with the administrator\'s settings and the board you are viewing.';
@@ -117,13 +114,17 @@ $txt['notify_regularity_instant'] = 'Instantly';
 $txt['notify_regularity_first_only'] = 'Instantly - but only for the first unread reply';
 $txt['notify_regularity_daily'] = 'Daily';
 $txt['notify_regularity_weekly'] = 'Weekly';
-$txt['auto_notify'] = 'Turn notification on when you post or reply to a topic.';
-$txt['notify_send_types'] = 'For topics and boards I\'ve requested notification on, notify me of';
+$txt['auto_notify'] = 'Turn topic notification on when you post or reply to a topic.';
+$txt['auto_notify_pbe_post'] = 'This is <strong>NOT</strong> recommended if you have "board" notifications enabled.';
+$txt['notify_send_types'] = 'Notify me of topics and boards I\'ve requested notification on';
 $txt['notify_send_type_everything'] = 'Replies and moderation';
 $txt['notify_send_type_everything_own'] = 'Moderation only if I started the topic';
 $txt['notify_send_type_only_replies'] = 'Only replies';
+$txt['notify_send_type_only_replies_pbe'] = 'All messages';
 $txt['notify_send_type_nothing'] = 'Nothing at all';
-$txt['notify_send_body'] = 'When sending notification of a reply to a topic, send the post in the email (but please don\'t reply to these emails.)';
+$txt['notify_send_body'] = 'When sending notifications of a reply to a topic, send the post in the email (but please don\'t reply to these emails.)';
+$txt['notify_send_body_pbe'] = 'When sending email notifications, send the full text of the post in the email';
+$txt['notify_send_body_pbe_post'] = '<strong>NOT</strong> available with Daily / Weekly summary';
 
 $txt['notifications_topics'] = 'Current Topic Notifications';
 $txt['notifications_topics_list'] = 'You are being notified of replies to the following topics';
@@ -188,8 +189,8 @@ $txt['trackLogins'] = 'Logins';
 
 $txt['likes_show'] = 'Show Likes';
 $txt['likes_given'] = 'Posts you liked';
-$txt['likes_profile_received'] = 'Likes received';
-$txt['likes_profile_given'] = 'Likes given';
+$txt['likes_profile_received'] = 'received';
+$txt['likes_profile_given'] = 'given';
 $txt['likes_received'] = 'Your posts liked by others';
 $txt['likes_none_given'] = 'You have not liked any posts';
 $txt['likes_none_received'] = 'No one has liked any of your posts :\'(';
@@ -203,7 +204,7 @@ $txt['change_authentication'] = 'From this section you can change how you login 
 
 $txt['profileEdit'] = 'Modify Profile';
 $txt['account_info'] = 'These are your account settings. This page holds all critical information that identifies you on this forum. For security reasons, you will need to enter your (current) password to make changes to this information.';
-$txt['forumProfile_info'] = 'You can change your personal information on this page. This information will be displayed throughout ' . $context['forum_name_html_safe'] . '. If you aren\'t comfortable with sharing some information, simply skip it - nothing here is required.';
+$txt['forumProfile_info'] = 'You can change your personal information on this page. This information will be displayed throughout {forum_name_html_safe}. If you aren\'t comfortable with sharing some information, simply skip it - nothing here is required.';
 $txt['theme_info'] = 'This section allows you to customize the look and layout of the forum.';
 $txt['notifications'] = 'Notifications';
 $txt['notification_info'] = 'This allows you to be notified of replies to posts, newly posted topics, and forum announcements. You can change those settings here, or oversee the topics and boards you are currently receiving notifications for.';
@@ -258,8 +259,6 @@ $txt['to_ask_password'] = 'to ask for your authentication details';
 $txt['user_email'] = 'Username/Email';
 
 // Use numeric entities in the below two strings.
-$txt['reminder_subject'] = 'New password for ' . $context['forum_name'];
-$txt['reminder_mail'] = 'This mail was sent because the \'forgot password\' function has been applied to your account. To set a new password, click the following link';
 $txt['reminder_sent'] = 'A mail has been sent to your email address. Click the link in that mail to set a new password.';
 $txt['reminder_openid_sent'] = 'Your current OpenID identity has been sent to your email address.';
 $txt['reminder_set_password'] = 'Set Password';
@@ -295,7 +294,6 @@ $txt['show_online'] = 'Show others my online status';
 
 $txt['return_to_post'] = 'Return to topics after posting by default.';
 $txt['no_new_reply_warning'] = 'Don\'t warn on new replies made while posting.';
-$txt['recent_posts_at_top'] = 'Show most recent posts at the top.';
 $txt['recent_pms_at_top'] = 'Show most recent personal messages at top.';
 $txt['wysiwyg_default'] = 'Show WYSIWYG editor on post page by default.';
 
@@ -317,13 +315,10 @@ $txt['topics_per_page'] = 'Topics to display per page:';
 $txt['messages_per_page'] = 'Messages to display per page:';
 $txt['hide_poster_area'] = 'Hide the poster information area.';
 $txt['per_page_default'] = 'forum default';
-$txt['calendar_start_day'] = 'First day of the week on the calendar';
+$txt['calendar_start_day'] = 'First day of the week on the calendar:';
 $txt['display_quick_reply'] = 'Use quick reply on topic display: ';
-$txt['display_quick_reply1'] = 'don\'t show at all';
-$txt['display_quick_reply2'] = 'show, off by default';
-$txt['display_quick_reply3'] = 'show, on by default';
-$txt['use_editor_quick_reply'] = 'Use full editor in Quick Reply';
-$txt['display_quick_mod'] = 'Show quick-moderation as ';
+$txt['use_editor_quick_reply'] = 'Use full editor in Quick Reply.';
+$txt['display_quick_mod'] = 'Show quick-moderation as:';
 $txt['display_quick_mod_none'] = 'don\'t show.';
 $txt['display_quick_mod_check'] = 'checkboxes.';
 $txt['display_quick_mod_image'] = 'icons.';
@@ -398,7 +393,7 @@ $txt['request_group_membership_desc'] = 'Before you can join this group your mem
 $txt['submit_request'] = 'Submit Request';
 
 $txt['profile_updated_own'] = 'Your profile has been updated successfully.';
-$txt['profile_updated_else'] = 'The profile for %1$s has been updated successfully.';
+$txt['profile_updated_else'] = 'The profile for <strong>%1$s</strong> has been updated successfully.';
 
 $txt['profile_error_signature_max_length'] = 'Your signature cannot be greater than %1$d characters';
 $txt['profile_error_signature_max_lines'] = 'Your signature cannot span more than %1$d lines';
@@ -436,8 +431,19 @@ $txt['profile_warning_notify_subject'] = 'Notification Subject';
 $txt['profile_warning_notify_body'] = 'Notification Message';
 $txt['profile_warning_notify_template_subject'] = 'You have received a warning';
 // Use numeric entities in below string.
-$txt['profile_warning_notify_template_outline'] = '{MEMBER},' . "\n\n" . 'You have received a warning for %1$s. Please cease these activities and abide by the forum rules otherwise we will take further action.' . "\n\n" . '{REGARDS}';
-$txt['profile_warning_notify_template_outline_post'] = '{MEMBER},' . "\n\n" . 'You have received a warning for %1$s in regards to the message:' . "\n" . '{MESSAGE}.' . "\n\n" . 'Please cease these activities and abide by the forum rules otherwise we will take further action.' . "\n\n" . '{REGARDS}';
+$txt['profile_warning_notify_template_outline'] = '{MEMBER},
+
+You have received a warning for %1$s. Please cease these activities and abide by the forum rules otherwise we will take further action.
+
+{REGARDS}';
+$txt['profile_warning_notify_template_outline_post'] = '{MEMBER},
+
+You have received a warning for %1$s in regards to the message:
+{MESSAGE}.
+
+Please cease these activities and abide by the forum rules otherwise we will take further action.
+
+{REGARDS}';
 $txt['profile_warning_notify_for_spamming'] = 'spamming';
 $txt['profile_warning_notify_title_spamming'] = 'Spamming';
 $txt['profile_warning_notify_for_offence'] = 'posting offensive material';
@@ -482,7 +488,7 @@ $txt['receive_from_buddies'] = 'Buddies and Administrators only';
 $txt['receive_from_description'] = 'This setting applies to both Personal Messages and emails (if the option to email members is enabled)';
 
 $txt['popup_messages'] = 'Show a popup when I receive new messages.';
-$txt['pm_remove_inbox_label'] = 'Remove the inbox label when applying another label';
+$txt['pm_remove_inbox_label'] = 'Remove the inbox label when applying another label.';
 $txt['pm_display_mode'] = 'Display personal messages';
 $txt['pm_display_mode_all'] = 'All at once';
 $txt['pm_display_mode_one'] = 'One at a time';

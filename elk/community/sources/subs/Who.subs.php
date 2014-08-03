@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -160,7 +160,7 @@ function addonsCredits()
 
 			// build this one out and stash it away
 			$name = empty($credit_info['url']) ? $title : '<a href="' . $credit_info['url'] . '">' . $title . '</a>';
-			$credits[] = $name . (!empty($license) ? ' | ' . $license  : '') . (!empty($copyright) ? ' | ' . $copyright  : '');
+			$credits[] = $name . (!empty($license) ? ' | ' . $license : '') . (!empty($copyright) ? ' | ' . $copyright : '');
 		}
 		cache_put_data('addons_credits', $credits, 86400);
 	}
@@ -173,23 +173,22 @@ function addonsCredits()
  *
  * Adding actions to the Who's Online list:
  * Adding actions to this list is actually relatively easy...
- *  - for actions anyone should be able to see, just add a string named whoall_ACTION.
- *    (where ACTION is the action used in index.php.)
- *  - for actions that have a subaction which should be represented differently, use whoall_ACTION_SUBACTION.
- *  - for actions that include a topic, and should be restricted, use whotopic_ACTION.
- *  - for actions that use a message, by msg or quote, use whopost_ACTION.
- *  - for administrator-only actions, use whoadmin_ACTION.
- *  - for actions that should be viewable only with certain permissions,
- *    use whoallow_ACTION and add a list of possible permissions to the
- *    $allowedActions array, using ACTION as the key.
+ * - for actions anyone should be able to see, just add a string named whoall_ACTION.
+ *   (where ACTION is the action used in index.php.)
+ * - for actions that have a subaction which should be represented differently, use whoall_ACTION_SUBACTION.
+ * - for actions that include a topic, and should be restricted, use whotopic_ACTION.
+ * - for actions that use a message, by msg or quote, use whopost_ACTION.
+ * - for administrator-only actions, use whoadmin_ACTION.
+ * - for actions that should be viewable only with certain permissions, use whoallow_ACTION and
+ * add a list of possible permissions to the $allowedActions array, using ACTION as the key.
  *
- * @param mixed $urls  a single url (string) or an array of arrays, each inner array being (serialized request data, id_member)
- * @param string $preferred_prefix = false
- * @return array, an array of descriptions if you passed an array, otherwise the string describing their current location.
+ * @param mixed[]|string $urls a single url (string) or an array of arrays, each inner array being (serialized request data, id_member)
+ * @param string|false $preferred_prefix = false
+ * @return mixed[]|string an array of descriptions if you passed an array, otherwise the string describing their current location.
  */
 function determineActions($urls, $preferred_prefix = false)
 {
-	global $txt, $user_info, $modSettings;
+	global $txt, $user_info, $modSettings, $scripturl;
 
 	$db = database();
 
@@ -214,7 +213,6 @@ function determineActions($urls, $preferred_prefix = false)
 		'optimizetables' => array('admin_forum'),
 		'repairboards' => array('admin_forum'),
 		'search' => array('search_posts'),
-		'search2' => array('search_posts'),
 		'setcensor' => array('moderate_forum'),
 		'setreserve' => array('moderate_forum'),
 		'stats' => array('view_stats'),
@@ -222,12 +220,15 @@ function determineActions($urls, $preferred_prefix = false)
 		'viewmembers' => array('moderate_forum'),
 	);
 
+	// Provide integration a way to add to the allowed action array
+	call_integration_hook('integrate_whos_online_allowed', array(&$allowedActions));
+
 	if (!is_array($urls))
 		$url_list = array(array($urls, $user_info['id']));
 	else
 		$url_list = $urls;
 
-	// These are done to later query these in large chunks. (instead of one by one.)
+	// These are done to query these in large chunks. (instead of one by one.)
 	$topic_ids = array();
 	$profile_ids = array();
 	$board_ids = array();
@@ -263,11 +264,11 @@ function determineActions($urls, $preferred_prefix = false)
 			}
 			// It's the board index!!  It must be!
 			else
-				$data[$k] = $txt['who_index'];
+				$data[$k] = replaceBasicActionUrl($txt['who_index']);
 		}
 		// Probably an error or some goon?
 		elseif ($actions['action'] == '')
-			$data[$k] = $txt['who_index'];
+			$data[$k] = replaceBasicActionUrl($txt['who_index']);
 		// Some other normal action...?
 		else
 		{
@@ -281,17 +282,21 @@ function determineActions($urls, $preferred_prefix = false)
 				$data[$k] = $txt['who_hidden'];
 				$profile_ids[(int) $actions['u']][$k] = $actions['action'] == 'profile' ? $txt['who_viewprofile'] : $txt['who_profile'];
 			}
-			elseif (($actions['action'] == 'post' || $actions['action'] == 'post2') && empty($actions['topic']) && isset($actions['board']))
+			// Trying to post
+			elseif (($actions['action'] == 'post' || $actions['action'] == 'post2' || $actions['action'] == 'topicbyemail') && empty($actions['topic']) && isset($actions['board']))
 			{
 				$data[$k] = $txt['who_hidden'];
-				$board_ids[(int) $actions['board']][$k] = isset($actions['poll']) ? $txt['who_poll'] : $txt['who_post'];
+				if ($actions['action'] == 'topicbyemail')
+					$board_ids[(int) $actions['board']][$k] = $txt['who_topicbyemail'];
+				else
+					$board_ids[(int) $actions['board']][$k] = isset($actions['poll']) ? $txt['who_poll'] : $txt['who_post'];
 			}
 			// A subaction anyone can view... if the language string is there, show it.
 			elseif (isset($actions['sa']) && isset($txt['whoall_' . $actions['action'] . '_' . $actions['sa']]))
 				$data[$k] = $preferred_prefix && isset($txt[$preferred_prefix . $actions['action'] . '_' . $actions['sa']]) ? $txt[$preferred_prefix . $actions['action'] . '_' . $actions['sa']] : $txt['whoall_' . $actions['action'] . '_' . $actions['sa']];
-			// An action any old fellow can look at. (if ['whoall_' . $action] exists, we know everyone can see it.)
+			// An action any old fellow can look at. (if $txt['whoall_' . $action] exists, we know everyone can see it.)
 			elseif (isset($txt['whoall_' . $actions['action']]))
-				$data[$k] = $preferred_prefix && isset($txt[$preferred_prefix . $actions['action']]) ? $txt[$preferred_prefix . $actions['action']] : $txt['whoall_' . $actions['action']];
+				$data[$k] = $preferred_prefix && isset($txt[$preferred_prefix . $actions['action']]) ? $txt[$preferred_prefix . $actions['action']] : replaceBasicActionUrl($txt['whoall_' . $actions['action']]);
 			// Viewable if and only if they can see the board...
 			elseif (isset($txt['whotopic_' . $actions['action']]))
 			{
@@ -300,6 +305,15 @@ function determineActions($urls, $preferred_prefix = false)
 
 				$data[$k] = $txt['who_hidden'];
 				$topic_ids[$topic][$k] = $txt['whotopic_' . $actions['action']];
+			}
+			// Viewable if and only if they can see the board...
+			elseif (isset($actions['sa']) && isset($txt['whotopic_' . $actions['action'] . '_' . $actions['sa']]))
+			{
+				// Find out what topic they are accessing.
+				$topic = (int) (isset($actions['topic']) ? $actions['topic'] : (isset($actions['from']) ? $actions['from'] : 0));
+
+				$data[$k] = $txt['who_hidden'];
+				$topic_ids[$topic][$k] = $txt['whotopic_' . $actions['action'] . '_' . $actions['sa']];
 			}
 			elseif (isset($txt['whopost_' . $actions['action']]))
 			{
@@ -321,7 +335,7 @@ function determineActions($urls, $preferred_prefix = false)
 					)
 				);
 				list ($id_topic, $subject) = $db->fetch_row($result);
-				$data[$k] = sprintf($txt['whopost_' . $actions['action']], $id_topic, $subject);
+				$data[$k] = sprintf($txt['whopost_' . $actions['action']], $scripturl . '?topic=' . $id_topic . '.0', $subject);
 				$db->free_result($result);
 
 				if (empty($id_topic))
@@ -334,7 +348,12 @@ function determineActions($urls, $preferred_prefix = false)
 			elseif (isset($allowedActions[$actions['action']]))
 			{
 				if (allowedTo($allowedActions[$actions['action']]))
-					$data[$k] = $txt['whoallow_' . $actions['action']];
+				{
+					if (isset($actions['sa']) && isset($txt['whoallow_' . $actions['action'] . '_' . $actions['sa']]))
+						$data[$k] = replaceBasicActionUrl($txt['whoallow_' . $actions['action'] . '_' . $actions['sa']]);
+					else
+						$data[$k] = replaceBasicActionUrl($txt['whoallow_' . $actions['action']]);
+				}
 				elseif (in_array('moderate_forum', $allowedActions[$actions['action']]))
 					$data[$k] = $txt['who_moderate'];
 				elseif (in_array('admin_forum', $allowedActions[$actions['action']]))
@@ -342,8 +361,10 @@ function determineActions($urls, $preferred_prefix = false)
 				else
 					$data[$k] = $txt['who_hidden'];
 			}
+			// Something we don't have details about, but it is an action, maybe an addon
 			elseif (!empty($actions['action']))
-				$data[$k] = $txt['who_generic'] . ' ' . $actions['action'];
+				$data[$k] = sprintf($txt['who_generic'], $actions['action']);
+			// We just don't know
 			else
 				$data[$k] = $txt['who_unknown'];
 		}
@@ -351,10 +372,12 @@ function determineActions($urls, $preferred_prefix = false)
 		// Maybe the action is integrated into another system?
 		if (count($integrate_actions = call_integration_hook('integrate_whos_online', array($actions))) > 0)
 		{
+			// Try each integraion hook with this url and see if they can fill in the details
 			foreach ($integrate_actions as $integrate_action)
 			{
 				if (!empty($integrate_action))
 				{
+					// Found it, all done then
 					$data[$k] = $integrate_action;
 					break;
 				}
@@ -372,7 +395,7 @@ function determineActions($urls, $preferred_prefix = false)
 		{
 			// Show the topic's subject for each of the members looking at this...
 			foreach ($topic_ids[$topic['id_topic']] as $k => $session_text)
-				$data[$k] = sprintf($session_text, $topic['id_topic'], $topic['subject']);
+				$data[$k] = sprintf($session_text, $scripturl . '?topic=' . $topic['id_topic'] . '.0', $topic['subject']);
 		}
 	}
 
@@ -386,7 +409,7 @@ function determineActions($urls, $preferred_prefix = false)
 		{
 			// Put the board name into the string for each member...
 			foreach ($board_ids[$board['id_board']] as $k => $session_text)
-				$data[$k] = sprintf($session_text, $board['id_board'], $board['board_name']);
+				$data[$k] = sprintf($session_text, $scripturl . '?board=' . $board['id_board'] . '.0', $board['board_name']);
 		}
 	}
 
@@ -403,7 +426,7 @@ function determineActions($urls, $preferred_prefix = false)
 
 			// Set their action on each - session/text to sprintf.
 			foreach ($profile_ids[$row['id_member']] as $k => $session_text)
-				$data[$k] = sprintf($session_text, $row['id_member'], $row['real_name']);
+				$data[$k] = sprintf($session_text, $scripturl . '?action=profile;u=' . $row['id_member'], $row['real_name']);
 		}
 	}
 
@@ -415,11 +438,14 @@ function determineActions($urls, $preferred_prefix = false)
 
 /**
  * Prepare credits for display.
- * This is a helper function, used by admin panel for credits and support page, and by the credits page.
+ *
+ * - This is a helper function, used by admin panel for credits and support page, and by the credits page.
  */
 function prepareCreditsData()
 {
 	global $txt;
+
+	$credits = array();
 
 	// Don't blink. Don't even blink. Blink and you're dead.
 	$credits['credits'] = array(
@@ -444,21 +470,28 @@ function prepareCreditsData()
 			'<a href="http://www.oxygen-icons.org/">Oxygen Icons</a> | These icons are licensed under <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>',
 		),
 		'fonts' => array(
-			'<a href="http://openfontlibrary.org/en/font/dotrice">Dotrice</a> | &copy; 2010 <a href="http://hisdeedsaredust.com/">Paul Flo Williams</a> | This font is licensed under the SIL Open Font License, Version 1.1',
-			'<a href="http://openfontlibrary.org/en/font/klaudia-and-berenika">Berenika</a> | &copy; 2011 wmk69 | This font is licensed under the SIL Open Font License, Version 1.1',
-			'<a href="http://openfontlibrary.org/en/font/vshexagonica-v1-0-1">vSHexagonica</a> | &copy; 2012 T.B. von Strong | This font is licensed under the SIL Open Font License, Version 1.1',
-			'<a href="http://openfontlibrary.org/en/font/press-start-2p">Press Start 2P</a> | &copy; 2012 Cody "CodeMan38" Boisclair | This font is licensed under the SIL Open Font License, Version 1.1',
 			'<a href="http://openfontlibrary.org/en/font/architect-s-daughter">Architect\'s Daughter</a> | &copy; 2010 <a href="http://kimberlygeswein.com/">Kimberly Geswein</a> | This font is licensed under the SIL Open Font License, Version 1.1',
+			'<a href="http://openfontlibrary.org/en/font/klaudia-and-berenika">Berenika</a> | &copy; 2011 wmk69 | This font is licensed under the SIL Open Font License, Version 1.1',
+			'<a href="http://openfontlibrary.org/en/font/dotrice">Dotrice</a> | &copy; 2010 <a href="http://hisdeedsaredust.com/">Paul Flo Williams</a> | This font is licensed under the SIL Open Font License, Version 1.1',
+			'<a href="http://fontawesome.io/">Font Awesome</a> | Created by Dave Gandy | This font is licensed under the SIL Open Font License, Version 1.1',
+			'<a href="http://openfontlibrary.org/en/font/press-start-2p">Press Start 2P</a> | &copy; 2012 Cody "CodeMan38" Boisclair | This font is licensed under the SIL Open Font License, Version 1.1',
 			'<a href="http://openfontlibrary.org/en/font/vds">VDS</a> | &copy; 2012 <a href="http://www.wix.com/artmake1/artmaker">artmaker</a> | This font is licensed under the SIL Open Font License, Version 1.1',
+			'<a href="http://openfontlibrary.org/en/font/vshexagonica-v1-0-1">vSHexagonica</a> | &copy; 2012 T.B. von Strong | This font is licensed under the SIL Open Font License, Version 1.1',
 		),
 		'software' => array(
+			'<a href="http://bad-behavior.ioerror.us/">Bad Behavior</a> | &copy; Michael Hampton | Licensed under <a href="http://opensource.org/licenses/LGPL-3.0">GNU Lesser General Public License</a>',
+			'<a href="https://code.google.com/p/google-code-prettify/">Google Code Prettify</a> | Licensed under <a href="http://opensource.org/licenses/Apache-2.0">Apache License, Version 2.0</a>',
+			'<a href="http://cherne.net/brian/resources/jquery.hoverIntent.html">hoverIntent</a> | &copy; Brian Cherne | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
+			'<a href="http://pajhome.org.uk/crypt/md5">Javascript Crypt</a> | &copy; Angel Marin, Paul Johnston | Licensed under <a href="http://opensource.org/licenses/BSD-3-Clause">The BSD License</a>',
+			'<a href="http://jquery.org/">JQuery</a> | &copy; jQuery Foundation and other contributors | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
+			'<a href="http://jqueryui.com/">JQuery UI</a> | &copy; jQuery Foundation and other contributors | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
+			'<a href="http://crisp.tweakblogs.net/blog/6861/jsmin%2B-version-14.html">JSMinPlus</a> | Licensed under <a href="http://opensource.org/licenses/MPL-1.1">Mozilla_Public_License, Version 1.1</a>',
+			'<a href="http://www.openwall.com/phpass/">PH Pass</a> | Author: Solar Designer | Placed in the public domain</a>',
+			'<a href="http://www.sceditor.com/">SCEditor</a> | &copy; Sam Clarke | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
+			'<a href="http://sourceforge.net/projects/simplehtmldom/">Simple HTML DOM</a> | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
 			'<a href="http://www.simplemachines.org/">Simple Machines</a> | &copy; Simple Machines | Licensed under <a href="http://www.simplemachines.org/about/smf/license.php">The BSD License</a>',
-			'<a href="http://jquery.org/">JQuery</a> | &copy; jQuery Foundation and other contributors | Licensed under <a href="https://github.com/jquery/jquery/blob/53021dad7f6c7f5c5a1c0d7b0493dd2ceee31166/MIT-LICENSE.txt">The MIT License (MIT)</a>',
-			'<a href="http://jqueryui.com/">JQuery UI</a> | &copy; jQuery Foundation and other contributors | Licensed under <a href="https://github.com/jquery/jquery-ui/blob/83cbf979788f22ba3bd1668507623c0dd6b57041/MIT-LICENSE.txt">The MIT License (MIT)</a>',
-			'<a href="http://cherne.net/brian/resources/jquery.hoverIntent.html">hoverIntent</a> | &copy; Brian Cherne | Licensed under <a href="http://en.wikipedia.org/wiki/MIT_License">The MIT License (MIT)</a>',
-			'<a href="http://users.tpg.com.au/j_birch/plugins/superfish/">Superfish</a> | &copy; Joel Birch | Licensed under <a href="http://en.wikipedia.org/wiki/MIT_License">The MIT License (MIT)</a>',
-			'<a href="http://www.sceditor.com/">SCEditor</a> | &copy; Sam Clarke | Licensed under <a href="http://en.wikipedia.org/wiki/MIT_License">The MIT License (MIT)</a>',
-			'<a href="https://code.google.com/p/google-code-prettify/">google-code-prettify</a> | Licensed under <a href=http://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a>',
+			'<a href="http://users.tpg.com.au/j_birch/plugins/superfish/">Superfish</a> | &copy; Joel Birch | Licensed under <a href="http://opensource.org/licenses/MIT">The MIT License (MIT)</a>',
+			'<a href="https://github.com/tubalmartin/YUI-CSS-compressor-PHP-port">YUI-CSS compressor (PHP port)</a> | &copy; Yahoo! Inc | Licensed under <a href="http://opensource.org/licenses/BSD-3-Clause">The BSD License</a>',
 		),
 	);
 
@@ -467,9 +500,9 @@ function prepareCreditsData()
 	$credits['credits_addons'] = addonsCredits();
 
 	// An alternative for addons credits is to use a hook.
-	call_integration_hook('integrate_credits');
+	call_integration_hook('integrate_credits', array(&$credits));
 
 	// Copyright information
-	$credits['copyrights']['elkarte'] = '&copy; 2013 ElkArte contributors';
+	$credits['copyrights']['elkarte'] = '&copy; 2012 - 2014 ElkArte Forum contributors';
 	return $credits;
 }

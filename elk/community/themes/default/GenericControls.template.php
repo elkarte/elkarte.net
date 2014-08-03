@@ -11,16 +11,16 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
 /**
- * This function displays all the stuff you get with a richedit box - BBC, smileys etc.
+ * This function displays all the goodies you get with a richedit box - BBC, smileys etc.
  *
  * @param string $editor_id
- * @param boolean $smileyContainer show the smiley container
- * @param boolean $bbcContainer show the bbc container
+ * @param string|null $smileyContainer if set show the smiley container id
+ * @param string|null $bbcContainer show the bbc container id
  */
 function template_control_richedit($editor_id, $smileyContainer = null, $bbcContainer = null)
 {
@@ -29,19 +29,25 @@ function template_control_richedit($editor_id, $smileyContainer = null, $bbcCont
 	$editor_context = &$context['controls']['richedit'][$editor_id];
 
 	echo '
-		<textarea class="editor" name="', $editor_id, '" id="', $editor_id, '" tabindex="', $context['tabindex']++, '" style="width:', $editor_context['width'], ';height: ', $editor_context['height'], ';', isset($context['post_error']['no_message']) || isset($context['post_error']['long_message']) ? 'border: 1px solid red;' : '', '" required="required">', $editor_context['value'], '</textarea>
+		<div id="editor_toolbar_container"></div>
+		<label for="', $editor_id, '">
+			<textarea class="editor', isset($context['post_error']['errors']['no_message']) || isset($context['post_error']['errors']['long_message']) ? ' border_error' : '', '" name="', $editor_id, '" id="', $editor_id, '" tabindex="', $context['tabindex']++, '" style="width:', $editor_context['width'], ';height: ', $editor_context['height'], ';" required="required">', $editor_context['value'], '</textarea>
+		</label>
 		<input type="hidden" name="', $editor_id, '_mode" id="', $editor_id, '_mode" value="0" />
 		<script><!-- // --><![CDATA[
-			$(document).ready(function(){',
+			var $editor_data = {},
+				$editor_container = {};
+
+			function elk_editor() {',
 				!empty($context['bbcodes_handlers']) ? $context['bbcodes_handlers'] : '', '
 				$("#', $editor_id, '").sceditor({
-					style: "', $settings['default_theme_url'], '/css/jquery.sceditor.elk.css",
+					style: "', $settings['theme_url'], '/css/', $context['theme_variant_url'], 'jquery.sceditor.elk_wiz', $context['theme_variant'], '.css",
 					width: "100%",
-					height: "100%",
+					toolbarContainer: $("#editor_toolbar_container"),
 					resizeWidth: false,
 					resizeMaxHeight: -1,
-					emoticonsCompat: true,', !empty($editor_context['locale']) ? '
-					locale: \'' . $editor_context['locale'] . '\',' : '', '
+					emoticonsCompat: true,
+					locale: "', !empty($editor_context['locale']) ? $editor_context['locale'] : 'en_US', '",
 					colors: "black,red,yellow,pink,green,orange,purple,blue,beige,brown,teal,navy,maroon,limegreen,white",
 					enablePasteFiltering: true,
 					plugins: "bbcode, splittag', !empty($context['mentions_enabled']) ? ', mention' : '', (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']) ? ', draft",
@@ -113,38 +119,39 @@ function template_control_richedit($editor_id, $smileyContainer = null, $bbcCont
 					emoticons:
 					{}';
 
+	// Show all the editor command buttons
 	if ($context['show_bbc'] && $bbcContainer !== null)
 	{
 		echo ',
-					toolbar: "emoticon,';
-		$count_tags = count($context['bbc_tags']);
+					toolbar: "';
 
-		// create the tooltag to display the buttons in the editor
+		// Create the tooltag rows to display the buttons in the editor
 		foreach ($context['bbc_toolbar'] as $i => $buttonRow)
-		{
-			echo implode('|', $buttonRow);
-			$count_tags--;
-			if (!empty($count_tags))
-				echo '||';
-		}
+			echo implode('', $buttonRow), '||';
 
-		echo '",';
+		echo ',emoticon",';
 	}
 	else
 		echo ',
-					toolbar: "emoticon,source",';
+					toolbar: "source,emoticon",';
 
 	echo '
 				});
-				$("#', $editor_id, '").data("sceditor").createPermanentDropDown();
-				$(".sceditor-container").width("100%").height("100%");', $editor_context['rich_active'] ? '' : '
-				$("#' . $editor_id . '").data("sceditor").setTextMode();', '
+				$editor_data[\'', $editor_id, '\'] = $("#', $editor_id, '").data("sceditor");
+				$editor_container[\'', $editor_id, '\'] = $(".sceditor-container");
+				$editor_data[\'', $editor_id, '\'].css(\'code {white-space: pre;}\').createPermanentDropDown();
+				$editor_container[\'', $editor_id, '\'].width("100%").height("100%");', $editor_context['rich_active'] ? '' : '
+				$editor_data[\'' . $editor_id . '\'].setTextMode();', '
 				if (!(is_ie || is_ff || is_opera || is_safari || is_chrome))
 					$(".sceditor-button-source").hide();
-				', isset($context['post_error']['no_message']) || isset($context['post_error']['long_message']) ? '
-				$(".sceditor-container").find("textarea").each(function() {$(this).css({border: "1px solid red"})});
-				$(".sceditor-container").find("iframe").each(function() {$(this).css({border: "1px solid red"})});' : '', '
-			});
+				', isset($context['post_error']['errors']['no_message']) || isset($context['post_error']['errors']['long_message']) ? '
+				$editor_container[\'' . $editor_id . '\'].find("textarea, iframe").addClass("border_error");' : '', '
+		}
+
+		$(document).ready(function(){
+			elk_editor();
+		});
+
 		// ]]></script>';
 }
 
@@ -155,20 +162,13 @@ function template_control_richedit($editor_id, $smileyContainer = null, $bbcCont
  */
 function template_control_richedit_buttons($editor_id)
 {
-	global $context, $settings, $options, $txt;
+	global $context, $options, $txt;
 
 	$editor_context = &$context['controls']['richedit'][$editor_id];
 
-	// Create an area to show the draft last saved on
-	if (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']))
-		echo '
-		<span class="draftautosave">
-			<span id="throbber" style="display:none"><img src="' . $settings['images_url'] . '/loading_sm.gif" alt="" class="centericon" />&nbsp;</span>
-			<span id="draft_lastautosave" ></span>
-		</span>';
-
+	// Show the helpful shortcut text
 	echo '
-		<span class="smalltext floatleft">
+		<span class="shortcuts">
 			', $context['shortcuts_text'], '
 		</span>
 		<input type="submit" value="', isset($editor_context['labels']['post_button']) ? $editor_context['labels']['post_button'] : $txt['post'], '" tabindex="', $context['tabindex']++, '" onclick="return submitThisOnce(this);" accesskey="s" class="button_submit" />';
@@ -177,23 +177,32 @@ function template_control_richedit_buttons($editor_id)
 		echo '
 		<input type="submit" name="preview" value="', isset($editor_context['labels']['preview_button']) ? $editor_context['labels']['preview_button'] : $txt['preview'], '" tabindex="', $context['tabindex']++, '" onclick="', $editor_context['preview_type'] == 2 ? 'return event.ctrlKey || previewControl();' : 'return submitThisOnce(this);', '" accesskey="p" class="button_submit" />';
 
+	// Show the spellcheck button?
 	if ($context['show_spellchecking'])
 		echo '
 		<input type="button" value="', $txt['spell_check'], '" tabindex="', $context['tabindex']++, '" onclick="spellCheckStart();" class="button_submit" />';
 
+	// Maybe drafts are enabled?
 	if (!empty($context['drafts_save']))
 	{
-		// Show the save draft button
 		echo '
 		<input type="submit" name="save_draft" value="', $txt['draft_save'], '" tabindex="', $context['tabindex']++, '" onclick="return confirm(' . JavaScriptEscape($txt['draft_save_note']) . ') && submitThisOnce(this);" accesskey="d" class="button_submit" />
 		<input type="hidden" id="id_draft" name="id_draft" value="', empty($context['id_draft']) ? 0 : $context['id_draft'], '" />';
 	}
 
+	// The PM draft save button
 	if (!empty($context['drafts_pm_save']))
 	{
-		// The PM draft save button
 		echo '
 		<input type="submit" name="save_draft" value="', $txt['draft_save'], '" tabindex="', $context['tabindex']++, '" onclick="submitThisOnce(this);" accesskey="d" class="button_submit" />
 		<input type="hidden" id="id_pm_draft" name="id_pm_draft" value="', empty($context['id_pm_draft']) ? 0 : $context['id_pm_draft'], '" />';
 	}
+
+	// Create an area to show the draft last saved on text
+	if (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']))
+		echo '
+		<div class="draftautosave">
+			<span id="throbber" style="display:none"><i class="fa fa-spinner fa-spin" alt="loading"></i>&nbsp;</span>
+			<span id="draft_lastautosave"></span>
+		</div>';
 }

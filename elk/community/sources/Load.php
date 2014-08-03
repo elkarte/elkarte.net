@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -21,24 +21,23 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * Load the $modSettings array.
+ * Load the $modSettings array and many necessary forum settings.
+ *
+ * What it does:
+ * - load the settings from cache if available, otherwse from the database.
+ * - sets the timezone
+ * - checks the load average settings if available.
+ * - check whether post moderation is enabled.
+ * - calls add_integration_function
+ * - calls integrate_pre_include, integrate_pre_load,
  *
  * @global array $modSettings is a giant array of all of the forum-wide settings and statistics.
  */
 function reloadSettings()
 {
-	global $modSettings, $db_character_set;
+	global $modSettings;
 
 	$db = database();
-
-	// Most database systems have not set UTF-8 as their default input charset.
-	// @todo is this still necessary? (I mean the if, not the query itself.)
-	if (!empty($db_character_set))
-		$db->query('set_character_set', '
-			SET NAMES ' . $db_character_set,
-			array(
-			)
-		);
 
 	// Try to load it from the cache first; it'll never get cached if the setting is off.
 	if (($modSettings = cache_get_data('modSettings', 90)) == null)
@@ -63,6 +62,8 @@ function reloadSettings()
 			$modSettings['defaultMaxMessages'] = 15;
 		if (empty($modSettings['defaultMaxMembers']) || $modSettings['defaultMaxMembers'] <= 0 || $modSettings['defaultMaxMembers'] > 999)
 			$modSettings['defaultMaxMembers'] = 30;
+		if (empty($modSettings['subject_length']))
+			$modSettings['subject_length'] = 24;
 
 		$modSettings['warning_enable'] = $modSettings['warning_settings'][0];
 
@@ -71,7 +72,7 @@ function reloadSettings()
 	}
 
 	// Setting the timezone is a requirement for some functions in PHP >= 5.1.
-	if (isset($modSettings['default_timezone']) && function_exists('date_default_timezone_set'))
+	if (isset($modSettings['default_timezone']))
 		date_default_timezone_set($modSettings['default_timezone']);
 
 	// Check the load averages?
@@ -118,7 +119,7 @@ function reloadSettings()
 	{
 		$integration_settings = unserialize(ELK_INTEGRATION_SETTINGS);
 		foreach ($integration_settings as $hook => $function)
-			add_integration_function($hook, $function, false);
+			add_integration_function($hook, $function);
 	}
 
 	// Any files to pre include?
@@ -130,14 +131,15 @@ function reloadSettings()
 
 /**
  * Load all the important user information.
+ *
  * What it does:
- *  - sets up the $user_info array
- *  - assigns $user_info['query_wanna_see_board'] for what boards the user can see.
- *  - first checks for cookie or integration validation.
- *  - uses the current session if no integration function or cookie is found.
- *  - checks password length, if member is activated and the login span isn't over.
- *    - if validation fails for the user, $id_member is set to 0.
- *    - updates the last visit time when needed.
+ * - sets up the $user_info array
+ * - assigns $user_info['query_wanna_see_board'] for what boards the user can see.
+ * - first checks for cookie or integration validation.
+ * - uses the current session if no integration function or cookie is found.
+ * - checks password length, if member is activated and the login span isn't over.
+ * - if validation fails for the user, $id_member is set to 0.
+ * - updates the last visit time when needed.
  */
 function loadUserSettings()
 {
@@ -169,7 +171,7 @@ function loadUserSettings()
 	if (empty($id_member) && isset($_COOKIE[$cookiename]))
 	{
 		// Fix a security hole in PHP 4.3.9 and below...
-		if (preg_match('~^a:[34]:\{i:0;i:\d{1,8};i:1;s:(0|40):"([a-fA-F0-9]{40})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~i', $_COOKIE[$cookiename]) == 1)
+		if (preg_match('~^a:[34]:\{i:0;i:\d{1,8};i:1;s:(0|64):"([a-fA-F0-9]{64})?";i:2;[id]:\d{1,14};(i:3;i:\d;)?\}$~i', $_COOKIE[$cookiename]) == 1)
 		{
 			list ($id_member, $password) = @unserialize($_COOKIE[$cookiename]);
 			$id_member = !empty($id_member) && strlen($password) > 0 ? (int) $id_member : 0;
@@ -181,7 +183,7 @@ function loadUserSettings()
 	{
 		// @todo Perhaps we can do some more checking on this, such as on the first octet of the IP?
 		list ($id_member, $password, $login_span) = @unserialize($_SESSION['login_' . $cookiename]);
-		$id_member = !empty($id_member) && strlen($password) == 40 && $login_span > time() ? (int) $id_member : 0;
+		$id_member = !empty($id_member) && strlen($password) == 64 && $login_span > time() ? (int) $id_member : 0;
 	}
 
 	// Only load this stuff if the user isn't a guest.
@@ -203,6 +205,9 @@ function loadUserSettings()
 			$user_settings = $db->fetch_assoc($request);
 			$db->free_result($request);
 
+			// Make the ID specifically an integer
+			$user_settings['id_member'] = (int) $user_settings['id_member'];
+
 			if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
 				cache_put_data('user_settings-' . $id_member, $user_settings, 60);
 		}
@@ -213,9 +218,9 @@ function loadUserSettings()
 			// As much as the password should be right, we can assume the integration set things up.
 			if (!empty($already_verified) && $already_verified === true)
 				$check = true;
-			// SHA-1 passwords should be 40 characters long.
-			elseif (strlen($password) == 40)
-				$check = sha1($user_settings['passwd'] . $user_settings['password_salt']) == $password;
+			// SHA-256 passwords should be 64 characters long.
+			elseif (strlen($password) == 64)
+				$check = hash('sha256', ($user_settings['passwd'] . $user_settings['password_salt'])) == $password;
 			else
 				$check = false;
 
@@ -313,7 +318,7 @@ function loadUserSettings()
 		else
 		{
 			$ci_user_agent = strtolower($req->user_agent());
-			$user_info['possibly_robot'] = (strpos($ci_user_agent, 'mozilla') === false && strpos($ci_user_agent, 'opera') === false) || strpos($ci_user_agent, 'googlebot') !== false || strpos($ci_user_agent, 'slurp') !== false || strpos($ci_user_agent, 'crawl') !== false || strpos($ci_user_agent, 'msnbot') !== false;
+			$user_info['possibly_robot'] = (strpos($ci_user_agent, 'mozilla') === false && strpos($ci_user_agent, 'opera') === false) || preg_match('~(googlebot|slurp|crawl|msnbot|yandex|bingbot|baidu)~u', $ci_user_agent) == 1;
 		}
 	}
 
@@ -342,7 +347,7 @@ function loadUserSettings()
 		), determineAvatar($user_settings)),
 		'smiley_set' => isset($user_settings['smiley_set']) ? $user_settings['smiley_set'] : '',
 		'messages' => empty($user_settings['personal_messages']) ? 0 : $user_settings['personal_messages'],
-		'mentions' => empty($user_settings['mentions']) ? 0 : $user_settings['mentions'],
+		'mentions' => empty($user_settings['mentions']) ? 0 : max(0, $user_settings['mentions']),
 		'unread_messages' => empty($user_settings['unread_messages']) ? 0 : $user_settings['unread_messages'],
 		'total_time_logged_in' => empty($user_settings['total_time_logged_in']) ? 0 : $user_settings['total_time_logged_in'],
 		'buddies' => !empty($modSettings['enable_buddylist']) && !empty($user_settings['buddy_list']) ? explode(',', $user_settings['buddy_list']) : array(),
@@ -391,6 +396,7 @@ function loadUserSettings()
 
 /**
  * Check for moderators and see if they have access to the board.
+ *
  * What it does:
  * - sets up the $board_info array for current board information.
  * - if cache is enabled, the $board_info array is stored in cache.
@@ -429,8 +435,6 @@ function loadBoard()
 			// So did it find anything?
 			if ($topic !== false)
 			{
-				$topic = $topic;
-
 				// Save save save.
 				cache_put_data('msg_topic-' . $_REQUEST['msg'], $topic, 120);
 			}
@@ -471,15 +475,21 @@ function loadBoard()
 
 	if (empty($temp))
 	{
+		$select_columns = array();
+		$select_tables = array();
+		// Wanna grab something more from the boards table or another table at all?
+		call_integration_hook('integrate_load_board_query', array(&$select_columns, &$select_tables));
+
 		$request = $db->query('', '
 			SELECT
 				c.id_cat, b.name AS bname, b.description, b.num_topics, b.member_groups, b.deny_member_groups,
 				b.id_parent, c.name AS cname, IFNULL(mem.id_member, 0) AS id_moderator,
 				mem.real_name' . (!empty($topic) ? ', b.id_board' : '') . ', b.child_level,
 				b.id_theme, b.override_theme, b.count_posts, b.id_profile, b.redirect,
-				b.unapproved_topics, b.unapproved_posts' . (!empty($topic) ? ', t.approved, t.id_member_started' : '') . '
+				b.unapproved_topics, b.unapproved_posts' . (!empty($topic) ? ', t.approved, t.id_member_started' : '') . (!empty($select_columns) ? ', ' . implode(', ', $select_columns) : '') . '
 			FROM {db_prefix}boards AS b' . (!empty($topic) ? '
-				INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})' : '') . '
+				INNER JOIN {db_prefix}topics AS t ON (t.id_topic = {int:current_topic})' : '') . (!empty($select_tables) ? '
+				' . implode("\n\t\t\t\t", $select_tables) : '') . '
 				LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)
 				LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = {raw:board_link})
 				LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = mods.id_member)
@@ -565,6 +575,8 @@ function loadBoard()
 				list ($board_info['unapproved_user_topics']) = $db->fetch_row($request);
 			}
 
+			call_integration_hook('integrate_loaded_board', array(&$board_info, &$row));
+
 			if (!empty($modSettings['cache_enable']) && (empty($topic) || $modSettings['cache_enable'] >= 3))
 			{
 				// @todo SLOW?
@@ -640,7 +652,7 @@ function loadBoard()
 		// If it's a prefetching agent or we're requesting an attachment.
 		if ((isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch') || (!empty($_REQUEST['action']) && $_REQUEST['action'] === 'dlattach'))
 		{
-			ob_end_clean();
+			@ob_end_clean();
 			header('HTTP/1.1 403 Forbidden');
 			die;
 		}
@@ -659,6 +671,14 @@ function loadBoard()
 
 /**
  * Load this user's permissions.
+ *
+ * What it does:
+ * - If the user is an admin, validate that they have not been banned.
+ * - Attempt to load permissions from cache for cache level > 2
+ * - See if the user is possibly a robot and apply added permissions as needed
+ * - Load permissions from the general permissions table.
+ * - If inside a board load the necessary board permissions.
+ * - If the user is not a guest, identify what other boards they have access to.
  */
 function loadPermissions()
 {
@@ -778,7 +798,7 @@ function loadPermissions()
 /**
  * Loads an array of users' data by ID or member_name.
  *
- * @param mixed $users An array of users by id or name
+ * @param int[]|int|string[]|string $users An array of users by id or name
  * @param bool $is_name = false $users is by name or by id
  * @param string $set = 'normal' What kind of data to load (normal, profile, minimal)
  * @return array|bool The ids of the members loaded or false
@@ -896,6 +916,10 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 		$db->free_result($request);
 	}
 
+	// Anthing else integration may want to add to the user_profile array
+	if (!empty($new_loaded_ids))
+		call_integration_hook('integrate_add_member_data', array($new_loaded_ids, $set));
+
 	if (!empty($new_loaded_ids) && !empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 3)
 	{
 		for ($i = 0, $n = count($new_loaded_ids); $i < $n; $i++)
@@ -932,6 +956,13 @@ function loadMemberData($users, $is_name = false, $set = 'normal')
 
 /**
  * Loads the user's basic values... meant for template/theme usage.
+ *
+ * What it does:
+ * - Always loads the minimal values of username, name, id, href, link, email, show_email, registered, registered_timestamp
+ * - if $context['loadMemberContext_set'] is not minimal it will load in full a full set of user information
+ * - prepares signature, personal_text, location fields for display (censoring if enabled)
+ * - loads in the members custom fields if any
+ * - prepares the users buddy list, including reverse buddy flags
  *
  * @param int $user
  * @param bool $display_custom_fields = false
@@ -1016,7 +1047,7 @@ function loadMemberContext($user, $display_custom_fields = false)
 			'posts' => comma_format($profile['posts']),
 			'avatar' => determineAvatar($profile),
 			'last_login' => empty($profile['last_login']) ? $txt['never'] : standardTime($profile['last_login']),
-			'last_login_timestamp' => empty($profile['last_login']) ? 0 : forum_time(0, $profile['last_login']),
+			'last_login_timestamp' => empty($profile['last_login']) ? 0 : forum_time(false, $profile['last_login']),
 			'karma' => array(
 				'good' => $profile['karma_good'],
 				'bad' => $profile['karma_bad'],
@@ -1093,13 +1124,14 @@ function loadMemberContext($user, $display_custom_fields = false)
 		}
 	}
 
-	call_integration_hook('integrate_member_context', array(&$user, $display_custom_fields));
+	call_integration_hook('integrate_member_context', array($user, $display_custom_fields));
 	return true;
 }
 
 /**
  * Loads information about what browser the user is viewing with and places it in $context
- *  - uses the class from BrowserDetect.class.php
+ *
+ * @uses the class from BrowserDetect.class.php
  */
 function detectBrowser()
 {
@@ -1111,9 +1143,10 @@ function detectBrowser()
 /**
  * Are we using this browser?
  *
- * Wrapper function for detectBrowser
+ * - Wrapper function for detectBrowser
+ *
  * @param string $browser  the browser we are checking for.
-*/
+ */
 function isBrowser($browser)
 {
 	global $context;
@@ -1127,6 +1160,17 @@ function isBrowser($browser)
 
 /**
  * Load a theme, by ID.
+ *
+ * What it does:
+ * - identify the theme to be loaded.
+ * - validate that the theme is valid and that the user has permission to use it
+ * - load the users theme settings and site setttings into $options.
+ * - prepares the list of folders to search for template loading.
+ * - identify what smiley set to use.
+ * - sets up $context['user']
+ * - detects the users browser and sets a mobile friendly enviroment if needed
+ * - loads default JS variables for use in every theme
+ * - loads default JS scripts for use in every theme
  *
  * @param int $id_theme = 0
  * @param bool $initialize = true
@@ -1181,13 +1225,16 @@ function loadTheme($id_theme = 0, $initialize = true)
 
 	$member = empty($user_info['id']) ? -1 : $user_info['id'];
 
+	// Do we already have this members theme data and specific options loaded (for agressive cache settings)
 	if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2 && ($temp = cache_get_data('theme_settings-' . $id_theme . ':' . $member, 60)) != null && time() - 60 > $modSettings['settings_updated'])
 	{
 		$themeData = $temp;
 		$flag = true;
 	}
+	// Or do we just have the system wide theme settings cached
 	elseif (($temp = cache_get_data('theme_settings-' . $id_theme, 90)) != null && time() - 60 > $modSettings['settings_updated'])
 		$themeData = $temp + array($member => array());
+	// Nothing at all then
 	else
 		$themeData = array(-1 => array(), 0 => array(), $member => array());
 
@@ -1231,6 +1278,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 			}
 		}
 
+		// If being aggressive we save the site wide and member theme settings
 		if (!empty($modSettings['cache_enable']) && $modSettings['cache_enable'] >= 2)
 			cache_put_data('theme_settings-' . $id_theme . ':' . $member, $themeData, 60);
 		// Only if we didn't already load that part of the cache...
@@ -1367,6 +1415,9 @@ function loadTheme($id_theme = 0, $initialize = true)
 
 	if (!$user_info['is_guest'])
 		$context['minmax_preferences'] = !empty($options['minmax_preferences']) ? unserialize($options['minmax_preferences']) : array();
+	// Guest may have collapsed the header, check the cookie to prevent collapse jumping
+	elseif ($user_info['is_guest'] && isset($_COOKIE['upshrink']))
+		$context['minmax_preferences'] = array('upshrink' => $_COOKIE['upshrink']);
 
 	// Determine the current smiley set.
 	$user_info['smiley_set'] = (!in_array($user_info['smiley_set'], explode(',', $modSettings['smiley_sets_known'])) && $user_info['smiley_set'] != 'none') || empty($modSettings['smiley_sets_enable']) ? (!empty($settings['smiley_sets_default']) ? $settings['smiley_sets_default'] : $modSettings['smiley_sets_default']) : $user_info['smiley_set'];
@@ -1396,7 +1447,11 @@ function loadTheme($id_theme = 0, $initialize = true)
 	$context['can_register'] = empty($modSettings['registration_method']) || $modSettings['registration_method'] != 3;
 
 	// Set some permission related settings.
-	$context['show_login_bar'] = $user_info['is_guest'] && !empty($modSettings['enableVBStyleLogin']);
+	if ($user_info['is_guest'] && !empty($modSettings['enableVBStyleLogin']))
+	{
+		$context['show_login_bar'] = true;
+		loadJavascriptFile('sha256.js', array('defer' => true));
+	}
 
 	// This determines the server... not used in many places, except for login fixing.
 	detectServer();
@@ -1407,11 +1462,24 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Set the top level linktree up.
 	array_unshift($context['linktree'], array(
 		'url' => $scripturl,
-		'name' => $context['forum_name_html_safe']
+		'name' => $context['forum_name']
 	));
 
 	// This allows sticking some HTML on the page output - useful for controls.
 	$context['insert_after_template'] = '';
+
+	// Just some mobile-friendly settings
+	if ($context['browser_body_id'] == 'mobile')
+	{
+		// Disable the preview text.
+		$modSettings['message_index_preview'] = 0;
+		// Force the usage of click menu instead of a hover menu.
+		$options['use_click_menu'] = 1;
+		// No space left for a sidebar
+		$options['use_sidebar_menu'] = false;
+		// Disable the search dropdown.
+		$modSettings['search_dropdown'] = false;
+	}
 
 	if (!isset($txt))
 		$txt = array();
@@ -1429,7 +1497,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Output is fully XML, so no need for the index template.
 	if (isset($_REQUEST['xml']))
 	{
-		loadLanguage('index+Modifications');
+		loadLanguage('index+Addons');
 
 		// @todo added because some $settings in template_init are necessary even in xml mode. Maybe move template_init to a settings file?
 		loadTemplate('index');
@@ -1439,7 +1507,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// These actions don't require the index template at all.
 	elseif (!empty($_REQUEST['action']) && in_array($_REQUEST['action'], $simpleActions))
 	{
-		loadLanguage('index+Modifications');
+		loadLanguage('index+Addons');
 		Template_Layers::getInstance()->removeAll();
 	}
 	else
@@ -1455,7 +1523,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 			loadTemplate($template);
 
 		// ...and attempt to load their associated language files.
-		$required_files = implode('+', array_merge($templates, array('Modifications')));
+		$required_files = implode('+', array_merge($templates, array('Addons')));
 		loadLanguage($required_files, '', false);
 
 		// Custom template layers?
@@ -1470,7 +1538,11 @@ function loadTheme($id_theme = 0, $initialize = true)
 	}
 
 	// Initialize the theme.
-	loadSubTemplate('init', 'ignore');
+	if (function_exists('template_init'))
+		$settings = array_merge($settings, template_init());
+
+	// Call initialization theme integration functions.
+	call_integration_hook('integrate_init_theme', array($id_theme, &$settings));
 
 	// Guests may still need a name.
 	if ($context['user']['is_guest'] && empty($context['user']['name']))
@@ -1479,6 +1551,9 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Any theme-related strings that need to be loaded?
 	if (!empty($settings['require_theme_strings']))
 		loadLanguage('ThemeStrings', '', false);
+
+	// Load font Awesome fonts
+	loadCSSFile('font-awesome.css');
 
 	// We allow theme variants, because we're cool.
 	$context['theme_variant'] = '';
@@ -1507,7 +1582,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	}
 
 	// A bit lonely maybe, though I think it should be set up *after* teh theme variants detection
-	$context['header_logo_url_html_safe'] = empty($settings['header_logo_url']) ? $settings['images_url'] . (!empty($context['theme_variant']) ? '/' . $context['theme_variant'] : '') .  '/logo_elk.png' : Util::htmlspecialchars($settings['header_logo_url']);
+	$context['header_logo_url_html_safe'] = empty($settings['header_logo_url']) ? $settings['images_url'] . '/' . $context['theme_variant_url'] .  'logo_elk.png' : Util::htmlspecialchars($settings['header_logo_url']);
 
 	// Allow overriding the board wide time/number formats.
 	if (empty($user_settings['time_format']) && !empty($txt['time_format']))
@@ -1523,8 +1598,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// Make a special URL for the language.
 	$settings['lang_images_url'] = $settings['images_url'] . '/' . (!empty($txt['image_lang']) ? $txt['image_lang'] : $user_info['language']);
 
-	// Set the character set from the template.
-	$context['character_set'] = 'UTF-8';
+	// Set a couple of bits for the template.
 	$context['right_to_left'] = !empty($txt['lang_rtl']);
 	$context['tabindex'] = 1;
 
@@ -1542,6 +1616,11 @@ function loadTheme($id_theme = 0, $initialize = true)
 	// This allows us to change the way things look for the admin.
 	$context['admin_features'] = isset($modSettings['admin_features']) ? explode(',', $modSettings['admin_features']) : array('cd,cp,k,w,rg,ml,pm');
 
+	if (!empty($modSettings['xmlnews_enable']) && (!empty($modSettings['allow_guestAccess']) || $context['user']['is_logged']))
+		$context['newsfeed_urls'] = array(
+			'rss' => $scripturl . '?action=.xml;type=rss2;limit=' . (!empty($modSettings['xmlnews_limit']) ? $modSettings['xmlnews_limit'] : 5),
+			'atom' => $scripturl . '?action=.xml;type=atom;limit=' . (!empty($modSettings['xmlnews_limit']) ? $modSettings['xmlnews_limit'] : 5)
+		);
 	// Default JS variables for use in every theme
 	addJavascriptVar(array(
 		'elk_theme_url' => '"' . $settings['theme_url'] . '"',
@@ -1581,7 +1660,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	if (!empty($modSettings['enableCodePrettify']))
 	{
 		loadCSSFile('prettify.css');
-		loadJavascriptFile('prettify.js', array('defer' => true));
+		loadJavascriptFile('prettify.min.js', array('defer' => true));
 
 		addInlineJavascript('
 		$(document).ready(function(){
@@ -1594,7 +1673,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 	{
 		addInlineJavascript('
 		var oRttime = ({
-			currentTime : ' . JavaScriptEscape(forum_time()) . ',
+			referenceTime : ' . forum_time() * 1000 . ',
 			now : ' . JavaScriptEscape($txt['rt_now']) . ',
 			minute : ' . JavaScriptEscape($txt['rt_minute']) . ',
 			minutes : ' . JavaScriptEscape($txt['rt_minutes']) . ',
@@ -1610,6 +1689,7 @@ function loadTheme($id_theme = 0, $initialize = true)
 			years : ' . JavaScriptEscape($txt['rt_years']) . ',
 		});
 		updateRelativeTime();', true);
+		$context['using_relative_time'] = true;
 	}
 
 	// Queue our Javascript
@@ -1657,8 +1737,9 @@ function loadTheme($id_theme = 0, $initialize = true)
 
 /**
  * This loads the bare minimum data.
- * Needed by scheduled tasks, and any other code that needs language files
- * before the forum (the theme) is loaded.
+ *
+ * - Needed by scheduled tasks,
+ * - Needed by any other code that needs language files before the forum (the theme) is loaded.
  */
 function loadEssentialThemeData()
 {
@@ -1708,20 +1789,23 @@ function loadEssentialThemeData()
 	if (!function_exists('loadLanguage'))
 		require_once(SOURCEDIR . '/Subs.php');
 
-	loadLanguage('index+Modifications');
+	loadLanguage('index+Addons');
 }
 
 /**
  * Load a template - if the theme doesn't include it, use the default.
- * What this function does:
- *  - loads a template file with the name template_name from the current, default, or base theme.
- *  - detects a wrong default theme directory and tries to work around it.
+ *
+ * What it does:
+ * - loads a template file with the name template_name from the current, default, or base theme.
+ * - detects a wrong default theme directory and tries to work around it.
+ * - can be used to only load style sheets by using false as the template name
  *
  * @uses the template_include() function to include the file.
- * @param string $template_name
- * @param array $style_sheets = array()
+ * @param string|false $template_name
+ * @param string[]|string $style_sheets any style sheets to load with the template
  * @param bool $fatal = true if fatal is true, dies with an error message if the template cannot be found
- * @return boolean
+ *
+ * @return boolean|null
  */
 function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 {
@@ -1733,13 +1817,14 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 
 	if ($default_loaded === false)
 	{
-		loadCSSFile(array('index.css'));
+		loadCSSFile('index.css');
 		$default_loaded = true;
 	}
 
 	// Any specific template style sheets to load?
 	if (!empty($style_sheets))
 	{
+		$sheets = array();
 		foreach ($style_sheets as $sheet)
 		{
 			$sheets[] = stripos('.css', $sheet) !== false ? $sheet : $sheet . '.css';
@@ -1782,7 +1867,9 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 		if (!empty($context['user']['is_admin']) && !isset($_GET['th']))
 		{
 			loadLanguage('Errors');
-			$context['security_controls']['files']['theme_dir'] = '<a href="' . $scripturl . '?action=admin;area=theme;sa=list;th=1;' . $context['session_var'] . '=' . $context['session_id'] . '">' . $txt['theme_dir_wrong'] . '</a>';
+			if (!isset($context['security_controls_files']['title']))
+				$context['security_controls_files']['title'] = $txt['generic_warning'];
+			$context['security_controls_files']['errors']['theme_dir'] = '<a href="' . $scripturl . '?action=admin;area=theme;sa=list;th=1;' . $context['session_var'] . '=' . $context['session_id'] . '">' . $txt['theme_dir_wrong'] . '</a>';
 		}
 
 		loadTemplate($template_name);
@@ -1798,15 +1885,16 @@ function loadTemplate($template_name, $style_sheets = array(), $fatal = true)
 
 /**
  * Load a sub-template.
+ *
  * What it does:
- *  - loads the sub template specified by sub_template_name, which must be in an already-loaded template.
- *  - if ?debug is in the query string, shows administrators a marker after every sub template
- *    for debugging purposes.
+ * - loads the sub template specified by sub_template_name, which must be in an already-loaded template.
+ * - if ?debug is in the query string, shows administrators a marker after every sub template
+ * for debugging purposes.
  *
  * @todo get rid of reading $_REQUEST directly
- *
  * @param string $sub_template_name
- * @param bool $fatal = false, $fatal = true is for templates that shouldn't get a 'pretty' error screen.
+ * @param bool|string $fatal = false, $fatal = true is for templates that
+ *                 shouldn't get a 'pretty' error screen 'ignore' to skip
  */
 function loadSubTemplate($sub_template_name, $fatal = false)
 {
@@ -1826,7 +1914,7 @@ function loadSubTemplate($sub_template_name, $fatal = false)
 		die(log_error(sprintf(isset($txt['theme_template_error']) ? $txt['theme_template_error'] : 'Unable to load the %s sub template!', (string) $sub_template_name), 'template'));
 
 	// Are we showing debugging for templates?  Just make sure not to do it before the doctype...
-	if (allowedTo('admin_forum') && isset($_REQUEST['debug']) && !in_array($sub_template_name, array('init', 'main_below')) && ob_get_length() > 0 && !isset($_REQUEST['xml']))
+	if (allowedTo('admin_forum') && isset($_REQUEST['debug']) && !in_array($sub_template_name, array('init')) && ob_get_length() > 0 && !isset($_REQUEST['xml']))
 	{
 		echo '
 <div style="font-size: 8pt; border: 1px dashed red; background: orange; text-align: center; font-weight: bold;">---- ', $sub_template_name, ' ends ----</div>';
@@ -1836,16 +1924,98 @@ function loadSubTemplate($sub_template_name, $fatal = false)
 /**
  * Add a CSS file for output later
  *
- * @param mixed $filenames string or array of filenames to work on
- * @param array $params = array()
- *		Keys are the following:
- *			- ['local'] (true/false): define if the file is local
- *			- ['fallback'] (true/false): if false  will attempt to load the file from the default theme
- *				if not found in the current theme
- *			- ['stale'] (true/false/string): if true or null, use cache stale, false do not, or used a supplied string
+ * @param string[]|string $filenames string or array of filenames to work on
+ * @param mixed[] $params = array()
+ * Keys are the following:
+ * - ['local'] (true/false): define if the file is local
+ * - ['fallback'] (true/false): if false  will attempt to load the file
+ *   from the default theme if not found in the current theme
+ * - ['stale'] (true/false/string): if true or null, use cache stale,
+ *   false do not, or used a supplied string
  * @param string $id optional id to use in html id=""
  */
 function loadCSSFile($filenames, $params = array(), $id = '')
+{
+	if (empty($filenames))
+		return;
+
+	$params['subdir'] = 'css';
+	$params['extension'] = 'css';
+	$params['index_name'] = 'css_files';
+	$params['debug_index'] = 'sheets';
+
+	loadAssetFile($filenames, $params, $id);
+}
+
+/**
+ * Add a Javascript file for output later
+ *
+ * What it does:
+ * - Can be passed an array of filenames, all which will have the same
+ *   parameters applied,
+ * - if you need specific parameters on a per file basis, call it multiple times
+ *
+ * @param string[]|string $filenames string or array of filenames to work on
+ * @param mixed[] $params = array()
+ * Keys are the following:
+ * - ['local'] (true/false): define if the file is local, if file does not
+ *     start with http its assumed local
+ * - ['defer'] (true/false): define if the file should load in <head> or before
+ *     the closing <html> tag
+ * - ['fallback'] (true/false): if true will attempt to load the file from the
+ *     default theme if not found in the current this is the default behavior
+ *     if this is not supplied
+ * - ['async'] (true/false): if the script should be loaded asynchronously (HTML5)
+ * - ['stale'] (true/false/string): if true or null, use cache stale, false do
+ *     not, or used a supplied string
+ * @param string $id = '' optional id to use in html id=""
+ */
+function loadJavascriptFile($filenames, $params = array(), $id = '')
+{
+	if (empty($filenames))
+		return;
+
+	$params['subdir'] = 'scripts';
+	$params['extension'] = 'js';
+	$params['index_name'] = 'javascript_files';
+	$params['debug_index'] = 'javascript';
+
+	loadAssetFile($filenames, $params, $id);
+}
+
+/**
+ * Add an asset (css, js or other) file for output later
+ *
+ * What it does:
+ * - Can be passed an array of filenames, all which will have the same
+ *   parameters applied,
+ * - if you need specific parameters on a per file basis, call it multiple times
+ *
+ * @param string[]|string $filenames string or array of filenames to work on
+ * @param mixed[] $params = array()
+ * Keys are the following:
+ * - ['subdir'] (string): the subdirectory of the theme dir the file is in
+ * - ['extension'] (string): the extension of the file (e.g. css)
+ * - ['index_name'] (string): the $context index that holds the array of loaded
+ *     files
+ * - ['debug_index'] (string): the index that holds the array of loaded
+ *     files for debugging debug
+ * - ['local'] (true/false): define if the file is local, if file does not
+ *     start with http or // (schema-less URLs) its assumed local.
+ *     The parameter is in fact useful only for files whose name starts with
+ *     http, in any other case (e.g. passing a local URL) the parameter would
+ *     fail in properly adding the file to the list.
+ * - ['defer'] (true/false): define if the file should load in <head> or before
+ *     the closing <html> tag
+ * - ['fallback'] (true/false): if true will attempt to load the file from the
+ *     default theme if not found in the current this is the default behavior
+ *     if this is not supplied
+ * - ['async'] (true/false): if the script should be loaded asynchronously (HTML5)
+ * - ['stale'] (true/false/string): if true or null, use cache stale, false do
+ *     not, or used a supplied string
+ * @param string $id = '' optional id to use in html id=""
+ */
+function loadAssetFile($filenames, $params = array(), $id = '')
 {
 	global $settings, $context, $db_show_debug;
 
@@ -1856,155 +2026,89 @@ function loadCSSFile($filenames, $params = array(), $id = '')
 		$filenames = array($filenames);
 
 	// Static values for all these settings
-	$params['stale'] = (!isset($params['stale']) || $params['stale'] === true) ? '?beta10' : (is_string($params['stale']) ? ($params['stale'] = $params['stale'][0] === '?' ? $params['stale'] : '?' . $params['stale']) : '');
-	$params['fallback'] = (!empty($params['fallback']) && ($params['fallback'] === false)) ? false : true;
+	if (!isset($params['stale']) || $params['stale'] === true)
+		$staler_string = CACHE_STALE;
+	elseif (is_string($params['stale']))
+		$staler_string = ($params['stale'][0] === '?' ? $params['stale'] : '?' . $params['stale']);
+	else
+		$staler_string = '';
+
+	$fallback = (!empty($params['fallback']) && ($params['fallback'] === false)) ? false : true;
+	$dir = '/' . $params['subdir'] . '/';
 
 	// Whoa ... we've done this before yes?
-	$cache_name = 'load_css_' . md5($settings['theme_dir'] . implode('_', $filenames));
+	$cache_name = 'load_' . $params['extension'] . '_' . md5($settings['theme_dir'] . implode('_', $filenames));
 	if (($temp = cache_get_data($cache_name, 600)) !== null)
 	{
-		if (empty($context['css_files']))
-			$context['css_files'] = array();
-		$context['css_files'] += $temp;
+		if (empty($context[$params['index_name']]))
+			$context[$params['index_name']] = array();
+		$context[$params['index_name']] += $temp;
 	}
 	else
 	{
-		// All the files in this group use the parameters as defined above
-		foreach ($filenames as $filename)
-		{
-			// Account for shorthand like admin.css?xyz11 filenames
-			$has_cache_staler = strpos($filename, '.css?');
-			$params['basename'] = $has_cache_staler ? substr($filename, 0, $has_cache_staler + 4) : $filename;
-			$this_id = empty($id) ? strtr(basename($filename), '?', '_') : $id;
+		$this_build = array();
 
-			// Is this a local file?
-			if (substr($filename, 0, 4) !== 'http' || !empty($params['local']))
-			{
-				$params['local'] = true;
-				$params['dir'] = $settings['theme_dir'] . '/css/';
-				$params['url'] = $settings['theme_url'];
-
-				// Fallback if needed?
-				if ($params['fallback'] && ($settings['theme_dir'] !== $settings['default_theme_dir']) && !file_exists($settings['theme_dir'] . '/css/' . $filename))
-				{
-					// Fallback if we are not already in the default theme
-					if (file_exists($settings['default_theme_dir'] . '/css/' . $filename))
-					{
-						$filename = $settings['default_theme_url'] . '/css/' . $filename . ($has_cache_staler ? '' : $params['stale']);
-						$params['dir'] = $settings['default_theme_dir'] . '/css/';
-						$params['url'] = $settings['default_theme_url'];
-					}
-					else
-						$filename = false;
-				}
-				else
-					$filename = $settings['theme_url'] . '/css/' . $filename . ($has_cache_staler ? '' : $params['stale']);
-			}
-
-			// Add it to the array for use in the template
-			if (!empty($filename))
-				$context['css_files'][$this_id] = array('filename' => $filename, 'options' => $params);
-
-			if ($db_show_debug === true)
-				$context['debug']['sheets'][] = $params['basename'] . (!empty($params['url']) ? '(' . basename($params['url']) . ')' : '');
-		}
-
-		// Save this build
-		cache_put_data($cache_name, $context['css_files'], 600);
-	}
-}
-
-/**
- * Add a Javascript file for output later
- *
- * Can be passed an array of filenames, all which will have the same parameters applied, if you
- * need specific parameters on a per file basis, call it multiple times
- *
- * @param mixed $filenames string or array of filenames to work on
- * @param array $params = array()
- *		Keys are the following:
- *			- ['local'] (true/false): define if the file is local
- *			- ['defer'] (true/false): define if the file should load in <head> or before the closing <html> tag
- *			- ['fallback'] (true/false): if true will attempt to load the file from the default theme if not found in the current
- *			- ['async'] (true/false): if the script should be loaded asynchronously (HTML5)
- *			- ['stale'] (true/false/string): if true or null, use cache stale, false do not, or used a supplied string
- * @param string $id = '' optional id to use in html id=""
- */
-function loadJavascriptFile($filenames, $params = array(), $id = '')
-{
-	global $settings, $context, $db_show_debug;
-
-	if (empty($filenames))
-		return;
-
-	if (!is_array($filenames))
-		$filenames = array($filenames);
-
-	// Static values for all these files
-	$params['stale'] = (!isset($params['stale']) || $params['stale'] === true) ? '?beta10' : (is_string($params['stale']) ? ($params['stale'] = $params['stale'][0] === '?' ? $params['stale'] : '?' . $params['stale']) : '');
-	$params['fallback'] = (!empty($params['fallback']) && ($params['fallback'] === false)) ? false : true;
-
-	// Dejvu?
-	$cache_name = 'load_js_' . md5($settings['theme_dir'] . implode('_', $filenames));
-	if (($temp = cache_get_data($cache_name, 600)) !== null)
-	{
-		if (empty($context['javascript_files']))
-			$context['javascript_files'] = array();
-		$context['javascript_files'] += $temp;
-	}
-	else
-	{
 		// All the files in this group use the above parameters
 		foreach ($filenames as $filename)
 		{
-			// Account for shorthand like admin.js?xyz11 filenames
-			$has_cache_staler = strpos($filename, '.js?');
-			$params['basename'] = $has_cache_staler ? substr($filename, 0, $has_cache_staler + 3) : $filename;
+			// Account for shorthand like admin.ext?xyz11 filenames
+			$has_cache_staler = strpos($filename, '.' . $params['extension'] . '?');
+			if ($has_cache_staler)
+			{
+				$cache_staler = $staler_string;
+
+				$params['basename'] = substr($filename, 0, $has_cache_staler + strlen($params['extension']) + 1);
+			}
+			else
+			{
+				$cache_staler = '';
+				$params['basename'] = $filename;
+			}
 			$this_id = empty($id) ? strtr(basename($filename), '?', '_') : $id;
 
 			// Is this a local file?
-			if (substr($filename, 0, 4) !== 'http' || !empty($params['local']))
+			if (!empty($params['local']) || (substr($filename, 0, 4) !== 'http' && substr($filename, 0, 2) !== '//'))
 			{
 				$params['local'] = true;
-				$params['dir'] = $settings['theme_dir'] . '/scripts/';
+				$params['dir'] = $settings['theme_dir'] . $dir;
 				$params['url'] = $settings['theme_url'];
 
 				// Fallback if we are not already in the default theme
-				if ($params['fallback'] && ($settings['theme_dir'] !== $settings['default_theme_dir']) && !file_exists($settings['theme_dir'] . '/scripts/' . $filename))
+				if ($fallback && ($settings['theme_dir'] !== $settings['default_theme_dir']) && !file_exists($settings['theme_dir'] . $dir . $filename))
 				{
 					// Can't find it in this theme, how about the default?
-					if (file_exists($settings['default_theme_dir'] . '/scripts/' . $filename))
+					if (file_exists($settings['default_theme_dir'] . $dir . $filename))
 					{
-						$filename = $settings['default_theme_url'] . '/scripts/' . $filename . ($has_cache_staler ? '' : $params['stale']);
-						$params['dir'] = $settings['default_theme_dir'] . '/scripts/';
+						$filename = $settings['default_theme_url'] . $dir . $filename . $cache_staler;
+						$params['dir'] = $settings['default_theme_dir'] . $dir;
 						$params['url'] = $settings['default_theme_url'];
 					}
 					else
 						$filename = false;
 				}
 				else
-					$filename = $settings['theme_url'] . '/scripts/' . $filename . ($has_cache_staler ? '' : $params['stale']);
+					$filename = $settings['theme_url'] . $dir . $filename . $cache_staler;
 			}
 
 			// Add it to the array for use in the template
 			if (!empty($filename))
 			{
-				$context['javascript_files'][$this_id] = array('filename' => $filename, 'options' => $params);
+				$this_build[$this_id] = $context[$params['index_name']][$this_id] = array('filename' => $filename, 'options' => $params);
 
 				if ($db_show_debug === true)
-					$context['debug']['javascript'][] = $params['basename'] . '(' . (!empty($params['local']) ? (!empty($params['url']) ? basename($params['url']) : basename($params['dir'])) : '') . ')';
+					$context['debug'][$params['debug_index']][] = $params['basename'] . '(' . (!empty($params['local']) ? (!empty($params['url']) ? basename($params['url']) : basename($params['dir'])) : '') . ')';
 			}
-		}
 
-		// Save it so we don't have to build this so often
-		cache_put_data($cache_name, $context['javascript_files'], 600);
+			// Save it so we don't have to build this so often
+			cache_put_data($cache_name, $this_build, 600);
+		}
 	}
 }
 
 /**
  * Add a Javascript variable for output later (for feeding text strings and similar to JS)
  *
- * @param array $vars array of vars to include in the output done as 'varname' => 'var value'
+ * @param mixed[] $vars array of vars to include in the output done as 'varname' => 'var value'
  * @param bool $escape = false, whether or not to escape the value
  */
 function addJavascriptVar($vars, $escape = false)
@@ -2021,6 +2125,7 @@ function addJavascriptVar($vars, $escape = false)
 /**
  * Add a block of inline Javascript code to be executed later
  *
+ * What it does:
  * - only use this if you have to, generally external JS files are better, but for very small scripts
  *   or for scripts that require help from PHP/whatever, this can be useful.
  * - all code added with this function is added to the same <script> tag so do make sure your JS is clean!
@@ -2037,7 +2142,9 @@ function addInlineJavascript($javascript, $defer = false)
 }
 
 /**
- * Load a language file.  Tries the current and default themes as well as the user and global languages.
+ * Load a language file.
+ *
+ * - Tries the current and default themes as well as the user and global languages.
  *
  * @param string $template_name
  * @param string $lang = ''
@@ -2102,16 +2209,17 @@ function loadLanguage($template_name, $lang = '', $fatal = true, $force_reload =
 		$found = false;
 		foreach ($attempts as $k => $file)
 		{
-			if (file_exists($file[0] . '/languages/' . $lang . '/' . $file[1] . '.' . $file[2] . '.php'))
+			if (file_exists($file[0] . '/languages/' . $file[2] . '/' . $file[1] . '.' . $file[2] . '.php'))
 			{
 				// Include it!
-				template_include($file[0] . '/languages/' . $lang . '/' . $file[1] . '.' . $file[2] . '.php');
+				template_include($file[0] . '/languages/' . $file[2] . '/' . $file[1] . '.' . $file[2] . '.php');
 
 				// Note that we found it.
 				$found = true;
 
 				break;
 			}
+			// @deprecated since 1.0 - old way of archiving language files, all in one directory
 			elseif (file_exists($file[0] . '/languages/' . $file[1] . '.' . $file[2] . '.php'))
 			{
 				// Include it!
@@ -2145,10 +2253,11 @@ function loadLanguage($template_name, $lang = '', $fatal = true, $force_reload =
 
 /**
  * Get all parent boards (requires first parent as parameter)
- * It finds all the parents of id_parent, and that board itself.
- * Additionally, it detects the moderators of said boards.
  *
- * Returns an array of information about the boards found.
+ * What it does:
+ * - It finds all the parents of id_parent, and that board itself.
+ * - Additionally, it detects the moderators of said boards.
+ * - Returns an array of information about the boards found.
  *
  * @param int $id_parent
  */
@@ -2253,7 +2362,7 @@ function getLanguages($use_cache = true)
 			$dir = dir($language_dir);
 			while ($entry = $dir->read())
 			{
-				// Only directories are intereting
+				// Only directories are interesting
 				if ($entry == '..' || !is_dir($dir->path . '/' . $entry))
 					continue;
 
@@ -2287,23 +2396,25 @@ function getLanguages($use_cache = true)
 
 /**
  * Replace all vulgar words with respective proper words. (substring or whole words..)
- * What this function does:
- *  - it censors the passed string.
- *  - if the theme setting allow_no_censored is on, and the theme option
- *    show_no_censored is enabled, does not censor, unless force is also set.
- *  - it caches the list of censored words to reduce parsing.
  *
- * Returns the censored text
+ * What it does:
+ * - it censors the passed string.
+ * - if the admin setting allow_no_censored is on it does not censor unless force is also set.
+ * - if the admin setting allow_no_censored is off will censor words unless the user has set
+ * it to not censor in their profile and force is off
+ * - it caches the list of censored words to reduce parsing.
+ * - Returns the censored text
  *
  * @param string $text
  * @param bool $force = false
  */
 function censorText(&$text, $force = false)
 {
-	global $modSettings, $options, $settings;
+	global $modSettings, $options;
 	static $censor_vulgar = null, $censor_proper = null;
 
-	if ((!empty($options['show_no_censored']) && $settings['allow_no_censored'] && !$force) || empty($modSettings['censor_vulgar']) || trim($text) === '')
+	// Are we going to censor this string
+	if ((!empty($options['show_no_censored']) && !empty($modSettings['allow_no_censored']) && !$force) || empty($modSettings['censor_vulgar']) || trim($text) === '')
 		return $text;
 
 	// If they haven't yet been loaded, load them.
@@ -2338,10 +2449,12 @@ function censorText(&$text, $force = false)
 
 /**
  * Load the template/language file using eval or require? (with eval we can show an error message!)
- *  - loads the template or language file specified by filename.
- *  - uses eval unless disableTemplateEval is enabled.
- *  - outputs a parse error if the file did not exist or contained errors.
- *  - attempts to detect the error and line, and show detailed information.
+ *
+ * What it does:
+ * - loads the template or language file specified by filename.
+ * - uses eval unless disableTemplateEval is enabled.
+ * - outputs a parse error if the file did not exist or contained errors.
+ * - attempts to detect the error and line, and show detailed information.
  *
  * @param string $filename
  * @param bool $once = false, if true only includes the file once (like include_once)
@@ -2380,9 +2493,9 @@ function template_include($filename, $once = false)
 
 	if ($file_found !== true)
 	{
-		ob_end_clean();
+		@ob_end_clean();
 		if (!empty($modSettings['enableCompressedOutput']))
-			@ob_start('ob_gzhandler');
+			ob_start('ob_gzhandler');
 		else
 			ob_start();
 
@@ -2398,7 +2511,8 @@ function template_include($filename, $once = false)
 		{
 			$txt['template_parse_error'] = 'Template Parse Error!';
 			$txt['template_parse_error_message'] = 'It seems something has gone sour on the forum with the template system.  This problem should only be temporary, so please come back later and try again.  If you continue to see this message, please contact the administrator.<br /><br />You can also try <a href="javascript:location.reload();">refreshing this page</a>.';
-			$txt['template_parse_error_details'] = 'There was a problem loading the <span style="font-family: monospace;"><strong>%1$s</strong></span> template or language file.  Please check the syntax and try again - remember, single quotes (<span style="font-family: monospace;">\'</span>) often have to be escaped with a slash (<span style="font-family: monospace;">\\</span>).  To see more specific error information from PHP, try <a href="' . $boardurl . '%1$s" class="extern">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="' . $scripturl . '?theme=1">use the default theme</a>.';
+			$txt['template_parse_error_details'] = 'There was a problem loading the <span style="font-family: monospace;"><strong>%1$s</strong></span> template or language file.  Please check the syntax and try again - remember, single quotes (<span style="font-family: monospace;">\'</span>) often have to be escaped with a slash (<span style="font-family: monospace;">\\</span>).  To see more specific error information from PHP, try <a href="%2$s%1$s" class="extern">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="%3$s">use the default theme</a>.';
+			$txt['template_parse_undefined'] = 'An undefined error occurred during the parsing of this template';
 		}
 
 		// First, let's get the doctype and language information out of the way.
@@ -2430,8 +2544,10 @@ function template_include($filename, $once = false)
 			require_once(SUBSDIR . '/Package.subs.php');
 
 			$error = fetch_web_data($boardurl . strtr($filename, array(BOARDDIR => '', strtr(BOARDDIR, '\\', '/') => '')));
-			if (empty($error) && ini_get('track_errors'))
+			if (empty($error) && ini_get('track_errors') && !empty($php_errormsg))
 				$error = $php_errormsg;
+			elseif (empty($error))
+				$error = $txt['template_parse_undefined'];
 
 			$error = strtr($error, array('<b>' => '<strong>', '</b>' => '</strong>'));
 
@@ -2440,7 +2556,7 @@ function template_include($filename, $once = false)
 	</head>
 	<body>
 		<h3>', $txt['template_parse_error'], '</h3>
-		', sprintf($txt['template_parse_error_details'], strtr($filename, array(BOARDDIR => '', strtr(BOARDDIR, '\\', '/') => '')));
+		', sprintf($txt['template_parse_error_details'], strtr($filename, array(BOARDDIR => '', strtr(BOARDDIR, '\\', '/') => '')), $boardurl, $scripturl . '?theme=1');
 
 			if (!empty($error))
 				echo '
@@ -2575,8 +2691,8 @@ function loadDatabase()
  *
  * @todo this function seems more useful than expected, it should be improved. :P
  *
- * @param array $profile
- * @return array $avatar
+ * @param mixed[] $profile array containing the users profile data
+ * @return mixed[] $avatar
  */
 function determineAvatar($profile)
 {
@@ -2588,8 +2704,8 @@ function determineAvatar($profile)
 	// If we're always html resizing, assume it's too large.
 	if ($modSettings['avatar_action_too_large'] == 'option_html_resize' || $modSettings['avatar_action_too_large'] == 'option_js_resize')
 	{
-		$max_avatar_width = !empty($modSettings['avatar_max_width_external']) ? ' width:' . $modSettings['avatar_max_width_external'] . 'px;' : '';
-		$max_avatar_height = !empty($modSettings['avatar_max_height_external']) ? ' height:' . $modSettings['avatar_max_height_external'] . 'px;' : '';
+		$max_avatar_width = !empty($modSettings['avatar_max_width_external']) ? ' max-width:' . $modSettings['avatar_max_width_external'] . 'px;' : '';
+		$max_avatar_height = !empty($modSettings['avatar_max_height_external']) ? ' max-height:' . $modSettings['avatar_max_height_external'] . 'px;' : '';
 	}
 	else
 	{
@@ -2630,7 +2746,7 @@ function determineAvatar($profile)
 
 		$avatar = array(
 			'name' => $profile['avatar'],
-			'image' => '<img src="' . $gravatar_url . '" alt="" class="avatar" />',
+			'image' => '<img class="avatar" src="' . $gravatar_url . '" style="' . $max_avatar_width . $max_avatar_height . '" alt="" />',
 			'href' => $gravatar_url,
 			'url' => $gravatar_url,
 		);
@@ -2640,7 +2756,7 @@ function determineAvatar($profile)
 	{
 		$avatar = array(
 			'name' => $profile['avatar'],
-			'image' => '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . $profile['avatar'] . '" alt="" />',
+			'image' => '<img class="avatar" src="' . $modSettings['avatar_url'] . '/' . $profile['avatar'] . '" style="' . $max_avatar_width . $max_avatar_height . '" alt="" />',
 			'href' => $modSettings['avatar_url'] . '/' . $profile['avatar'],
 			'url' => $modSettings['avatar_url'] . '/' . $profile['avatar'],
 		);
@@ -2655,7 +2771,7 @@ function determineAvatar($profile)
 		// Let's proceed with the default avatar.
 		$avatar = array(
 			'name' => '',
-			'image' => '<img src="' . $settings['images_url'] . '/default_avatar.png" alt="" class="avatar" />',
+			'image' => '<img class="avatar" src="' . $settings['images_url'] . '/default_avatar.png" style="' . $max_avatar_width . $max_avatar_height . '" alt="" />',
 			'href' => $settings['images_url'] . '/default_avatar.png',
 			'url' => 'http://',
 		);
@@ -2699,6 +2815,8 @@ function detectServer()
 
 /**
  * Do some important security checks:
+ *
+ * What it does:
  * - checks the existence of critical files e.g. install.php
  * - checks for an active admin session.
  * - checks cache directory is writable.
@@ -2707,16 +2825,43 @@ function detectServer()
  */
 function doSecurityChecks()
 {
-	global $modSettings, $context, $maintenance, $user_info;
+	global $modSettings, $context, $maintenance, $user_info, $txt, $scripturl, $user_settings;
+
+	$show_warnings = false;
 
 	if (allowedTo('admin_forum') && !$user_info['is_guest'])
 	{
+		// If agreement is enabled, at least the english version shall exists
+		if ($modSettings['requireAgreement'] && !file_exists(BOARDDIR . '/agreement.txt'))
+		{
+			$context['security_controls_files']['title'] = $txt['generic_warning'];
+			$context['security_controls_files']['errors']['agreement'] = $txt['agreement_missing'];
+			$show_warnings = true;
+		}
+
+		// Cache directory writeable?
+		if (!empty($modSettings['cache_enable']) && !is_writable(CACHEDIR))
+		{
+			$context['security_controls_files']['title'] = $txt['generic_warning'];
+			$context['security_controls_files']['errors']['cache'] = $txt['cache_writable'];
+			$show_warnings = true;
+		}
+
 		// @todo add a hook here
-		$securityFiles = array('install.php', 'webinstall.php', 'upgrade.php', 'convert.php', 'repair_paths.php', 'repair_settings.php', 'Settings.php~', 'Settings_bak.php~');
-		foreach ($securityFiles as $i => $securityFile)
+		$securityFiles = array('install.php', 'upgrade.php', 'convert.php', 'repair_paths.php', 'repair_settings.php', 'Settings.php~', 'Settings_bak.php~');
+		foreach ($securityFiles as $securityFile)
 		{
 			if (file_exists(BOARDDIR . '/' . $securityFile))
-				$context['security_controls']['files']['to_remove'][] = $securityFile;
+			{
+				$context['security_controls_files']['title'] = $txt['security_risk'];
+				$context['security_controls_files']['errors'][$securityFile] = sprintf($txt['not_removed'], $securityFile);
+				$show_warnings = true;
+
+				if ($securityFile == 'Settings.php~' || $securityFile == 'Settings_bak.php~')
+				{
+					$context['security_controls_files']['errors'][$securityFile] .= '<span class="smalltext">' . sprintf($txt['not_removed_extra'], $securityFile, substr($securityFile, 0, -1)) . '</span>';
+				}
+			}
 		}
 
 		// We are already checking so many files...just few more doesn't make any difference! :P
@@ -2725,42 +2870,66 @@ function doSecurityChecks()
 		secureDirectory($path, true);
 		secureDirectory(CACHEDIR);
 
-		// If agreement is enabled, at least the english version shall exists
-		if ($modSettings['requireAgreement'] && !file_exists(BOARDDIR . '/agreement.txt'))
-			$context['security_controls']['files']['agreement'] = true;
-
-		// Cache directory writeable?
-		if (!empty($modSettings['cache_enable']) && !is_writable(CACHEDIR))
-			$context['security_controls']['files']['cache'] = true;
-
 		// Active admin session?
 		if (empty($modSettings['securityDisable']) && (isset($_SESSION['admin_time']) && $_SESSION['admin_time'] + ($modSettings['admin_session_lifetime'] * 60) > time()))
-			$context['security_controls']['admin_session'] = true;
+			$context['warning_controls']['admin_session'] = sprintf($txt['admin_session_active'], ($scripturl . '?action=admin;area=adminlogoff;redir;' . $context['session_var'] . '=' . $context['session_id']));
 
 		// Maintenance mode enabled?
 		if (!empty($maintenance))
-			$context['security_controls']['maintenance'] = true;
+			$context['warning_controls']['maintenance'] = sprintf($txt['admin_maintenance_active'], ($scripturl . '?action=admin;area=serversettings;' . $context['session_var'] . '=' . $context['session_id']));
 	}
 
 	// Check for database errors.
 	if (!empty($_SESSION['query_command_denied']))
 	{
 		if ($user_info['is_admin'])
+		{
+			$context['security_controls_query']['title'] = $txt['query_command_denied'];
+			$show_warnings = true;
 			foreach ($_SESSION['query_command_denied'] as $command => $error)
-				$context['security_controls']['query'][$command] = Util::htmlspecialchars($error);
+				$context['security_controls_query']['errors'][$command] = '<pre>' . Util::htmlspecialchars($error) . '</pre>';
+		}
 		else
+		{
+			$context['security_controls_query']['title'] = $txt['query_command_denied_guests'];
 			foreach ($_SESSION['query_command_denied'] as $command => $error)
-				$context['security_controls']['query'][$command] = Util::htmlspecialchars($command);
+				$context['security_controls_query']['errors'][$command] = '<pre>' . sprintf($txt['query_command_denied_guests_msg'], Util::htmlspecialchars($command)) . '</pre>';
+		}
+	}
+
+	// Are there any members waiting for approval?
+	if (allowedTo('moderate_forum') && ((!empty($modSettings['registration_method']) && $modSettings['registration_method'] == 2) || !empty($modSettings['approveAccountDeletion'])) && !empty($modSettings['unapprovedMembers']))
+		$context['warning_controls']['unapproved_members'] = sprintf($txt[$modSettings['unapprovedMembers'] == 1 ? 'approve_one_member_waiting' : 'approve_many_members_waiting'], $scripturl . '?action=admin;area=viewmembers;sa=browse;type=approve', $modSettings['unapprovedMembers']);
+
+	if (!empty($context['open_mod_reports']) && (empty($user_settings['mod_prefs']) || $user_settings['mod_prefs'][0] == 1))
+		$context['warning_controls']['open_mod_reports'] = '<a href="' . $scripturl . '?action=moderate;area=reports">' . sprintf($txt['mod_reports_waiting'], $context['open_mod_reports']) . '</a>';
+
+	if (isset($_SESSION['ban']['cannot_post']))
+	{
+		// An admin cannot be banned (technically he could), and if it is better he knows.
+		$context['security_controls_ban']['title'] = sprintf($txt['you_are_post_banned'], $user_info['is_guest'] ? $txt['guest_title'] : $user_info['name']);
+		$show_warnings = true;
+
+		$context['security_controls_ban']['errors']['reason'] = '';
+
+		if (!empty($_SESSION['ban']['cannot_post']['reason']))
+			$context['security_controls_ban']['errors']['reason'] = $_SESSION['ban']['cannot_post']['reason'];
+
+		if (!empty($_SESSION['ban']['expire_time']))
+			$context['security_controls_ban']['errors']['reason'] .= '<span class="smalltext">' . sprintf($txt['your_ban_expires'], standardTime($_SESSION['ban']['expire_time'], false)) . '</span>';
+		else
+			$context['security_controls_ban']['errors']['reason'] .= '<span class="smalltext">' . $txt['your_ban_expires_never'] . '</span>';
 	}
 
 	// Finally, let's show the layer.
-	if (!empty($context['security_controls']))
+	if ($show_warnings || !empty($context['warning_controls']))
 		Template_Layers::getInstance()->addAfter('admin_warning', 'body');
 }
 
 /**
  * Returns the current server load for nix systems
- * Used to enable / disable features based on current system overhead
+ *
+ * - Used to enable / disable features based on current system overhead
  */
 function detectServerLoad()
 {

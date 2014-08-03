@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the posting and previewing
  */
@@ -22,13 +22,6 @@
 var bPost;
 function previewControl()
 {
-	if (is_ff)
-	{
-		// Firefox doesn't render <marquee> that have been put it using javascript
-		if (document.forms[form_name].elements[post_box_name].value.indexOf('[move]') !== -1)
-			return submitThisOnce(document.forms[form_name]);
-	}
-
 	// Lets make a background preview request
 	bPost = false;
 
@@ -163,10 +156,10 @@ function getFields(textFields, numericFields, checkboxFields, form_name)
 		if (textFields[i] in document.forms[form_name])
 		{
 			// Handle the editor.
-			if (textFields[i] == post_box_name && $('#' + post_box_name).data('sceditor') !== undefined)
+			if (textFields[i] == post_box_name && $editor_data[post_box_name] !== undefined)
 			{
-				fields[fields.length] = textFields[i] + '=' + $('#' + post_box_name).data('sceditor').getText().replace(/&#/g, '&#38;#').php_to8bit().php_urlencode();
-				fields[fields.length] = 'message_mode=' + $("#message").data("sceditor").inSourceMode();
+				fields[fields.length] = textFields[i] + '=' + $editor_data[post_box_name].getText().replace(/&#/g, '&#38;#').php_to8bit().php_urlencode();
+				fields[fields.length] = 'message_mode=' + $editor_data[post_box_name].inSourceMode();
 			}
 			else
 				fields[fields.length] = textFields[i] + '=' + document.forms[form_name][textFields[i]].value.replace(/&#/g, '&#38;#').php_to8bit().php_urlencode();
@@ -211,7 +204,8 @@ function onDocSent(XMLDoc)
 	var i = 0,
 		n = 0,
 		numErrors = 0,
-		numCaptions = 0;
+		numCaptions = 0,
+		$editor;
 
 	if (!XMLDoc || !XMLDoc.getElementsByTagName('elk')[0])
 	{
@@ -239,13 +233,16 @@ function onDocSent(XMLDoc)
 		errorList = '',
 		errorCode = '',
 		error_area = 'post_error',
-		error_list = error_area + '_list';
+		error_list = error_area + '_list',
+		error_post = false;
 
 	// @todo: this should stay together with the rest of the error handling or
 	// should use errorbox_handler (at the moment it cannot be used because is not enough generic)
 	for (i = 0, numErrors = errors.getElementsByTagName('error').length; i < numErrors; i++)
 	{
 		errorCode = errors.getElementsByTagName('error')[i].attributes.getNamedItem("code").value;
+		if (errorCode == 'no_message' || errorCode == 'long_message')
+			error_post = true;
 		errorList += '<li id="' + error_area + '_' + errorCode + '" class="error">' + errors.getElementsByTagName('error')[i].firstChild.nodeValue + '</li>';
 	}
 
@@ -265,7 +262,7 @@ function onDocSent(XMLDoc)
 
 	// Show a warning if the topic has been locked.
 	if (bPost)
-		document.getElementById('lock_warning').style.display = errors.getAttribute('topic_locked') === 1 ? '' : 'none';
+		document.getElementById('lock_warning').style.display = parseInt(errors.getAttribute('topic_locked')) === 1 ? '' : 'none';
 
 	// Adjust the color of captions if the given data is erroneous.
 	var captions = errors.getElementsByTagName('caption');
@@ -275,15 +272,15 @@ function onDocSent(XMLDoc)
 			document.getElementById('caption_' + captions[i].getAttribute('name')).className = captions[i].getAttribute('class');
 	}
 
-	if (errors.getElementsByTagName('post_error').length === 1)
-		document.forms[form_name][post_box_name].style.border = '1px solid red';
-	else if (document.forms[form_name][post_box_name].style.borderColor === 'red' || document.forms[form_name][post_box_name].style.borderColor === 'red red red red')
-	{
-		if ('runtimeStyle' in document.forms[form_name][post_box_name])
-			document.forms[form_name][post_box_name].style.borderColor = '';
-		else
-			document.forms[form_name][post_box_name].style.border = null;
-	}
+	if (typeof $editor_container[post_box_name] !== 'undefined')
+		$editor = $editor_container[post_box_name];
+	else
+		$editor = $(document.forms[form_name][post_box_name]);
+
+	if (error_post)
+		$editor.find("textarea, iframe").addClass('border_error');
+	else
+		$editor.find("textarea, iframe").removeClass('border_error');
 
 	// If this is a post preview, then we have some extra work to do
 	if (bPost)
@@ -310,20 +307,22 @@ function onDocSent(XMLDoc)
 				new_replies[new_replies.length] = newPosts[i].getAttribute("id");
 
 				ignoring = false;
-				if (newPosts[i].getElementsByTagName("is_ignored")[0].firstChild.nodeValue !== 0)
+				if (newPosts[i].getElementsByTagName("is_ignored")[0].firstChild.nodeValue !== '0')
 					ignored_replies[ignored_replies.length] = ignoring = newPosts[i].getAttribute("id");
 
-				newPostsHTML += '<div class="windowbg' + (++reply_counter % 2 === 0 ? '2' : '') + ' core_posts"><div class="content" id="msg' + newPosts[i].getAttribute("id") + '"><div class="floatleft"><h5>' + txt_posted_by + ': ' + newPosts[i].getElementsByTagName("poster")[0].firstChild.nodeValue + '</h5><span class="smalltext">&#171;&nbsp;<strong>' + txt_on + ':</strong> ' + newPosts[i].getElementsByTagName("time")[0].firstChild.nodeValue + '&nbsp;&#187;</span> <span class="new_posts" id="image_new_' + newPosts[i].getAttribute("id") + '">' + txt_new + '</span></div>';
+				newPostsHTML += '<div class="windowbg' + (++reply_counter % 2 === 0 ? '2' : '') + '"><div class="postarea2" id="msg' + newPosts[i].getAttribute("id") + '"><div class="keyinfo">';
+				newPostsHTML += '<h5 class="floatleft"><span>' + txt_posted_by + '</span>&nbsp;' + newPosts[i].getElementsByTagName("poster")[0].firstChild.nodeValue + '&nbsp;-&nbsp;' + newPosts[i].getElementsByTagName("time")[0].firstChild.nodeValue;
+				newPostsHTML += ' <span class="new_posts" id="image_new_' + newPosts[i].getAttribute("id") + '">' + txt_new + '</span></h5>';
 
 				if (can_quote)
-					newPostsHTML += '<ul class="quickbuttons" id="msg_' + newPosts[i].getAttribute('id') + '_quote"><li class="listlevel1"><a href="#postmodify" onclick="return insertQuoteFast(' + newPosts[i].getAttribute('id') + ');" class="linklevel1 quote_button">' + txt_bbc_quote + '</a></li></ul>';
+					newPostsHTML += '<ul class="quickbuttons" id="msg_' + newPosts[i].getAttribute('id') + '_quote"><li class="listlevel1"><a href="#postmodify" onmousedown="return insertQuoteFast(' + newPosts[i].getAttribute('id') + ');" class="linklevel1 quote_button">' + txt_bbc_quote + '</a></li></ul>';
 
-				newPostsHTML += '<br class="clear" />';
+				newPostsHTML += '</div>';
 
 				if (ignoring)
-					newPostsHTML += '<div id="msg_' + newPosts[i].getAttribute("id") + '_ignored_prompt" class="smalltext">' + txt_ignoring_user + '<a href="#" id="msg_' + newPosts[i].getAttribute("id") + '_ignored_link" style="display: none;">' + show_ignore_user_post + '</a></div>';
+					newPostsHTML += '<div id="msg_' + newPosts[i].getAttribute("id") + '_ignored_prompt">' + txt_ignoring_user + '<a href="#" id="msg_' + newPosts[i].getAttribute("id") + '_ignored_link" style="display: none;">' + show_ignore_user_post + '</a></div>';
 
-				newPostsHTML += '<div class="list_posts smalltext" id="msg_' + newPosts[i].getAttribute("id") + '_body">' + newPosts[i].getElementsByTagName("message")[0].firstChild.nodeValue + '<' + '/div></div></div>';
+				newPostsHTML += '<div class="inner" id="msg_' + newPosts[i].getAttribute("id") + '_body">' + newPosts[i].getElementsByTagName("message")[0].firstChild.nodeValue + '</div></div></div>';
 			}
 			setOuterHTML(document.getElementById('new_replies'), newPostsHTML);
 		}
@@ -362,6 +361,12 @@ function onDocSent(XMLDoc)
 	$('.spoilerheader').click(function(){
 		$(this).next().children().slideToggle("fast");
 	});
+
+	// Fix and Prettify code blocks
+	if (typeof elk_codefix === 'function')
+		elk_codefix();
+	if (typeof prettyPrint === 'function')
+		prettyPrint();
 }
 
 /**
@@ -439,9 +444,9 @@ function onDocReceived(XMLDoc)
 	var text = '';
 
 	for (var i = 0, n = XMLDoc.getElementsByTagName('quote')[0].childNodes.length; i < n; i++)
-		text += XMLDoc.getElementsByTagName('quote')[0].childNodes[i].nodeValue;
+		text += XMLDoc.getElementsByTagName('quote')[0].childNodes[i].nodeValue + "\n";
 
-	$('#' + post_box_name).data("sceditor").insert(text);
+	$editor_data[post_box_name].insert(text);
 
 	ajax_indicator(false);
 }
@@ -453,7 +458,7 @@ function onDocReceived(XMLDoc)
  */
 function onReceiveOpener(text)
 {
-	$('#' + post_box_name).data("sceditor").insert(text);
+	$editor_data[post_box_name].insert(text);
 }
 
 /**

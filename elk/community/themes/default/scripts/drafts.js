@@ -3,7 +3,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript associated with the drafts auto function as it
  * relates to a plain text box (no sceditor invocation)
@@ -95,7 +95,7 @@ elk_DraftAutoSave.prototype.draftSave = function ()
 
 	// Nothing to save?
 	var sPostdata = document.forms.postmodify["message"].value;
-	if (isEmptyText(sPostdata))
+	if (isEmptyText(sPostdata) || !('topic' in document.forms.postmodify.elements))
 		return false;
 
 	// Flag that we are saving a draft

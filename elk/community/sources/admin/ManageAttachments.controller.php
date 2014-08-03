@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 /**
  * This is the attachments and avatars controller class.
  * It is doing the job of attachments and avatars maintenance and management.
+ *
+ * @package Attachments
  */
 class ManageAttachments_Controller extends Action_Controller
 {
@@ -34,9 +36,11 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * The main 'Attachments and Avatars' admin.
-	 * This method is the entry point for index.php?action=admin;area=manageattachments
+	 *
+	 * What it does:
+	 * - This method is the entry point for index.php?action=admin;area=manageattachments
 	 * and it calls a function based on the sub-action.
-	 * It requires the manage_attachments permission.
+	 * - It requires the manage_attachments permission.
 	 *
 	 * @uses ManageAttachments template.
 	 * @uses Admin language file.
@@ -55,7 +59,7 @@ class ManageAttachments_Controller extends Action_Controller
 		loadTemplate('ManageAttachments');
 
 		// We're working with them settings here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// If they want to delete attachment(s), delete them. (otherwise fall through..)
 		$subActions = array(
@@ -76,14 +80,8 @@ class ManageAttachments_Controller extends Action_Controller
 			'transfer' => array($this, 'action_transfer'),
 		);
 
-		call_integration_hook('integrate_manage_attachments', array(&$subActions));
-
-		$action = new Action();
-		$action->initialize($subActions, 'browse');
-
-		// Pick the correct sub-action.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'browse';
-		$context['sub_action'] = $subAction;
+		// Get ready for some action
+		$action = new Action('manage_attachments');
 
 		// Default page title is good.
 		$context['page_title'] = $txt['attachments_avatars'];
@@ -95,14 +93,19 @@ class ManageAttachments_Controller extends Action_Controller
 			'description' => $txt['attachments_desc'],
 		);
 
+		// Get the subAction, call integrate_sa_manage_attachments
+		$subAction = $action->initialize($subActions, 'browse');
+		$context['sub_action'] = $subAction;
+
 		// Finally go to where we want to go
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Allows to show/change attachment settings.
-	 * This is the default sub-action of the 'Attachments and Avatars' center.
-	 * Called by index.php?action=admin;area=manageattachments;sa=attachments.
+	 *
+	 * - This is the default sub-action of the 'Attachments and Avatars' center.
+	 * - Called by index.php?action=admin;area=manageattachments;sa=attachments.
 	 *
 	 * @uses 'attachments' sub template.
 	 */
@@ -125,10 +128,8 @@ class ManageAttachments_Controller extends Action_Controller
 	base_dir.addEventListener("change", toggleSubDir, false);
 	toggleSubDir();', true);
 
-		call_integration_hook('integrate_modify_attachment_settings');
-
 		// These are very likely to come in handy! (i.e. without them we're doomed!)
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 		require_once(SUBSDIR . '/Attachments.subs.php');
 
 		// Saving settings?
@@ -196,14 +197,15 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Initialize attachmentForm.
-	 * Retrieve and return the administration settings for attachments.
+	 *
+	 * - Retrieve and return the administration settings for attachments.
 	 */
 	private function _initAttachSettingsForm()
 	{
-		// instantiate the form
+		// Instantiate the form
 		$this->_attachSettingsForm = new Settings_Form();
 
-		// initialize settings
+		// Initialize settings
 		$config_vars = $this->_settings();
 
 		return $this->_attachSettingsForm->settings($config_vars);
@@ -214,7 +216,7 @@ class ManageAttachments_Controller extends Action_Controller
 	 */
 	private function _settings()
 	{
-		global $modSettings, $txt, $scripturl;
+		global $modSettings, $txt, $scripturl, $context;
 
 		require_once(SUBSDIR . '/Attachments.subs.php');
 
@@ -238,6 +240,9 @@ class ManageAttachments_Controller extends Action_Controller
 			$context['valid_basedirectory'] = true;
 
 		// A bit of razzle dazzle with the $txt strings. :)
+		$txt['basedirectory_for_attachments_warning'] = str_replace('{attach_repair_url}', $scripturl . '?action=admin;area=manageattachments;sa=attachpaths', $txt['basedirectory_for_attachments_warning']);
+		$txt['attach_current_dir_warning'] = str_replace('{attach_repair_url}', $scripturl . '?action=admin;area=manageattachments;sa=attachpaths', $txt['attach_current_dir_warning']);
+
 		$txt['attachment_path'] = $context['attachmentUploadDir'];
 		$txt['basedirectory_for_attachments_path'] = isset($modSettings['basedirectory_for_attachments']) ? $modSettings['basedirectory_for_attachments'] : '';
 		$txt['use_subdirectories_for_attachments_note'] = empty($modSettings['attachment_basedirectories']) || empty($modSettings['use_subdirectories_for_attachments']) ? $txt['use_subdirectories_for_attachments_note'] : '';
@@ -267,7 +272,7 @@ class ManageAttachments_Controller extends Action_Controller
 				array('select', 'automanage_attachments', array(0 => $txt['attachments_normal'], 1 => $txt['attachments_auto_space'], 2 => $txt['attachments_auto_years'], 3 => $txt['attachments_auto_months'], 4 => $txt['attachments_auto_16'])),
 				array('check', 'use_subdirectories_for_attachments', 'subtext' => $txt['use_subdirectories_for_attachments_note']),
 				(empty($modSettings['attachment_basedirectories']) ? array('text', 'basedirectory_for_attachments', 40,) : array('var_message', 'basedirectory_for_attachments', 'message' => 'basedirectory_for_attachments_path', 'invalid' => empty($context['valid_basedirectory']), 'text_label' => (!empty($context['valid_basedirectory']) ? $txt['basedirectory_for_attachments_current'] : $txt['basedirectory_for_attachments_warning']))),
-				empty($modSettings['attachment_basedirectories']) && $modSettings['currentAttachmentUploadDir'] == 1 && count($modSettings['attachmentUploadDir']) == 1	? array('text', 'attachmentUploadDir', 'subtext' => $txt['attachmentUploadDir_multiple_configure'], 40, 'invalid' => !$context['valid_upload_dir']) : array('var_message', 'attach_current_directory', 'subtext' => $txt['attachmentUploadDir_multiple_configure'], 'message' => 'attachment_path', 'invalid' => empty($context['valid_upload_dir']), 'text_label' => (!empty($context['valid_upload_dir']) ? $txt['attach_current_dir'] : $txt['attach_current_dir_warning'])),
+				empty($modSettings['attachment_basedirectories']) && $modSettings['currentAttachmentUploadDir'] == 1 && count($modSettings['attachmentUploadDir']) == 1 ? array('text', 'attachmentUploadDir', 'subtext' => $txt['attachmentUploadDir_multiple_configure'], 40, 'invalid' => !$context['valid_upload_dir']) : array('var_message', 'attach_current_directory', 'subtext' => $txt['attachmentUploadDir_multiple_configure'], 'message' => 'attachment_path', 'invalid' => empty($context['valid_upload_dir']), 'text_label' => (!empty($context['valid_upload_dir']) ? $txt['attach_current_dir'] : $txt['attach_current_dir_warning'])),
 				array('int', 'attachmentDirFileLimit', 'subtext' => $txt['zero_for_no_limit'], 6),
 				array('int', 'attachmentDirSizeLimit', 'subtext' => $txt['zero_for_no_limit'], 6, 'postinput' => $txt['kilobyte']),
 			'',
@@ -303,6 +308,9 @@ class ManageAttachments_Controller extends Action_Controller
 				array('int', 'max_image_height', 'subtext' => $txt['zero_for_no_limit']),
 		);
 
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_attachment_settings', array(&$config_vars));
+
 		return $config_vars;
 	}
 
@@ -316,10 +324,11 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Show a list of attachment or avatar files.
-	 * Called by ?action=admin;area=manageattachments;sa=browse for attachments
-	 *  and ?action=admin;area=manageattachments;sa=browse;avatars for avatars.
-	 * Allows sorting by name, date, size and member.
-	 * Paginates results.
+	 *
+	 * - Called by ?action=admin;area=manageattachments;sa=browse for attachments
+	 * and ?action=admin;area=manageattachments;sa=browse;avatars for avatars.
+	 * - Allows sorting by name, date, size and member.
+	 * - Paginates results.
 	 *
 	 *  @uses the 'browse' sub template
 	 */
@@ -357,6 +366,7 @@ class ManageAttachments_Controller extends Action_Controller
 				'name' => array(
 					'header' => array(
 						'value' => $txt['attachment_name'],
+						'class' => 'grid50',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
@@ -399,6 +409,7 @@ class ManageAttachments_Controller extends Action_Controller
 				'filesize' => array(
 					'header' => array(
 						'value' => $txt['attachment_file_size'],
+						'class' => 'nowrap',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
@@ -415,6 +426,7 @@ class ManageAttachments_Controller extends Action_Controller
 				'member' => array(
 					'header' => array(
 						'value' => $context['browse_type'] == 'avatars' ? $txt['attachment_manager_member'] : $txt['posted_by'],
+						'class' => 'nowrap',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
@@ -437,6 +449,7 @@ class ManageAttachments_Controller extends Action_Controller
 				'date' => array(
 					'header' => array(
 						'value' => $context['browse_type'] == 'avatars' ? $txt['attachment_manager_last_active'] : $txt['date'],
+						'class' => 'nowrap',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
@@ -460,6 +473,7 @@ class ManageAttachments_Controller extends Action_Controller
 				'downloads' => array(
 					'header' => array(
 						'value' => $txt['downloads'],
+						'class' => 'nowrap',
 					),
 					'data' => array(
 						'db' => 'downloads',
@@ -523,14 +537,16 @@ class ManageAttachments_Controller extends Action_Controller
 		);
 
 		// Create the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 
 	/**
 	 * Show several file maintenance options.
-	 * Called by ?action=admin;area=manageattachments;sa=maintain.
-	 * Calculates file statistics (total file size, number of attachments,
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=manageattachments;sa=maintain.
+	 * - Calculates file statistics (total file size, number of attachments,
 	 * number of avatars, attachment space available).
 	 *
 	 * @uses the 'maintenance' sub template.
@@ -545,7 +561,7 @@ class ManageAttachments_Controller extends Action_Controller
 		// We're working with them attachments here!
 		require_once(SUBSDIR . '/ManageAttachments.subs.php');
 
-		// we need our attachments directories...
+		// We need our attachments directories...
 		$attach_dirs = getAttachmentDirs();
 
 		// Get the number of attachments...
@@ -582,7 +598,8 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Move avatars from their current location, to the custom_avatar_dir folder.
-	 * Called from the maintenance screen by ?action=admin;area=manageattachments;sa=action_moveAvatars.
+	 *
+	 * - Called from the maintenance screen by ?action=admin;area=manageattachments;sa=action_moveAvatars.
 	 */
 	public function action_moveAvatars()
 	{
@@ -608,11 +625,10 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Remove attachments older than a given age.
-	 * Called from the maintenance screen by
-	 *   ?action=admin;area=manageattachments;sa=byAge.
-	 * It optionally adds a certain text to the messages the attachments
-	 *  were removed from.
-	 *  @todo refactor this silly superglobals use...
+	 *
+	 * - Called from the maintenance screen by ?action=admin;area=manageattachments;sa=byAge.
+	 * - It optionally adds a certain text to the messages the attachments were removed from.
+	 * @todo refactor this silly superglobals use...
 	 */
 	public function action_byAge()
 	{
@@ -643,10 +659,9 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Remove attachments larger than a given size.
-	 * Called from the maintenance screen by
-	 *  ?action=admin;area=manageattachments;sa=bySize.
-	 * Optionally adds a certain text to the messages the attachments were
-	 *  removed from.
+	 *
+	 * - Called from the maintenance screen by ?action=admin;area=manageattachments;sa=bySize.
+	 * - Optionally adds a certain text to the messages the attachments were removed from.
 	 */
 	public function action_bySize()
 	{
@@ -667,8 +682,8 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Remove a selection of attachments or avatars.
-	 * Called from the browse screen as submitted form by
-	 *  ?action=admin;area=manageattachments;sa=remove
+	 *
+	 * - Called from the browse screen as submitted form by ?action=admin;area=manageattachments;sa=remove
 	 */
 	public function action_remove()
 	{
@@ -681,8 +696,8 @@ class ManageAttachments_Controller extends Action_Controller
 			// we'll need this
 			require_once(SUBSDIR . '/ManageAttachments.subs.php');
 
-			$attachments = array();
 			// There must be a quicker way to pass this safety test??
+			$attachments = array();
 			foreach ($_POST['remove'] as $removeID => $dummy)
 				$attachments[] = (int) $removeID;
 
@@ -708,8 +723,8 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * Removes all attachments in a single click
-	 * Called from the maintenance screen by
-	 *  ?action=admin;area=manageattachments;sa=removeall.
+	 *
+	 * - Called from the maintenance screen by ?action=admin;area=manageattachments;sa=removeall.
 	 */
 	public function action_removeall()
 	{
@@ -733,17 +748,19 @@ class ManageAttachments_Controller extends Action_Controller
 
 	/**
 	 * This function will performs many attachment checks and provides ways to fix them
-	 * Checks for the following common issues
-	 *  - Orphan Thumbnails
-	 *  - Attachments that have no thumbnails
-	 *  - Attachments that list thumbnails, but actually, don't have any
-	 *  - Attachments list in the wrong_folder
-	 *  - Attachments that dont exists on disk anylonger
-	 *  - Attachments that are zero size
-	 *  - Attachments that file size does not match the DB size
-	 *  - Attachments that no longer have a message
-	 *  - Avatars with no members associated with them.
-	 *  - Attachments that are in the attachment folder, but not listed in the DB
+	 *
+	 * What it does:
+	 * - Checks for the following common issues
+	 * - Orphan Thumbnails
+	 * - Attachments that have no thumbnails
+	 * - Attachments that list thumbnails, but actually, don't have any
+	 * - Attachments list in the wrong_folder
+	 * - Attachments that don't exists on disk any longer
+	 * - Attachments that are zero size
+	 * - Attachments that file size does not match the DB size
+	 * - Attachments that no longer have a message
+	 * - Avatars with no members associated with them.
+	 * - Attachments that are in the attachment folder, but not listed in the DB
 	 */
 	public function action_repair()
 	{
@@ -845,7 +862,6 @@ class ManageAttachments_Controller extends Action_Controller
 
 			for (; $_GET['substep'] < $thumbnails; $_GET['substep'] += 250)
 			{
-				$to_remove = array();
 				$repair_errors = repairAttachmentData($_GET['substep'], $fix_errors, $to_fix);
 
 				foreach($repair_errors as $key => $value)
@@ -940,7 +956,7 @@ class ManageAttachments_Controller extends Action_Controller
 									}
 								}
 							}
-							elseif ($file != 'index.php')
+							elseif ($file != 'index.php' && !is_dir($attach_dir . '/' . $file))
 							{
 								if ($fix_errors && in_array('files_without_attachment', $to_fix))
 									@unlink($attach_dir . '/' . $file);
@@ -969,6 +985,7 @@ class ManageAttachments_Controller extends Action_Controller
 
 		// What stage are we at?
 		$context['completed'] = $fix_errors ? true : false;
+		$context['errors_found'] = false;
 		foreach ($context['repair_errors'] as $number)
 			if (!empty($number))
 			{
@@ -1020,6 +1037,7 @@ class ManageAttachments_Controller extends Action_Controller
 					continue;
 
 				$real_path = rtrim(trim($path), DIRECTORY_SEPARATOR);
+
 				// If it doesn't look like a directory, probably is not a directory
 				if (preg_match('~[/\\\\]~', $real_path) !== 1)
 					$real_path = realpath(BOARDDIR . DIRECTORY_SEPARATOR . ltrim($real_path, DIRECTORY_SEPARATOR));
@@ -1157,7 +1175,7 @@ class ManageAttachments_Controller extends Action_Controller
 			}
 
 			// If the user wishes to go back, update the last_dir array
-			if ($_POST['current_dir'] != $modSettings['currentAttachmentUploadDir']&& !empty($modSettings['last_attachments_directory']) && (isset($modSettings['last_attachments_directory'][$_POST['current_dir']]) || isset($modSettings['last_attachments_directory'][0])))
+			if ($_POST['current_dir'] != $modSettings['currentAttachmentUploadDir'] && !empty($modSettings['last_attachments_directory']) && (isset($modSettings['last_attachments_directory'][$_POST['current_dir']]) || isset($modSettings['last_attachments_directory'][0])))
 			{
 				if (!is_array($modSettings['last_attachments_directory']))
 					$modSettings['last_attachments_directory'] = unserialize($modSettings['last_attachments_directory']);
@@ -1379,12 +1397,10 @@ class ManageAttachments_Controller extends Action_Controller
 				'status' => array(
 					'header' => array(
 						'value' => $txt['attach_dir_status'],
-						'class' => 'centertext',
 					),
 					'data' => array(
 						'db' => 'status',
 						'style' => 'width: 25%;',
-						'class' => 'centertext',
 					),
 				),
 			),
@@ -1393,6 +1409,7 @@ class ManageAttachments_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'below_table_data',
 					'value' => '
 					<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
@@ -1412,7 +1429,7 @@ class ManageAttachments_Controller extends Action_Controller
 				),
 			),
 		);
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		if (!empty($modSettings['attachment_basedirectories']))
@@ -1463,7 +1480,6 @@ class ManageAttachments_Controller extends Action_Controller
 						'data' => array(
 							'db' => 'status',
 							'style' => 'width: 15%;',
-							'class' => 'centertext',
 						),
 					),
 				),
@@ -1472,6 +1488,7 @@ class ManageAttachments_Controller extends Action_Controller
 				),
 				'additional_rows' => array(
 					array(
+						'class' => 'submitbutton',
 						'position' => 'below_table_data',
 						'value' => '<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
 						<input type="submit" name="save2" value="' . $txt['save'] . '" class="right_submit" />
@@ -1499,31 +1516,33 @@ class ManageAttachments_Controller extends Action_Controller
 	}
 
 	/**
-	 * Maintance function to move attachments from one directory to another
-	 * @todo Move db queries to ManageAttachments.subs.php
+	 * Maintenance function to move attachments from one directory to another
 	 */
 	public function action_transfer()
 	{
 		global $modSettings, $txt;
 
-		$db = database();
-
 		checkSession();
 
+		// We will need the functions from here
 		require_once(SUBSDIR . '/Attachments.subs.php');
 		require_once(SUBSDIR . '/ManageAttachments.subs.php');
 
+		// The list(s) of directory's that are available.
 		$modSettings['attachmentUploadDir'] = unserialize($modSettings['attachmentUploadDir']);
 		if (!empty($modSettings['attachment_basedirectories']))
 			$modSettings['attachment_basedirectories'] = unserialize($modSettings['attachment_basedirectories']);
 		else
 			$modSettings['basedirectory_for_attachments'] = array();
 
+		// Clean the inputs
 		$_POST['from'] = (int) $_POST['from'];
 		$_POST['auto'] = !empty($_POST['auto']) ? (int) $_POST['auto'] : 0;
 		$_POST['to'] = (int) $_POST['to'];
 		$start = !empty($_POST['empty_it']) ? 0 : $modSettings['attachmentDirFileLimit'];
 		$_SESSION['checked'] = !empty($_POST['empty_it']) ? true : false;
+
+		// Prepare for the moving
 		$limit = 501;
 		$results = array();
 		$dir_files = 0;
@@ -1531,12 +1550,15 @@ class ManageAttachments_Controller extends Action_Controller
 		$total_moved = 0;
 		$total_not_moved = 0;
 
+		// Need to know where we are moving things from
 		if (empty($_POST['from']) || (empty($_POST['auto']) && empty($_POST['to'])))
 			$results[] = $txt['attachment_transfer_no_dir'];
 
+		// Same location, that's easy
 		if ($_POST['from'] == $_POST['to'])
 			$results[] = $txt['attachment_transfer_same_dir'];
 
+		// No errors so determine how many we may have to move
 		if (empty($results))
 		{
 			// Get the total file count for the progress bar.
@@ -1547,62 +1569,60 @@ class ManageAttachments_Controller extends Action_Controller
 				$results[] = $txt['attachment_transfer_no_find'];
 		}
 
+		// Nothing to move (no files in source or below the max limit)
 		if (empty($results))
 		{
-			// Where are they going?
+			// Moving them automaticaly?
 			if (!empty($_POST['auto']))
 			{
 				$modSettings['automanage_attachments'] = 1;
+
+				// Create sub directroys off the root or from an attachment directory?
 				$modSettings['use_subdirectories_for_attachments'] = $_POST['auto'] == -1 ? 0 : 1;
 				$modSettings['basedirectory_for_attachments'] = $_POST['auto'] > 0 ? $modSettings['attachmentUploadDir'][$_POST['auto']] : $modSettings['basedirectory_for_attachments'];
 
+				// Finaly, where do they need to go
 				automanage_attachments_check_directory();
 				$new_dir = $modSettings['currentAttachmentUploadDir'];
 			}
+			// Or to a specified directory
 			else
 				$new_dir = $_POST['to'];
 
 			$modSettings['currentAttachmentUploadDir'] = $new_dir;
-
 			$break = false;
-			while ($break == false)
+			while ($break === false)
 			{
 				@set_time_limit(300);
 				if (function_exists('apache_reset_timeout'))
 					@apache_reset_timeout();
 
-				// If limts are set, get the file count and size for the destination folder
+				// If limits are set, get the file count and size for the destination folder
 				if ($dir_files <= 0 && (!empty($modSettings['attachmentDirSizeLimit']) || !empty($modSettings['attachmentDirFileLimit'])))
-					list ($dir_files, $dir_size) = attachDirProperties($new_dir);
+				{
+					$current_dir = attachDirProperties($new_dir);
+					$dir_files = $current_dir['files'];
+					$dir_size = $current_dir['size'];
+				}
 
 				// Find some attachments to move
-				$request = $db->query('', '
-					SELECT id_attach, filename, id_folder, file_hash, size
-					FROM {db_prefix}attachments
-					WHERE id_folder = {int:folder}
-						AND attachment_type != {int:attachment_type}
-					LIMIT {int:start}, {int:limit}',
-					array(
-						'folder' => $_POST['from'],
-						'attachment_type' => 1,
-						'start' => $start,
-						'limit' => $limit,
-					)
-				);
+				list ($tomove_count, $tomove) = findAttachmentsToMove($_POST['from'], $start, $limit);
 
-				if ($db->num_rows($request) === 0)
+				// Nothing found to move
+				if ($tomove_count === 0)
 				{
 					if (empty($current_progress))
 						$results[] = $txt['attachment_transfer_no_find'];
 					break;
 				}
 
-				if ($db->num_rows($request) < $limit)
+				// No more to move after this batch then set the finished flag.
+				if ($tomove_count < $limit)
 					$break = true;
 
 				// Move them
 				$moved = array();
-				while ($row = $db->fetch_assoc($request))
+				foreach ($tomove as $row)
 				{
 					$source = getAttachmentFilename($row['filename'], $row['id_attach'], $row['id_folder'], false, $row['file_hash']);
 					$dest = $modSettings['attachmentUploadDir'][$new_dir] . '/' . basename($source);
@@ -1613,12 +1633,12 @@ class ManageAttachments_Controller extends Action_Controller
 						$dir_files++;
 						$dir_size += !empty($row['size']) ? $row['size'] : filesize($source);
 
-						// If we've reached a limit. Do something.
+						// If we've reached a directory limit. Do something if we are in auto mode, otherwise set an error.
 						if (!empty($modSettings['attachmentDirSizeLimit']) && $dir_size > $modSettings['attachmentDirSizeLimit'] * 1024 || (!empty($modSettings['attachmentDirFileLimit']) && $dir_files > $modSettings['attachmentDirFileLimit']))
 						{
+							// Since we're in auto mode. Create a new folder and reset the counters.
 							if (!empty($_POST['auto']))
 							{
-								// Since we're in auto mode. Create a new folder and reset the counters.
 								automanage_attachments_by_space();
 
 								$results[] = sprintf($txt['attachments_transfered'], $total_moved, $modSettings['attachmentUploadDir'][$new_dir]);
@@ -1632,9 +1652,9 @@ class ManageAttachments_Controller extends Action_Controller
 								$break = false;
 								break;
 							}
+							// Hmm, not in auto. Time to bail out then...
 							else
 							{
-								// Hmm, not in auto. Time to bail out then...
 								$results[] = $txt['attachment_transfer_no_room'];
 								$break = true;
 								break;
@@ -1642,6 +1662,7 @@ class ManageAttachments_Controller extends Action_Controller
 						}
 					}
 
+					// Actually move the file
 					if (@rename($source, $dest))
 					{
 						$total_moved++;
@@ -1651,26 +1672,15 @@ class ManageAttachments_Controller extends Action_Controller
 					else
 						$total_not_moved++;
 				}
-				$db->free_result($request);
 
+				// Update the database to reflect the new file location
 				if (!empty($moved))
-				{
-					// Update the database
-					$db->query('', '
-						UPDATE {db_prefix}attachments
-						SET id_folder = {int:new}
-						WHERE id_attach IN ({array_int:attachments})',
-						array(
-							'attachments' => $moved,
-							'new' => $new_dir,
-						)
-					);
-				}
+					moveAttachments($moved, $new_dir);
 
-				$moved = array();
 				$new_dir = $modSettings['currentAttachmentUploadDir'];
 
-				// Create the progress bar.
+				// Create / update the progress bar.
+				// @todo why was this done this way?
 				if (!$break)
 				{
 					$percent_done = min(round($current_progress / $total_progress * 100, 0), 100);
@@ -1679,8 +1689,9 @@ class ManageAttachments_Controller extends Action_Controller
 							<div class="full_bar">' . $percent_done . '%</div>
 							<div class="green_percent" style="width: ' . $percent_done . '%;">&nbsp;</div>
 						</div>';
+
 					// Write it to a file so it can be displayed
-					$fp = fopen(BOARDDIR . '/progress.php', "w");
+					$fp = fopen(BOARDDIR . '/progress.php', 'w');
 					fwrite($fp, $prog_bar);
 					fclose($fp);
 					usleep(500000);
@@ -1692,6 +1703,7 @@ class ManageAttachments_Controller extends Action_Controller
 				$results[] = sprintf($txt['attachments_not_transfered'], $total_not_moved);
 		}
 
+		// All done, time to clean up
 		$_SESSION['results'] = $results;
 		if (file_exists(BOARDDIR . '/progress.php'))
 			unlink(BOARDDIR . '/progress.php');
@@ -1702,10 +1714,13 @@ class ManageAttachments_Controller extends Action_Controller
 
 /**
  * Function called in-between each round of attachments and avatar repairs.
- * Called by repairAttachments().
- * If repairAttachments() has more steps added, this function needs updated!
  *
- * @param array $to_fix attachments to fix
+ * What it does:
+ * - Called by repairAttachments().
+ * - If repairAttachments() has more steps added, this function needs updated!
+ *
+ * @package Attachments
+ * @param mixed[] $to_fix attachments to fix
  * @param int $max_substep = 0
  * @todo Move to ManageAttachments.subs.php
  */

@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -17,16 +17,20 @@ if (!defined('ELK'))
 /**
  * This class controls execution for admin actions in the bans area
  * of the admin panel.
+ *
+ * @package Bans
  */
 class ManageBans_Controller extends Action_Controller
 {
 	/**
 	 * Ban center. The main entrance point for all ban center functions.
-	 * It is accesssed by ?action=admin;area=ban.
-	 * It choses a function based on the 'sa' parameter, like many others.
-	 * The default sub-action is action_list().
-	 * It requires the ban_members permission.
-	 * It initializes the admin tabs.
+	 *
+	 * What it does:
+	 * - It is accesssed by ?action=admin;area=ban.
+	 * - It choses a function based on the 'sa' parameter, like many others.
+	 * - The default sub-action is action_list().
+	 * - It requires the ban_members permission.
+	 * - It initializes the admin tabs.
 	 *
 	 * @uses ManageBans template.
 	 */
@@ -46,14 +50,11 @@ class ManageBans_Controller extends Action_Controller
 			'log' => array($this, 'action_log', 'permission' => 'manage_bans'),
 		);
 
-		call_integration_hook('integrate_manage_bans', array(&$subActions));
+		// Start up the controller
+		$action = new Action();
 
 		// Default the sub-action to 'view ban list'.
 		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'list';
-
-		// Prepare some items for the template
-		$context['page_title'] = $txt['ban_title'];
-		$context['sub_action'] = $subAction;
 
 		// Tabs for browsing the different ban functions.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -85,18 +86,26 @@ class ManageBans_Controller extends Action_Controller
 			),
 		);
 
+		// Make the call to integrate-manage_bans
+		call_integration_hook('integrate_manage_bans', array(&$subActions));
+
+		// Prepare some items for the template
+		$context['page_title'] = $txt['ban_title'];
+		$context['sub_action'] = $subAction;
+
 		// Call the right function for this sub-action.
-		$action = new Action();
 		$action->initialize($subActions, 'list');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Shows a list of bans currently set.
-	 * It is accesssed by ?action=admin;area=ban;sa=list.
-	 * It removes expired bans.
-	 * It allows sorting on different criteria.
-	 * It also handles removal of selected ban items.
+	 *
+	 * What it does:
+	 * - It is accesssed by ?action=admin;area=ban;sa=list.
+	 * - It removes expired bans.
+	 * - It allows sorting on different criteria.
+	 * - It also handles removal of selected ban items.
 	 *
 	 * @uses the main ManageBans template.
 	 */
@@ -112,11 +121,11 @@ class ManageBans_Controller extends Action_Controller
 			checkSession();
 
 			// Make sure every entry is a proper integer.
-			array_map('intval', $_POST['remove']);
+			$to_remove = array_map('intval', $_POST['remove']);
 
 			// Unban them all!
-			removeBanGroups($_POST['remove']);
-			removeBanTriggers($_POST['remove']);
+			removeBanGroups($to_remove);
+			removeBanTriggers($to_remove);
 
 			// No more caching this ban!
 			updateSettings(array('banLastUpdated' => time()));
@@ -279,12 +288,13 @@ class ManageBans_Controller extends Action_Controller
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 
 	/**
 	 * This function is behind the screen for adding new bans and modifying existing ones.
+	 *
 	 * Adding new bans:
 	 *  - is accesssed by ?action=admin;area=ban;sa=add.
 	 *  - uses the ban_edit sub template of the ManageBans template.
@@ -302,6 +312,7 @@ class ManageBans_Controller extends Action_Controller
 
 		$ban_errors = Error_Context::context('ban', 1);
 
+		// Saving a new or edited ban?
 		if ((isset($_POST['add_ban']) || isset($_POST['modify_ban']) || isset($_POST['remove_selection'])) && !$ban_errors->hasErrors())
 			$this->action_edit2();
 
@@ -312,6 +323,7 @@ class ManageBans_Controller extends Action_Controller
 		createToken('admin-bet');
 		$context['form_url'] = $scripturl . '?action=admin;area=ban;sa=edit';
 
+		// Prepare any errors found to the template to show
 		$context['ban_errors'] = array(
 			'errors' => $ban_errors->prepareErrors(),
 			'type' => $ban_errors->getErrorType() == 0 ? 'minor' : 'serious',
@@ -326,7 +338,7 @@ class ManageBans_Controller extends Action_Controller
 				$context['ban_group_id'] = $ban_group_id;
 
 				// We're going to want this for making our list.
-				require_once(SUBSDIR . '/List.class.php');
+				require_once(SUBSDIR . '/GenericList.class.php');
 
 				// Setup for a createlist
 				$listOptions = array(
@@ -409,18 +421,13 @@ class ManageBans_Controller extends Action_Controller
 					'additional_rows' => array(
 						array(
 							'position' => 'below_table_data',
+							'class' => 'submitbutton',
 							'value' => '
-							<div class="submitbutton">
-								<input type="submit" name="remove_selection" value="' . $txt['ban_remove_selected_triggers'] . '" class="button_submit" />
+								<input type="submit" name="remove_selection" value="' . $txt['ban_remove_selected_triggers'] . '" class="right_submit" />
 								<a class="linkbutton" href="' . $scripturl . '?action=admin;area=ban;sa=edittrigger;bg=' . $ban_group_id . '">' . $txt['ban_add_trigger'] . '</a>
-							</div>',
-						),
-						array(
-							'position' => 'below_table_data',
-							'value' => '
-							<input type="hidden" name="bg" value="' . $ban_group_id . '" />
-							<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
-							<input type="hidden" name="' . $context['admin-bet_token_var'] . '" value="' . $context['admin-bet_token'] . '" />',
+								<input type="hidden" name="bg" value="' . $ban_group_id . '" />
+								<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+								<input type="hidden" name="' . $context['admin-bet_token_var'] . '" value="' . $context['admin-bet_token'] . '" />',
 						),
 					),
 				);
@@ -469,7 +476,8 @@ class ManageBans_Controller extends Action_Controller
 						// Default the ban name to the name of the banned member.
 						$context['ban']['name'] = $context['ban_suggestions']['member']['name'];
 
-						// @todo: there should be a better solution...used to lock the "Ban on Username" input when banning from profile
+						// @todo: there should be a better solution...
+						// used to lock the "Ban on Username" input when banning from profile
 						$context['ban']['from_user'] = true;
 
 						// Would be nice if we could also ban the hostname.
@@ -479,23 +487,35 @@ class ManageBans_Controller extends Action_Controller
 						$context['ban_suggestions']['other_ips'] = banLoadAdditionalIPs($context['ban_suggestions']['member']['id']);
 					}
 				}
+				else
+				{
+					$context['use_autosuggest'] = true;
+					loadJavascriptFile('suggest.js');
+				}
 			}
 		}
 
-		// Template needs this to show errors using javascript
-		loadLanguage('Errors');
+		// Set the right template
 		$context['sub_template'] = 'ban_edit';
-		loadJavascriptFile('suggest.js', array('default_theme' => true), 'suggest.js');
+
+		// A couple of text strings we *may* need
+		addJavascriptVar(array(
+			'txt_ban_name_empty' => $txt['ban_name_empty'],
+			'txt_ban_restriction_empty' => $txt['ban_restriction_empty']), true
+		);
+
+		// And a bit of javascript to enable/disable some fields
+		addInlineJavascript('addLoadEvent(fUpdateStatus);', true);
 	}
 
 	/**
 	 * This handles the listing of ban log entries, and allows their deletion.
-	 * Shows a list of logged access attempts by banned users.
-	 * It is accessed by ?action=admin;area=ban;sa=log.
 	 *
-	 * How it works:
-	 *  - allows sorting of several columns.
-	 *  - also handles deletion of (a selection of) log entries.
+	 * What it does:
+	 * - Shows a list of logged access attempts by banned users.
+	 * - It is accessed by ?action=admin;area=ban;sa=log.
+	 * - allows sorting of several columns.
+	 * - also handles deletion of (a selection of) log entries.
 	 */
 	public function action_log()
 	{
@@ -515,8 +535,8 @@ class ManageBans_Controller extends Action_Controller
 			// 'Delete selection' button was pressed.
 			else
 			{
-				array_map('intval', $_POST['remove']);
-				removeBanLogs($_POST['remove']);
+				$to_remove = array_map('intval', $_POST['remove']);
+				removeBanLogs($to_remove);
 			}
 		}
 
@@ -620,6 +640,7 @@ class ManageBans_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'bottom_of_list',
 					'value' => '
 						<input type="submit" name="removeSelected" value="' . $txt['ban_log_remove_selected'] . '" onclick="return confirm(\'' . $txt['ban_log_remove_selected_confirm'] . '\');" class="right_submit" />
@@ -631,7 +652,7 @@ class ManageBans_Controller extends Action_Controller
 		createToken('admin-bl');
 
 		// Build the list
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['page_title'] = $txt['ban_log'];
@@ -646,6 +667,7 @@ class ManageBans_Controller extends Action_Controller
 
 		require_once(SUBSDIR . '/Bans.subs.php');
 
+		// Check with security first
 		checkSession();
 		validateToken('admin-bet');
 
@@ -654,6 +676,8 @@ class ManageBans_Controller extends Action_Controller
 		// Adding or editing a ban group
 		if (isset($_POST['add_ban']) || isset($_POST['modify_ban']))
 		{
+			$ban_info = array();
+
 			// Let's collect all the information we need
 			$ban_info['id'] = isset($_REQUEST['bg']) ? (int) $_REQUEST['bg'] : 0;
 			$ban_info['is_new'] = empty($ban_info['id']);
@@ -689,32 +713,42 @@ class ManageBans_Controller extends Action_Controller
 			$context['ban'] = $ban_info;
 		}
 
+		// Update the triggers associated with this ban
 		if (isset($_POST['ban_suggestions']))
 		{
 			$saved_triggers = saveTriggers($_POST['ban_suggestions'], $ban_info['id'], isset($_REQUEST['u']) ? (int) $_REQUEST['u'] : 0, isset($_REQUEST['bi']) ? (int) $_REQUEST['bi'] : 0);
 			$context['ban_suggestions']['saved_triggers'] = $saved_triggers;
 		}
 
-		// Something went wrong somewhere... Oh well, let's go back.
+		// Something went wrong somewhere, ban info or triggers, ... Oh well, let's go back.
 		if ($ban_errors->hasErrors())
 		{
 			$context['ban_suggestions'] = $saved_triggers;
 			$context['ban']['from_user'] = true;
-			$context['ban_suggestions'] = array_merge($context['ban_suggestions'], getMemberData((int) $_REQUEST['u']));
+
+			// They may have entered a name not using the member select box
+			if (isset($_REQUEST['u']))
+				$context['ban_suggestions'] = array_merge($context['ban_suggestions'], getMemberData((int) $_REQUEST['u']));
+			elseif (isset($_REQUEST['user']))
+			{
+				$context['ban']['from_user'] = false;
+				$context['use_autosuggest'] = true;
+				$context['ban_suggestions']['member']['name'] = $_REQUEST['user'];
+			}
 
 			// Not strictly necessary, but it's nice
 			if (!empty($context['ban_suggestions']['member']['id']))
 				$context['ban_suggestions']['other_ips'] = banLoadAdditionalIPs($context['ban_suggestions']['member']['id']);
 
-			return action_edit();
+			return $this->action_edit();
 		}
 
 		if (isset($_POST['ban_items']))
 		{
 			$ban_group_id = isset($_REQUEST['bg']) ? (int) $_REQUEST['bg'] : 0;
-			array_map('intval', $_POST['ban_items']);
+			$ban_items = array_map('intval', $_POST['ban_items']);
 
-			removeBanTriggers($_POST['ban_items'], $ban_group_id);
+			removeBanTriggers($ban_items, $ban_group_id);
 		}
 
 		// Register the last modified date.
@@ -722,20 +756,24 @@ class ManageBans_Controller extends Action_Controller
 
 		// Update the member table to represent the new ban situation.
 		updateBanMembers();
-		redirectexit('action=admin;area=ban;sa=edit;bg=' . $ban_group_id);
+
+		// Go back to an appropriate spot
+		redirectexit('action=admin;area=ban;sa=' . isset($_POST['add_ban']) ? 'list' : 'edit;bg=' . $ban_group_id);
 	}
 
 	/**
 	 * This function handles the ins and outs of the screen for adding new ban
 	 * triggers or modifying existing ones.
 	 *
-	 * Adding new ban triggers:
-	 *  - is accessed by ?action=admin;area=ban;sa=edittrigger;bg=x
-	 *  - uses the ban_edit_trigger sub template of ManageBans.
+	 * - Adding new ban triggers:
+	 *   - is accessed by ?action=admin;area=ban;sa=edittrigger;bg=x
+	 *   - uses the ban_edit_trigger sub template of ManageBans.
 	 *
-	 * Editing existing ban triggers:
-	 *  - is accessed by ?action=admin;area=ban;sa=edittrigger;bg=x;bi=y
-	 *  - uses the ban_edit_trigger sub template of ManageBans.
+	 * - Editing existing ban triggers:
+	 *   - is accessed by ?action=admin;area=ban;sa=edittrigger;bg=x;bi=y
+	 *   - uses the ban_edit_trigger sub template of ManageBans.
+	 *
+	 * @uses sub template ban_edit_trigger
 	 */
 	public function action_edittrigger()
 	{
@@ -743,20 +781,19 @@ class ManageBans_Controller extends Action_Controller
 
 		require_once(SUBSDIR . '/Bans.subs.php');
 
-		$context['sub_template'] = 'ban_edit_trigger';
-		$context['form_url'] = $scripturl . '?action=admin;area=ban;sa=edittrigger';
-
 		$ban_group = isset($_REQUEST['bg']) ? (int) $_REQUEST['bg'] : 0;
 		$ban_id = isset($_REQUEST['bi']) ? (int) $_REQUEST['bi'] : 0;
 
 		if (empty($ban_group))
 			fatal_lang_error('ban_not_found', false);
 
+		// Adding a new trigger
 		if (isset($_POST['add_new_trigger']) && !empty($_POST['ban_suggestions']))
 		{
 			saveTriggers($_POST['ban_suggestions'], $ban_group, 0, $ban_id);
 			redirectexit('action=admin;area=ban;sa=edit' . (!empty($ban_group) ? ';bg=' . $ban_group : ''));
 		}
+		// Edit an existing trigger with new / updated details
 		elseif (isset($_POST['edit_trigger']) && !empty($_POST['ban_suggestions']))
 		{
 			// The first replaces the old one, the others are added new
@@ -767,15 +804,14 @@ class ManageBans_Controller extends Action_Controller
 
 			redirectexit('action=admin;area=ban;sa=edit' . (!empty($ban_group) ? ';bg=' . $ban_group : ''));
 		}
+		// Removing a ban trigger by clearing the checkbox
 		elseif (isset($_POST['edit_trigger']))
 		{
 			removeBanTriggers($ban_id);
 			redirectexit('action=admin;area=ban;sa=edit' . (!empty($ban_group) ? ';bg=' . $ban_group : ''));
 		}
 
-		// The template uses the autosuggest functions
-		loadJavascriptFile('suggest.js', array('default_theme' => true, 'defer' => true), 'suggest.js');
-
+		// No id supplied, this must be a new trigger being added
 		if (empty($ban_id))
 		{
 			$context['ban_trigger'] = array(
@@ -800,12 +836,15 @@ class ManageBans_Controller extends Action_Controller
 				'is_new' => true,
 			);
 		}
+		// Otherwise its an existing trigger they want to edit
 		else
 		{
-			$row = banDetails($ban_id, $ban_group);
-			if (empty($row))
+			$ban_row = banDetails($ban_id, $ban_group);
+			if (empty($ban_row))
 				fatal_lang_error('ban_not_found', false);
+			$row = $ban_row[$ban_id];
 
+			// Load it up for the template
 			$context['ban_trigger'] = array(
 				'id' => $row['id_ban'],
 				'group' => $row['id_ban_group'],
@@ -829,13 +868,22 @@ class ManageBans_Controller extends Action_Controller
 			);
 		}
 
+		// The template uses the autosuggest functions
+		loadJavascriptFile('suggest.js');
+
+		// Template we will use
+		$context['sub_template'] = 'ban_edit_trigger';
+		$context['form_url'] = $scripturl . '?action=admin;area=ban;sa=edittrigger';
+
 		createToken('admin-bet');
 	}
 
 	/**
 	 * This handles the screen for showing the banned entities
-	 * It is accessed by ?action=admin;area=ban;sa=browse
-	 * It uses sub-tabs for browsing by IP, hostname, email or username.
+	 *
+	 * What it does:
+	 * - It is accessed by ?action=admin;area=ban;sa=browse
+	 * - It uses sub-tabs for browsing by IP, hostname, email or username.
 	 *
 	 * @uses ManageBans template, browse_triggers sub template.
 	 */
@@ -850,9 +898,9 @@ class ManageBans_Controller extends Action_Controller
 			checkSession();
 
 			// Make sure every entry is a proper integer.
-			array_map('intval', $_POST['remove']);
+			$to_remove = array_map('intval', $_POST['remove']);
 
-			removeBanTriggers($_POST['remove']);
+			removeBanTriggers($to_remove);
 
 			// Rehabilitate some members.
 			if ($_REQUEST['entity'] == 'member')
@@ -947,30 +995,28 @@ class ManageBans_Controller extends Action_Controller
 				),
 			),
 			'list_menu' => array(
-				array(
-					'show_on' => 'top',
-					'value' => array(
-						array(
-							'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=ip',
-							'is_selected' => $context['selected_entity'] == 'ip',
-							'label' => $txt['ip']
-						),
-						array(
-							'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=hostname',
-							'is_selected' => $context['selected_entity'] == 'hostname',
-							'label' => $txt['hostname']
-						),
-						array(
-							'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=email',
-							'is_selected' => $context['selected_entity'] == 'email',
-							'label' => $txt['email']
-						),
-						array(
-							'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=member',
-							'is_selected' => $context['selected_entity'] == 'member',
-							'label' => $txt['username']
-						)
+				'show_on' => 'top',
+				'links' => array(
+					array(
+						'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=ip',
+						'is_selected' => $context['selected_entity'] == 'ip',
+						'label' => $txt['ip']
 					),
+					array(
+						'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=hostname',
+						'is_selected' => $context['selected_entity'] == 'hostname',
+						'label' => $txt['hostname']
+					),
+					array(
+						'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=email',
+						'is_selected' => $context['selected_entity'] == 'email',
+						'label' => $txt['email']
+					),
+					array(
+						'href' => $scripturl . '?action=admin;area=ban;sa=browse;entity=member',
+						'is_selected' => $context['selected_entity'] == 'member',
+						'label' => $txt['username']
+					)
 				),
 			),
 		);
@@ -1048,7 +1094,7 @@ class ManageBans_Controller extends Action_Controller
 		}
 
 		// Create the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 }

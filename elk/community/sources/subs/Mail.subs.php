@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,26 +23,26 @@ if (!defined('ELK'))
 
 /**
  * This function sends an email to the specified recipient(s).
+ *
  * It uses the mail_type settings and webmaster_email variable.
  *
- * @param array $to - the email(s) to send to
+ * @package Mail
+ * @param string[]|string $to - the email(s) to send to
  * @param string $subject - email subject, expected to have entities, and slashes, but not be parsed
  * @param string $message - email body, expected to have slashes, no htmlentities
- * @param string $from = null - the address to use for replies
- * @param string $message_id = null - if specified, it will be used as local part of the Message-ID header.
+ * @param string|null $from = null - the address to use for replies
+ * @param string|null $message_id = null - if specified, it will be used as local part of the Message-ID header.
  * @param bool $send_html = false, whether or not the message is HTML vs. plain text
  * @param int $priority = 3
- * @param bool $hotmail_fix = null
+ * @param bool|null $hotmail_fix = null
  * @param bool $is_private
- * @param string $from_wrapper - used to provide envelope from wrapper based on if we sharing a users display name
- * @param int $reference - The parent topic id for use in a References header
- * @return boolean, whether or not the email was accepted properly.
+ * @param string|null $from_wrapper - used to provide envelope from wrapper based on if we sharing a users display name
+ * @param int|null $reference - The parent topic id for use in a References header
+ * @return boolean whether or not the email was accepted properly.
  */
 function sendmail($to, $subject, $message, $from = null, $message_id = null, $send_html = false, $priority = 3, $hotmail_fix = null, $is_private = false, $from_wrapper = null, $reference = null)
 {
 	global $webmaster_email, $context, $modSettings, $txt, $scripturl, $boardurl;
-
-	$db = database();
 
 	// Use sendmail if it's set or if no SMTP server is set.
 	$use_sendmail = empty($modSettings['mail_type']) || $modSettings['smtp_host'] == '';
@@ -107,7 +107,7 @@ function sendmail($to, $subject, $message, $from = null, $message_id = null, $se
 		$headers = 'From: ' . $from_name . ' <' . $from_wrapper . '>' . $line_break;
 		$headers .= 'Reply-To: "' . (!empty($modSettings['maillist_sitename']) ? $modSettings['maillist_sitename'] : $context['forum_name']) . '" <' . (!empty($modSettings['maillist_sitename_address']) ? $modSettings['maillist_sitename_address'] : (empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'])) . '>' . $line_break;
 		if ($reference !== null)
-			$headers .= 'References: <' . $reference . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . ">" . $line_break;
+			$headers .= 'References: <' . $reference . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . '>' . $line_break;
 	}
 	else
 	{
@@ -122,7 +122,7 @@ function sendmail($to, $subject, $message, $from = null, $message_id = null, $se
 	$headers .= 'X-Mailer: ELK' . $line_break;
 
 	// Using the maillist functions?
-	$maillist = !empty($modSettings['maillist_enabled']) && $from_wrapper !== null &&$message_id !== null && $priority < 4 && empty($modSettings['mail_no_message_id']);
+	$maillist = !empty($modSettings['maillist_enabled']) && $from_wrapper !== null && $message_id !== null && $priority < 4 && empty($modSettings['mail_no_message_id']);
 	if ($maillist)
 	{
 		// Lets try to avoid auto replies
@@ -222,7 +222,7 @@ function sendmail($to, $subject, $message, $from = null, $message_id = null, $se
 			{
 				$unq_head = md5($boardurl . microtime() . rand()) . '-' . $message_id;
 				$encoded_unq_head = base64_encode($line_break . $line_break . '[' . $unq_head . ']' . $line_break);
-				$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . ">";
+				$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . '>';
 				$message = mail_insert_key($message, $unq_head, $encoded_unq_head, $line_break);
 			}
 			elseif (empty($modSettings['mail_no_message_id']))
@@ -253,14 +253,8 @@ function sendmail($to, $subject, $message, $from = null, $message_id = null, $se
 		// Log each email that we sent so they can be replied to
 		if (!empty($sent))
 		{
-			$db->insert('ignore',
-				'{db_prefix}postby_emails',
-				array(
-					'id_email' => 'string', 'time_sent' => 'int', 'email_to' => 'string'
-				),
-				$sent,
-				array('id_email')
-			);
+			require_once(SUBSDIR . '/Maillist.subs.php');
+			log_email($sent);
 		}
 	}
 	else
@@ -277,15 +271,16 @@ function sendmail($to, $subject, $message, $from = null, $message_id = null, $se
 /**
  * Add an email to the mail queue.
  *
+ * @package Mail
  * @param bool $flush = false
- * @param array $to_array = array()
+ * @param string[] $to_array = array()
  * @param string $subject = ''
  * @param string $message = ''
  * @param string $headers = ''
  * @param bool $send_html = false
  * @param int $priority = 3
- * @param $is_private
- * @param $message_id
+ * @param boolean $is_private
+ * @param string|null $message_id
  * @return boolean
  */
 function AddMailQueue($flush = false, $to_array = array(), $subject = '', $message = '', $headers = '', $send_html = false, $priority = 3, $is_private = false, $message_id = '')
@@ -382,17 +377,20 @@ function AddMailQueue($flush = false, $to_array = array(), $subject = '', $messa
 
 /**
  * Prepare text strings for sending as email body or header.
- * In case there are higher ASCII characters in the given string, this
- * function will attempt the transport method 'quoted-printable'.
- * Otherwise the transport method '7bit' is used.
  *
+ * What it does:
+ * - In case there are higher ASCII characters in the given string, this
+ * function will attempt the transport method 'quoted-printable'.
+ * - Otherwise the transport method '7bit' is used.
+ *
+ * @package Mail
  * @param string $string
  * @param bool $with_charset = true
  * @param bool $hotmail_fix = false, with hotmail_fix set all higher ASCII
- *  characters are converted to HTML entities to assure proper display of the mail
- * @param $line_break
- * @param string $custom_charset = null, if set, it uses this character set
- * @return array an array containing the character set, the converted string and the transport method.
+ * characters are converted to HTML entities to assure proper display of the mail
+ * @param string $line_break
+ * @param string|null $custom_charset = null, if set, it uses this character set
+ * @return string[] an array containing the character set, the converted string and the transport method.
  */
 function mimespecialchars($string, $with_charset = true, $hotmail_fix = false, $line_break = "\r\n", $custom_charset = null)
 {
@@ -410,10 +408,10 @@ function mimespecialchars($string, $with_charset = true, $hotmail_fix = false, $
 		unset($matches);
 
 		if ($simple)
-			$string = preg_replace_callback('~&#(\d{3,8});~', create_function('$m', ' return chr("$m[1]");'), $string);
+			$string = preg_replace_callback('~&#(\d{3,7});~', 'mimespecialchars_callback', $string);
 		else
 		{
-			$string = preg_replace_callback('~&#(\d{3,8});~', 'fixchar__callback', $string);
+			$string = preg_replace_callback('~&#(\d{3,7});~', 'fixchar__callback', $string);
 
 			// Unicode, baby.
 			$charset = 'UTF-8';
@@ -423,24 +421,9 @@ function mimespecialchars($string, $with_charset = true, $hotmail_fix = false, $
 	// Convert all special characters to HTML entities...just for Hotmail :-\
 	if ($hotmail_fix)
 	{
-		// @todo ... another replaceEntities ?
-		$entityConvert = create_function('$m', '
-			$c = $m[1];
-			if (strlen($c) === 1 && ord($c[0]) <= 0x7F)
-				return $c;
-			elseif (strlen($c) === 2 && ord($c[0]) >= 0xC0 && ord($c[0]) <= 0xDF)
-				return "&#" . (((ord($c[0]) ^ 0xC0) << 6) + (ord($c[1]) ^ 0x80)) . ";";
-			elseif (strlen($c) === 3 && ord($c[0]) >= 0xE0 && ord($c[0]) <= 0xEF)
-				return "&#" . (((ord($c[0]) ^ 0xE0) << 12) + ((ord($c[1]) ^ 0x80) << 6) + (ord($c[2]) ^ 0x80)) . ";";
-			elseif (strlen($c) === 4 && ord($c[0]) >= 0xF0 && ord($c[0]) <= 0xF7)
-				return "&#" . (((ord($c[0]) ^ 0xF0) << 18) + ((ord($c[1]) ^ 0x80) << 12) + ((ord($c[2]) ^ 0x80) << 6) + (ord($c[3]) ^ 0x80)) . ";";
-			else
-				return "";');
-
 		// Convert all 'special' characters to HTML entities.
-		return array($charset, preg_replace_callback('~([\x80-\x{10FFFF}])~u', $entityConvert, $string), '7bit');
+		return array($charset, preg_replace_callback('~([\x80-\x{10FFFF}])~u', 'entityConvert', $string), '7bit');
 	}
-
 	// We don't need to mess with the line if no special characters were in it..
 	elseif (!$hotmail_fix && preg_match('~([^\x09\x0A\x0D\x20-\x7F])~', $string) === 1)
 	{
@@ -457,21 +440,61 @@ function mimespecialchars($string, $with_charset = true, $hotmail_fix = false, $
 
 		return array($charset, $string, 'base64');
 	}
-
 	else
 		return array($charset, $string, '7bit');
 }
 
 /**
- * Sends mail, like mail() but over SMTP.
- * It expects no slashes or entities.
- * @internal
+ * Converts out of ascii range characters in to HTML entities
  *
- * @param array $mail_to_array - array of strings (email addresses)
+ * - Character codes <= 128 are left as is
+ * - Callback function of preg_replace_callback, used just for hotmail address
+ *
+ * @package Mail
+ * @param mixed[] $match
+ */
+function entityConvert($match)
+{
+	$c = $match[1];
+	$c_strlen = strlen($c);
+	$c_ord = ord($c[0]);
+
+	if ($c_strlen === 1 && $c_ord <= 0x7F)
+		return $c;
+	elseif ($c_strlen === 2 && $c_ord >= 0xC0 && $c_ord <= 0xDF)
+		return '&#' . ((($c_ord ^ 0xC0) << 6) + (ord($c[1]) ^ 0x80)) . ';';
+	elseif ($c_strlen === 3 && $c_ord >= 0xE0 && $c_ord <= 0xEF)
+		return '&#' . ((($c_ord ^ 0xE0) << 12) + ((ord($c[1]) ^ 0x80) << 6) + (ord($c[2]) ^ 0x80)) . ';';
+	elseif ($c_strlen === 4 && $c_ord >= 0xF0 && $c_ord <= 0xF7)
+		return '&#' . ((($c_ord ^ 0xF0) << 18) + ((ord($c[1]) ^ 0x80) << 12) + ((ord($c[2]) ^ 0x80) << 6) + (ord($c[3]) ^ 0x80)) . ';';
+	else
+		return '';
+}
+
+/**
+ * Callback for the preg_replace in mimespecialchars
+ *
+ * @package Mail
+ * @param mixed[] $match
+ */
+function mimespecialchars_callback($match)
+{
+	return chr($match[1]);
+}
+
+/**
+ * Sends mail, like mail() but over SMTP.
+ *
+ * - It expects no slashes or entities.
+ *
+ * @package Mail
+ * @internal
+ * @param string[] $mail_to_array - array of strings (email addresses)
  * @param string $subject email subject
  * @param string $message email message
  * @param string $headers
- * @param string $message_id
+ * @param int $priority
+ * @param string|null $message_id
  * @return boolean whether it sent or not.
  */
 function smtp_mail($mail_to_array, $subject, $message, $headers, $priority, $message_id = null)
@@ -571,7 +594,7 @@ function smtp_mail($mail_to_array, $subject, $message, $headers, $priority, $mes
 		{
 			$unq_head = md5($scripturl . microtime() . rand()) . '-' . $message_id;
 			$encoded_unq_head = base64_encode($line_break . $line_break . '[' . $unq_head . ']' . $line_break);
-			$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . ">";
+			$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . '>';
 			$message = mail_insert_key($message, $unq_head, $encoded_unq_head, $line_break);
 		}
 
@@ -624,16 +647,8 @@ function smtp_mail($mail_to_array, $subject, $message, $headers, $priority, $mes
 	// Log each email
 	if (!empty($sent))
 	{
-		$db = database();
-
-		$db->insert('ignore',
-			'{db_prefix}postby_emails',
-			array(
-				'id_email' => 'int', 'time_sent' => 'string', 'email_to' => 'string'
-			),
-			$sent,
-			array('id_email')
-		);
+		require_once(SUBSDIR . '/Maillist.subs.php');
+		log_email($sent);
 	}
 
 	return true;
@@ -641,14 +656,15 @@ function smtp_mail($mail_to_array, $subject, $message, $headers, $priority, $mes
 
 /**
  * Parse a message to the SMTP server.
- * Sends the specified message to the server, and checks for the
- * expected response.
- * @internal
  *
+ * - Sends the specified message to the server, and checks for the expected response.
+ *
+ * @package Mail
+ * @internal
  * @param string $message - the message to send
  * @param resource $socket - socket to send on
  * @param string $response - the expected response code
- * @return whether it responded as such.
+ * @return string|boolean it responded as such.
  */
 function server_parse($message, $socket, $response)
 {
@@ -682,13 +698,15 @@ function server_parse($message, $socket, $response)
 
 /**
  * Adds the unique security key in to an email
+ *
  * - adds the key in to (each) message body section
  * - safety net for clients that strip out the message-id and in-reply-to headers
  *
+ * @package Mail
  * @param string $message
  * @param string $unq_head
  * @param string $encoded_unq_head
- * @param bool $line_break
+ * @param string $line_break
  */
 function mail_insert_key($message, $unq_head, $encoded_unq_head, $line_break)
 {
@@ -714,8 +732,9 @@ function mail_insert_key($message, $unq_head, $encoded_unq_head, $line_break)
 /**
  * Load a template from EmailTemplates language file.
  *
+ * @package Mail
  * @param string $template
- * @param array $replacements = array()
+ * @param mixed[] $replacements
  * @param string $lang = ''
  * @param bool $loadLang = true
  */
@@ -749,7 +768,7 @@ function loadEmailTemplate($template, $replacements = array(), $lang = '', $load
 		'THEMEURL' => $settings['theme_url'],
 		'IMAGESURL' => $settings['images_url'],
 		'DEFAULT_THEMEURL' => $settings['default_theme_url'],
-		'REGARDS' => $txt['regards_team'],
+		'REGARDS' => replaceBasicActionUrl($txt['regards_team']),
 	);
 
 	// Split the replacements up into two arrays, for use with str_replace
@@ -776,7 +795,10 @@ function loadEmailTemplate($template, $replacements = array(), $lang = '', $load
 
 /**
  * Prepare subject and message of an email for the preview box
+ *
  * Used in action_mailingcompose and RetrievePreview (Xml.controller.php)
+ *
+ * @package Mail
  */
 function prepareMailingForPreview()
 {
@@ -842,7 +864,8 @@ function prepareMailingForPreview()
  * Callback function for load email template on subject and body
  * Uses capture group 1 in array
  *
- * @param array $matches
+ * @package Mail
+ * @param mixed[] $matches
  * @return string
  */
 function user_info_callback($matches)
@@ -872,6 +895,7 @@ function user_info_callback($matches)
 /**
  * This function grabs the mail queue items from the database, according to the params given.
  *
+ * @package Mail
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -911,6 +935,8 @@ function list_getMailQueue($start, $items_per_page, $sort)
 
 /**
  * Returns the total count of items in the mail queue.
+ *
+ * @package Mail
  * @return int
  */
 function list_getMailQueueSize()
@@ -932,7 +958,9 @@ function list_getMailQueueSize()
 
 /**
  * Deletes items from the mail queue
- * @param array $items
+ *
+ * @package Mail
+ * @param int[] $items
  */
 function deleteMailQueueItems($items)
 {
@@ -950,7 +978,7 @@ function deleteMailQueueItems($items)
 /**
  * Get the current mail queue status
  *
- * @return array
+ * @package Mail
  */
 function list_MailQueueStatus()
 {
@@ -973,9 +1001,11 @@ function list_MailQueueStatus()
 
 /**
  * This function handles updates to account for failed emails.
- * It is used to keep track of failed emails attempts and next try.
  *
- * @param array $failed_emails
+ * - It is used to keep track of failed emails attempts and next try.
+ *
+ * @package Mail
+ * @param mixed[] $failed_emails
  */
 function updateFailedQueue($failed_emails)
 {
@@ -1016,7 +1046,10 @@ function updateFailedQueue($failed_emails)
 
 /**
  * Updates the failed attempts to email in the database.
- * It sets mail failed attempts value to 0.
+ *
+ * - It sets mail failed attempts value to 0.
+ *
+ * @package Mail
  */
 function updateSuccessQueue()
 {
@@ -1059,9 +1092,11 @@ function resetNextSendTime()
 
 /**
  * Update the next sending time for mail queue.
- * By default, move it 10 seconds for lower per mail_period_limits and 5 seconds for larger mail_period_limits
- * Requires an affected row
  *
+ * - By default, move it 10 seconds for lower per mail_period_limits and 5 seconds for larger mail_period_limits
+ * - Requires an affected row
+ *
+ * @package Mail
  * @return bool
  */
 function updateNextSendTime()
@@ -1093,6 +1128,7 @@ function updateNextSendTime()
 /**
  * Retrieve all details from the database on the next emails.
  *
+ * @package Mail
  * @param int $number
  * @return array
  */
@@ -1134,10 +1170,12 @@ function emailsInfo($number)
 
 /**
  * Sends a group of emails from the mail queue.
- * Allows a batch of emails to be released every 5 to 10 seconds (based on per period limits)
- * If batch size is not set, will determine a size such that it sends in 1/2 the period (buffer)
  *
- * @param mixed $batch_size = false the number to send each loop
+ * - Allows a batch of emails to be released every 5 to 10 seconds (based on per period limits)
+ * - If batch size is not set, will determine a size such that it sends in 1/2 the period (buffer)
+ *
+ * @package Mail
+ * @param int|false $batch_size = false the number to send each loop
  * @param boolean $override_limit = false bypassing our limit flaf
  * @param boolean $force_send = false
  * @return boolean
@@ -1265,7 +1303,8 @@ function reduceMailQueue($batch_size = false, $override_limit = false, $force_se
 			{
 				$unq_head = md5($scripturl . microtime() . rand()) . '-' . $email['message_id'];
 				$encoded_unq_head = base64_encode($line_break . $line_break . '[' . $unq_head . ']' . $line_break);
-				$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . ">";
+				$unq_id = ($need_break ? $line_break : '') . 'Message-ID: <' . $unq_head . strstr(empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from'], '@') . '>';
+				$email['body_fail'] = $email['body'];
 				$email['body'] = mail_insert_key($email['body'], $unq_head, $encoded_unq_head, $line_break);
 			}
 			elseif ($email['message_id'] !== null && empty($modSettings['mail_no_message_id']))
@@ -1292,7 +1331,7 @@ function reduceMailQueue($batch_size = false, $override_limit = false, $force_se
 
 		// Hopefully it sent?
 		if (!$result)
-			$failed_emails[] = array(time(), $email['to'], $email['body'], $email['subject'], $email['headers'], $email['send_html'], $email['priority'], $email['private'], $email['message_id']);
+			$failed_emails[] = array(time(), $email['to'], $email['body_fail'], $email['subject'], $email['headers'], $email['send_html'], $email['priority'], $email['private'], $email['message_id']);
 	}
 
 	// Clear out the stat cache.
@@ -1322,10 +1361,10 @@ function reduceMailQueue($batch_size = false, $override_limit = false, $force_se
  * poster of a certain message.
  *
  * @todo very similar to mailFromMesasge
- *
+ * @package Mail
  * @param int $id_msg the id of a message
  * @param int $topic_id the topic the message belongs to
- * @return array, the poster's details
+ * @return mixed[] the poster's details
  */
 function posterDetails($id_msg, $topic_id)
 {
@@ -1353,7 +1392,8 @@ function posterDetails($id_msg, $topic_id)
 /**
  * Little utility function to calculate how long ago a time was.
  *
- * @param long $time_diff
+ * @package Mail
+ * @param integer|double $time_diff
  * @return string
  */
 function time_since($time_diff)

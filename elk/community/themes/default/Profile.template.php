@@ -11,9 +11,17 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
+
+/**
+ * We need some trick to proprerly display things
+ */
+function template_Profile_init()
+{
+	loadTemplate('GenericMessages');
+}
 
 /**
  * Template for the profile header - goes before any other profile template.
@@ -22,8 +30,8 @@ function template_profile_above()
 {
 	global $context;
 
-	// Prevent Chrome from auto completing fields when viewing/editing other members profiles
-	if (isBrowser('is_webkit') && !$context['user']['is_owner'])
+	// Prevent browssers from auto completing fields when viewing/editing other members profiles
+	if (!$context['user']['is_owner'])
 		addInlineJavascript('disableAutoComplete();', true);
 
 	// If an error occurred while trying to save previously, give the user a clue!
@@ -43,60 +51,68 @@ function template_profile_above()
  */
 function template_showDrafts()
 {
-	global $context, $settings, $scripturl, $txt;
+	global $context, $settings, $txt, $scripturl;
+
+	if (!empty($context['drafts']))
+		template_pagesection();
 
 	echo '
-		<h3 class="category_header">
-			', $txt['drafts'], ' - ', $context['member']['name'], '
-		</h3>',
-	template_pagesection();
+		<div id="profilecenter">
+			<form action="', $scripturl, '?action=profile;u=' . $context['member']['id'] . ';area=showdrafts;delete" method="post" accept-charset="UTF-8" name="draftForm" id="draftForm" >
+				<h2 class="category_header">
+					<span class="floatright">
+						<input type="checkbox" onclick="invertAll(this, this.form, \'delete[]\');" class="input_check" />
+					</span>
+					', $txt['drafts'], '
+				</h2>';
 
 	// No drafts? Just show an informative message.
 	if (empty($context['drafts']))
 		echo '
-		<div class="information centertext">
-			', $txt['draft_none'], '
-		</div>';
+			<div class="information centertext">
+				', $txt['draft_none'], '
+			</div>';
 	else
 	{
-		// For every draft to be displayed, give it its own div, and show the important details of the draft.
+		// For every draft to be displayed show the important details.
 		foreach ($context['drafts'] as $draft)
 		{
-			echo '
-			<div class="', $draft['alternate'] === 0 ? 'windowbg2' : 'windowbg', ' core_posts">
-				<div class="content">
-					<div class="counter">', $draft['counter'], '</div>
-					<div class="topic_details">
-						<h5><strong><a href="', $scripturl, '?board=', $draft['board']['id'], '.0">', $draft['board']['name'], '</a> / ', $draft['topic']['link'], '</strong>&nbsp;&nbsp;';
+			$draft['title'] = '<strong>' . $draft['board']['link'] . ' / ' . $draft['topic']['link'] . '</strong>&nbsp;&nbsp;';
 
 			if (!empty($draft['sticky']))
-				echo '<img src="', $settings['images_url'], '/icons/quick_sticky.png" alt="', $txt['sticky_topic'], '" title="', $txt['sticky_topic'], '" />';
+				$draft['title'] .= '<img src="' . $settings['images_url'] . '/icons/quick_sticky.png" alt="' . $txt['sticky_topic'] . '" title="' . $txt['sticky_topic'] . '" />';
 
 			if (!empty($draft['locked']))
-				echo '<img src="', $settings['images_url'], '/icons/quick_lock.png" alt="', $txt['locked_topic'], '" title="', $txt['locked_topic'], '" />';
+				$draft['title'] .= '<img src="' . $settings['images_url'] . '/icons/quick_lock.png" alt="' . $txt['locked_topic'] . '" title="' . $txt['locked_topic'] . '" />';
 
-			echo '
-						</h5>
-						<span class="smalltext">&#171;&nbsp;<strong>', $txt['draft_saved_on'], ':</strong> ', ($draft['age'] > 0 ? sprintf($txt['draft_days_ago'], $draft['age']) : $draft['time']), (!empty($draft['remaining']) ? ', ' . sprintf($txt['draft_retain'], $draft['remaining']) : ''), '&#187;</span>
-					</div>
-					<div class="list_posts">
-						', $draft['body'], '
-					</div>
-					<ul class="quickbuttons">
-						<li class="listlevel1">
-							<a href="', $scripturl, '?action=profile;u=', $context['member']['id'], ';area=showdrafts;delete=', $draft['id_draft'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['draft_remove'], '?\');" class="linklevel1 remove_button">', $txt['draft_delete'], '</a>
-						</li>
-						<li class="listlevel1">
-							<a href="', $scripturl, '?action=post;', (empty($draft['topic']['id']) ? 'board=' . $draft['board']['id'] : 'topic=' . $draft['topic']['id']), '.0;id_draft=', $draft['id_draft'], '" class="linklevel1 reply_button">', $txt['draft_edit'], '</a>
-						</li>
-					</ul>
-				</div>
-			</div>';
+			$draft['date'] = '&#171; <strong>' . $txt['draft_saved_on'] . ':</strong> ' . ($draft['age'] > 0 ? sprintf($txt['draft_days_ago'], $draft['age']) : $draft['time']) . (!empty($draft['remaining']) ? ', ' . sprintf($txt['draft_retain'], $draft['remaining']) : '') . ' &#187;';
+			$draft['class'] = $draft['alternate'] === 0 ? 'windowbg2' : 'windowbg';
+
+			template_simple_message($draft);
 		}
 	}
 
-	// Show page numbers.
-	template_pagesection();
+	// Show page numbers
+	if (!empty($context['drafts']))
+	{
+		echo '
+				<div class="flow_auto">
+					<div class="floatleft">';
+
+		template_pagesection();
+
+		echo '
+					</div>
+					<div class="additional_row below_table_data">
+						<input type="submit" name="delete_selected" value="' . $txt['quick_mod_remove'] . '" class="right_submit" onclick="return confirm(' . JavaScriptEscape($txt['draft_remove_selected'] . '?') . ');" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+					</div>
+				</div>';
+	}
+
+	echo '
+			</form>
+		</div>';
 }
 
 /**
@@ -114,11 +130,11 @@ function template_profile_save()
 		echo '
 					<dl>
 						<dt>
-							<strong', isset($context['modify_error']['bad_password']) || isset($context['modify_error']['no_password']) ? ' class="error"' : '', '>', $txt['current_password'], ': </strong><br />
+							<strong', isset($context['modify_error']['bad_password']) || isset($context['modify_error']['no_password']) ? ' class="error"' : '', '><label for="oldpasswrd">', $txt['current_password'], '</label>: </strong><br />
 							<span class="smalltext">', $txt['required_security_reasons'], '</span>
 						</dt>
 						<dd>
-							<input type="password" name="oldpasswrd" size="20" style="margin-right: 4ex;" class="input_password" placeholder="', $txt['current_password'], '" />
+							<input type="password" id="oldpasswrd" name="oldpasswrd" size="20" style="margin-right: 4ex;" class="input_password" placeholder="', $txt['current_password'], '" />
 						</dd>
 					</dl>';
 

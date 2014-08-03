@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -53,7 +53,7 @@ function template_messages_informations_above()
 				<span class="nextlinks">',
 					!empty($context['links']['go_prev']) ? '<a href="' . $context['links']['go_prev'] . '">' . $txt['previous_next_back'] . '</a>' : '',
 					!empty($context['links']['go_next']) ? ' - <a href="' . $context['links']['go_next'] . '">' . $txt['previous_next_forward'] . '</a>' : '',
-					!empty($context['links']['derived_from']) ? ' - <a href="' . $context['links']['derived_from'] . '">' . sprintf($txt['topic_derived_from'], '<em>' . shorten_text($context['topic_derived_from']['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24)) . '</em></a>' : '',
+					!empty($context['links']['derived_from']) ? ' - <a href="' . $context['links']['derived_from'] . '">' . sprintf($txt['topic_derived_from'], '<em>' . shorten_text($context['topic_derived_from']['subject'], $modSettings['subject_length'])) . '</em></a>' : '',
 				'</span>
 			</h2>';
 
@@ -124,7 +124,7 @@ function template_messages()
 		// Show the message anchor and a "new" anchor if this message is new.
 		echo '
 				<div class="post_wrapper ', $message['approved'] ? ($message['alternate'] == 0 ? 'windowbg' : 'windowbg2') : 'approvebg', '">', $message['id'] != $context['first_message'] ? '
-					<a id="msg' . $message['id'] . '"></a>' . ($message['first_new'] ? '<a id="new"></a>' : '') : '';
+					<a class="post_anchor" id="msg' . $message['id'] . '"></a>' . ($message['first_new'] ? '<a id="new"></a>' : '') : '';
 
 		// Showing the sidebar posting area?
 		if (empty($options['hide_poster_area']))
@@ -189,7 +189,7 @@ function template_messages()
 
 		// Show the quickbuttons, for various operations on posts.
 		echo '
-						<ul class="quickbuttons">';
+						<ul id="buttons_', $message['id'], '" class="quickbuttons">';
 
 		// Show a checkbox for quick moderation?
 		if (!empty($options['display_quick_mod']) && $options['display_quick_mod'] == 1 && $message['can_remove'])
@@ -197,18 +197,18 @@ function template_messages()
 							<li class="listlevel1 inline_mod_check" style="display: none;" id="in_topic_mod_check_', $message['id'], '"></li>';
 
 		// Show "Last Edit: Time by Person" if this post was edited.
-		if ($settings['show_modify'] && !empty($message['modified']['name']))
+		if ($settings['show_modify'])
 			echo '
-							<li class="listlevel1 modified" id="modified_', $message['id'], '">
-								', $message['modified']['last_edit_text'], '
+							<li class="listlevel1 modified" id="modified_', $message['id'], '"',  !empty($message['modified']['name']) ? '' : ' style="display:none"', '>
+								',  !empty($message['modified']['name']) ? $message['modified']['last_edit_text'] : '', '
 							</li>';
 
 		// Maybe they can modify the post (this is the more button)
 		if ($message['can_modify'] || ($context['can_report_moderator']))
 			echo '
-							<li class="listlevel1 subsections" aria-haspopup="true"><a class="linklevel1 post_options">', $txt['post_options'], '</a>';
+							<li class="listlevel1 subsections" aria-haspopup="true"><a href="#" onclick="return false;" class="linklevel1 post_options">', $txt['post_options'], '</a>';
 
-		if ($message['can_modify'] || $message['can_remove'] || ($context['can_split'] && !empty($context['real_num_replies'])) || $context['can_restore_msg'] || $message['can_approve'] || $message['can_unapprove'] || $context['can_report_moderator'])
+		if ($message['can_modify'] || $message['can_remove'] || $context['can_follow_up'] || ($context['can_split'] && !empty($context['real_num_replies'])) || $context['can_restore_msg'] || $message['can_approve'] || $message['can_unapprove'] || $context['can_report_moderator'])
 		{
 			// Show them the other options they may have in a nice pulldown
 			echo '
@@ -223,6 +223,11 @@ function template_messages()
 			if ($message['can_remove'])
 				echo '
 									<li class="listlevel2"><a href="', $scripturl, '?action=deletemsg;topic=', $context['current_topic'], '.', $context['start'], ';msg=', $message['id'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['remove_message'], '?\');" class="linklevel2 remove_button">', $txt['remove'], '</a></li>';
+
+			// Can they quote to a new topic? @todo - This needs rethinking for GUI layout.
+			if ($context['can_follow_up'])
+				echo '
+									<li class="listlevel2"><a href="', $scripturl, '?action=post;board=', $context['current_board'], ';quote=', $message['id'], ';followup=', $message['id'], '" class="linklevel2 quotetonew_button">', $txt['quote_new'], '</a></li>';
 
 			// What about splitting it off the rest of the topic?
 			if ($context['can_split'] && !empty($context['real_num_replies']))
@@ -262,38 +267,42 @@ function template_messages()
 		// Hide likes if its off
 		if ($message['likes_enabled'])
 		{
-			// Can they like this post?
-			if ($message['can_like'])
+			// Can they like/unlike this post?
+			if ($message['can_like'] || $message['can_unlike'])
 				echo '
-							<li class="listlevel1"><a href="', $scripturl, '?action=likes;sa=likepost;topic=', $context['current_topic'], ';msg=', $message['id'], ';', $context['session_var'], '=', $context['session_id'], '" title="', !empty($message['like_counter']) ? $txt['liked_by'] . ' ' . implode(', ', $context['likes'][$message['id']]['member']) : '', '" class="linklevel1 like_button">', !empty($message['like_counter']) ? '&nbsp;' . $message['like_counter'] . '&nbsp;' . $txt['likes'] : '&nbsp;', '</a></li>';
-			// Or remove the like they made
-			elseif ($message['can_unlike'])
-				echo '
-							<li class="listlevel1"><a href="', $scripturl, '?action=likes;sa=unlikepost;topic=', $context['current_topic'], ';msg=', $message['id'], ';', $context['session_var'], '=', $context['session_id'], '" title="', !empty($message['like_counter']) ? $txt['liked_by'] . ' ' . implode(', ', $context['likes'][$message['id']]['member']) : '', '" class="linklevel1 unlike_button">', !empty($message['like_counter']) ? '&nbsp;' . $message['like_counter'] . '&nbsp;' . $txt['likes'] : '&nbsp;', '</a></li>';
+							<li class="listlevel1', !empty($message['like_counter']) ? ' liked"' : '"' ,'>
+								<a class="linklevel1 ', $message['can_unlike'] ? 'unlike_button' : 'like_button', '" href="javascript:void(0)" title="', !empty($message['like_counter']) ? $txt['liked_by'] . ' ' . implode(', ', $context['likes'][$message['id']]['member']) : '', '" onclick="likePosts.prototype.likeUnlikePosts(event,', $message['id'],', ',$context['current_topic'],'); return false;">',
+									!empty($message['like_counter']) ? '<span class="likes_indicator">' . $message['like_counter'] . '</span>&nbsp;' . $txt['likes'] : $txt['like_post'], '
+								</a>
+							</li>';
+
 			// Or just view the count
 			else
 				echo '
-							<li class="listlevel1"><a href="#" title="', !empty($message['like_counter']) ? $txt['liked_by'] . ' ' . implode(', ', $context['likes'][$message['id']]['member']) : '', '" class="linklevel1 likes_button">', !empty($message['like_counter']) ? '&nbsp;' . $message['like_counter'] . '&nbsp;' . $txt['likes'] : '&nbsp;', '</a></li>';
+							<li class="listlevel1', !empty($message['like_counter']) ? ' liked"' : '"', '>
+								<a href="javascript:void(0)" title="', !empty($message['like_counter']) ? $txt['liked_by'] . ' ' . implode(', ', $context['likes'][$message['id']]['member']) : '', '" class="linklevel1 likes_button">',
+									!empty($message['like_counter']) ? '<span class="likes_indicator">' . $message['like_counter'] . '</span>&nbsp;' . $txt['likes'] : '&nbsp;', '
+								</a>
+							</li>';
 		}
 
 		// Can the user quick modify the contents of this post?  Show the quick (inline) modify button.
 		if ($message['can_modify'])
 			echo '
-							<li class="listlevel1 quick_edit" style="display: none"><a class="linklevel1"><img src="', $settings['images_url'], '/icons/modify_inline.png" alt="', $txt['modify_msg'], '" title="', $txt['modify_msg'], '" class="modifybutton" id="modify_button_', $message['id'], '" onclick="oQuickModify.modifyMsg(\'', $message['id'], '\')" />', $txt['quick_edit'], '</a></li>';
-
-		// Can they quote to a new topic? @todo - This needs rethinking for GUI layout.
-		if ($context['can_follow_up'])
-			echo '
-							<li class="listlevel1"><a href="', $scripturl, '?action=post;board=', $context['current_board'], ';quote=', $message['id'], ';followup=', $message['id'], '" class="linklevel1 quotetonew_button">', $txt['quote_new'], '</a></li>';
+							<li class="listlevel1 quick_edit" id="modify_button_', $message['id'], '" style="display: none"><a class="linklevel1 quick_edit" onclick="oQuickModify.modifyMsg(\'', $message['id'], '\')">', $txt['quick_edit'], '</a></li>';
 
 		// Can they reply? Have they turned on quick reply?
 		if ($context['can_quote'] && !empty($options['display_quick_reply']))
 			echo '
-							<li class="listlevel1"><a href="', $scripturl, '?action=post;quote=', $message['id'], ';topic=', $context['current_topic'], '.', $context['start'], ';last_msg=', $context['topic_last_message'], '" onclick="return oQuickReply.quote(', $message['id'], ');" class="linklevel1 quote_button">', $txt['quote'], '</a></li>';
+							<li class="listlevel1">
+								<a href="', $scripturl, '?action=post;quote=', $message['id'], ';topic=', $context['current_topic'], '.', $context['start'], ';last_msg=', $context['topic_last_message'], '" onclick="return oQuickReply.quote(', $message['id'], ');" class="linklevel1 quote_button">', $txt['quote'], '</a>
+							</li>';
 		// So... quick reply is off, but they *can* reply?
 		elseif ($context['can_quote'])
 			echo '
-							<li class="listlevel1"><a href="', $scripturl, '?action=post;quote=', $message['id'], ';topic=', $context['current_topic'], '.', $context['start'], ';last_msg=', $context['topic_last_message'], '" class="linklevel1 quote_button">', $txt['quote'], '</a></li>';
+							<li class="listlevel1">
+								<a href="', $scripturl, '?action=post;quote=', $message['id'], ';topic=', $context['current_topic'], '.', $context['start'], ';last_msg=', $context['topic_last_message'], '" class="linklevel1 quote_button">', $txt['quote'], '</a>
+							</li>';
 
 		// Anything else added by mods for example?
 		if (!empty($context['additional_quick_buttons']))
@@ -373,14 +382,13 @@ function template_quickreply_below()
 				<h2 class="category_header">
 					<span id="category_toggle">&nbsp;
 						<a href="javascript:oQuickReply.swap();">
-							<span id="quickReplyExpand" class="', $options['display_quick_reply'] > 1 ? 'collapse' : 'expand', '" title="', $txt['hide'], '"></span>
+							<span id="quickReplyExpand" class="', empty($context['minmax_preferences']['qreply']) ? 'collapse' : 'expand', '" title="', $txt['hide'], '"></span>
 						</a>
 					</span>
 					<a href="javascript:oQuickReply.swap();">', $txt['quick_reply'], '</a>
 				</h2>
-				<div id="quickReplyOptions" class="windowbg"', $options['display_quick_reply'] > 1 ? '' : ' style="display: none"', '>
+				<div id="quickReplyOptions" class="windowbg"', empty($context['minmax_preferences']['qreply']) ? '' : ' style="display: none"', '>
 					<div class="editor_wrapper">
-						<p class="smalltext lefttext">', $txt['quick_reply_desc'], '</p>
 						', $context['is_locked'] ? '<p class="alert smalltext">' . $txt['quick_reply_warning'] . '</p>' : '',
 						$context['oldTopicError'] ? '<p class="alert smalltext">' . sprintf($txt['error_old_topic'], $modSettings['oldTopicDays']) . '</p>' : '', '
 						', $context['can_reply_approved'] ? '' : '<em>' . $txt['wait_for_approval'] . '</em>', '
@@ -400,13 +408,18 @@ function template_quickreply_below()
 		// Guests just need more.
 		if ($context['user']['is_guest'])
 			echo '
-							<strong>', $txt['name'], ':</strong> <input type="text" name="guestname" value="', $context['name'], '" size="25" class="input_text" tabindex="', $context['tabindex']++, '" />
-							<strong>', $txt['email'], ':</strong> <input type="text" name="email" value="', $context['email'], '" size="25" class="input_text" tabindex="', $context['tabindex']++, '" />
-							<br />';
+							<dl>
+								<dt>
+									<strong><label for="guestname">', $txt['name'], '</label>:</strong> <input type="text" name="guestname" id="guestname" value="', $context['name'], '" size="25" class="input_text" tabindex="', $context['tabindex']++, '" />
+								</dd>
+								<dt>
+									<strong><label for="email">', $txt['email'], '</label>:</strong> <input type="text" name="email" id="email" value="', $context['email'], '" size="25" class="input_text" tabindex="', $context['tabindex']++, '" />
+								</dd>
+							</dl>';
 
 		// Is visual verification enabled?
 		if ($context['require_verification'])
-			template_control_verification($context['visual_verification_id'], '
+			template_verification_controls($context['visual_verification_id'], '
 							<strong>' . $txt['verification'] . ':</strong>', '<br />');
 
 		// Using the full editor or a plain text box?
@@ -419,42 +432,38 @@ function template_quickreply_below()
 		}
 		else
 		{
-			// Show the actual posting area...
-			if ($context['show_bbc'])
-				echo '
-							<div id="bbcBox_message"></div>';
-
-			// What about smileys?
-			if (!empty($context['smileys']['postform']) || !empty($context['smileys']['popup']))
-				echo '
-							<div id="smileyBox_message"></div>';
-
 			echo '
 							', template_control_richedit($context['post_box_name'], 'smileyBox_message', 'bbcBox_message');
 		}
 
 		echo '
-							<div class="submitbutton">
+							<div id="post_confirm_buttons" class="submitbutton">
 								<input type="submit" name="post" value="', $txt['post'], '" onclick="return submitThisOnce(this);" accesskey="s" tabindex="', $context['tabindex']++, '" class="button_submit" />
 								<input type="submit" name="preview" value="', $txt['preview'], '" onclick="return submitThisOnce(this);" accesskey="p" tabindex="', $context['tabindex']++, '" class="button_submit" />';
 
+		// Spellcheck button?
 		if ($context['show_spellchecking'])
 			echo '
 								<input type="button" value="', $txt['spell_check'], '" onclick="spellCheck(\'postmodify\', \'message\', ', (empty($options['use_editor_quick_reply']) ? 'false' : 'true'), ')" tabindex="', $context['tabindex']++, '" class="button_submit" />';
 
-		if ($context['drafts_save'] && !empty($options['display_quick_reply']))
-		{
+		// Draft save button?
+		if (!empty($context['drafts_save']))
 			echo '
 								<input type="submit" name="save_draft" value="', $txt['draft_save'], '" onclick="return confirm(' . JavaScriptEscape($txt['draft_save_note']) . ') && submitThisOnce(this);" accesskey="d" tabindex="', $context['tabindex']++, '" class="button_submit" />
 								<input type="hidden" id="id_draft" name="id_draft" value="', empty($context['id_draft']) ? 0 : $context['id_draft'], '" />';
 
-			if (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']))
-				echo '
-								<div class="clear"><span id="throbber" style="display:none"><img src="' . $settings['images_url'] . '/loading_sm.gif" alt="" class="centericon" />&nbsp;</span><span id="draft_lastautosave"></span></div>';
-		}
+		echo '
+							</div>';
+
+		// Show the draft last saved on area
+		if (!empty($context['drafts_autosave']) && !empty($options['drafts_autosave_enabled']))
+			echo '
+							<div class="draftautosave">
+								<span id="throbber" style="display:none"><i class="fa fa-spinner fa-spin" alt="loading"></i>&nbsp;</span>
+								<span id="draft_lastautosave"></span>
+							</div>';
 
 		echo '
-							</div>
 						</form>
 					</div>
 				</div>
@@ -491,7 +500,7 @@ function template_quickreply_below()
 	echo '
 		<script><!-- // --><![CDATA[
 			var oQuickReply = new QuickReply({
-				bDefaultCollapsed: ', !empty($options['display_quick_reply']) && $options['display_quick_reply'] > 1 ? 'false' : 'true', ',
+				bDefaultCollapsed: ', empty($context['minmax_preferences']['qreply']) ? 'false' : 'true', ',
 				iTopicId: ', $context['current_topic'], ',
 				iStart: ', $context['start'], ',
 				sScriptUrl: elk_scripturl,
@@ -504,7 +513,18 @@ function template_quickreply_below()
 				sTitleExpanded: ', JavaScriptEscape($txt['hide']), ',
 				sJumpAnchor: "quickreply",
 				bIsFull: ', !empty($options['use_editor_quick_reply']) ? 'true,
-				sEditorId: ' . $options['use_editor_quick_reply'] : 'false', '
+				sEditorId: ' . $options['use_editor_quick_reply'] : 'false', ',
+				oThemeOptions: {
+					bUseThemeSettings: ', $context['user']['is_guest'] ? 'false' : 'true', ',
+					sOptionName: \'minmax_preferences\',
+					sSessionId: elk_session_id,
+					sSessionVar: elk_session_var,
+					sAdditionalVars: \';minmax_key=qreply\'
+				},
+				oCookieOptions: {
+					bUseCookie: ', $context['user']['is_guest'] ? 'true' : 'false', ',
+					sCookieName: \'elk_qreply\'
+				}
 			});
 		// ]]></script>';
 
@@ -515,12 +535,6 @@ function template_quickreply_below()
 				<input type="hidden" name="spellstring" value="" />
 				<input type="hidden" name="fulleditor" value="" />
 			</form>';
-
-	// Tooltips for likes
-	echo '
-			<script><!-- // --><![CDATA[
-				$(".like_button").SiteTooltip({hoverIntent: {sensitivity: 10, interval: 150, timeout: 50}});
-			// ]]></script>';
 
 	// Quick moderation options
 	echo '
@@ -564,7 +578,7 @@ function template_quickreply_below()
 					bShowModify: ', $settings['show_modify'] ? 'true' : 'false', ',
 					iTopicId: ', $context['current_topic'], ',
 					sTemplateBodyEdit: ', JavaScriptEscape('
-						<div id="quick_edit_body_container" style="width: 90%">
+						<div id="quick_edit_body_container" style="width: 90%;">
 							<div id="error_box" class="errorbox" style="display:none;"></div>
 							<textarea class="editor" name="message" rows="12" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 100%; min-width: 100%' : 'width: 100%') . '; margin-bottom: 10px;" tabindex="' . $context['tabindex']++ . '">%body%</textarea><br />
 							<input type="hidden" name="\' + elk_session_var + \'" value="\' + elk_session_id + \'" />
@@ -578,22 +592,8 @@ function template_quickreply_below()
 					sTemplateSubjectEdit: ', JavaScriptEscape('<input type="text" style="width: 85%;" name="subject" value="%subject%" size="80" maxlength="80" tabindex="' . $context['tabindex']++ . '" class="input_text" />'), ',
 					sTemplateSubjectNormal: ', JavaScriptEscape('%subject%'), ',
 					sTemplateTopSubject: ', JavaScriptEscape($txt['topic'] . ': %subject% &nbsp;(' . $context['num_views_text'] . ')'), ',
-					sTemplateInfoNormal: ', JavaScriptEscape('<a href="' . $scripturl . '?topic=' . $context['current_topic'] . '.msg%msg_id%#msg%msg_id%" rel="nofollow">%subject%</a><span class="smalltext modified" id="modified_%msg_id%"></span>'), ',
-					sErrorBorderStyle: ', JavaScriptEscape('1px solid red'), ($context['can_reply'] && !empty($options['display_quick_reply'])) ? ',
+					sTemplateInfoNormal: ', JavaScriptEscape('<a href="' . $scripturl . '?topic=' . $context['current_topic'] . '.msg%msg_id%#msg%msg_id%" rel="nofollow">%subject%</a><span class="smalltext modified" id="modified_%msg_id%"></span>'), ($context['can_reply'] && !empty($options['display_quick_reply'])) ? ',
 					sFormRemoveAccessKeys: \'postmodify\'' : '', '
-				});
-
-				aJumpTo[aJumpTo.length] = new JumpTo({
-					sContainerId: "display_jump_to",
-					sJumpToTemplate: "<label class=\"smalltext\" for=\"%select_id%\">', $context['jump_to']['label'], ':<" + "/label> %dropdown_list%",
-					iCurBoardId: ', $context['current_board'], ',
-					iCurBoardChildLevel: ', $context['jump_to']['child_level'], ',
-					sCurBoardName: "', $context['jump_to']['board_name'], '",
-					sBoardChildLevelIndicator: "&#8195;",
-					sBoardPrefix: "', isBrowser('ie8') ? '&#187; ' : '&#10148; ', '",
-					sCatClass: "jump_to_header",
-					sCatPrefix: "",
-					sGoButtonLabel: "', $txt['go'], '"
 				});
 
 				aIconLists[aIconLists.length] = new IconList({
@@ -633,6 +633,7 @@ function template_quickreply_below()
 function template_display_poll_above()
 {
 	global $settings, $context, $txt, $scripturl;
+
 	echo '
 			<div id="poll">
 				<h3 class="category_header">
@@ -648,26 +649,27 @@ function template_display_poll_above()
 	if ($context['poll']['show_results'] || !$context['allow_vote'])
 	{
 		echo '
-					<dl class="options">';
+					<ul class="options">';
 
 		// Show each option with its corresponding percentage bar.
 		foreach ($context['poll']['options'] as $option)
 		{
 			echo '
-						<dt class="', $option['voted_this'] ? 'voted' : '', '">', $option['option'], '</dt>
-						<dd class="statsbar', $option['voted_this'] ? ' voted' : '', '">';
+						<li', $option['voted_this'] ? ' class="voted"' : '', '>', $option['option'], '
+							<div class="results">';
 
 			if ($context['allow_poll_view'])
 				echo '
-							', $option['bar_ndt'], '
-							<span class="percentage">', $option['votes'], ' (', $option['percent'], '%)</span>';
+								<div class="statsbar"> ', $option['bar_ndt'], '</div>
+								<span class="percentage">', $option['votes'], ' (', $option['percent'], '%)</span>';
 
 			echo '
-						</dd>';
+							</div>
+						</li>';
 		}
 
 		echo '
-					</dl>';
+					</ul>';
 
 		if ($context['allow_poll_view'])
 			echo '
@@ -677,7 +679,7 @@ function template_display_poll_above()
 	else
 	{
 		echo '
-						<form action="', $scripturl, '?action=vote;topic=', $context['current_topic'], '.', $context['start'], ';poll=', $context['poll']['id'], '" method="post" accept-charset="UTF-8">';
+						<form action="', $scripturl, '?action=poll;sa=vote;topic=', $context['current_topic'], '.', $context['start'], ';poll=', $context['poll']['id'], '" method="post" accept-charset="UTF-8">';
 
 		// Show a warning if they are allowed more than one option.
 		if ($context['poll']['allowed_warning'])
@@ -765,7 +767,7 @@ function template_pages_and_buttons_above()
  */
 function template_pages_and_buttons_below()
 {
-	global $context;
+	global $context, $txt;
 
 	// Show the page index... "Pages: [1]".
 	template_pagesection('normal_buttons', 'right');
@@ -778,7 +780,27 @@ function template_pages_and_buttons_below()
 
 	// Show the jump-to box, or actually...let Javascript do it.
 	echo '
-			<div id="display_jump_to">&nbsp;</div>';
+			<div id="display_jump_to">&nbsp;</div>
+			<script><!-- // --><![CDATA[
+				aJumpTo[aJumpTo.length] = new JumpTo({
+					sContainerId: "display_jump_to",
+					sJumpToTemplate: "<label class=\"smalltext\" for=\"%select_id%\">', $context['jump_to']['label'], ':<" + "/label> %dropdown_list%",
+					iCurBoardId: ', $context['current_board'], ',
+					iCurBoardChildLevel: ', $context['jump_to']['child_level'], ',
+					sCurBoardName: "', $context['jump_to']['board_name'], '",
+					sBoardChildLevelIndicator: "&#8195;",
+					sBoardPrefix: "', isBrowser('ie8') ? '&#187; ' : '&#10148; ', '",
+					sCatClass: "jump_to_header",
+					sCatPrefix: "",
+					sGoButtonLabel: "', $txt['go'], '"
+				});
+			// ]]></script>';
+
+	// Tooltips for likes
+	echo '
+			<script><!-- // --><![CDATA[
+				$(".like_button, .unlike_button, .likes_button").SiteTooltip({hoverIntent: {sensitivity: 10, interval: 150, timeout: 50}});
+			// ]]></script>';
 }
 
 /**
@@ -795,7 +817,6 @@ function template_display_attachments($message, $ignoring)
 							<div id="msg_', $message['id'], '_footer" class="attachments"', $ignoring ? ' style="display:none;"' : '', '>';
 
 	$last_approved_state = 1;
-	$attachments_per_line = 4;
 	$i = 0;
 
 	foreach ($message['attachment'] as $attachment)
@@ -817,26 +838,26 @@ function template_display_attachments($message, $ignoring)
 		}
 
 		echo '
-									<div class="floatleft">';
+									<div class="attachment">';
 
 		if ($attachment['is_image'])
 		{
 			echo '
-										<div class="attachments_top">';
+										<div class="attachment_thumb">';
 
 			if ($attachment['thumbnail']['has_thumb'])
 				echo '
 											<a href="', $attachment['href'], ';image" id="link_', $attachment['id'], '" onclick="', $attachment['thumbnail']['javascript'], '"><img src="', $attachment['thumbnail']['href'], '" alt="" id="thumb_', $attachment['id'], '" /></a>';
 			else
 				echo '
-											<img src="' . $attachment['href'] . ';image" alt="" style="width:' . $attachment['width'] . 'px; height:' . $attachment['height'] . 'px"/>';
+											<img src="' . $attachment['href'] . ';image" alt="" style="width:' . $attachment['width'] . 'px; height:' . $attachment['height'] . 'px;"/>';
 
 			echo '
 										</div>';
 		}
 
 		echo '
-										<div class="attachments_bot">
+										<div class="attachment_name">
 											<a href="' . $attachment['href'] . '"><img src="' . $settings['images_url'] . '/icons/clip.png" class="centericon" alt="*" />&nbsp;' . $attachment['name'] . '</a> ';
 
 		if (!$attachment['is_approved'] && $context['can_approve'])
@@ -848,11 +869,6 @@ function template_display_attachments($message, $ignoring)
 
 		echo '
 									</div>';
-
-		// Next attachment line ?
-		if (++$i % $attachments_per_line === 0)
-			echo '
-									<hr />';
 	}
 
 	// If we had unapproved attachments clean up.

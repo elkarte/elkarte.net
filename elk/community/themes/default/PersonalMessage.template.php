@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -78,31 +78,36 @@ function template_pm_below()
 }
 
 /**
- * Messages folder.
+ * Messages folder, used to viewing a listing of messages
  */
 function template_folder()
 {
 	global $context, $scripturl, $options, $txt;
 
-	// Got some messages to display?
+	$start = true;
+
+	// Do we have some messages to display?
 	if ($context['get_pmessage']('message', true))
 	{
 		echo '
 					<div class="forumposts">';
 
-		// Show the helpful titlebar - generally.
-		if ($context['display_mode'] != 1)
-			echo '
-						<h2 class="category_header">
-							', $txt[$context['display_mode'] == 0 ? 'messages' : 'conversation'], '
-						</h2>';
-
 		while ($message = $context['get_pmessage']('message'))
 		{
+			// Show the helpful titlebar - generally.
+			if ($start && $context['display_mode'] != 1)
+			{
+				echo '
+						<h2 class="category_header">
+							', $context['display_mode'] == 0 ? $txt['messages'] : $txt['conversation'] . ': ' . $message['subject'], '
+						</h2>';
+				$start = false;
+			}
+
 			$window_class = $message['alternate'] === 0 ? 'windowbg' : 'windowbg2';
 
 			echo '
-						<div id="msg_', $message['id'], '" class="', $window_class, '">';
+						<a class="pm_anchor" id="msg_', $message['id'], '"></a><div class="', $window_class, '">';
 
 			// Showing the sidebar posting area?
 			if (empty($options['hide_poster_area']))
@@ -119,22 +124,24 @@ function template_folder()
 			// @todo - above needs fixing re document outlining (a11y stuffz).
 			// Show who the message was sent to.
 			echo '
-										<strong> ', $txt['sent_to'], ':</strong> ';
+										<strong>', $txt['sent_to'], ': </strong>';
 
 			// People it was sent directly to....
 			if (!empty($message['recipients']['to']))
-				echo implode(', ', $message['recipients']['to']);
+				echo
+										implode(', ', $message['recipients']['to']);
 			// Otherwise, we're just going to say "some people"...
 			elseif ($context['folder'] != 'sent')
-				echo '(', $txt['pm_undisclosed_recipients'], ')';
+				echo
+										'(', $txt['pm_undisclosed_recipients'], ')';
 
 			echo '
-										<strong> ', $txt['on'], ':</strong> ', $message['time'];
+										<strong> ', $txt['on'], ': </strong>', $message['time'];
 
 			// If we're in the sent items folder, show who it was sent to besides the "To:" people.
 			if (!empty($message['recipients']['bcc']))
 				echo '
-										<br /><strong> ', $txt['pm_bcc'], ':</strong> ', implode(', ', $message['recipients']['bcc']);
+										<br /><strong> ', $txt['pm_bcc'], ': </strong>', implode(', ', $message['recipients']['bcc']);
 
 			if (!empty($message['is_replied_to']))
 				echo '
@@ -155,13 +162,16 @@ function template_folder()
 			// Showing all then give a remove item checkbox
 			if (empty($context['display_mode']))
 				echo '
-									<li class="listlevel1 quickmod_check"><input type="checkbox" name="pms[]" id="deletedisplay', $message['id'], '" value="', $message['id'], '" onclick="document.getElementById(\'deletelisting', $message['id'], '\').checked = this.checked;" class="input_check" /></li>';
+									<li class="listlevel1 quickmod_check">
+										<input type="checkbox" name="pms[]" id="deletedisplay', $message['id'], '" value="', $message['id'], '" onclick="document.getElementById(\'deletelisting', $message['id'], '\').checked = this.checked;" class="input_check" />
+									</li>';
 
 			// Maybe there is something...more :P (this is the more button)
 			if (!empty($context['additional_pm_drop_buttons']))
 			{
 				echo '
-									<li class="listlevel1 subsections" aria-haspopup="true"><a class="linklevel1 post_options">', $txt['post_options'], '</a>
+									<li class="listlevel1 subsections" aria-haspopup="true">
+										<a class="linklevel1 post_options">', $txt['post_options'], '</a>
 										<ul class="menulevel2">';
 
 				foreach ($context['additional_pm_drop_buttons'] as $key => $button)
@@ -351,7 +361,7 @@ function template_subject_list_above()
 {
 	global $context;
 
-	// If we are not in single display mode show the subjects on the top! @todo - Horrible markup here.
+	// If we are not in single display mode show the subjects on the top!
 	if ($context['display_mode'] != 1)
 	{
 		template_subject_list();
@@ -385,7 +395,6 @@ function template_subject_list()
 {
 	global $context, $settings, $txt, $scripturl;
 
-	// @todo - Should really get rid of some of the inline CSS in this table.
 	echo '
 					<table class="table_grid">
 						<thead>
@@ -402,7 +411,7 @@ function template_subject_list()
 								<th class="pm_from">
 									<a href="', $scripturl, '?action=pm;f=', $context['folder'], ';start=', $context['start'], ';sort=name', $context['sort_by'] == 'name' && $context['sort_direction'] == 'up' ? ';desc' : '', $context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : '', '">', ($context['from_or_to'] == 'from' ? $txt['from'] : $txt['to']), $context['sort_by'] == 'name' ? ' <img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
 								</th>
-								<th class="pm_qickmod">
+								<th class="pm_quickmod">
 									<input type="checkbox" onclick="invertAll(this, this.form);" class="input_check" />
 								</th>
 							</tr>
@@ -414,13 +423,14 @@ function template_subject_list()
 							<tr class="standard_row">
 								<td colspan="5">', $txt['pm_alert_none'], '</td>
 							</tr>';
-	$next_alternate = false;
 
 	// Use the query callback to get the subject list
 	while ($message = $context['get_pmessage']('subject'))
 	{
+		$discussion_url = $context['display_mode'] == 0 || $context['current_pm'] == $message['id'] ? '' : ($scripturl . '?action=pm;pmid=' . $message['id'] . ';kstart;f=' . $context['folder'] . ';start=' . $context['start'] . ';sort=' . $context['sort_by'] . ($context['sort_direction'] == 'up' ? ';' : ';desc') . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : ''));
+
 		echo '
-							<tr class="', $next_alternate ? 'standard_row' : 'alternate_row', '">
+							<tr class="standard_row">
 								<td class="pm_icon">
 									<script><!-- // --><![CDATA[
 										currentLabels[', $message['id'], '] = {';
@@ -443,19 +453,17 @@ function template_subject_list()
 								<td class="pm_date">', $message['time'], '</td>
 								<td class="pm_subject">',
 									($context['display_mode'] != 0 && $context['current_pm'] == $message['id'] ? '<img src="' . $settings['images_url'] . '/selected.png" alt="*" />' : ''),
-									'<a href="', ($context['display_mode'] == 0 || $context['current_pm'] == $message['id'] ? '' : ($scripturl . '?action=pm;pmid=' . $message['id'] . ';kstart;f=' . $context['folder'] . ';start=' . $context['start'] . ';sort=' . $context['sort_by'] . ($context['sort_direction'] == 'up' ? ';' : ';desc') . ($context['current_label_id'] != -1 ? ';l=' . $context['current_label_id'] : ''))), '#msg_', $message['id'], '">
-										', $message['subject'], $message['is_unread'] ? '&nbsp;<span class="new_posts">' . $txt['new'] . '</span>' : '', '
+									'<a href="', $discussion_url, '#msg_', $message['id'], '">
+										', $message['subject'], '</a>', $message['is_unread'] ? '&nbsp;<a href="' . $discussion_url . '#msg_' . $message['id'] . '" class="new_posts">' . $txt['new'] . '</a>' : '', '
 									</a>
 								</td>
 								<td class="pm_from">
 									', ($context['from_or_to'] == 'from' ? $message['member']['link'] : (empty($message['recipients']['to']) ? '' : implode(', ', $message['recipients']['to']))), '
 								</td>
-								<td class="pm_qiuckmod">
+								<td class="pm_quickmod">
 									<input type="checkbox" name="pms[]" id="deletelisting', $message['id'], '" value="', $message['id'], '"', $message['is_selected'] ? ' checked="checked"' : '', ' onclick="if (document.getElementById(\'deletedisplay', $message['id'], '\')) document.getElementById(\'deletedisplay', $message['id'], '\').checked = this.checked;" class="input_check" />
 								</td>
 							</tr>';
-
-		$next_alternate = !$next_alternate;
 	}
 
 	echo '
@@ -523,99 +531,84 @@ function template_search()
 	<form action="', $scripturl, '?action=pm;sa=search2" method="post" accept-charset="UTF-8" name="searchform" id="searchform">
 		<h2 class="category_header">', $txt['pm_search_title'], '</h2>';
 
+	// Any search errors we need to let them know about
 	if (!empty($context['search_errors']))
-	{
 		echo '
-		<div class="errorbox">
-			', implode('<br />', $context['search_errors']['messages']), '
-		</div>';
-	}
+		<div class="errorbox">', implode('<br />', $context['search_errors']['messages']), '</div>';
 
-	// Basic search
-	if ($context['simple_search'] && (empty($context['minmax_preferences']['pmsearch']) || isset($_GET['basic'])))
-	{
-		echo '
+	// Start with showing the basic search input box
+	echo '
 		<fieldset id="simple_search" class="content">
 			<div id="search_term_input">
-				<label for="search"><strong>', $txt['pm_search_text'], ':</strong>
-				<input type="text" name="search"', !empty($context['search_params']['search']) ? ' value="' . $context['search_params']['search'] . '"' : '', ' size="40" class="input_text" placeholder="', $txt['search'], '" required="required" autofocus="autofocus" /></label>
+				<label for="search">
+					<strong>', $txt['pm_search_text'], ':</strong>
+				</label>
+				<input type="search" id="search" class="input_text" name="search"', !empty($context['search_params']['search']) ? ' value="' . $context['search_params']['search'] . '"' : '', ' size="40" placeholder="', $txt['search'], '" required="required" autofocus="autofocus" />
 				<input type="submit" name="pm_search" value="', $txt['pm_search_go'], '" class="button_submit" />
+			</div>';
+
+	// Now all the advanced options, hidden or shown by JS based on the users minmax choices
+	echo '
+			<div id="advanced_search" class="content">
+				<dl id="search_options">
+					<dt class="righttext"><label for="searchtype">
+						', $txt['search_match'], ':</label>
+					</dt>
+					<dd>
+						<select name="searchtype">
+							<option value="1"', empty($context['search_params']['searchtype']) ? ' selected="selected"' : '', '>', $txt['pm_search_match_all'], '</option>
+							<option value="2"', !empty($context['search_params']['searchtype']) ? ' selected="selected"' : '', '>', $txt['pm_search_match_any'], '</option>
+						</select>
+					</dd>
+					<dt>
+						<label for="userspec">', $txt['pm_search_user'], ':</label>
+					</dt>
+					<dd>
+						<input type="text" name="userspec" value="', empty($context['search_params']['userspec']) ? '*' : $context['search_params']['userspec'], '" size="40" class="input_text" />
+					</dd>
+					<dt>
+						<label for="sort">', $txt['pm_search_order'], ':</label>
+					</dt>
+					<dd>
+						<select name="sort" id="sort">
+							<option value="relevance|desc">', $txt['pm_search_orderby_relevant_first'], '</option>
+							<option value="id_pm|desc">', $txt['pm_search_orderby_recent_first'], '</option>
+							<option value="id_pm|asc">', $txt['pm_search_orderby_old_first'], '</option>
+						</select>
+					</dd>
+					<dt class="options">
+						', $txt['pm_search_options'], ':
+					</dt>
+					<dd class="options">
+						<label for="show_complete">
+							<input type="checkbox" name="show_complete" id="show_complete" value="1"', !empty($context['search_params']['show_complete']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_show_complete'], '
+						</label><br />
+						<label for="subject_only">
+							<input type="checkbox" name="subject_only" id="subject_only" value="1"', !empty($context['search_params']['subject_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_subject_only'], '
+						</label><br />
+						<label for="sent_only">
+							<input type="checkbox" name="sent_only" id="sent_only" value="1"', !empty($context['search_params']['sent_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_sent_only'], '
+						</label>
+					</dd>
+					<dt class="between">
+						', $txt['pm_search_post_age'], ':
+					</dt>
+					<dd>
+						<label for="minage">', $txt['pm_search_between'], ' <input type="text" id="minage" name="minage" value="', empty($context['search_params']['minage']) ? '0' : $context['search_params']['minage'], '" size="5" maxlength="5" class="input_text" /></label>&nbsp;<label for="maxage">', $txt['pm_search_between_and'], '&nbsp;<input type="text" name="maxage" id="maxage" value="', empty($context['search_params']['maxage']) ? '9999' : $context['search_params']['maxage'], '" size="5" maxlength="5" class="input_text" /></label> ', $txt['pm_search_between_days'], '
+					</dd>
+				</dl>
 			</div>
-			<a class="linkbutton" href="', $scripturl, '?action=pm;sa=search;advanced" onclick="elk_setThemeOption(\'minmax_preferences\', \'1\', null, elk_session_id, elk_session_var, \';minmax_key=pmsearch\');this.href += \';search=\' + escape(document.forms.searchform.search.value);">', $txt['pm_search_advanced'], '</a>
-			<input type="hidden" name="advanced" value="0" />
+			<a id="upshrink_link" href="', $scripturl, '?action=search;advanced" class="linkbutton" style="display:none">', $txt['pm_search_simple'], '</a>';
+
+	// Set the initial search style for the form
+	echo '
+			<input id="advanced" type="hidden" name="advanced" value="1" />
 		</fieldset>';
-	}
-	// Advanced search!
-	else
+
+	// Do we have some labels setup? If so offer to search by them!
+	if ($context['currently_using_labels'])
 	{
 		echo '
-		<fieldset id="advanced_search" class="content">
-			<dl class="settings" id="search_options">
-				<dt>
-					<label for="search"><strong>', $txt['pm_search_text'], ':</strong></label>
-				</dt>
-				<dd>
-					<input type="text" name="search"', !empty($context['search_params']['search']) ? ' value="' . $context['search_params']['search'] . '"' : '', ' size="40" class="input_text" placeholder="', $txt['search'], '" required="required" autofocus="autofocus" />
-					<select name="searchtype">
-						<option value="1"', empty($context['search_params']['searchtype']) ? ' selected="selected"' : '', '>', $txt['pm_search_match_all'], '</option>
-						<option value="2"', !empty($context['search_params']['searchtype']) ? ' selected="selected"' : '', '>', $txt['pm_search_match_any'], '</option>
-					</select>
-				</dd>
-				<dt>
-					<label for="userspec">', $txt['pm_search_user'], ':</label>
-				</dt>
-				<dd>
-					<input type="text" name="userspec" value="', empty($context['search_params']['userspec']) ? '*' : $context['search_params']['userspec'], '" size="40" class="input_text" />
-				</dd>
-				<dt>
-					<label for="sort">', $txt['pm_search_order'], ':</label>
-				</dt>
-				<dd>
-					<select name="sort" id="sort">
-						<option value="relevance|desc">', $txt['pm_search_orderby_relevant_first'], '</option>
-						<option value="id_pm|desc">', $txt['pm_search_orderby_recent_first'], '</option>
-						<option value="id_pm|asc">', $txt['pm_search_orderby_old_first'], '</option>
-					</select>
-				</dd>
-				<dt class="options">
-					', $txt['pm_search_options'], ':
-				</dt>
-				<dd class="options">
-					<label for="show_complete">
-						<input type="checkbox" name="show_complete" id="show_complete" value="1"', !empty($context['search_params']['show_complete']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_show_complete'], '
-					</label><br />
-					<label for="subject_only">
-						<input type="checkbox" name="subject_only" id="subject_only" value="1"', !empty($context['search_params']['subject_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_subject_only'], '
-					</label><br />
-					<label for="sent_only">
-						<input type="checkbox" name="sent_only" id="sent_only" value="1"', !empty($context['search_params']['sent_only']) ? ' checked="checked"' : '', ' class="input_check" /> ', $txt['pm_search_sent_only'], '
-					</label>
-				</dd>
-				<dt class="between">
-					', $txt['pm_search_post_age'], ':
-				</dt>
-				<dd>
-					<label for="minage">', $txt['pm_search_between'], ' <input type="text" id="minage" name="minage" value="', empty($context['search_params']['minage']) ? '0' : $context['search_params']['minage'], '" size="5" maxlength="5" class="input_text" /></label>&nbsp;<label for="maxage">', $txt['pm_search_between_and'], '&nbsp;<input type="text" name="maxage" id="maxage" value="', empty($context['search_params']['maxage']) ? '9999' : $context['search_params']['maxage'], '" size="5" maxlength="5" class="input_text" /></label> ', $txt['pm_search_between_days'], '
-				</dd>
-				<dt>
-				</dt>
-				<dd>
-					<a href="', $scripturl, '?action=pm;sa=search;basic" onclick="elk_setThemeOption(\'minmax_preferences\', \'0\', null, elk_session_id, elk_session_var, \';minmax_key=pmsearch\');this.href += \';search=\' + escape(document.forms.searchform.search.value);" class="linkbutton">', $txt['pm_search_simple'], '</a>
-				</dd>
-			</dl>
-			<input type="hidden" name="advanced" value="1" />';
-
-		if (!$context['currently_using_labels'])
-			echo '
-			<input type="submit" name="pm_search" value="', $txt['pm_search_go'], '" class="right_submit" />';
-
-		echo '
-		</fieldset>';
-
-		// Do we have some labels setup? If so offer to search by them!
-		if ($context['currently_using_labels'])
-		{
-			echo '
 		<fieldset class="content">
 			<h3 class="secondary_header">
 				<span id="category_toggle">&nbsp;
@@ -638,19 +631,17 @@ function template_search()
 			</div>
 			<div class="submitbuttons content">
 				<input type="checkbox" name="all" id="check_all" value="" ', $context['check_all'] ? 'checked="checked"' : '', ' onclick="invertAll(this, this.form, \'searchlabel\');" class="input_check" /><em> <label for="check_all">', $txt['check_all'], '</label></em>
-				<input type="submit" name="pm_search" value="', $txt['pm_search_go'], '" class="right_submit" />
 			</div>
 		</fieldset>';
 
-			// Some javascript for the advanced toggling
-			echo '
-		<script><!-- // --><![CDATA[
+		// And now some javascript for the advanced label toggling
+		addInlineJavascript('
 			createEventListener(window);
 			window.addEventListener("load", initSearch, false);
 
 			var oAdvancedPanelToggle = new elk_Toggle({
 				bToggleEnabled: true,
-				bCurrentlyCollapsed: ', empty($context['minmax_preferences']['pm']) ? 'false' : 'true', ',
+				bCurrentlyCollapsed: ' .(empty($context['minmax_preferences']['pm']) ? 'false' : 'true') . ',
 				aSwappableContainers: [
 					\'advanced_panel_div\'
 				],
@@ -658,29 +649,61 @@ function template_search()
 					{
 						sId: \'advanced_panel_toggle\',
 						classExpanded: \'collapse\',
-						titleExpanded: ', JavaScriptEscape($txt['hide']), ',
+						titleExpanded: ' . JavaScriptEscape($txt['hide']) . ',
 						classCollapsed: \'expand\',
-						titleCollapsed: ', JavaScriptEscape($txt['show']), '
+						titleCollapsed: ' . JavaScriptEscape($txt['show']) . '
 					}
 				],
 				aSwapLinks: [
 					{
 						sId: \'advanced_panel_link\',
-						msgExpanded: ', JavaScriptEscape($txt['pm_search_choose_label']), ',
-						msgCollapsed: ', JavaScriptEscape($txt['pm_search_choose_label']), '
+						msgExpanded: ' . JavaScriptEscape($txt['pm_search_choose_label']) . ',
+						msgCollapsed: ' . JavaScriptEscape($txt['pm_search_choose_label']) . '
 					}
 				],
 				oThemeOptions: {
-					bUseThemeSettings: ', $context['user']['is_guest'] ? 'false' : 'true', ',
+					bUseThemeSettings: ' . ($context['user']['is_guest'] ? 'false' : 'true') . ',
 					sOptionName: \'minmax_preferences\',
 					sSessionId: elk_session_id,
 					sSessionVar: elk_session_var,
 					sAdditionalVars: \';minmax_key=pm\'
 				},
-			});
-		// ]]></script>';
-		}
+			});', true);
 	}
+
+	// And the JS to make the advanced / basic form work
+	addInlineJavascript('
+		// Set the search style
+		document.getElementById(\'advanced\').value = "' . (empty($context['minmax_preferences']['pmsearch']) ? '1' : '0') . '";
+
+		// And allow for the collapsing of the advanced search options
+		var oSearchToggle = new elk_Toggle({
+			bToggleEnabled: true,
+			bCurrentlyCollapsed: ' . (empty($context['minmax_preferences']['pmsearch']) ? 'false' : 'true') . ',
+			funcOnBeforeCollapse: function () {
+				document.getElementById(\'advanced\').value = \'0\';
+			},
+			funcOnBeforeExpand: function () {
+				document.getElementById(\'advanced\').value = \'1\';
+			},
+			aSwappableContainers: [
+				\'advanced_search\'
+			],
+			aSwapLinks: [
+				{
+					sId: \'upshrink_link\',
+					msgExpanded: ' . JavaScriptEscape($txt['search_simple']) . ',
+					msgCollapsed: ' . JavaScriptEscape($txt['search_advanced']) . '
+				}
+			],
+			oThemeOptions: {
+				bUseThemeSettings: ' . ($context['user']['is_guest'] ? 'false' : 'true') . ',
+				sOptionName: \'minmax_preferences\',
+				sSessionId: elk_session_id,
+				sSessionVar: elk_session_var,
+				sAdditionalVars: \';minmax_key=pmsearch\'
+			},
+		});', true);
 
 	echo '
 	</form>';
@@ -701,15 +724,14 @@ function template_search_results()
 			</h2>';
 
 	// complete results ?
-	// @todo - Should really get rid of some of the inline CSS in this table.
 	if (empty($context['search_params']['show_complete']) && !empty($context['personal_messages']))
 		echo '
 			<table class="table_grid">
 				<thead>
 					<tr class="table_head">
-						<th class="lefttext" style="width:30%">', $txt['date'], '</th>
-						<th class="lefttext" style="width:50%">', $txt['subject'], '</th>
-						<th class="lefttext" style="width:20%">', $txt['from'], '</th>
+						<th class="lefttext grid30">', $txt['date'], '</th>
+						<th class="lefttext grid50">', $txt['subject'], '</th>
+						<th class="lefttext grid20">', $txt['from'], '</th>
 					</tr>
 				</thead>
 				<tbody>';
@@ -773,7 +795,7 @@ function template_search_results()
 		{
 			// @todo No context at all of the search?
 			echo '
-			<tr class="', $alternate ? 'windowbg' : 'windowbg2', '" style="vertical-align:top">
+			<tr class="', $alternate ? 'windowbg' : 'windowbg2', '" style="vertical-align: top;">
 				<td>', $message['time'], '</td>
 				<td>', $message['link'], '</td>
 				<td>', $message['member']['link'], '</td>
@@ -871,7 +893,7 @@ function template_send()
 	// To and bcc. Include a button to search for members.
 	echo '
 						<dt>
-							<span', (isset($context['post_error']['no_to']) || isset($context['post_error']['bad_to']) ? ' class="error"' : ''), ' id="caption_to">', $txt['pm_to'], ':</span>
+							<label for="to_control"', (isset($context['post_error']['no_to']) || isset($context['post_error']['bad_to']) ? ' class="error"' : ''), ' id="caption_to">', $txt['pm_to'], ':</label>
 						</dt>';
 
 	// Autosuggest will be added by the javascript later on.
@@ -893,7 +915,7 @@ function template_send()
 	// This BCC row will be hidden by default if javascript is enabled.
 	echo '
 						<dt  class="clear_left" id="bcc_div">
-							<span', (isset($context['post_error']['no_to']) || isset($context['post_error']['bad_bcc']) ? ' class="error"' : ''), ' id="caption_bbc">', $txt['pm_bcc'], ':</span>
+							<label for="bcc_control"', (isset($context['post_error']['no_to']) || isset($context['post_error']['bad_bcc']) ? ' class="error"' : ''), ' id="caption_bbc">', $txt['pm_bcc'], ':</label>
 						</dt>
 						<dd id="bcc_div2">
 							<input type="text" name="bcc" id="bcc_control" value="', $context['bcc_value'], '" tabindex="', $context['tabindex']++, '" size="40" style="width: 130px;" class="input_text" />
@@ -903,22 +925,12 @@ function template_send()
 	// The subject of the PM.
 	echo '
 						<dt class="clear_left">
-							<span', (isset($context['post_error']['no_subject']) ? ' class="error"' : ''), ' id="caption_subject">', $txt['subject'], ':</span>
+							<label for="subject"', (isset($context['post_error']['no_subject']) ? ' class="error"' : ''), ' id="caption_subject">', $txt['subject'], ':</label>
 						</dt>
 						<dd id="pm_subject">
-							<input type="text" name="subject" value="', $context['subject'], '" tabindex="', $context['tabindex']++, '" size="80" maxlength="80"', isset($context['post_error']['no_subject']) ? ' class="error"' : ' class="input_text"', ' placeholder="', $txt['subject'], '" required="required" />
+							<input type="text" id="subject" name="subject" value="', $context['subject'], '" tabindex="', $context['tabindex']++, '" size="80" maxlength="80"', isset($context['post_error']['no_subject']) ? ' class="error"' : ' class="input_text"', ' placeholder="', $txt['subject'], '" required="required" />
 						</dd>
 					</dl>';
-
-	// Showing BBC?
-	if ($context['show_bbc'])
-		echo '
-					<div id="bbcBox_message"></div>';
-
-	// What about smileys?
-	if (!empty($context['smileys']['postform']) || !empty($context['smileys']['popup']))
-		echo '
-					<div id="smileyBox_message"></div>';
 
 	// Show BBC buttons, smileys and textbox.
 	echo '
@@ -926,7 +938,7 @@ function template_send()
 
 	// Require an image to be typed to save spamming?
 	if ($context['require_verification'])
-		template_control_verification($context['visual_verification_id'], '
+		template_verification_controls($context['visual_verification_id'], '
 					<div class="post_verification">
 						<strong>' . $txt['pm_visual_verification_label'] . ':</strong>
 						', '
@@ -934,7 +946,7 @@ function template_send()
 
 	// Send, Preview, spellchecker buttons.
 	echo '
-					<div class="submitbutton">
+					<div id="post_confirm_buttons" class="submitbutton">
 						', template_control_richedit_buttons($context['post_box_name']), '
 					</div>
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -1076,11 +1088,8 @@ function template_send()
 				bBccShowByDefault: ', empty($context['recipients']['bcc']) && empty($context['bcc_value']) ? 'false' : 'true', ',
 				sShowBccLinkTemplate: ', JavaScriptEscape('
 					<a href="#" id="bcc_link">' . $txt['make_bcc'] . '</a> <a href="' . $scripturl . '?action=quickhelp;help=pm_bcc" onclick="return reqOverlayDiv(this.href);"><img class="icon" src="' . $settings['images_url'] . '/helptopics.png" alt="(?)" /></a>'
-	), '
+				), '
 			});
-		';
-
-	echo '
 		// ]]></script>';
 }
 
@@ -1109,11 +1118,11 @@ function template_prune()
 	global $context, $scripturl, $txt;
 
 	echo '
-	<form action="', $scripturl, '?action=pm;sa=prune" method="post" accept-charset="UTF-8" onsubmit="return confirm(\'', $txt['pm_prune_warning'], '\');">
+	<form id="prune_pm" action="', $scripturl, '?action=pm;sa=prune" method="post" accept-charset="UTF-8" onsubmit="return confirm(\'', $txt['pm_prune_warning'], '\');">
 		<h2 class="category_header">', $txt['pm_prune'], '</h2>
 		<div class="windowbg">
 			<div class="content">
-				<p>', $txt['pm_prune_desc1'], ' <input type="text" name="age" size="3" value="14" class="input_text" /> ', $txt['pm_prune_desc2'], '</p>
+				<p><label for="age">', sprintf($txt['pm_prune_desc'], '<input type="text" id="age" name="age" size="3" value="14" class="input_text" />'), '</label></p>
 				<input type="submit" value="', $txt['delete'], '" class="right_submit" />
 			</div>
 		</div>
@@ -1140,7 +1149,7 @@ function template_labels()
 				<th class="lefttext">
 					', $txt['pm_label_name'], '
 				</th>
-				<th style="width:4%">';
+				<th style="width: 4%;">';
 
 	if (count($context['labels']) > 2)
 		echo '
@@ -1170,7 +1179,7 @@ function template_labels()
 				<td>
 					<input type="text" name="label_name[', $label['id'], ']" value="', $label['name'], '" size="30" maxlength="30" class="input_text" />
 				</td>
-				<td class="centertext" style="width:4%">
+				<td style="width: 4%;">
 					<input type="checkbox" class="input_check" name="delete_label[', $label['id'], ']" />
 				</td>
 			</tr>';
@@ -1306,7 +1315,7 @@ function template_rules()
 				<th class="lefttext">
 					', $txt['pm_rule_title'], '
 				</th>
-				<th style="width:4%">';
+				<th style="width: 4%;">';
 
 	if (!empty($context['rules']))
 		echo '
@@ -1334,7 +1343,7 @@ function template_rules()
 				<td>
 					<a href="', $scripturl, '?action=pm;sa=manrules;add;rid=', $rule['id'], '">', $rule['name'], '</a>
 				</td>
-				<td class="centertext" style="width:4%">
+				<td style="width: 4%;">
 					<input type="checkbox" name="delrule[', $rule['id'], ']" class="input_check" />
 				</td>
 			</tr>';
@@ -1354,7 +1363,7 @@ function template_rules()
 	if (!empty($context['rules']))
 		echo '
 			<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
-			<input type="submit" name="delselected" value="', $txt['pm_delete_selected_rule'], '" onclick="return confirm(\'', $txt['pm_js_delete_rule_confirm'], '\');" class="button_submit smalltext" />';
+			<input type="submit" name="delselected" value="', $txt['pm_delete_selected_rule'], '" onclick="return confirm(\'', $txt['pm_js_delete_rule_confirm'], '\');" class="button_submit" />';
 
 	echo '
 		</div>
@@ -1369,41 +1378,21 @@ function template_add_rule()
 	global $context, $txt, $scripturl;
 
 	echo '
-	<script><!-- // --><![CDATA[';
-
-	// All of the groups
-	foreach ($context['groups'] as $id => $title)
-		echo '
-		groups[', $id, '] = "', addslashes($title), '";';
-
-	// And any existing labels
-	foreach ($context['labels'] as $label)
-		if ($label['id'] != -1)
-			echo '
-		labels[', ($label['id'] + 1), '] = "', addslashes($label['name']), '";';
-
-	echo '
-	// ]]></script>';
-
-	echo '
 	<form action="', $scripturl, '?action=pm;sa=manrules;save;rid=', $context['rid'], '" method="post" accept-charset="UTF-8" name="addrule" id="addrule" class="flow_hidden">
 		<h2 class="category_header">', $context['rid'] == 0 ? $txt['pm_add_rule'] : $txt['pm_edit_rule'], '</h2>
 		<div class="windowbg">
 			<div class="content">
 				<dl class="addrules">
 					<dt class="floatleft">
-						<strong>', $txt['pm_rule_name'], ':</strong><br />
+						<strong><label for="rule_name">', $txt['pm_rule_name'], '</label>:</strong><br />
 						<span class="smalltext">', $txt['pm_rule_name_desc'], '</span>
 					</dt>
 					<dd class="floatleft">
-						<input type="text" name="rule_name" value="', empty($context['rule']['name']) ? $txt['pm_rule_name_default'] : $context['rule']['name'], '" size="50" class="input_text" />
+						<input type="text" id="rule_name" name="rule_name" value="', empty($context['rule']['name']) ? $txt['pm_rule_name_default'] : $context['rule']['name'], '" size="50" class="input_text" />
 					</dd>
 				</dl>
-				<fieldset>
+				<fieldset id="criteria">
 					<legend>', $txt['pm_rule_criteria'], '</legend>';
-
-	// Add a dummy criteria to allow expansion for none js users.
-	$context['rule']['criteria'][] = array('t' => '', 'v' => '');
 
 	// For each criteria print it out.
 	$isFirst = true;
@@ -1415,19 +1404,20 @@ function template_add_rule()
 			echo '<br />';
 
 		echo '
-					<select name="ruletype[', $k, ']" id="ruletype', $k, '" onchange="updateRuleDef(', $k, '); rebuildRuleDesc();">
-						<option value="">', $txt['pm_rule_criteria_pick'], ':</option>
-						<option value="mid" ', $criteria['t'] == 'mid' ? 'selected="selected"' : '', '>', $txt['pm_rule_mid'], '</option>
-						<option value="gid" ', $criteria['t'] == 'gid' ? 'selected="selected"' : '', '>', $txt['pm_rule_gid'], '</option>
-						<option value="sub" ', $criteria['t'] == 'sub' ? 'selected="selected"' : '', '>', $txt['pm_rule_sub'], '</option>
-						<option value="msg" ', $criteria['t'] == 'msg' ? 'selected="selected"' : '', '>', $txt['pm_rule_msg'], '</option>
-						<option value="bud" ', $criteria['t'] == 'bud' ? 'selected="selected"' : '', '>', $txt['pm_rule_bud'], '</option>
+					<select name="ruletype[', $k, ']" id="ruletype', $k, '" data-optnum="', $k, '">
+						<option value="">', $txt['pm_rule_criteria_pick'], ':</option>';
+
+		foreach ($context['known_rules'] as $rule)
+			echo '
+						<option value="', $rule, '" ', $criteria['t'] == $rule ? 'selected="selected"' : '', '>', $txt['pm_rule_' . $rule], '</option>';
+
+		echo '
 					</select>
 					<span id="defdiv', $k, '" ', !in_array($criteria['t'], array('gid', 'bud')) ? '' : 'style="display: none;"', '>
-						<input type="text" name="ruledef[', $k, ']" id="ruledef', $k, '" onkeyup="rebuildRuleDesc();" value="', in_array($criteria['t'], array('mid', 'sub', 'msg')) ? $criteria['v'] : '', '" class="input_text" />
+						<input type="text" name="ruledef[', $k, ']" id="ruledef', $k, '" value="', in_array($criteria['t'], array('mid', 'sub', 'msg')) ? $criteria['v'] : '', '" class="input_text" />
 					</span>
 					<span id="defseldiv', $k, '" ', $criteria['t'] == 'gid' ? '' : 'style="display: none;"', '>
-						<select name="ruledefgroup[', $k, ']" id="ruledefgroup', $k, '" onchange="rebuildRuleDesc();">
+						<select class="criteria" name="ruledefgroup[', $k, ']" id="ruledefgroup', $k, '">
 							<option value="">', $txt['pm_rule_sel_group'], '</option>';
 
 		foreach ($context['groups'] as $id => $group)
@@ -1447,15 +1437,15 @@ function template_add_rule()
 
 	echo '
 					<span id="criteriaAddHere"></span><br />
-					<a id="addonjs1" class="linkbutton" href="#" onclick="addCriteriaOption(); return false;"  style="display: none;">', $txt['pm_rule_criteria_add'], '</a>
+					<a id="addonjs1" class="linkbutton" href="#" onclick="addCriteriaOption(); return false;" style="display: none;">', $txt['pm_rule_criteria_add'], '</a>
 					<br /><br />
 					', $txt['pm_rule_logic'], ':
-					<select name="rule_logic" id="logic" onchange="rebuildRuleDesc();">
+					<select name="rule_logic" id="logic"">
 						<option value="and" ', $context['rule']['logic'] == 'and' ? 'selected="selected"' : '', '>', $txt['pm_rule_logic_and'], '</option>
 						<option value="or" ', $context['rule']['logic'] == 'or' ? 'selected="selected"' : '', '>', $txt['pm_rule_logic_or'], '</option>
 					</select>
 				</fieldset>
-				<fieldset>
+				<fieldset id="actions">
 					<legend>', $txt['pm_rule_actions'], '</legend>';
 
 	// As with criteria - add a dummy action for "expansion".
@@ -1471,13 +1461,13 @@ function template_add_rule()
 			echo '<br />';
 
 		echo '
-					<select name="acttype[', $k, ']" id="acttype', $k, '" onchange="updateActionDef(', $k, '); rebuildRuleDesc();">
+					<select name="acttype[', $k, ']" id="acttype', $k, '" data-actnum="', $k, '">
 						<option value="">', $txt['pm_rule_sel_action'], ':</option>
 						<option value="lab" ', $action['t'] == 'lab' ? 'selected="selected"' : '', '>', $txt['pm_rule_label'], '</option>
 						<option value="del" ', $action['t'] == 'del' ? 'selected="selected"' : '', '>', $txt['pm_rule_delete'], '</option>
 					</select>
 					<span id="labdiv', $k, '">
-						<select name="labdef[', $k, ']" id="labdef', $k, '" onchange="rebuildRuleDesc();">
+						<select name="labdef[', $k, ']" id="labdef', $k, '">
 							<option value="">', $txt['pm_rule_sel_label'], '</option>';
 
 		foreach ($context['labels'] as $label)
@@ -1514,18 +1504,8 @@ function template_add_rule()
 
 	// Now setup all the bits!
 	echo '
-	<script><!-- // --><![CDATA[';
-
-	foreach ($context['rule']['criteria'] as $k => $c)
-		echo '
-			updateRuleDef(', $k, ');';
-
-	foreach ($context['rule']['actions'] as $k => $c)
-		echo '
-			updateActionDef(', $k, ');';
-
-	echo '
-			rebuildRuleDesc();';
+	<script><!-- // --><![CDATA[
+		initUpdateRulesActions();';
 
 	// If this isn't a new rule and we have JS enabled remove the JS compatibility stuff.
 	if ($context['rid'])
@@ -1567,30 +1547,28 @@ function template_showPMDrafts()
 		{
 			echo '
 		<div class="', $draft['alternate'] === 0 ? 'windowbg2' : 'windowbg', ' core_posts">
-			<div class="content">
-				<div class="counter">', $draft['counter'], '</div>
-				<div class="topic_details">
-					<h5>
-						<strong>', $draft['subject'], '</strong>&nbsp;
-					</h5>
-					<span class="smalltext">&#171;&nbsp;<strong>', $txt['draft_saved_on'], ':</strong> ', sprintf($txt['draft_days_ago'], $draft['age']), (!empty($draft['remaining']) ? ', ' . sprintf($txt['draft_retain'], $draft['remaining']) : ''), '&#187;</span>
-					<br />
-					<span class="smalltext">&#171;&nbsp;<strong>', $txt['to'], ':</strong> ', implode(', ', $draft['recipients']['to']), '&nbsp;&#187;</span>
-					<br />
-					<span class="smalltext">&#171;&nbsp;<strong>', $txt['pm_bcc'], ':</strong> ', implode(', ', $draft['recipients']['bcc']), '&nbsp;&#187;</span>
-				</div>
-				<div class="list_posts">
-					', $draft['body'], '
-				</div>
-				<ul class="quickbuttons">
-					<li class="listlevel1">
-						<a href="', $scripturl, '?action=pm;sa=showpmdrafts;id_draft=', $draft['id_draft'], ';', $context['session_var'], '=', $context['session_id'], '" class="linklevel1 reply_button">', $txt['draft_edit'], '</a>
-					</li>
-					<li class="listlevel1">
-						<a href="', $scripturl, '?action=pm;sa=showpmdrafts;delete=', $draft['id_draft'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['draft_remove'], '?\');" class="linklevel1 remove_button">', $txt['draft_delete'], '</a>
-					</li>
-				</ul>
+			<div class="counter">', $draft['counter'], '</div>
+			<div class="topic_details">
+				<h5>
+					<strong>', $draft['subject'], '</strong>&nbsp;
+				</h5>
+				<span class="smalltext">&#171;&nbsp;<strong>', $txt['draft_saved_on'], ':</strong> ', sprintf($txt['draft_days_ago'], $draft['age']), (!empty($draft['remaining']) ? ', ' . sprintf($txt['draft_retain'], $draft['remaining']) : ''), '&#187;</span>
+				<br />
+				<span class="smalltext">&#171;&nbsp;<strong>', $txt['to'], ':</strong> ', implode(', ', $draft['recipients']['to']), '&nbsp;&#187;</span>
+				<br />
+				<span class="smalltext">&#171;&nbsp;<strong>', $txt['pm_bcc'], ':</strong> ', implode(', ', $draft['recipients']['bcc']), '&nbsp;&#187;</span>
 			</div>
+			<div class="inner">
+				', $draft['body'], '
+			</div>
+			<ul class="quickbuttons">
+				<li class="listlevel1">
+					<a href="', $scripturl, '?action=pm;sa=showpmdrafts;id_draft=', $draft['id_draft'], ';', $context['session_var'], '=', $context['session_id'], '" class="linklevel1 reply_button">', $txt['draft_edit'], '</a>
+				</li>
+				<li class="listlevel1">
+					<a href="', $scripturl, '?action=pm;sa=showpmdrafts;delete=', $draft['id_draft'], ';', $context['session_var'], '=', $context['session_id'], '" onclick="return confirm(\'', $txt['draft_remove'], '?\');" class="linklevel1 remove_button">', $txt['draft_delete'], '</a>
+				</li>
+			</ul>
 		</div>';
 		}
 	}

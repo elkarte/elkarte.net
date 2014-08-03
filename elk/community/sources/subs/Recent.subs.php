@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,7 +23,7 @@ if (!defined('ELK'))
 /**
  * Get the latest posts of a forum.
  *
- * @param array $latestPostOptions
+ * @param mixed[] $latestPostOptions
  * @return array
  */
 function getLastPosts($latestPostOptions)
@@ -32,7 +32,7 @@ function getLastPosts($latestPostOptions)
 
 	$db = database();
 
-	// Find all the posts.  Newer ones will have higher IDs.  (assuming the last 20 * number are accessable...)
+	// Find all the posts. Newer ones will have higher IDs. (assuming the last 20 * number are accessable...)
 	// @todo SLOW This query is now slow, NEEDS to be fixed.  Maybe break into two?
 	$request = $db->query('substring', '
 		SELECT
@@ -83,7 +83,7 @@ function getLastPosts($latestPostOptions)
 				'link' => empty($row['id_member']) ? $row['poster_name'] : '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['poster_name'] . '</a>'
 			),
 			'subject' => $row['subject'],
-			'short_subject' => shorten_text($row['subject'], !empty($modSettings['subject_length']) ? $modSettings['subject_length'] : 24),
+			'short_subject' => shorten_text($row['subject'], $modSettings['subject_length']),
 			'preview' => $row['body'],
 			'time' => standardTime($row['poster_time']),
 			'html_time' => htmlTime($row['poster_time']),
@@ -101,7 +101,7 @@ function getLastPosts($latestPostOptions)
 /**
  * Callback-function for the cache for getLastPosts().
  *
- * @param array $latestPostOptions
+ * @param mixed[] $latestPostOptions
  */
 function cache_getLastPosts($latestPostOptions)
 {
@@ -123,11 +123,12 @@ function cache_getLastPosts($latestPostOptions)
 /**
  * For a supplied list of message id's, loads the posting details for each.
  *  - Intended to get all the most recent posts.
- *  - Tracks the posts made by this user (from the supplied message list) and loads the id's in to the 'own'
- * 	  or 'any' array.  Reminder The controller needs to check permissions
+ *  - Tracks the posts made by this user (from the supplied message list) and
+ *    loads the id's in to the 'own' or 'any' array.
+ *    Reminder The controller needs to check permissions
  *  - Returns two arrays, one of the posts one of any/own
  *
- * @param array $messages
+ * @param int[] $messages
  * @param int $start
  */
 function getRecentPosts($messages, $start)
@@ -206,10 +207,13 @@ function getRecentPosts($messages, $start)
 				'href' => empty($row['id_member']) ? '' : $scripturl . '?action=profile;u=' . $row['id_member'],
 				'link' => empty($row['id_member']) ? $row['poster_name'] : '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['poster_name'] . '</a>'
 			),
+			'body' => $row['body'],
 			'message' => $row['body'],
-			'can_reply' => false,
-			'can_mark_notify' => false,
-			'can_delete' => false,
+			'tests' => array(
+				'can_reply' => false,
+				'can_mark_notify' => false,
+				'can_delete' => false,
+			),
 			'delete_possible' => ($row['id_first_msg'] != $row['id_msg'] || $row['id_last_msg'] == $row['id_msg']) && (empty($modSettings['edit_disable_time']) || $row['poster_time'] + $modSettings['edit_disable_time'] * 60 >= time()),
 		);
 
@@ -220,7 +224,6 @@ function getRecentPosts($messages, $start)
 	$db->free_result($request);
 
 	return array($posts, $board_ids);
-
 }
 
 /**

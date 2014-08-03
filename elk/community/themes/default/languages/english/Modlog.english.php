@@ -1,8 +1,6 @@
 <?php
 // Version: 1.0; Modlog
 
-global $scripturl;
-
 $txt['modlog_date'] = 'Date';
 $txt['modlog_member'] = 'Member';
 $txt['modlog_position'] = 'Position';
@@ -17,8 +15,8 @@ $txt['modlog_ac_unapprove'] = 'Unapproved message &quot;{subject}&quot; in &quot
 $txt['modlog_ac_lock'] = 'Locked &quot;{topic}&quot;';
 $txt['modlog_ac_warning'] = 'Warned {member} for &quot;{message}&quot;';
 $txt['modlog_ac_unlock'] = 'Unlocked &quot;{topic}&quot;';
-$txt['modlog_ac_sticky'] = 'Stickied &quot;{topic}&quot;';
-$txt['modlog_ac_unsticky'] = 'Un-Stickied &quot;{topic}&quot;';
+$txt['modlog_ac_sticky'] = 'Pinned &quot;{topic}&quot;';
+$txt['modlog_ac_unsticky'] = 'Unpinned &quot;{topic}&quot;';
 $txt['modlog_ac_delete'] = 'Deleted &quot;{subject}&quot; by &quot;{member}&quot; from &quot;{topic}&quot;';
 $txt['modlog_ac_delete_member'] = 'Deleted member &quot;{name}&quot;';
 $txt['modlog_ac_remove'] = 'Removed topic &quot;{topic}&quot; from &quot;{board}&quot;';
@@ -48,6 +46,8 @@ $txt['modlog_ac_modify_warn_template'] = 'Edited the warning template: &quot;{te
 $txt['modlog_ac_delete_warn_template'] = 'Deleted the warning template: &quot;{template}&quot;';
 
 $txt['modlog_ac_ban'] = 'Added ban triggers:';
+$txt['modlog_ac_ban_update'] = 'Edited ban triggers:';
+$txt['modlog_ac_ban_remove'] = 'Removed ban triggers:';
 $txt['modlog_ac_ban_trigger_member'] = ' <em>Member:</em> {member}';
 $txt['modlog_ac_ban_trigger_email'] = ' <em>Email:</em> {email}';
 $txt['modlog_ac_ban_trigger_ip_range'] = ' <em>IP:</em> {ip_range}';

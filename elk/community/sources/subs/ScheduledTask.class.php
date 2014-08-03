@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -22,15 +22,20 @@ if (!defined('ELK'))
 
 /**
  * This class handles known scheduled tasks.
- * Each method implements a task, and it's called automatically for the task to run.
+ *
+ * - Each method implements a task, and
+ * - it's called automatically for the task to run.
+ *
+ * @package ScheduledTasks
  */
-class ScheduledTask
+class Scheduled_Task
 {
 	/**
 	 * Function to sending out approval notices to moderators.
-	 * It checks who needs to receive approvals notifications and sends emails.
+	 *
+	 * - It checks who needs to receive approvals notifications and sends emails.
 	 */
-	function approval_notification()
+	public function approval_notification()
 	{
 		global $scripturl, $txt;
 
@@ -242,13 +247,14 @@ class ScheduledTask
 
 	/**
 	 * This function does daily cleaning up:
-	 *  - decrements warning levels if it's enabled
-	 *  - consolidate spider statistics
-	 *  - fix MySQL version
-	 *  - regenerate Diffie-Hellman keys for OpenID
-	 *  - remove obsolete login history logs
+	 *
+	 * - decrements warning levels if it's enabled
+	 * - consolidate spider statistics
+	 * - fix MySQL version
+	 * - regenerate Diffie-Hellman keys for OpenID
+	 * - remove obsolete login history logs
 	 */
-	function daily_maintenance()
+	public function daily_maintenance()
 	{
 		global $modSettings, $db_type;
 
@@ -361,7 +367,7 @@ class ScheduledTask
 	/**
 	 * Auto optimize the database.
 	 */
-	function auto_optimize()
+	public function auto_optimize()
 	{
 		global $modSettings, $db_prefix;
 
@@ -407,12 +413,13 @@ class ScheduledTask
 
 	/**
 	 * Send out a daily email of all subscribed topics, to members.
-	 * It sends notifications about replies or new topics,
+	 *
+	 * - It sends notifications about replies or new topics,
 	 * and moderation actions.
 	 */
-	function daily_digest()
+	public function daily_digest()
 	{
-		global $is_weekly, $txt, $mbname, $scripturl, $context, $modSettings, $boardurl;
+		global $is_weekly, $txt, $mbname, $scripturl, $modSettings, $boardurl;
 
 		$db = database();
 
@@ -445,6 +452,7 @@ class ScheduledTask
 		$members = array();
 		$langs = array();
 		$notify = array();
+		$boards = array();
 		while ($row = $db->fetch_assoc($request))
 		{
 			if (!isset($members[$row['id_member']]))
@@ -471,10 +479,9 @@ class ScheduledTask
 		if (empty($boards))
 			return true;
 
-		require_once(SUBSDIR . '/Boards.subs.php');
 		// Just get the board names.
-
-		$boards = fetchBoardsInfo(array('boards' => $boards));
+		require_once(SUBSDIR . '/Boards.subs.php');
+		$boards = fetchBoardsInfo(array('boards' => $boards), array('override_permissions' => true));
 
 		if (empty($boards))
 			return true;
@@ -632,9 +639,6 @@ class ScheduledTask
 		// Right - send out the silly things - this will take quite some space!
 		foreach ($members as $mid => $member)
 		{
-			// Right character set!
-			$context['character_set'] = 'UTF-8';
-
 			// Do the start stuff!
 			$email = array(
 				'subject' => $mbname . ' - ' . $langtxt[$lang]['subject'],
@@ -802,11 +806,11 @@ class ScheduledTask
 
 	/**
 	 * Sends out email notifications for new/updated topics.
-	 * Like the daily stuff - just seven times less regular ;)
 	 *
-	 * This method forwards to daily_digest()
+	 * - Like the daily stuff - just seven times less regular ;)
+	 * - This method forwards to daily_digest()
 	 */
-	function weekly_digest()
+	public function weekly_digest()
 	{
 		global $is_weekly;
 
@@ -816,72 +820,14 @@ class ScheduledTask
 	}
 
 	/**
-	 * This task retrieves files from the official server.
+	 * This task retrieved files from the official server.
+	 * This task is no longer used and the method remains only to avoid
+	 * "last minute" problems, it will be removed from 1.1 version
+	 *
+	 * @deprecated since 1.0 - will be removed in 1.1
 	 */
-	function fetchFiles()
+	public function fetchFiles()
 	{
-		global $txt, $language, $forum_version, $modSettings, $context;
-
-		$db = database();
-
-		// What files do we want to get
-		$request = $db->query('', '
-			SELECT id_file, filename, path, parameters
-			FROM {db_prefix}admin_info_files',
-			array(
-			)
-		);
-
-		$js_files = array();
-		$errors = 0;
-
-		while ($row = $db->fetch_assoc($request))
-		{
-			$js_files[$row['id_file']] = array(
-				'filename' => $row['filename'],
-				'path' => $row['path'],
-				'parameters' => sprintf($row['parameters'], $language, urlencode($modSettings['time_format']), urlencode($forum_version)),
-			);
-		}
-		$db->free_result($request);
-
-		// We're gonna need fetch_web_data() to pull this off.
-		require_once(SUBSDIR . '/Package.subs.php');
-
-		// Just in case we run into a problem.
-		loadEssentialThemeData();
-		loadLanguage('Errors', $language, false);
-
-		foreach ($js_files as $ID_FILE => $file)
-		{
-			// Create the url
-			$server = empty($file['path']) || (substr($file['path'], 0, 7) != 'http://' && substr($file['path'], 0, 8) != 'https://') ? 'http://www.elkarte.net' : '';
-			$url = $server . (!empty($file['path']) ? $file['path'] : $file['path']) . $file['filename'] . (!empty($file['parameters']) ? '?' . $file['parameters'] : '');
-
-			// Get the file
-			$file_data = fetch_web_data($url);
-
-			// If we are tossing errors - give up - the site might be down.
-			if ($file_data === false && $errors++ > 2)
-			{
-				$context['scheduled_errors']['fetchFiles'][] = sprintf($txt['st_cannot_retrieve_file'], $url);
-				log_error(sprintf($txt['st_cannot_retrieve_file'], $url));
-				return false;
-			}
-			elseif ($file_data !== false)
-			{
-				// Save the update to the database
-				$db->query('substring', '
-					UPDATE {db_prefix}admin_info_files
-					SET data = SUBSTRING({string:file_data}, 1, 65534)
-					WHERE id_file = {int:id_file}',
-					array(
-						'id_file' => $ID_FILE,
-						'file_data' => $file_data,
-					)
-				);
-			}
-		}
 		return true;
 	}
 
@@ -889,7 +835,7 @@ class ScheduledTask
 	 * Schedule birthday emails.
 	 * (aka "Happy birthday!!")
 	 */
-	function birthdayemails()
+	public function birthdayemails()
 	{
 		global $modSettings, $txt, $txtBirthdayEmails;
 
@@ -970,13 +916,15 @@ class ScheduledTask
 	}
 
 	/**
-	 * Weekly maintenance:
-	 *  - remove empty or temporary settings
-	 *  - prune logs
-	 *  - obsolete paid subscriptions
-	 *  - clear sessions table
+	 * Weekly maintenance taks
+	 *
+	 * What it does:
+	 * - remove empty or temporary settings
+	 * - prune logs
+	 * - obsolete paid subscriptions
+	 * - clear sessions table
 	 */
-	function weekly_maintenance()
+	public function weekly_maintenance()
 	{
 		global $modSettings;
 
@@ -1096,10 +1044,8 @@ class ScheduledTask
 						'not_ignored' => 0,
 					)
 				);
-
 				while ($row = $db->fetch_row($result))
 					$reports[] = $row[0];
-
 				$db->free_result($result);
 
 				if (!empty($reports))
@@ -1176,10 +1122,11 @@ class ScheduledTask
 
 	/**
 	 * Perform the standard checks on expiring/near expiring subscriptions:
-	 *  - remove expired subscriptions
-	 *  - notify of subscriptions about to expire
+	 *
+	 * - remove expired subscriptions
+	 * - notify of subscriptions about to expire
 	 */
-	function paid_subscriptions()
+	public function paid_subscriptions()
 	{
 		global $scripturl, $modSettings, $language;
 
@@ -1264,9 +1211,10 @@ class ScheduledTask
 
 	/**
 	 * Check for un-posted attachments is something we can do once in a while :P
-	 * This function uses opendir cycling through all the attachments
+	 *
+	 * - This function uses opendir cycling through all the attachments
 	 */
-	function remove_temp_attachments()
+	public function remove_temp_attachments()
 	{
 		global $context, $txt;
 
@@ -1308,9 +1256,10 @@ class ScheduledTask
 
 	/**
 	 * Check for move topic notices that have past their best by date:
-	 *  - remove them if the time has expired.
+	 *
+	 * - remove them if the time has expired.
 	 */
-	function remove_topic_redirect()
+	public function remove_topic_redirect()
 	{
 		$db = database();
 
@@ -1348,7 +1297,7 @@ class ScheduledTask
 	/**
 	 * Check for old drafts and remove them
 	 */
-	function remove_old_drafts()
+	public function remove_old_drafts()
 	{
 		global $modSettings;
 
@@ -1372,7 +1321,6 @@ class ScheduledTask
 				'poster_time_old' => time() - (86400 * $modSettings['drafts_keep_days']),
 			)
 		);
-
 		while ($row = $db->fetch_row($request))
 			$drafts[] = (int) $row[0];
 		$db->free_result($request);
@@ -1388,10 +1336,11 @@ class ScheduledTask
 	}
 
 	/**
-	 * If we can't run this via cron, run it as a task instead
 	 * Fetch emails from an imap box and process them
+	 *
+	 * - If we can't run this via cron, run it as a task instead
 	 */
-	function maillist_fetch_IMAP()
+	public function maillist_fetch_IMAP()
 	{
 		// Only should be run if the user can't set up a proper cron job and can not pipe emails
 		require_once(BOARDDIR . '/email_imap_cron.php');
@@ -1402,7 +1351,7 @@ class ScheduledTask
 	/**
 	 * Check for followups from removed topics and remove them from the table
 	 */
-	function remove_old_followups()
+	public function remove_old_followups()
 	{
 		global $modSettings;
 
@@ -1437,11 +1386,13 @@ class ScheduledTask
 	}
 
 	/**
-	 * Re-syncs if a user can access a mention, for example if they loose or gain access
-	 * to a board, this will correct the viewing of the mention table.  Since this can be
-	 * a large job it is run as a scheduled immediate task
+	 * Re-syncs if a user can access a mention,
+	 *
+	 * - for example if they loose or gain access to a board, this will correct
+	 * the viewing of the mention table.  Since this can be a large job it is run
+	 * as a scheduled immediate task
 	 */
-	function user_access_mentions()
+	public function user_access_mentions()
 	{
 		global $modSettings;
 
@@ -1458,80 +1409,70 @@ class ScheduledTask
 					continue;
 
 				require_once(SUBSDIR . '/Boards.subs.php');
+				require_once(SUBSDIR . '/Mentions.subs.php');
+				require_once(SUBSDIR . '/Members.subs.php');
+
 				$user_see_board = memberQuerySeeBoard($member);
+				$limit = 100;
 
-				// If you are admin how the heck did you end up here?
-				if ($user_see_board == '1=1')
+				// We need to repeat this twice: once to find the boards the user can access,
+				// once for those he cannot access
+				foreach (array('can', 'cannot') as $can)
 				{
-					// Drop it
-					unset($user_access_mentions[$member]);
+					// Let's always start from the begin
+					$start = $begin;
 
-					// And save everything for the next run
-					updateSettings(array('user_access_mentions' => serialize($user_access_mentions)));
-				}
-				// Here you are someone that may or may not be able to access a certain board
-				else
-				{
-					$limit = 100;
-
-					require_once(SUBSDIR . '/Mentions.subs.php');
-
-					// We need to repeat this twice: once to find the boards the user can access,
-					// once for those he cannot access
-					foreach (array('can', 'cannot') as $can)
+					while (true)
 					{
-						// Let's always start from the begin
-						$start = $begin;
+						// Find all the mentions that this user can or cannot see
+						$request = $db->query('', '
+							SELECT mnt.id_mention
+							FROM {db_prefix}log_mentions as mnt
+								LEFT JOIN {db_prefix}messages AS m ON (m.id_msg = mnt.id_msg)
+								LEFT JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board)
+							WHERE mnt.id_member = {int:current_member}
+								AND mnt.mention_type IN ({array_string:mention_types})
+								AND {raw:user_see_board}
+							LIMIT {int:start}, {int:limit}',
+							array(
+								'current_member' => $member,
+								'mention_types' => array('men', 'like', 'rlike'),
+								'user_see_board' => ($can == 'can' ? '' : 'NOT ') . $user_see_board,
+								'start' => $start,
+								'limit' => $limit,
+							)
+						);
+						$mentions = array();
+						while ($row = $db->fetch_assoc($request))
+							$mentions[] = $row['id_mention'];
+						$db->free_result($request);
 
-						while (true)
-						{
-							// Find all the mentions that this user can or cannot see
-							$request = $db->query('', '
-								SELECT mnt.id_mention
-								FROM {db_prefix}log_mentions as mnt
-									LEFT JOIN {db_prefix}messages AS m ON (m.id_msg = mnt.id_msg)
-									LEFT JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board)
-								WHERE mnt.id_member = {int:current_member}
-									AND mnt.mention_type IN ({array_string:mention_types})
-									AND {raw:user_see_board}
-								LIMIT {int:start}, {int:limit}',
-								array(
-									'current_member' => $member,
-									'mention_types' => array('men', 'like', 'rlike'),
-									'user_see_board' => ($can == 'can' ? '' : 'NOT ') . $user_see_board,
-									'start' => $start,
-									'limit' => $limit,
-								)
-							);
-							$mentions = array();
-							while ($row = $db->fetch_assoc($request))
-								$mentions[] = $row['id_mention'];
-							$db->free_result($request);
+						// If we found something toggle them and increment the start for the next round
+						if (!empty($mentions))
+							toggleMentionsAccessibility($mentions, $can == 'can');
+						// Otherwise it means we have finished with this access level for this member
+						else
+							break;
 
-							// If we found something toggle them and increment the start for the next round
-							if (!empty($mentions))
-								toggleMentionsAccessibility($mentions, $can == 'can');
-							// Otherwise it means we have finished with this access level for this member
-							else
-								break;
-
-							// Next batch
-							$start += $limit;
-						}
+						// Next batch
+						$start += $limit;
 					}
-
-					// Drop the member
-					unset($user_access_mentions[$member]);
-
-					// And save everything for the next run
-					updateSettings(array('user_access_mentions' => serialize($user_access_mentions)));
-
-					// Run this only once for each user, it may be quite heavy, let's split up the load
-					break;
 				}
+
+				// Drop the member
+				unset($user_access_mentions[$member]);
+
+				// And save everything for the next run
+				updateSettings(array('user_access_mentions' => serialize($user_access_mentions)));
+
+				// Count helps keep things correct
+				countUserMentions(false, '', $member);
+
+				// Run this only once for each user, it may be quite heavy, let's split up the load
+				break;
 			}
 
-			// If there is no more users, scheduleTaskImmediate can be stopped
+			// If there are no more users, scheduleTaskImmediate can be stopped
 			if (empty($user_access_mentions))
 				removeScheduleTaskImmediate('user_access_mentions', false);
 
@@ -1539,10 +1480,10 @@ class ScheduledTask
 		}
 		else
 		{
-			$start = !empty($modSettings['user_access_mentions']) ? $modSettings['user_access_mentions'] : 0;
 			// Checks 10 users at a time, the scheduled task is set to run once per hour, so 240 users a day
 			// @todo <= I know you like it Spuds! :P It may be necessary to set it to something higher.
 			$limit = 10;
+			$current_check = !empty($modSettings['mentions_member_check']) ? $modSettings['mentions_member_check'] : 0;
 
 			require_once(SUBSDIR . '/Members.subs.php');
 			require_once(SUBSDIR . '/Mentions.subs.php');
@@ -1554,7 +1495,7 @@ class ScheduledTask
 				WHERE id_member > {int:last_id_member}
 					AND mention_type IN ({array_string:mention_types})',
 				array(
-					'last_id_member' => !empty($modSettings['mentions_member_check']) ? $modSettings['mentions_member_check'] : 0,
+					'last_id_member' => $current_check,
 					'mention_types' => array('men', 'like', 'rlike'),
 				)
 			);
@@ -1563,7 +1504,7 @@ class ScheduledTask
 			$db->free_result($request);
 
 			if ($remaining == 0)
-				$modSettings['mentions_member_check'] = 0;
+				$current_check = 0;
 
 			// Grab users with mentions
 			$request = $db->query('', '
@@ -1573,14 +1514,14 @@ class ScheduledTask
 					AND mention_type IN ({array_string:mention_types})
 				LIMIT {int:limit}',
 				array(
-					'last_id_member' => !empty($modSettings['mentions_member_check']) ? $modSettings['mentions_member_check'] : 0,
+					'last_id_member' => $current_check,
 					'mention_types' => array('men', 'like', 'rlike'),
 					'limit' => $limit,
 				)
 			);
 
 			// Remember where we are
-			updateSettings(array('mentions_member_check' => $modSettings['mentions_member_check'] + $limit));
+			updateSettings(array('mentions_member_check' => $current_check + $limit));
 
 			while ($row = $db->fetch_assoc($request))
 			{
@@ -1588,7 +1529,7 @@ class ScheduledTask
 				$user_see_board = memberQuerySeeBoard($row['id_member']);
 
 				// Find out if this user cannot see something that was supposed to be able to see
-				$request = $db->query('', '
+				$request2 = $db->query('', '
 					SELECT mnt.id_mention
 					FROM {db_prefix}log_mentions as mnt
 						LEFT JOIN {db_prefix}messages AS m ON (m.id_msg = mnt.id_msg)
@@ -1605,7 +1546,7 @@ class ScheduledTask
 					)
 				);
 				// One row of results is enough: scheduleTaskImmediate!
-				if ($db->num_rows($request) == 1)
+				if ($db->num_rows($request2) == 1)
 				{
 					if (!empty($modSettings['user_access_mentions']))
 						$modSettings['user_access_mentions'] = @unserialize($modSettings['user_access_mentions']);
@@ -1620,7 +1561,11 @@ class ScheduledTask
 						scheduleTaskImmediate('user_access_mentions');
 					}
 				}
+				$db->free_result($request2);
 			}
+			$db->free_result($request);
+
+			return true;
 		}
 	}
 }

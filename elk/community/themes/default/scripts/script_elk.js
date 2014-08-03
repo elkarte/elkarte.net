@@ -3,7 +3,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0 Release Candidate 1
  *
  * This file contains javascript utility functions specific to ElkArte
  */
@@ -101,7 +101,7 @@ function toggleHeaderAJAX(btn, container_id)
 {
 	// Show ajax is in progress
 	ajax_indicator(true);
-	var text_template = '<h3 class="category_header centertext">{text}</h3>';
+	var body_template = '<div class="board_row centertext">{body}</div>';
 
 	$.ajax({
 		type: 'GET',
@@ -110,17 +110,24 @@ function toggleHeaderAJAX(btn, container_id)
 		beforeSend: ajax_indicator(true)
 		})
 		.done(function(request) {
+			if (request === '')
+				return;
+
 			var oElement = $(request).find('elk')[0];
 
 			// No errors
 			if (oElement.getElementsByTagName('error').length === 0)
 			{
-				var text = oElement.getElementsByTagName('text')[0].firstChild.nodeValue.removeEntities();
+				var text_elem = oElement.getElementsByTagName('text'),
+					body_elem = oElement.getElementsByTagName('body');
 
 				$('#' + container_id + ' .pagesection').remove();
-				$('#' + container_id + ' .category_header').remove();
 				$('#' + container_id + ' .topic_listing').remove();
-				$(text_template.replace('{text}', text)).insertBefore('#topic_icons');
+				$('#' + container_id + ' .topic_sorting').remove();
+				if (text_elem.length === 1)
+					$('#' + container_id + ' #unread_header').html(text_elem[0].firstChild.nodeValue.removeEntities());
+				if (body_elem.length === 1)
+					$(body_template.replace('{body}', body_elem[0].firstChild.nodeValue.removeEntities())).insertAfter('#unread_header');
 			}
 		})
 		.fail(function() {
@@ -215,6 +222,7 @@ function markallreadButton(btn)
 function markunreadButton(btn)
 {
 	toggleHeaderAJAX(btn, 'main_content_section');
+
 	return false;
 }
 
@@ -228,7 +236,7 @@ function updateRelativeTime()
 	relative_time_refresh = 3600000;
 
 	$('time').each(function() {
-		var oRelativeTime = new relativeTime($(this).data('timestamp')),
+		var oRelativeTime = new relativeTime($(this).data('timestamp') * 1000, oRttime.referenceTime),
 			time_text = '';
 
 		if (oRelativeTime.seconds())
@@ -273,8 +281,9 @@ function updateRelativeTime()
 			relative_time_refresh = Math.min(relative_time_refresh, 3600000);
 		}
 	});
+	oRttime.referenceTime += relative_time_refresh;
 
-	setTimeout('updateRelativeTime()', relative_time_refresh);
+	setTimeout(function() {updateRelativeTime();}, relative_time_refresh);
 }
 
 /**
@@ -289,26 +298,23 @@ function relativeTime(sFrom, sTo)
 {
 	if (typeof sTo === 'undefined')
 	{
-		if (typeof oRttime.currentTime === 'undefined')
-			this.dateTo = new Date();
-		else
-			this.dateTo = new Date(oRttime.currentTime * 1000);
+		this.dateTo = new Date();
 	}
 	else if (parseInt(sTo) == 'NaN')
 	{
-		sToSplit = sTo.split(/\D/);
+		var sToSplit = sTo.split(/\D/);
 		this.dateTo = new Date(sToSplit[0], --sToSplit[1], sToSplit[2], sToSplit[3], sToSplit[4]);
 	}
 	else
-		this.dateTo = new Date(sTo * 1000);
+		this.dateTo = new Date(sTo);
 
 	if (parseInt(sFrom) == 'NaN')
 	{
-		sFromSplit = sFrom.split(/\D/);
+		var sFromSplit = sFrom.split(/\D/);
 		this.dateFrom = new Date(sFromSplit[0], --sFromSplit[1], sFromSplit[2], sFromSplit[3], sFromSplit[4]);
 	}
 	else
-		this.dateFrom = new Date(sFrom * 1000);
+		this.dateFrom = new Date(sFrom);
 
 	this.time_text = '';
 	this.past_time = (this.dateTo - this.dateFrom) / 1000;
@@ -424,7 +430,7 @@ function revalidateMentions(sForm, sInput)
 			// Was this invoked as the editor plugin?
 			if (all_elk_mentions[i].oOptions.isPlugin)
 			{
-				var $editor = $('#' + all_elk_mentions[i].selector).data("sceditor");
+				var $editor = $editor_data[all_elk_mentions[i].selector];
 
 				cached_names = $editor.opts.mentionOptions.cache.names;
 				cached_queries = $editor.opts.mentionOptions.cache.queries;
@@ -477,17 +483,33 @@ function revalidateMentions(sForm, sInput)
 
 			for (var k = 0, ccount = cached_queries.length; k < ccount; k++)
 			{
-				names = cached_names[cached_queries[k]];
+				var names = cached_names[cached_queries[k]];
+
 				for (var l = 0, ncount = names.length; l < ncount; l++)
 				{
-					pos = body.indexOf(' @' + names[l].name);
-					// If there is something like "{space}@username" AND the following char is a space or a punctation mark
-					if (pos !== -1 && body.charAt(pos + 2 + names[l].name.length + 1).search(boundaries_pattern) === 0)
-						mentions.append($('<input type="hidden" name="uid[]" />').val(names[l].id));
+					if(checkWordOccurrence(body, names[l].name)) {
+						// alert(names[l].name);
+						pos = body.indexOf(' @' + names[l].name);
+
+						// If there is something like "{space}@username" AND the following char is a space or a punctation mark
+						if (pos !== -1 && body.charAt(pos + 2 + names[l].name.length + 1).search(boundaries_pattern) === 0)
+							mentions.append($('<input type="hidden" name="uid[]" />').val(names[l].id));
+					}
 				}
 			}
 		}
 	}
+}
+
+/**
+ * Check whether the word exists in a given paragraph
+ *
+ * @param paragraph to check
+ * @param word to match
+ */
+
+function checkWordOccurrence(paragraph, word){
+  return new RegExp( '\\b' + word + '\\b', 'i').test(paragraph);
 }
 
 /**
@@ -531,6 +553,7 @@ function add_elk_mention(selector, oOptions)
 			scroll: true,
 			containment: 'parent',
 			delay: 150,
+			handle: '', // Restricts sort start click to the specified element, like category_header
 			href: '', // If an error occurs redirect here
 			tolerance: 'intersect', // mode to use for testing whether the item is hovering over another item.
 			setorder: 'serialize', // how to return the data, really only supports serialize and inorder
@@ -549,21 +572,21 @@ function add_elk_mention(selector, oOptions)
 
 		// Divs to hold our responses
 		var ajax_infobar = document.createElement('div'),
-			ajax_errorbox = document.createElement('div');
+			ajax_errorbox = $("<div id='errorContainer'><div/>").appendTo('body');
 
 		// Prepare the infobar and errorbox divs to confirm valid responses or show an error
-		$(ajax_infobar).css({'position': 'fixed', 'top': '0', 'left': '0', 'width': '100%'});
+		$(ajax_infobar).css({'position': 'fixed', 'top': '0', 'left': '0', 'width': '100%', 'z-index': '100'});
 		$("body").append(ajax_infobar);
 		$(ajax_infobar).slideUp();
 
-		$(ajax_errorbox).css({'display': 'none'});
-		$("body").append(ajax_errorbox).attr('id', 'errorContainer');
+		$('#errorContainer').css({'display': 'none'});
 
 		// Find all oSettings.tag and attach the UI sortable action
 		$(oSettings.tag).sortable({
 			opacity: oSettings.opacity,
 			cursor: oSettings.cursor,
 			axis: oSettings.axis,
+			handle: oSettings.handle,
 			containment: oSettings.containment,
 			connectWith: oSettings.connect,
 			placeholder: oSettings.placeholder,
@@ -571,18 +594,39 @@ function add_elk_mention(selector, oOptions)
 			delay: oSettings.delay,
 			scroll: oSettings.scroll,
 			helper: function(e, ui) {
-				// Create a clone of the element being dragged, add it to the body, and hide it
-				$('body').append('<div id="clone" class="' + oSettings.placeholder + '">' + ui.html() + '</div>');
-				$('#clone').hide();
+				// Fist create a helper container
+				var $originals = ui.children(),
+					$helper = ui.clone(),
+					$clone;
 
-				// Now append the clone element to the container we are working in and show it
+				// Replace the helper elements with spans, normally this is a <td> -> <span>
+				// Done to make this container agnostic.
+				$helper.children().each(function() {
+					$(this).replaceWith(function(){
+						return $("<span />", {html: $(this).html()});
+					});
+				});
+
+				// Set the width of each helper cell span to be the width of the original cells
+				$helper.children().each(function(index) {
+					// Set helper cell sizes to match the original sizes
+					return $(this).width($originals.eq(index).width()).css('display', 'inline-block');
+				});
+
+				// Next to overcome an issue where page scrolling does not work, we add the new agnostic helper
+				// element to the body, and hide it
+				$('body').append('<div id="clone" class="' + oSettings.placeholder + '">' + $helper.html() + '</div>');
+				$clone = $('#clone');
+				$clone.hide();
+
+				// Append the clone element to the actual container we are working in and show it
 				setTimeout(function() {
-					$('#clone').appendTo(ui.parent());
-					$("#clone").show();
+					$clone.appendTo(ui.parent());
+					$clone.show();
 				}, 1);
 
-				// The above process allows page scrolls to work
-				return $("#clone");
+				// The above append process allows page scrolls to work while dragging the clone element
+				return $clone;
 			},
 			update: function(e, ui) {
 				// Called when an element is dropped in a new location
@@ -624,7 +668,7 @@ function add_elk_mention(selector, oOptions)
 				postdata += '&received=' + receiver;
 
 				if (oSettings.token !== '')
-					postdata += '&' + oSettings.token['token_var'] + '=' + oSettings.token['token_id'];
+					postdata += '&' + oSettings.token.token_var + '=' + oSettings.token.token_id;
 
 				// And with the post data prepared, lets make the ajax request
 				$.ajax({
@@ -680,11 +724,11 @@ function add_elk_mention(selector, oOptions)
 					}
 				})
 				.always(function(data, textStatus, jqXHR) {
-					if (textStatus === 'success' && $(data).find("elk > tokens > token").length !== 0)
+					if ($(data).find("elk > tokens > token").length !== 0)
 					{
 						// Reset the token
-						oSettings.token['token_id'] = $(data).find("tokens").find('[type="token"]').text();
-						oSettings.token['token_var'] = $(data).find("tokens").find('[type="token_var"]').text();
+						oSettings.token.token_id = $(data).find("tokens").find('[type="token"]').text();
+						oSettings.token.token_var = $(data).find("tokens").find('[type="token_var"]').text();
 					}
 				});
 			}
@@ -701,7 +745,7 @@ function setBoardIds() {
 	// For each category of board
 	$("[id^=category_]").each(function() {
 		var cat = $(this).attr('id').split('category_'),
-				uls = $(this).find("ul");
+			uls = $(this).find("ul");
 
 		// First up add drop zones so we can drag and drop to each level
 		if (uls.length === 1)
@@ -754,127 +798,6 @@ function setBoardIds() {
  */
 ;(function($) {
 	$.fn.expand_pages = function() {
-		var $container,
-			lastPositions = new Array();
-
-		// Hovering over an ... we expand it as much as we can
-		function hover_expand($element)
-		{
-			var $expanded_pages_li = $element,
-				baseurl = eval($element.data('baseurl')),
-				perpage = $element.data('perpage'),
-				firstpage = $element.data('firstpage'),
-				lastpage = $element.data('lastpage'),
-				$exp_pages = $('<li id="expanded_pages" />'),
-				pages = 0,
-				container_width = $element.outerWidth() * 2,
-				width_elements = 3,
-				$scroll_left = null,
-				$scroll_right = null;
-
-			var aModel = $element.closest('.linavPages').prev().find('a').clone();
-
-			if (typeof(lastPositions[firstpage]) === 'undefined')
-				lastPositions[firstpage] = 0;
-
-			$container = $('<ul id="expanded_pages_container">');
-
-			for (var i = firstpage; i < lastpage; i += perpage)
-			{
-				pages++;
-				var bElem = aModel.clone();
-
-				bElem.attr('href', baseurl.replace('%1$d', i)).text(i / perpage + 1);
-				$exp_pages.append(bElem);
-			}
-
-			if (pages > width_elements)
-			{
-				$container.append($('<li />').append(aModel.clone()
-				.attr('id', 'pages_scroll_left')
-				.attr('href', '#').text('<').click(function(ev) {
-					ev.stopPropagation();
-					ev.preventDefault();
-				}).hover(
-					function() {
-						$exp_pages.animate({
-							'margin-left': 0
-						}, 200 * pages);
-					},
-					function() {
-						$exp_pages.stop();
-						lastPositions[firstpage] = $exp_pages.css('margin-left');
-					}
-				)));
-			}
-
-			$container.append($exp_pages);
-			$element.parent().superfish({
-				delay : 300,
-				speed: 175,
-				speedOut: 50,
-				onHide: function () {
-					$container.remove();
-				}
-			});
-
-			$element.append($container);
-
-			if (pages > width_elements)
-			{
-				$container.append($('<li />').append(aModel.clone()
-				.attr('id', 'pages_scroll_right')
-				.attr('href', '#').text('>').click(function(ev) {
-					ev.stopPropagation();
-					ev.preventDefault();
-				}).hover(
-					function() {
-						var $pages = $exp_pages.find('a'),
-							move = 0;
-
-						for (var i = 0, count = $exp_pages.find('a').length; i < count; i++)
-							move += $($pages[i]).outerWidth();
-
-						move = (move + $container.find('#pages_scroll_left').outerWidth()) - ($container.outerWidth() - $container.find('#pages_scroll_right').outerWidth());
-
-						$exp_pages.animate({
-							'margin-left': -move
-						}, 200 * pages);
-					},
-					function() {
-						$exp_pages.stop();
-						lastPositions[firstpage] = $exp_pages.css('margin-left');
-					}
-				)));
-			}
-
-			// @todo this seems broken
-			$exp_pages.find('a').each(function() {
-				if (width_elements > -1)
-					container_width += $element.outerWidth();
-
-				if (width_elements <= 0 || pages >= width_elements)
-				{
-					$container.css({
-						'margin-left': -container_width / 2
-					}).width(container_width);
-				}
-
-				if (width_elements < 0)
-					return false;
-
-				width_elements--;
-			}).click(function (ev) {
-				$expanded_pages_li.attr('onclick', '').off('click');
-			});
-
-			$exp_pages.css({
-				'height': $element.outerHeight(),
-				'padding-left': $container.find('#pages_scroll_left').outerWidth(),
-				'margin-left': lastPositions[firstpage]
-			});
-		};
-
 		// Used when the user clicks on the ... to expand instead of just a hover expand
 		function expand_pages($element)
 		{
@@ -950,11 +873,6 @@ function setBoardIds() {
 			e.preventDefault();
 
 			expand_pages($zhis);
-
-			$zhis.off('mouseenter focus');
-		})
-		.on('mouseenter focus', function() {
-			hover_expand($(this));
 		});
 	};
 })(jQuery);
@@ -999,7 +917,7 @@ function setBoardIds() {
 		var positionTooltip = function(event)
 		{
 			var iPosx = 0,
-					iPosy = 0;
+				iPosy = 0;
 
 			if (!event)
 				event = window.event;
@@ -1135,7 +1053,6 @@ function setBoardIds() {
 				hideTooltip(this);
 				return true;
 			});
-
 		});
 	};
 })(jQuery);
@@ -1186,7 +1103,7 @@ errorbox_handler.prototype.init = function()
 		var current_error_handler = this.opt.self;
 		$(document).ready(function() {
 			var current_error = eval(current_error_handler);
-			$('#' + current_error.opt.editor_id).data("sceditor").addEvent(current_error.opt.editor_id, 'keyup', function() {
+			$editor_data[current_error.opt.editor_id].addEvent(current_error.opt.editor_id, 'keyup', function() {
 				current_error.checkErrors();
 			});
 		});
@@ -1223,7 +1140,7 @@ errorbox_handler.prototype.checkErrors = function()
 				this.removeError(this.oError_box, $elem);
 		}
 
-		this.oError_box.attr("class", "noticebox");
+		this.oError_box.attr("class", "errorbox");
 	}
 
 	// Hide show the error box based on if we have any errors
@@ -1287,23 +1204,23 @@ errorbox_handler.prototype.removeError = function(error_box, error_elem)
 function addAnotherOption(parent, oDtName, oDdName, oData)
 {
 	// Some defaults to use if none are passed
-	oDtName['type'] = oDtName['type'] || 'text';
+	oDtName['type'] = oDtName.type || 'text';
 	oDtName['class'] = oDtName['class'] || 'input_text';
-	oDtName['size'] = oDtName['size'] || '20';
+	oDtName['size'] = oDtName.size || '20';
 
-	oDdName['type'] = oDdName['type'] || 'text';
+	oDdName['type'] = oDdName.type || 'text';
 	oDdName['class'] = oDdName['class'] || 'input_text';
-	oDdName['size'] = oDdName['size'] || '20';
+	oDdName['size'] = oDdName.size || '20';
 	oData = oData || '';
 
 	// Our new <dt> element
 	var newDT = document.createElement('dt'),
 		newInput = document.createElement('input');
 
-	newInput.name = oDtName['name'];
-	newInput.type = oDtName['type'];
+	newInput.name = oDtName.name;
+	newInput.type = oDtName.type;
 	newInput.setAttribute('class', oDtName['class']);
-	newInput.size = oDtName['size'];
+	newInput.size = oDtName.size;
 	newDT.appendChild(newInput);
 
 	// And its matching <dd>
@@ -1315,9 +1232,9 @@ function addAnotherOption(parent, oDtName, oDdName, oData)
 	else
 		newInput = document.createElement('select');
 
-	newInput.name = oDdName['name'];
-	newInput.type = oDdName['type'];
-	newInput.size = oDdName['size'];
+	newInput.name = oDdName.name;
+	newInput.type = oDdName.type;
+	newInput.size = oDdName.size;
 	newInput.setAttribute('class', oDdName['class']);
 	newDD.appendChild(newInput);
 
@@ -1345,4 +1262,158 @@ function addAnotherOption(parent, oDtName, oDdName, oData)
 
 	placeHolder.parentNode.insertBefore(newDT, placeHolder);
 	placeHolder.parentNode.insertBefore(newDD, placeHolder);
+}
+
+/**
+ * Shows the member search dropdown with the serch options
+ */
+function toggle_mlsearch_opt()
+{
+	// If the box is already visible just forget about it
+	if ($('#mlsearch_options').is(':visible'))
+		return;
+
+	// Time to show the droppy
+	$('#mlsearch_options').fadeIn('fast');
+
+	// A click anywhere on the page will close the droppy
+	$('body').on('click', mlsearch_opt_hide);
+	// Except clicking on the box itself or into the search text input
+	$('#mlsearch_options, #mlsearch_input').off('click', mlsearch_opt_hide).click(function(ev) {
+		ev.stopPropagation();
+	});
+}
+
+/**
+ * Hides the member search dropdown and detach the body click event
+ */
+function mlsearch_opt_hide()
+{
+	$('body').off('click', mlsearch_opt_hide);
+	$('#mlsearch_options').slideToggle('fast');
+}
+
+/**
+ * Called when the add/remove poll button is pressed from the post screen
+ *
+ * Used to add add/remove poll input area above the post new topic screen
+ * Updates the message icon to the poll icon
+ * Swaps poll button to match the current condtions
+ *
+ * @param {object} button
+ * @param {int} id_board
+ * @param {string} form_name
+ */
+function loadAddNewPoll(button, id_board, form_name)
+{
+	if (typeof id_board == 'undefined')
+		return true;
+
+	// Find the form and add poll to the url
+	var $form = $('#post_header').closest("form");
+
+	// Change the button label
+	if ($(button).val() === poll_add)
+	{
+		$(button).val(poll_remove);
+
+		// We usually like to have the poll icon associated to polls,
+		// but only if the currently selected is the default one
+		if ($('#icon').val() === 'xx')
+			$('#icon').val('poll').change();
+
+		// Add poll to the form action
+		$form.attr('action', $form.attr('action') + ';poll');
+
+		// If the form already exists...just show it back and go out
+		if ($('#poll_main').length > 0)
+		{
+			$('#poll_main, #poll_options').find('input').each(function() {
+				if ($(this).data('required') === 'required')
+					$(this).attr('required', 'required');
+			});
+
+			$('#poll_main, #poll_options').toggle();
+			return false;
+		}
+	}
+	// Remove the poll section
+	else
+	{
+		if ($('#icon').val() === 'poll')
+			$('#icon').val('xx').change();
+
+		// Remove poll to the form action
+		$form.attr('action', $form.attr('action').replace(';poll', ''));
+
+		$('#poll_main, #poll_options').hide().find('input').each(function() {
+			if ($(this).attr('required') === 'required')
+			{
+				$(this).data('required', 'required');
+				$(this).removeAttr('required');
+			}
+		});
+
+		$(button).val(poll_add);
+
+		return false;
+	}
+
+	// Retrieve the poll area
+	$.ajax({
+		url: elk_scripturl + '?action=poll;sa=interface;xml;board=' + id_board,
+		type: "GET",
+		dataType: "html",
+		beforeSend: ajax_indicator(true)
+	})
+	.done(function (data, textStatus, xhr) {
+		// Find the highest tabindex already present
+		var max_tabIndex = 0;
+		for (var i = 0, n = document.forms[form_name].elements.length; i < n; i++)
+			max_tabIndex = Math.max(max_tabIndex, document.forms[form_name].elements[i].tabIndex);
+
+		// Inject the html
+		$('#post_header').after(data);
+
+		$('#poll_main input, #poll_options input').each(function () {
+			$(this).attr('tabindex', ++max_tabIndex);
+		});
+
+		// Repeated collapse/expand of fieldsets as above
+		$('#poll_main legend, #poll_options legend').click(function() {
+			$(this).siblings().slideToggle("fast");
+			$(this).parent().toggleClass("collapsed");
+		}).each(function () {
+			if ($(this).data('collapsed'))
+			{
+				$(this).siblings().css({display: "none"});
+				$(this).parent().toggleClass("collapsed");
+			}
+		});
+	})
+	.always(function() {
+		// turn off the indicator
+		ajax_indicator(false);
+	});
+
+	return false;
+}
+
+/**
+ * Attempt to prevent browsers from auto completing fields when viewing/editing other members profiles
+ * or when register new member
+ */
+function disableAutoComplete()
+{
+	if (document.addEventListener)
+		document.addEventListener("DOMContentLoaded", disableAutoCompleteNow, false);
+}
+
+/**
+ * Once DOMContentLoaded is triggered, find text and password fields in the forms
+ * turn autocomplete off and empty the value.
+ */
+function disableAutoCompleteNow()
+{
+	$("input[type=password]").attr("autocomplete", "off").val('');
 }

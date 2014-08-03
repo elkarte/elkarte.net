@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -258,7 +258,7 @@ function recacheSpiderNames()
 /**
  * Sort the search engine table by user agent name to avoid misidentification of engine.
  *
- * @deprecated the ordering is done in the query, probably not needed
+ * @deprecated since 1.0 - the ordering is done in the query, probably not needed
  */
 function sortSpiderTable()
 {
@@ -438,7 +438,7 @@ function getSpiderStats($start, $items_per_page, $sort)
  * Get the number of spider stat rows from the log spider stats table
  * (used by createList() callbacks)
  *
- * @param int $time (optional) if specified counts only the entries before that date
+ * @param int|null $time (optional) if specified counts only the entries before that date
  * @return int
  */
 function getNumSpiderStats($time = null)
@@ -500,7 +500,7 @@ function removeSpiderOldStats($time)
 /**
  * Remove all the entries connected to a certain spider (description, entries, stats)
  *
- * @param array $spiders_id an array of spider ids
+ * @param int[] $spiders_id an array of spider ids
  */
 function removeSpiders($spiders_id)
 {

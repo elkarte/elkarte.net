@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -23,18 +23,21 @@ if (!defined('ELK'))
 /**
  * ManageMembers controller deals with members administration, approval,
  * admin-visible list and search in it.
+ *
+ * @package Members
  */
 class ManageMembers_Controller extends Action_Controller
 {
 	/**
 	 * The main entrance point for the Manage Members screen.
-	 * As everyone else, it calls a function based on the given sub-action.
-	 * Called by ?action=admin;area=viewmembers.
-	 * Requires the moderate_forum permission.
+	 *
+	 * What it does:
+	 * - As everyone else, it calls a function based on the given sub-action.
+	 * - Called by ?action=admin;area=viewmembers.
+	 * - Requires the moderate_forum permission.
 	 *
 	 * @uses ManageMembers template
 	 * @uses ManageMembers language file.
-	 *
 	 * @see Action_Controller::action_index()
 	 */
 	public function action_index()
@@ -68,13 +71,11 @@ class ManageMembers_Controller extends Action_Controller
 				'permission' => 'moderate_forum'),
 		);
 
-		call_integration_hook('integrate_manage_members', array(&$subActions));
-
-		// Default to sub action 'all'.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'all';
-
+		// Prepare our action control
 		$action = new Action();
-		$action->initialize($subActions, 'all');
+
+		// Default to sub action 'all', needed for the tabs array below
+		$subAction = $action->initialize($subActions, 'all');
 
 		// You can't pass!
 		$action->isAllowedTo($subAction);
@@ -136,6 +137,9 @@ class ManageMembers_Controller extends Action_Controller
 			),
 		);
 
+		// Call integrate_manage_members
+		call_integration_hook('integrate_manage_members', array(&$subActions));
+
 		// Sort out the tabs for the ones which may not exist!
 		if (!$context['show_activate'] && ($subAction != 'browse' || $_REQUEST['type'] != 'activate'))
 		{
@@ -151,18 +155,21 @@ class ManageMembers_Controller extends Action_Controller
 			unset($context['tabs']['approve']);
 		}
 
+		// Last items for the template
 		$context['page_title'] = $txt['admin_members'];
 		$context['sub_action'] = $subAction;
 
+		// Off we go
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * View all members list. It allows sorting on several columns, and deletion of
-	 * selected members. It also handles the search query sent by
-	 * ?action=admin;area=viewmembers;sa=search.
-	 * Called by ?action=admin;area=viewmembers;sa=all or ?action=admin;area=viewmembers;sa=query.
-	 * Requires the moderate_forum permission.
+	 * selected members.
+	 *
+	 * - It also handles the search query sent by ?action=admin;area=viewmembers;sa=search.
+	 * - Called by ?action=admin;area=viewmembers;sa=all or ?action=admin;area=viewmembers;sa=query.
+	 * - Requires the moderate_forum permission.
 	 *
 	 * @uses the view_members sub template of the ManageMembers template.
 	 */
@@ -179,6 +186,7 @@ class ManageMembers_Controller extends Action_Controller
 			checkSession();
 
 			// Clean the input.
+			$delete = array();
 			foreach ($_POST['delete'] as $key => $value)
 			{
 				// Don't delete yourself, idiot.
@@ -531,19 +539,7 @@ class ManageMembers_Controller extends Action_Controller
 								$difference = $txt[\'never\'];
 							else
 							{
-								$num_days_difference = jeffsdatediff($rowData[\'last_login\']);
-
-								// Today.
-								if (empty($num_days_difference))
-									$difference = $txt[\'viewmembers_today\'];
-
-								// Yesterday.
-								elseif ($num_days_difference == 1)
-									$difference = sprintf(\'1 %1$s\', $txt[\'viewmembers_day_ago\']);
-
-								// X days ago.
-								else
-									$difference = sprintf(\'%1$d %2$s\', $num_days_difference, $txt[\'viewmembers_days_ago\']);
+								$difference = htmlTime($rowData[\'last_login\']);
 							}
 
 							// Show it in italics if they\'re not activated...
@@ -602,7 +598,7 @@ class ManageMembers_Controller extends Action_Controller
 		if (!allowedTo('profile_remove_any'))
 			unset($listOptions['cols']['check'], $listOptions['form'], $listOptions['additional_rows']);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'show_list';
@@ -611,9 +607,11 @@ class ManageMembers_Controller extends Action_Controller
 
 	/**
 	 * Search the member list, using one or more criteria.
-	 * Called by ?action=admin;area=viewmembers;sa=search.
-	 * Requires the moderate_forum permission.
-	 * form is submitted to action=admin;area=viewmembers;sa=query.
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=viewmembers;sa=search.
+	 * - Requires the moderate_forum permission.
+	 * - form is submitted to action=admin;area=viewmembers;sa=query.
 	 *
 	 * @uses the search_members sub template of the ManageMembers template.
 	 */
@@ -635,11 +633,13 @@ class ManageMembers_Controller extends Action_Controller
 
 	/**
 	 * List all members who are awaiting approval / activation, sortable on different columns.
-	 * It allows instant approval or activation of (a selection of) members.
-	 * Called by ?action=admin;area=viewmembers;sa=browse;type=approve
-	 *   or ?action=admin;area=viewmembers;sa=browse;type=activate.
-	 * The form submits to ?action=admin;area=viewmembers;sa=approve.
-	 * Requires the moderate_forum permission.
+	 *
+	 * What it does:
+	 * - It allows instant approval or activation of (a selection of) members.
+	 * - Called by ?action=admin;area=viewmembers;sa=browse;type=approve
+	 * or ?action=admin;area=viewmembers;sa=browse;type=activate.
+	 * - The form submits to ?action=admin;area=viewmembers;sa=approve.
+	 * - Requires the moderate_forum permission.
 	 *
 	 * @uses the admin_browse sub template of the ManageMembers template.
 	 */
@@ -861,8 +861,6 @@ class ManageMembers_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							global $modSettings;
-
 							return host_from_ip($rowData[\'member_ip\']);
 						'),
 						'class' => 'smalltext',
@@ -975,15 +973,17 @@ class ManageMembers_Controller extends Action_Controller
 		}
 
 		// Now that we have all the options, create the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 
 	/**
 	 * This function handles the approval, rejection, activation or deletion of members.
-	 * Called by ?action=admin;area=viewmembers;sa=approve.
-	 * Requires the moderate_forum permission.
-	 * Redirects to ?action=admin;area=viewmembers;sa=browse
+	 *
+	 * What it does:
+	 * - Called by ?action=admin;area=viewmembers;sa=approve.
+	 * - Requires the moderate_forum permission.
+	 * - Redirects to ?action=admin;area=viewmembers;sa=browse
 	 * with the same parameters as the calling page.
 	 */
 	public function action_approve()
@@ -998,6 +998,9 @@ class ManageMembers_Controller extends Action_Controller
 
 		// We also need to the login languages here - for emails.
 		loadLanguage('Login');
+
+		// Start off clean
+		$conditions = array();
 
 		// Sort out where we are going...
 		$current_filter = $conditions['activated_status'] = (int) $_REQUEST['orig_filter'];
@@ -1064,6 +1067,8 @@ class ManageMembers_Controller extends Action_Controller
 		// Maybe we're sending it off for activation?
 		elseif ($_POST['todo'] == 'require_activation')
 		{
+			require_once(SUBSDIR . '/Auth.subs.php');
+
 			// We have to do this for each member I'm afraid.
 			foreach ($member_info as $member)
 			{
