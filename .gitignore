@@ -8,3 +8,4 @@ elk/packages/temp
 */.buildpath
 */.project
 */.settings
+elk/secure/*
