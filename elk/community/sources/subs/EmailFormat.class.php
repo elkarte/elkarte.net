@@ -1,4 +1,5 @@
 <?php
+
 /**
  * class that will reflow/format an email message to make it look like a post again
  *
@@ -6,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -33,85 +34,101 @@ if (!defined('ELK'))
  * Make the call, accepts a string of data and returns it formatted
  * - $body = $formatter->reflow($body, '', $html);
  *
+ * @package Maillist
  */
 class Email_Format
 {
 	/**
 	 * The full message section we will return
+	 * @var string
 	 */
 	private $_body = null;
 
 	/**
 	 * The full message section broken in to parts
+	 * @var mixed[]
 	 */
 	private $_body_array = array();
 
 	/**
 	 * Holds the current quote level we are in
+	 * @var int
 	 */
 	private $_in_quote = 0;
 
 	/**
 	 * Holds the current code block level we are in
+	 * @var int
 	 */
 	private $_in_code = 0;
 
 	/**
 	 * Holds the level of bbc list we are in
+	 * @var int
 	 */
 	private $_in_bbclist = 0;
 
 	/**
 	 * Holds the level of plain list we are in
+	 * @var int
 	 */
 	private $_in_plainlist = 0;
 
 	/**
 	 * Holds if we are in a plain text list
+	 * @var int
 	 */
 	private $_in_list = 0;
 
 	/**
 	 * Set if we have entered an area of the message that is a signature block
+	 * @var boolean
 	 */
 	private $_found_sig = false;
 
 	/**
 	 * Holds the members display name, used for signature check etc.
+	 * @var string
 	 */
 	private $_real_name = null;
 
 	/**
 	 * Tuning value (fudge) used to decide if a line is short
 	 * change with care, used to help figure out wrapping decisions
+	 * @var int
 	 */
 	private $_maillist_short_line = null;
 
 	/**
 	 * Extra items to removed, defined in the acp
+	 * @var string[]
 	 */
 	private $_maillist_leftover_remove = null;
 
 	/**
-	 * Items that may indicatte the start of a signature line, defined in the acp
+	 * Items that may indicate the start of a signature line, defined in the acp
+	 * @var string[]
 	 */
 	private $_maillist_sig_keys = null;
 
 	/**
 	 * Tuning delta value (fudge) to help indicate the last line in a paragraph
 	 * change with care
+	 * @var int
 	 */
 	private $_para_check = 25;
 
 	/**
 	 * tuning value used to define a long line in a signature line
 	 * change with care
+	 * @var int
 	 */
 	private $_sig_longline = 67;
 
 	/**
 	 * Main routine, calls the need functions in the order needed
-	 * Returns a formated string
+	 *
+	 * - Returns a formated string
 	 *
 	 * @param string $data
 	 * @param boolean $html
@@ -137,7 +154,8 @@ class Email_Format
 
 	/**
 	 * Takes a string of data and creates a line by line array broken on newlines
-	 * Builds all needed details for each array element, including length, if its
+	 *
+	 * - Builds all needed details for each array element, including length, if its
 	 * in a quote (&depth) code (&depth) or list (bbc or plain) etc.
 	 *
 	 * @param string $data
@@ -183,7 +201,7 @@ class Email_Format
 	 * Goes through the message array and only inserts line feeds (breaks) where
 	 * they are needed, allowing all other text to flow in one line.
 	 *
-	 * Insets breaks at blank lines, around bbc quote/code/list, text lists,
+	 * - Insets breaks at blank lines, around bbc quote/code/list, text lists,
 	 * signature lines and end of paragraphs ... all assuming it can figure or
 	 * best guess those areas.
 	 */
@@ -258,8 +276,8 @@ class Email_Format
 				// If this line is longer than the line above it we need to do some extra checks
 				if (($i > 0) && ($this->_body_array[$i - 1]['length'] > $this->_maillist_short_line) && !$this->_found_sig && !$this->_in_code && !$this->_in_bbclist)
 				{
-					// If the previous short line did not end in a period or it did and the next line does not start with a capital and passes para check
-					// then it wraps
+					// If the previous short line did not end in a period or it did and the next line does not start
+					// with a capital and passes para check then it wraps
 					if ((substr($this->_body_array[$i - 1]['content'], -1) !== '.') || (substr($this->_body_array[$i - 1]['content'], -1) === '.' && $para_check < $this->_para_check && ($this->_body_array[$i]['content'][0] !== strtoupper($this->_body_array[$i]['content'][0]))))
 						$this->_body_array[$i]['content'] = $this->_body_array[$i]['content'];
 					else
@@ -280,6 +298,7 @@ class Email_Format
 			$this->_body_array[$i + $quotes] = '[/quote]';
 
 		// Join the message back together while dropping null index's
+		$temp = array();
 		foreach ($this->_body_array as $key => $values)
 			$temp[] = $values['content'];
 		$this->_body = trim(implode(' ', array_values($temp)));
@@ -349,7 +368,8 @@ class Email_Format
 
 	/**
 	 * Checks if a string is the start or end of a bbc [quote] line
-	 * Keeps track of the tag depth
+	 *
+	 * - Keeps track of the tag depth
 	 *
 	 * @param string $var
 	 */
@@ -385,7 +405,8 @@ class Email_Format
 
 	/**
 	 * Checks if a string is the start or end of a bbc [code] tag
-	 * Keeps track of the tag depth
+	 *
+	 * - Keeps track of the tag depth
 	 *
 	 * @param string $var
 	 */
@@ -404,7 +425,8 @@ class Email_Format
 
 	/**
 	 * Checks if a string is the start or end of a bbc [list] tag
-	 * Keeps track of the tag depth
+	 *
+	 * - Keeps track of the tag depth
 	 *
 	 * @param string $var
 	 */
@@ -436,9 +458,9 @@ class Email_Format
 	}
 
 	/**
-	 * Callback function for array_walk
+	 * Callback function for array_walk to remove spaces
 	 *
-	 * &nbsp; can be translated to 0xA0, or in UTF8 as chr(0xC2).chr(0xA0)
+	 * - &nbsp; can be translated to 0xA0, or in UTF8 as chr(0xC2).chr(0xA0)
 	 * this function looks to remove all of those in any form.  Needed because
 	 * email is often has its character set mangled.
 	 *

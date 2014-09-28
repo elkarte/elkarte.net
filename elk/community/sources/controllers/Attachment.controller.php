@@ -13,13 +13,18 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
 /**
- * Attachment_Controller class.  It downloads an attachment or avatar, and
- * increments the download count where applicable.
+ * Attachment_Controller class.
+ *
+ * - Handles the downloading of an attachment or avatar
+ * - Handles the uploadign of attachments via Ajax
+ * - increments the download count where applicable
+ *
+ * @package Attachments
  */
 class Attachment_Controller extends Action_Controller
 {
@@ -29,8 +34,148 @@ class Attachment_Controller extends Action_Controller
 	 */
 	public function action_index()
 	{
-		// Default action to execute, guess which one
-		$this->action_dlattach();
+		require_once(SUBSDIR . '/Action.class.php');
+
+		// add an subaction array to act accordingly
+		$subActions = array(
+			'dlattach' => array($this, 'action_dlattach'),
+			'ulattach' => array($this, 'action_ulattach'),
+			'rmattach' => array($this, 'action_rmattach'),
+		);
+
+		// Setup the action handler
+		$action = new Action();
+		$subAction = $action->initialize($subActions, 'dlattach');
+
+		// Call the action
+		$action->dispatch($subAction);
+	}
+
+	/**
+	 * Function to upload attachements via ajax calls
+	 *
+	 * - Currently called by drag drop attachment functionality
+	 * - Pass the form data with session vars
+	 * - Responds back with errors or file data
+	 */
+	public function action_ulattach()
+	{
+		global $context, $modSettings, $txt;
+
+		$resp_data = array();
+		loadLanguage('Errors');
+		$context['attachments']['can']['post'] = !empty($modSettings['attachmentEnable']) && $modSettings['attachmentEnable'] == 1 && (allowedTo('post_attachment') || ($modSettings['postmod_active'] && allowedTo('post_unapproved_attachments')));
+
+		// Set up the template details
+		$template_layers = Template_Layers::getInstance();
+		$template_layers->removeAll();
+		loadTemplate('Json');
+		$context['sub_template'] = 'send_json';
+
+		// Make sure the session is still valid
+		if (checkSession('request', '', false) != '')
+		{
+			$context['json_data'] = array('result' => false, 'data' => $txt['session_timeout_file_upload']);
+			return false;
+		}
+
+		// We should have files, otherwise why are we here?
+		if (isset($_FILES['attachment']))
+		{
+			loadLanguage('Post');
+
+			require_once(SOURCEDIR . '/AttachmentErrorContext.class.php');
+			$attach_errors = Attachment_Error_Context::context();
+			$attach_errors->activate();
+
+			if ($context['attachments']['can']['post'] && empty($_POST['from_qr']))
+			{
+				require_once(SUBSDIR . '/Attachments.subs.php');
+
+				if (isset($_REQUEST['msg']))
+					processAttachments((int) $_REQUEST['msg']);
+				else
+					processAttachments();
+			}
+
+			// Any mistakes?
+			if ($attach_errors->hasErrors())
+			{
+				$errors = $attach_errors->prepareErrors();
+
+				// Bad news for you, the attachments did not process, lets tell them why
+				foreach ($errors as $key => $error)
+					$resp_data[] = $error;
+
+				$context['json_data'] = array('result' => false, 'data' => $resp_data);
+			}
+			// No errors, lets get the details of what we have for our response back
+			else
+			{
+				foreach ($_SESSION['temp_attachments'] as $attachID => $val)
+				{
+					// We need to grab the name anyhow
+					if (!empty($val['tmp_name']))
+					{
+						$resp_data = array(
+							'name' => $val['name'],
+							'attachid' => $attachID,
+							'size' => $val['size']
+						);
+					}
+				}
+
+				$context['json_data'] = array('result' => true, 'data' => $resp_data);
+			}
+		}
+		// Could not find the files you claimed to have sent
+		else
+			$context['json_data'] = array('result' => false, 'data' => $txt['no_files_uploaded']);
+	}
+
+	/**
+	 * Function to remove attachements which were added via ajax calls
+	 * Currently called by drag drop attachment functionality
+	 * Requires file name and file path
+	 * responds back with success or error
+	 */
+	public function action_rmattach()
+	{
+		global $context, $txt;
+
+		// Prepare the template so we can respond with json
+		$template_layers = Template_Layers::getInstance();
+		$template_layers->removeAll();
+		loadTemplate('Json');
+		$context['sub_template'] = 'send_json';
+
+		// Make sure the session is valid
+		if (checkSession('request', '', false) !== '')
+		{
+			loadLanguage('Errors');
+			$context['json_data'] = array('result' => false, 'data' => $txt['session_timeout']);
+
+			return false;
+		}
+
+		// We need a filename and path or we are not going any further
+		if (isset($_REQUEST['attachid']))
+		{
+			require_once(SUBSDIR . '/Attachments.subs.php');
+			$result = removeTempAttachById($_REQUEST['attachid']);
+			if ($result === true)
+				$context['json_data'] = array('result' => true);
+			else
+			{
+				loadLanguage('Errors');
+				$context['json_data'] = array('result' => false, 'data' => $txt[$result]);
+			}
+		}
+		else
+		{
+			loadLanguage('Errors');
+			$context['json_data'] = array('result' => false, 'data' => $txt['attachment_not_found']);
+		}
 	}
 
 	/**
@@ -45,7 +190,6 @@ class Attachment_Controller extends Action_Controller
 		global $txt, $modSettings, $user_info, $context, $topic;
 
 		// Some defaults that we need.
-		$context['character_set'] = 'UTF-8';
 		$context['no_last_modified'] = true;
 
 		// Make sure some attachment was requested!
@@ -90,7 +234,7 @@ class Attachment_Controller extends Action_Controller
 			@ob_end_clean();
 
 		if (!empty($modSettings['enableCompressedOutput']) && @filesize($filename) <= 4194304 && in_array($file_ext, array('txt', 'html', 'htm', 'js', 'doc', 'docx', 'rtf', 'css', 'php', 'log', 'xml', 'sql', 'c', 'java')))
-			@ob_start('ob_gzhandler');
+			ob_start('ob_gzhandler');
 		else
 		{
 			ob_start();
@@ -115,7 +259,7 @@ class Attachment_Controller extends Action_Controller
 			list ($modified_since) = explode(';', $_SERVER['HTTP_IF_MODIFIED_SINCE']);
 			if (strtotime($modified_since) >= filemtime($filename))
 			{
-				ob_end_clean();
+				@ob_end_clean();
 
 				// Answer the question - no, it hasn't been modified ;).
 				header('HTTP/1.1 304 Not Modified');
@@ -127,7 +271,7 @@ class Attachment_Controller extends Action_Controller
 		$eTag = '"' . substr($id_attach . $real_filename . filemtime($filename), 0, 64) . '"';
 		if (!empty($_SERVER['HTTP_IF_NONE_MATCH']) && strpos($_SERVER['HTTP_IF_NONE_MATCH'], $eTag) !== false)
 		{
-			ob_end_clean();
+			@ob_end_clean();
 
 			header('HTTP/1.1 304 Not Modified');
 			exit;

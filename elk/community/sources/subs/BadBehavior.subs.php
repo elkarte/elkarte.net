@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -16,12 +16,15 @@ if (!defined('ELK'))
 
 /**
  * Delete all or some of the entries in the bad behavior log.
- * It applies any necessary filters to deletion.
- * It attempts to TRUNCATE the table to reset the auto_increment.
- * Redirects back to the badbehavior log when done.
  *
+ * What it does:
+ * - It applies any necessary filters to deletion.
+ * - It attempts to TRUNCATE the table to reset the auto_increment.
+ * - Redirects back to the badbehavior log when done.
+ *
+ * @package BadBehavior
  * @param string $type
- * @param array $filter
+ * @param mixed[] $filter
  */
 function deleteBadBehavior($type, $filter)
 {
@@ -37,7 +40,7 @@ function deleteBadBehavior($type, $filter)
 		);
 	}
 	// Deleting all with a filter?
-	elseif ($type === 'delall'  && !empty($filter))
+	elseif ($type === 'delall' && !empty($filter))
 	{
 		$db->query('', '
 			DELETE FROM {db_prefix}log_badbehavior
@@ -66,9 +69,13 @@ function deleteBadBehavior($type, $filter)
 
 /**
  * Get the number of badbehavior log entries.
- * Will take in to acount any current filter value in its count result
  *
- * @param array $filter
+ * What it does:
+ * - Will take in to acount any current filter value in its count result
+ *
+ * @package BadBehavior
+ * @param mixed[] $filter
+ * @return integer
  */
 function getBadBehaviorLogEntryCount($filter)
 {
@@ -91,10 +98,11 @@ function getBadBehaviorLogEntryCount($filter)
 /**
  * Gets the badbehavior log entries that match the specified parameters.
  *
+ * @package BadBehavior
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
- * @param array $filter
+ * @param string|mixed[]|null $filter
  */
 function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 {
@@ -122,7 +130,7 @@ function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 		// Turn the key in to something nice to show
 		$key_response = bb2_get_response($row['valid']);
 
-		//Prevent undefined errors and log ..
+		// Prevent undefined errors and log ..
 		if (isset($key_response[0]) && $key_response[0] == '00000000')
 		{
 			$key_response['response'] = '';
@@ -131,7 +139,7 @@ function getBadBehaviorLogEntries($start, $items_per_page, $sort, $filter = '')
 		}
 
 		$bb_entries[$row['id']] = array(
-			'alternate' => $i %2 == 0,
+			'alternate' => $i % 2 == 0,
 			'ip' => $row['ip'],
 			'request_method' => $row['request_method'],
 			'server_protocol' => $row['server_protocol'],

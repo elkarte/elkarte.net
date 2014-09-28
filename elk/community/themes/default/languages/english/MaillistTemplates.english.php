@@ -28,45 +28,17 @@ $txt['pbe_notify_boards_once_body_body'] = 'A new topic, \'{TOPICSUBJECT}\', has
 
 
 ------------------------------------
-Posting Information: More topics may be posted, but you won\'t receive more email notifications (on this topic) until you return to the board and read some of them.
+Posting Information:
+More topics may be posted, but you won\'t receive more email notifications (on this topic) until you return to the board and read some of them.
+You can reply to this email and have it posted as a topic reply.
 
 {FORUMNAMESHORT} Links:
 
 <*> To visit {FORUMNAMESHORT} on the web, go to:
     {FORUMURL}
 
-<*> You can see this message with attachments and/or images (if any) by using this link:
+<*> You can see this message by using this link:
     {TOPICLINK}
-
-<*> Unsubscribe to this by using this link:
-    {UNSUBSCRIBELINK}
-
-{EMAILREGARDS}';
-
-/*
-	@additional_params: pbbe_notify_boards_once
-		TOPICSUBJECT: The subject of the topic causing the notification
-		TOPICLINK: A link to the topic.
-		FORUMNAMESHORT: Short or nickname for the forum
-		UNSUBSCRIBELINK: Link to unsubscribe from notifications.
-		BOARDNAME: Name of the board the post was made in
-		EMAILREGARDS: The site name signature
-	@description: A member wants to be notified of the first new post in a topic on a board they have subscribed to
-*/
-$txt['pbe_notify_boards_once_subject'] = '[{FORUMNAMESHORT}] {TOPICSUBJECT}';
-$txt['pbe_notify_boards_once_body'] = 'A new topic, \'{TOPICSUBJECT}\', has been started in \'{BOARDNAME}\'.
-
-You can see it at
-    {TOPICLINK}
-
-
-------------------------------------
-Posting Information: More topics may be posted, but you won\'t receive more email notifications (on this topic) until you return to the board and read some of them.
-
-{FORUMNAMESHORT} Links:
-
-<*> To visit {FORUMNAMESHORT} on the web, go to:
-    {FORUMURL}
 
 <*> Unsubscribe to this by using this link:
     {UNSUBSCRIBELINK}
@@ -94,48 +66,19 @@ $txt['pbe_notify_boards_body_body'] = '
 
 
 ------------------------------------
-Posting Information: {POSTERNAME} started the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
+Posting Information:
+{POSTERNAME} started the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
+You can reply to this email and have it posted as a topic reply.
 
 {FORUMNAMESHORT} Links:
 
 <*> To visit {FORUMNAMESHORT} on the web, go to:
     {FORUMURL}
 
-<*> You can see this message with attachments and/or images (if any) by using this link:
+<*> You can see this message by using this link:
     {TOPICLINK}
 
-<*> You can go to your first unread message in the thread by using this link:
-    {TOPICLINKNEW}
-
-<*> Unsubscribe to this by using this link:
-    {UNSUBSCRIBELINK}
-
-{EMAILREGARDS}';
-
-/*
-	@additional_params: pbe_notify_boards
-		TOPICSUBJECT: The subject of the topic causing the notification
-		TOPICLINK: A link to the topic.
-		UNSUBSCRIBELINK: Link to unsubscribe from notifications.
-		FORUMURL: The url to the forum
-		FORUMNAMESHORT: Short or nickname for the forum
-		BOARDNAME: Name of the board the post was made in
-		EMAILREGARDS: The site name signature
-	@description: Notification only of a new topic has been started in a subscribed board
-*/
-$txt['pbe_notify_boards_subject'] = '[{FORUMNAMESHORT}] {TOPICSUBJECT}';
-$txt['pbe_notify_boards_body'] = 'A new topic, \'{TOPICSUBJECT}\', has been started in \'{BOARDNAME}\'.
-
-You can see it at:
-    {TOPICLINK}
-
-------------------------------------
-{FORUMNAMESHORT} Links:
-
-<*> To visit {FORUMNAMESHORT} on the web, go to:
-    {FORUMURL}
-
-<*> You can go to your first unread message in the thread by using this link:
+<*> You can go to your first unread message by using this link:
     {TOPICLINKNEW}
 
 <*> Unsubscribe to this by using this link:
@@ -164,49 +107,19 @@ $txt['pbe_notification_reply_body_body'] = '
 
 
 ------------------------------------
-Posting Information: {POSTERNAME} replied to the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
+Posting Information:
+{POSTERNAME} replied to the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
+You can reply to this email and have it posted as a topic reply.
 
 {FORUMNAMESHORT} Links:
 
 <*> To visit {FORUMNAMESHORT} on the web, go to:
     {FORUMURL}
 
-<*> You can see this message with attachments and/or images (if any) by using this link:
+<*> You can see this message by using this link:
     {TOPICLINK}
 
-<*> You can go to your first unread message in the thread by using this link:
-    {TOPICLINKNEW}
-
-<*> Unsubscribe to this by using this link:
-    {UNSUBSCRIBELINK}
-
-{EMAILREGARDS}';
-
-/*
-	@additional_params: pbe_notification_reply_once
-		TOPICSUBJECT: The subject of the topic causing the notification
-		TOPICLINK: A link to the topic.
-		UNSUBSCRIBELINK: Link to unsubscribe from notifications.
-		FORUMURL: The url to the forum
-		FORUMNAMESHORT: Short or nickname for the forum
-		EMAILREGARDS: The site name signature
-	@description: A reply has been made to topic in a subscribed board, notification without body
-*/
-$txt['pbe_notification_reply_once_subject'] = 'Re: [{FORUMNAMESHORT}] {TOPICSUBJECT}';
-$txt['pbe_notification_reply_once_body'] = '{POSTERNAME} replied to a topic you are watching
-
-View the reply with attachments and/or images (if any) at:
-    {TOPICLINK}
-
-------------------------------------
-Posting Information: More replies may be posted, but you won\'t receive any more notifications until you read the topic.
-
-{FORUMNAMESHORT} Links:
-
-<*> To visit {FORUMNAMESHORT} on the web, go to:
-    {FORUMURL}
-
-<*> You can go to your first unread message in the thread by using this link:
+<*> You can go to your first unread message by using this link:
     {TOPICLINKNEW}
 
 <*> Unsubscribe to this by using this link:
@@ -235,18 +148,20 @@ $txt['pbe_notification_reply_body_once_body'] = '
 
 
 ------------------------------------
-Posting Information: {POSTERNAME} replied to the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
+Posting Information:
+{POSTERNAME} replied to the topic \'{TOPICSUBJECT}\' on the \'{BOARDNAME}\' Board.
 More replies may be posted, but you won\'t receive any more notifications until you read the topic.
+You can reply to this email and have it posted as a reply.
 
 {FORUMNAMESHORT} Links:
 
 <*> To visit {FORUMNAMESHORT} on the web, go to:
     {FORUMURL}
 
-<*> You can see this message with attachments and/or images (if any) by using this link:
+<*> You can see this message by using this link:
     {TOPICLINK}
 
-<*> You can go to your first unread message in the thread by using this link:
+<*> You can go to your first unread message by using this link:
     {TOPICLINKNEW}
 
 <*> Unsubscribe to this by using this link:
@@ -270,12 +185,15 @@ The message they sent you is:
 {MESSAGE}
 
 ------------------------------------
+Posting Information:
+You can reply to this email and have it sent as a PM response to {SENDER}
+
 {FORUMNAMESHORT} Links:
 
 <*> To visit {FORUMNAMESHORT} on the web, go to:
     {FORUMURL}
 
-<*> Reply to this Personal Message here::
+<*> Reply to this Personal Message here:
     {REPLYLINK}
 
 {EMAILREGARDS}';

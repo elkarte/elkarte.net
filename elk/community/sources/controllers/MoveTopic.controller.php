@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -141,7 +141,7 @@ class MoveTopic_Controller extends Action_Controller
 	 */
 	public function action_movetopic2()
 	{
-		global $txt, $board, $topic, $scripturl, $modSettings, $context, $language, $user_info;
+		global $txt, $board, $topic, $scripturl, $context, $language, $user_info;
 
 		if (empty($topic))
 			fatal_lang_error('no_access', false);
@@ -173,22 +173,9 @@ class MoveTopic_Controller extends Action_Controller
 		if (!allowedTo('move_any'))
 		{
 			if ($topic_info['id_member_started'] == $user_info['id'])
-			{
 				isAllowedTo('move_own');
-				$boards = array_merge(boardsAllowedTo('move_own'), boardsAllowedTo('move_any'));
-			}
 			else
 				isAllowedTo('move_any');
-		}
-		else
-			$boards = boardsAllowedTo('move_any');
-
-		// If this topic isn't approved don't let them move it if they can't approve it!
-		if ($modSettings['postmod_active'] && !$context['is_approved'] && !allowedTo('approve_posts'))
-		{
-			// Only allow them to move it to other boards they can't approve it in.
-			$can_approve = !empty($user_info['mod_cache']['ap']) ? $user_info['mod_cache']['ap'] : boardsAllowedTo('approve_posts');
-			$boards = array_intersect($boards, $can_approve);
 		}
 
 		checkSession();
@@ -224,18 +211,7 @@ class MoveTopic_Controller extends Action_Controller
 				if ($all_messages)
 				{
 					// Get a response prefix, but in the forum's default language.
-					if (!isset($context['response_prefix']) && !($context['response_prefix'] = cache_get_data('response_prefix')))
-					{
-						if ($language === $user_info['language'])
-							$context['response_prefix'] = $txt['response_prefix'];
-						else
-						{
-							loadLanguage('index', $language, false);
-							$context['response_prefix'] = $txt['response_prefix'];
-							loadLanguage('index');
-						}
-						cache_put_data('response_prefix', $context['response_prefix'], 600);
-					}
+					$context['response_prefix'] = response_prefix();
 
 					topicSubject($topic_info, $custom_subject, $context['response_prefix'], $all_messages);
 				}
@@ -265,14 +241,14 @@ class MoveTopic_Controller extends Action_Controller
 			));
 
 			// Auto remove this MOVED redirection topic in the future?
-			$redirect_expires = !empty($_POST['redirect_expires']) ? ((int) ($_POST['redirect_expires'] * 60) + time()) : 0;
+			$redirect_expires = !empty($_POST['redirect_expires']) ? (int) $_POST['redirect_expires'] : 0;
 
 			// Redirect to the MOVED topic from topic list?
 			$redirect_topic = isset($_POST['redirect_topic']) ? $topic : 0;
 
 			// And remember the last expiry period too.
 			$_SESSION['move_to_topic']['redirect_topic'] = $redirect_topic;
-			$_SESSION['move_to_topic']['redirect_expires'] = (int) $_POST['redirect_expires'];
+			$_SESSION['move_to_topic']['redirect_expires'] = $redirect_expires;
 
 			$msgOptions = array(
 				'subject' => $txt['moved'] . ': ' . $board_info['subject'],
@@ -285,7 +261,7 @@ class MoveTopic_Controller extends Action_Controller
 				'board' => $board,
 				'lock_mode' => 1,
 				'mark_as_read' => true,
-				'redirect_expires' => $redirect_expires,
+				'redirect_expires' => empty($redirect_expires) ? 0 : ($redirect_expires * 60) + time(),
 				'redirect_topic' => $redirect_topic,
 			);
 

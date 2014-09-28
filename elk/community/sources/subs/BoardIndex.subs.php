@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Beta 2
  *
  */
 
@@ -23,14 +23,14 @@ if (!defined('ELK'))
 
 /**
  * Fetches a list of boards and (optional) categories including
- * statistical information, child boards and moderators.
+ * statistical information, sub-boards and moderators.
  *  - Used by both the board index (main data) and the message index (child
  * boards).
  *  - Depending on the include_categories setting returns an associative
  * array with categories->boards->child_boards or an associative array
  * with boards->child_boards.
  *
- * @param array $boardIndexOptions
+ * @param mixed[] $boardIndexOptions
  * @return array
  */
 function getBoardIndex($boardIndexOptions)
@@ -74,7 +74,7 @@ function getBoardIndex($boardIndexOptions)
 		WHERE {query_see_board}' . (empty($boardIndexOptions['countChildPosts']) ? (empty($boardIndexOptions['base_level']) ? '' : '
 			AND b.child_level >= {int:child_level}') : '
 			AND b.child_level BETWEEN ' . $boardIndexOptions['base_level'] . ' AND ' . ($boardIndexOptions['base_level'] + 1)) . '
-		ORDER BY board_order',
+		ORDER BY' . ($boardIndexOptions['include_categories'] ? ' c.cat_order,' : '') . ' b.board_order',
 		array(
 			'current_member' => $user_info['id'],
 			'child_level' => $boardIndexOptions['base_level'],
@@ -169,7 +169,7 @@ function getBoardIndex($boardIndexOptions)
 				$this_category[$row_board['id_board']]['link_moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $row_board['id_moderator'] . '" title="' . $txt['board_moderator'] . '">' . $row_board['mod_real_name'] . '</a>';
 			}
 		}
-		// Found a child board.... make sure we've found its parent and the child hasn't been set already.
+		// Found a sub-board.... make sure we've found its parent and the child hasn't been set already.
 		elseif (isset($this_category[$row_board['id_parent']]['children']) && !isset($this_category[$row_board['id_parent']]['children'][$row_board['id_board']]))
 		{
 			// A valid child!
@@ -190,7 +190,7 @@ function getBoardIndex($boardIndexOptions)
 				'link' => '<a href="' . $scripturl . '?board=' . $row_board['id_board'] . '.0">' . $row_board['board_name'] . '</a>'
 			);
 
-			// Counting child board posts is... slow :/.
+			// Counting sub-board posts is... slow :/.
 			if (!empty($boardIndexOptions['countChildPosts']) && !$row_board['is_redirect'])
 			{
 				$this_category[$row_board['id_parent']]['posts'] += $row_board['num_posts'];

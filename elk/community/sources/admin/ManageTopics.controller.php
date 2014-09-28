@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -41,14 +41,17 @@ class ManageTopics_Controller extends Action_Controller
 				'permission' => 'admin_forum')
 		);
 
-		// Only one option I'm afraid
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'display';
+		// Control for an action, why not!
+		$action = new Action('manage_topics');
+
+		// Only one option I'm afraid, but integrate_sa_manage_topics may add more
+		$subAction = $action->initialize($subActions, 'display');
+
+		// Page items for the template
 		$context['sub_action'] = $subAction;
 		$context['page_title'] = $txt['manageposts_topic_settings'];
 
 		// Set up action/subaction stuff.
-		$action = new Action();
-		$action->initialize($subActions, 'display');
 		$action->dispatch($subAction);
 	}
 
@@ -70,8 +73,6 @@ class ManageTopics_Controller extends Action_Controller
 		// Retrieve the current config settings
 		$config_vars = $this->_topicSettings->settings();
 
-		call_integration_hook('integrate_modify_topic_settings');
-
 		// Setup the template.
 		$context['sub_template'] = 'show_settings';
 
@@ -82,7 +83,7 @@ class ManageTopics_Controller extends Action_Controller
 			checkSession();
 
 			// Notify addons and integrations of the settings change.
-			call_integration_hook('integrate_save_topic_settings', array(&$config_vars));
+			call_integration_hook('integrate_save_topic_settings');
 
 			// Save the result!
 			Settings_Form::save_db($config_vars);
@@ -105,7 +106,7 @@ class ManageTopics_Controller extends Action_Controller
 	private function _initTopicSettingsForm()
 	{
 		// We're working with them settings.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_topicSettings = new Settings_Form();
@@ -125,10 +126,11 @@ class ManageTopics_Controller extends Action_Controller
 
 		// initialize it with our settings
 		$config_vars = array(
-				// Some simple bools...
+				// Some simple big bools...
 				array('check', 'enableStickyTopics'),
 				array('check', 'enableParticipation'),
 				array('check', 'enableFollowup'),
+				array('check', 'pollMode'),
 			'',
 				// Pagination etc...
 				array('int', 'oldTopicDays', 'postinput' => $txt['manageposts_days'], 'subtext' => $txt['oldTopicDays_zero']),
@@ -146,6 +148,8 @@ class ManageTopics_Controller extends Action_Controller
 				array('check', 'disableCustomPerPage'),
 				array('check', 'enablePreviousNext'),
 		);
+
+		call_integration_hook('integrate_modify_topic_settings', array(&$config_vars));
 
 		return $config_vars;
 	}

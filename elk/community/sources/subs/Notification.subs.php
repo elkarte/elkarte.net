@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -21,14 +21,15 @@ if (!defined('ELK'))
  * checks permissions for each member who is "signed up" for notifications.
  * It will not send 'reply' notifications more than once in a row.
  *
- * @param array $topics - represents the topics the action is happening to.
+ * @param int[]|int $topics - represents the topics the action is happening to.
  * @param string $type - can be any of reply, sticky, lock, unlock, remove,
  *                       move, merge, and split.  An appropriate message will be sent for each.
- * @param array $exclude = array() - members in the exclude array will not be
+ * @param int[]|int $exclude = array() - members in the exclude array will not be
  *                                   processed for the topic with the same key.
- * @param array $members_only = array() - are the only ones that will be sent the notification if they have it on.
- * @param array $pbe = array() - array containing user_info if this is being run as a result of an email posting
+ * @param int[]|int $members_only = array() - are the only ones that will be sent the notification if they have it on.
+ * @param mixed[] $pbe = array() - array containing user_info if this is being run as a result of an email posting
  * @uses Post language file
+ *
  */
 function sendNotifications($topics, $type, $exclude = array(), $members_only = array(), $pbe = array())
 {
@@ -40,12 +41,6 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 	$user_id = (!empty($pbe['user_info']['id']) && !empty($modSettings['maillist_enabled'])) ? $pbe['user_info']['id'] : $user_info['id'];
 	$user_language = (!empty($pbe['user_info']['language']) && !empty($modSettings['maillist_enabled'])) ? $pbe['user_info']['language'] : $user_info['language'];
 
-	// Load in our dependencies
-	$maillist = !empty($modSettings['maillist_enabled']) && !empty($modSettings['pbe_post_enabled']);
-	if ($maillist)
-		require_once(SUBSDIR . '/Emailpost.subs.php');
-	require_once(SUBSDIR . '/Mail.subs.php');
-
 	// Can't do it if there's no topics.
 	if (empty($topics))
 		return;
@@ -54,9 +49,14 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 	if (!is_array($topics))
 		$topics = array($topics);
 
-	// I hope we are not sending one of silly moderation notices
+	// I hope we are not sending one of those silly moderation notices
+	$maillist = !empty($modSettings['maillist_enabled']) && !empty($modSettings['pbe_post_enabled']);
 	if ($type !== 'reply' && !empty($maillist) && !empty($modSettings['pbe_no_mod_notices']))
 		return;
+
+	// Load in our dependencies
+	require_once(SUBSDIR . '/Emailpost.subs.php');
+	require_once(SUBSDIR . '/Mail.subs.php');
 
 	// Get the subject, body and basic poster details, number of attachments if any
 	$result = $db->query('', '
@@ -68,7 +68,7 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = ml.id_member)
 			LEFT JOIN {db_prefix}attachments AS a ON(a.attachment_type = {int:attachment_type} AND a.id_msg = t.id_last_msg)
 		WHERE t.id_topic IN ({array_int:topic_list})
-		GROUP BY t.id_topic',
+		GROUP BY t.id_topic, mf.subject, ml.body, ml.id_member, mem.signature, mem.real_name, ml.poster_name',
 		array(
 			'topic_list' => $topics,
 			'attachment_type' => 0,
@@ -78,21 +78,8 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 	$boards_index = array();
 	while ($row = $db->fetch_assoc($result))
 	{
-		// Using the maillist function or the standard style
-		if ($maillist)
-		{
-			// Convert to markdown markup e.g. text ;)
-			pbe_prepare_text($row['body'], $row['subject'], $row['signature']);
-		}
-		else
-		{
-			// Clean it up.
-			censorText($row['subject']);
-			censorText($row['body']);
-			censorText($row['signature']);
-			$row['subject'] = un_htmlspecialchars($row['subject']);
-			$row['body'] = trim(un_htmlspecialchars(strip_tags(strtr(parse_bbc($row['body'], false, $row['id_last_msg']), array('<br />' => "\n", '</div>' => "\n", '</li>' => "\n", '&#91;' => '[', '&#93;' => ']')))));
-		}
+		// Convert to markdown e.g. text ;) and clean it up
+		pbe_prepare_text($row['body'], $row['subject'], $row['signature']);
 
 		// all the boards for these topics, used to find all the members to be notified
 		$boards_index[] = $row['id_board'];
@@ -235,16 +222,17 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 				// Send only if once is off or it's on and it hasn't been sent.
 				if ($type !== 'reply' || empty($row['notify_regularity']) || empty($row['sent']))
 				{
-					$emaildata = loadEmailTemplate((($maillist && $email_perm && $type === 'reply') ? 'pbe_' : '') . $message_type, $replacements, $needed_language);
+					$emaildata = loadEmailTemplate((($maillist && $email_perm && $type === 'reply' && !empty($row['notify_send_body'])) ? 'pbe_' : '') . $message_type, $replacements, $needed_language);
 
-					if ($maillist && $email_perm && $type === 'reply')
+					// If using the maillist functions, we adjust who this is coming from
+					if ($maillist && $email_perm && $type === 'reply' && !empty($row['notify_send_body']))
 					{
 						// In group mode like google group or yahoo group, the mail is from the poster
 						// Otherwise in maillist mode, it is from the site
 						$emailfrom = !empty($modSettings['maillist_group_mode']) ? un_htmlspecialchars($data['name']) : (!empty($modSettings['maillist_sitename']) ? un_htmlspecialchars($modSettings['maillist_sitename']) : $mbname);
 
 						// The email address of the sender, irrespective of the envelope name above
-						$from_wrapper = !empty($modSettings['maillist_sitename_address']) ? $modSettings['maillist_sitename_address'] : (empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from']);
+						$from_wrapper = !empty($modSettings['maillist_mail_from']) ? $modSettings['maillist_mail_from'] : (empty($modSettings['maillist_sitename_address']) ? $webmaster_email : $modSettings['maillist_sitename_address']);
 						sendmail($row['email_address'], $emaildata['subject'], $emaildata['body'], $emailfrom, 'm' . $data['last_id'], false, 3, null, false, $from_wrapper, $id);
 					}
 					else
@@ -252,7 +240,7 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 
 					$sent++;
 
-					// make a note that this member was sent this topic
+					// Make a note that this member was sent this topic
 					$boards[$row['id_member']][$id] = 1;
 				}
 			}
@@ -263,8 +251,8 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 	// Find the members with notification on for this topic.
 	$members = $db->query('', '
 		SELECT
-			mem.id_member, mem.email_address, mem.notify_regularity, mem.notify_types,
-			mem.notify_send_body, mem.lngfile, mem.id_group, mem.additional_groups,mem.id_post_group, 
+			mem.id_member, mem.email_address, mem.notify_regularity, mem.notify_types, mem.warning,
+			mem.notify_send_body, mem.lngfile, mem.id_group, mem.additional_groups,mem.id_post_group,
 			t.id_member_started, b.member_groups, b.name, b.id_profile,
 			ln.id_topic, ln.sent
 		FROM {db_prefix}log_notify AS ln
@@ -287,7 +275,6 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 			'members_only' => is_array($members_only) ? $members_only : array($members_only),
 		)
 	);
-
 	while ($row = $db->fetch_assoc($members))
 	{
 		// Don't do the excluded...
@@ -337,14 +324,14 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
 		// Send only if once is off or it's on and it hasn't been sent.
 		if ($type != 'reply' || empty($row['notify_regularity']) || empty($row['sent']))
 		{
-			$emaildata = loadEmailTemplate((($maillist && $email_perm && $type === 'reply') ? 'pbe_' : '') . $message_type, $replacements, $needed_language);
+			$emaildata = loadEmailTemplate((($maillist && $email_perm && $type === 'reply' && !empty($row['notify_send_body'])) ? 'pbe_' : '') . $message_type, $replacements, $needed_language);
 
-			// Using the maillist functions?
-			if ($maillist && $email_perm && $type === 'reply')
+			// Using the maillist functions? Then adjust the from wrapper
+			if ($maillist && $email_perm && $type === 'reply' && !empty($row['notify_send_body']))
 			{
 				// Set the from name base on group or maillist mode
 				$emailfrom = !empty($modSettings['maillist_group_mode']) ? un_htmlspecialchars($topicData[$row['id_topic']]['name']) : un_htmlspecialchars($modSettings['maillist_sitename']);
-				$from_wrapper = !empty($modSettings['maillist_sitename_address']) ? $modSettings['maillist_sitename_address'] : (empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from']);
+				$from_wrapper = !empty($modSettings['maillist_mail_from']) ? $modSettings['maillist_mail_from'] : (empty($modSettings['maillist_sitename_address']) ? $webmaster_email : $modSettings['maillist_sitename_address']);
 				sendmail($row['email_address'], $emaildata['subject'], $emaildata['body'], $emailfrom, 'm' . $data['last_id'], false, 3, null, false, $from_wrapper, $row['id_topic']);
 			}
 			else
@@ -402,7 +389,7 @@ function sendNotifications($topics, $type, $exclude = array(), $members_only = a
  * only sends notifications to those who can *currently* see the topic (it doesn't matter if they could when they requested notification.)
  * loads the Post language file multiple times for each language if the userLanguage setting is set.
  *
- * @param array $topicData
+ * @param mixed[] $topicData
  */
 function sendBoardNotifications(&$topicData)
 {
@@ -411,6 +398,7 @@ function sendBoardNotifications(&$topicData)
 	$db = database();
 
 	require_once(SUBSDIR . '/Mail.subs.php');
+	require_once(SUBSDIR . '/Emailpost.subs.php');
 
 	// Do we have one or lots of topics?
 	if (isset($topicData['body']))
@@ -418,8 +406,6 @@ function sendBoardNotifications(&$topicData)
 
 	// Using the post to email functions?
 	$maillist = !empty($modSettings['maillist_enabled']) && !empty($modSettings['pbe_post_enabled']);
-	if ($maillist)
-		require_once(SUBSDIR . '/Emailpost.subs.php');
 
 	// Find out what boards we have... and clear out any rubbish!
 	$boards = array();
@@ -433,21 +419,8 @@ function sendBoardNotifications(&$topicData)
 			continue;
 		}
 
-		// Using maillist functionality?
-		if ($maillist)
-		{
-			// Convert to markdown markup e.g. styled plain text
-			pbe_prepare_text($topicData[$key]['body'], $topicData[$key]['subject'], $topicData[$key]['signature']);
-		}
-		else
-		{
-			// Censor the subject and body...
-			censorText($topicData[$key]['subject']);
-			censorText($topicData[$key]['body']);
-
-			$topicData[$key]['subject'] = un_htmlspecialchars($topicData[$key]['subject']);
-			$topicData[$key]['body'] = trim(un_htmlspecialchars(strip_tags(strtr(parse_bbc($topicData[$key]['body'], false), array('<br />' => "\n", '</div>' => "\n", '</li>' => "\n", '&#91;' => '[', '&#93;' => ']')))));
-		}
+		// Convert to markdown markup e.g. styled plain text, while doing the censoring
+		pbe_prepare_text($topicData[$key]['body'], $topicData[$key]['subject'], $topicData[$key]['signature']);
 	}
 
 	// Just the board numbers.
@@ -455,8 +428,8 @@ function sendBoardNotifications(&$topicData)
 	if (empty($board_index))
 		return;
 
-	require_once(SUBSDIR . '/Boards.subs.php');
 	// Load the actual board names
+	require_once(SUBSDIR . '/Boards.subs.php');
 	$board_names = fetchBoardsInfo(array('boards' => $board_index, 'override_permissions' => true));
 
 	// Yea, we need to add this to the digest queue.
@@ -544,14 +517,14 @@ function sendBoardNotifications(&$topicData)
 			if (!empty($emailtype))
 			{
 				$emailtype .= $send_body ? '_body' : '';
-				$emaildata = loadEmailTemplate((($maillist && $email_perm) ? 'pbe_' : '') . $emailtype, $replacements, $langloaded);
+				$emaildata = loadEmailTemplate((($maillist && $email_perm && $send_body) ? 'pbe_' : '') . $emailtype, $replacements, $langloaded);
 				$emailname = (!empty($topicData[$key]['name'])) ? un_htmlspecialchars($topicData[$key]['name']) : null;
 
 				// Maillist style?
-				if ($maillist && $email_perm)
+				if ($maillist && $email_perm && $send_body)
 				{
 					// Add in the from wrapper and trigger sendmail to add in a security key
-					$from_wrapper = !empty($modSettings['maillist_sitename_address']) ? $modSettings['maillist_sitename_address'] : (empty($modSettings['maillist_mail_from']) ? $webmaster_email : $modSettings['maillist_mail_from']);
+					$from_wrapper = !empty($modSettings['maillist_mail_from']) ? $modSettings['maillist_mail_from'] : (empty($modSettings['maillist_sitename_address']) ? $webmaster_email : $modSettings['maillist_sitename_address']);
 					sendmail($rowmember['email_address'], $emaildata['subject'], $emaildata['body'], $emailname, 't' . $topicData[$key]['topic'], false, 3, null, false, $from_wrapper, $topicData[$key]['topic']);
 				}
 				else
@@ -582,7 +555,7 @@ function sendBoardNotifications(&$topicData)
 /**
  * A special function for handling the hell which is sending approval notifications.
  *
- * @param $topicData
+ * @param mixed[] $topicData
  */
 function sendApprovalNotifications(&$topicData)
 {
@@ -596,11 +569,7 @@ function sendApprovalNotifications(&$topicData)
 
 	// Email ahoy
 	require_once(SUBSDIR . '/Mail.subs.php');
-
-	// Maillist format?
-	$maillist = !empty($modSettings['maillist_enabled']) && !empty($modSettings['pbe_post_enabled']);
-	if ($maillist)
-		require_once(SUBSDIR . '/Emailpost.subs.php');
+	require_once(SUBSDIR . '/Emailpost.subs.php');
 
 	$topics = array();
 	$digest_insert = array();
@@ -608,18 +577,8 @@ function sendApprovalNotifications(&$topicData)
 	{
 		foreach ($msgs as $msgKey => $msg)
 		{
-			if ($maillist)
-			{
-				// Convert it to markdown for sending
-				pbe_prepare_text($topicData[$topic][$msgKey]['body'], $topicData[$topic][$msgKey]['subject']);
-			}
-			else
-			{
-				censorText($topicData[$topic][$msgKey]['subject']);
-				censorText($topicData[$topic][$msgKey]['body']);
-				$topicData[$topic][$msgKey]['subject'] = un_htmlspecialchars($topicData[$topic][$msgKey]['subject']);
-				$topicData[$topic][$msgKey]['body'] = trim(un_htmlspecialchars(strip_tags(strtr(parse_bbc($topicData[$topic][$msgKey]['body'], false), array('<br />' => "\n", '</div>' => "\n", '</li>' => "\n", '&#91;' => '[', '&#93;' => ']')))));
-			}
+			// Convert it to markdown for sending, censor is done as well
+			pbe_prepare_text($topicData[$topic][$msgKey]['body'], $topicData[$topic][$msgKey]['subject']);
 
 			$topics[] = $msg['id'];
 			$digest_insert[] = array($msg['topic'], $msg['id'], 'reply', $user_info['id']);
@@ -744,7 +703,7 @@ function sendApprovalNotifications(&$topicData)
  *
  * @param string $type types supported are 'approval', 'activation', and 'standard'.
  * @param int $memberID
- * @param string $member_name = null
+ * @param string|null $member_name = null
  * @uses the Login language file.
  */
 function sendAdminNotifications($type, $memberID, $member_name = null)
@@ -843,7 +802,7 @@ function sendAdminNotifications($type, $memberID, $member_name = null)
  * Returns false if they do not have the proper group access to a board
  * Sets email_perm to false if they should not get a reply-able message
  *
- * @param array $row
+ * @param mixed[] $row
  * @param boolean $maillist
  * @param boolean $email_perm
  */

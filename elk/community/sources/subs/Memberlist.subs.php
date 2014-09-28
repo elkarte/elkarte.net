@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -57,6 +57,7 @@ function ml_CustomProfile()
 		// Load the standard column info
 		$context['custom_profile_fields']['columns'][$curField] = array(
 			'label' => $row['field_name'],
+			'class' => $row['field_name'],
 			'type' => $row['field_type'],
 			'bbc' => !empty($row['bbc']),
 			'enclose' => $row['enclose'],
@@ -78,7 +79,7 @@ function ml_CustomProfile()
 				);
 
 			// Build the join and parameters for the sort query
-			$context['custom_profile_fields']['join'] = 'LEFT JOIN {db_prefix}custom_fields_data AS cfd' . $curField . ' ON (cfd' . $curField . '.variable = {string:cfd' . $curField . '} AND cfd' . $curField . '.id_theme = 1 AND cfd' . $curField . '.id_member = mem.id_member)';
+			$context['custom_profile_fields']['join'] = 'LEFT JOIN {db_prefix}custom_fields_data AS cfd' . $curField . ' ON (cfd' . $curField . '.variable = {string:cfd' . $curField . '} AND cfd' . $curField . '.id_member = mem.id_member)';
 			$context['custom_profile_fields']['parameters']['cfd' . $curField] = $row['col_name'];
 		}
 	}
@@ -158,7 +159,7 @@ function ml_memberCount()
 /**
  * Get all all the members who's name starts below a given letter
  *
- * @param char $start
+ * @param string $start single letter to start with
  */
 function ml_alphaStart($start)
 {
@@ -184,7 +185,7 @@ function ml_alphaStart($start)
  * Primary query for the memberlist display, runs the query based on the users
  * sort and start selections.
  *
- * @param array $query_parameters
+ * @param mixed[] $query_parameters
  * @param string $where
  * @param int $limit
  * @param string $sort
@@ -218,10 +219,11 @@ function ml_selectMembers($query_parameters, $where = '', $limit = 0, $sort = ''
  * sort and start selections.
  *  - Uses printMemberListRows to load the query results in to context
  *
- * @param array $query_parameters
- * @param string $customJoin
+ * @param mixed[] $query_parameters
+ * @param string|string[]|null $customJoin
  * @param string $where
  * @param int $limit
+ * @return integer
  */
 function ml_searchMembers($query_parameters, $customJoin = '', $where = '', $limit = 0)
 {

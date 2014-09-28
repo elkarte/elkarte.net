@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -33,7 +33,7 @@ function template_servers()
 		<h2 class="category_header">', $txt['package_servers'], '</h2>';
 
 	if ($context['package_download_broken'])
-		template_ftp_required();
+		template_ftp_form_required();
 
 	echo '
 		<div class="windowbg2">
@@ -58,16 +58,16 @@ function template_servers()
 					<form action="' . $scripturl . '?action=admin;area=packageservers;sa=add" method="post" accept-charset="UTF-8">
 						<dl class="settings">
 							<dt>
-								<strong>' . $txt['server_name'] . ':</strong>
+								<strong><label for="servername">' . $txt['server_name'] . '</label>:</strong>
 							</dt>
 							<dd>
-								<input type="text" name="servername" size="44" value="ElkArte" class="input_text" />
+								<input type="text" id="servername" name="servername" size="44" value="ElkArte" class="input_text" />
 							</dd>
 							<dt>
-								<strong>' . $txt['serverurl'] . ':</strong>
+								<strong><label for="serverurl">' . $txt['serverurl'] . '</label>:</strong>
 							</dt>
 							<dd>
-								<input type="text" name="serverurl" size="44" value="http://" class="input_text" />
+								<input type="text" id="serverurl" name="serverurl" size="44" value="http://" class="input_text" />
 							</dd>
 						</dl>
 						<div class="submitbutton">
@@ -81,16 +81,16 @@ function template_servers()
 					<form action="', $scripturl, '?action=admin;area=packageservers;sa=download;byurl;', $context['session_var'], '=', $context['session_id'], '" method="post" accept-charset="UTF-8">
 						<dl class="settings">
 							<dt>
-								<strong>' . $txt['serverurl'] . ':</strong>
+								<strong><label for="package">' . $txt['serverurl'] . '</label>:</strong>
 							</dt>
 							<dd>
-								<input type="text" name="package" size="44" value="http://" class="input_text" />
+								<input type="text" id="package" name="package" size="44" value="http://" class="input_text" />
 							</dd>
 							<dt>
-								<strong>', $txt['package_download_filename'], ':</strong>
+								<strong><label for="filename">', $txt['package_download_filename'], '</label>:</strong>
 							</dt>
 							<dd>
-								<input type="text" name="filename" size="44" class="input_text" /><br />
+								<input type="text" id="filename" name="filename" size="44" class="input_text" /><br />
 								<span class="smalltext">', $txt['package_download_filename_info'], '</span>
 							</dd>
 						</dl>
@@ -118,7 +118,7 @@ function template_package_confirm()
 			<div class="content">
 				<p>', $context['confirm_message'], '</p>
 				<a href="', $context['proceed_href'], '">[ ', $txt['package_confirm_proceed'], ' ]</a>
-				<a href="JavaScript:history.go(-1);">[ ', $txt['package_confirm_go_back'], ' ]</a>
+				<a href="JavaScript:window.location.assign(document.referrer);">[ ', $txt['package_confirm_go_back'], ' ]</a>
 			</div>
 		</div>
 	</div>';
@@ -308,19 +308,22 @@ function template_downloaded()
 	global $context, $txt, $scripturl;
 
 	echo '
-	<div id="admincenter">
+	<div id="admin_form_wrapper">
 		<h2 class="category_header">', $context['page_title'], '</h2>
+		<p class="infobox">', (empty($context['package_server']) ? $txt['package_uploaded_successfully'] : $txt['package_downloaded_successfully']), '</p>
 		<div class="windowbg">
-			<div class="content">
-				<p>', (empty($context['package_server']) ? $txt['package_uploaded_successfully'] : $txt['package_downloaded_successfully']), '</p>
+			<div class="content flow_auto">
 				<ul>
-					<li><span class="floatleft"><strong>', $context['package']['name'], '</strong></span>
+					<li>
+						<span class="floatleft"><strong>', $context['package']['name'], '</strong></span>
 						<span class="package_server floatright">', $context['package']['list_files']['link'], '</span>
 						<span class="package_server floatright">', $context['package']['install']['link'], '</span>
 					</li>
 				</ul>
-				<br /><br />
-				<p><a href="', $scripturl, '?action=admin;area=packageservers', (isset($context['package_server']) ? ';sa=browse;server=' . $context['package_server'] : ''), '">[ ', $txt['back'], ' ]</a></p>
+			</div>
+			<div class="submitbutton">
+				<hr />
+				<a class="linkbutton" href="', $scripturl, '?action=admin;', (!empty($context['package_server']) ? 'area=packageservers;sa=browse;server=' . $context['package_server'] : 'area=packages;sa=browse'), '">', $txt['back'], '</a>
 			</div>
 		</div>
 	</div>';
@@ -335,20 +338,20 @@ function template_upload()
 
 	if (!empty($context['package_ftp']['error']))
 		echo '
-					<div class="errorbox">
-						<span class="tt">', $context['package_ftp']['error'], '</span>
-					</div>';
+	<div class="errorbox">
+		', $context['package_ftp']['error'], '
+	</div>';
 
 	echo '
 	<div id="admin_form_wrapper">
-		<h3 class="category_header">', $txt['upload_new_package'], '</h3>';
+		<h2 class="category_header">', $txt['upload_new_package'], '</h2>';
 
 	if ($context['package_download_broken'])
 	{
-		template_ftp_required();
+		template_ftp_form_required();
 
 		echo '
-			<h3 class="category_header">' . $txt['package_upload_title'] . '</h3>';
+			<h2 class="category_header">' . $txt['package_upload_title'] . '</h2>';
 	}
 
 	echo '
@@ -357,15 +360,17 @@ function template_upload()
 				<form action="' . $scripturl . '?action=admin;area=packageservers;sa=upload2" method="post" accept-charset="UTF-8" enctype="multipart/form-data" style="margin-bottom: 0;">
 					<dl class="settings">
 						<dt>
-							<strong>' . $txt['package_upload_select'] . ':</strong>
+							<strong><label for="package">' . $txt['package_upload_select'] . '</label>:</strong>
 						</dt>
 						<dd>
-							<input type="file" name="package" size="38" class="input_file" />
+							<input type="file" id="package" name="package" size="38" class="input_file" />
 						</dd>
 					</dl>
 					<hr />
-					<input type="submit" value="' . $txt['package_upload'] . '" class="right_submit" />
-					<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+					<div class="submitbutton">
+						<input type="submit" value="' . $txt['package_upload'] . '" class="button_submit" />
+						<input type="hidden" name="' . $context['session_var'] . '" value="' . $context['session_id'] . '" />
+					</div>
 				</form>
 			</div>
 		</div>
@@ -376,7 +381,7 @@ function template_upload()
  * Section of package servers tabs
  * It displays a form to connect to admin's FTP account.
  */
-function template_ftp_required()
+function template_ftp_form_required()
 {
 	global $context, $txt, $scripturl;
 

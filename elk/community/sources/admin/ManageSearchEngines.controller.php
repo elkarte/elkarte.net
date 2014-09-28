@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -21,9 +21,10 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * ManageSearchEngines admin controller.
- * This class handles all search engines pages in admin panel,
- *  forwards to display and allows to change options.
+ * ManageSearchEngines admin controller. This class handles all search engines
+ * pages in admin panel, forwards to display and allows to change options.
+ *
+ * @package SearchEngines
  */
 class ManageSearchEngines_Controller extends Action_Controller
 {
@@ -53,14 +54,8 @@ class ManageSearchEngines_Controller extends Action_Controller
 			'stats' => array($this, 'action_stats', 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_search_engines', array(&$subActions));
-
-		// Ensure we have a valid subaction.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'stats';
-
-		// Some contextual data for the template.
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['search_engines'];
+		// Control
+		$action = new Action('manage_search_engines');
 
 		// Some more tab data.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -68,9 +63,14 @@ class ManageSearchEngines_Controller extends Action_Controller
 			'description' => $txt['search_engines_description'],
 		);
 
+		// Ensure we have a valid subaction. call integrate_sa_manage_search_engines
+		$subAction = $action->initialize($subActions, 'stats');
+
+		// Some contextual data for the template.
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['search_engines'];
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions);
 		$action->dispatch($subAction);
 	}
 
@@ -89,9 +89,6 @@ class ManageSearchEngines_Controller extends Action_Controller
 		// Set up a message.
 		$context['settings_message'] = sprintf($txt['spider_settings_desc'], $scripturl . '?action=admin;area=logs;sa=pruning;' . $context['session_var'] . '=' . $context['session_id']);
 
-		// Notify the integration that we're preparing to mess up with search engine settings...
-		call_integration_hook('integrate_modify_search_engine_settings', array(&$config_vars));
-
 		require_once(SUBSDIR . '/SearchEngines.subs.php');
 		require_once(SUBSDIR . '/Membergroups.subs.php');
 
@@ -104,7 +101,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 			$_POST['spider_group'] = 0;
 
 		// We'll want this for our easy save.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Setup the template.
 		$context['page_title'] = $txt['settings'];
@@ -117,7 +114,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 			checkSession();
 
 			// notify the interested addons or integrations
-			call_integration_hook('integrate_save_search_engine_settings', array(&$config_vars));
+			call_integration_hook('integrate_save_search_engine_settings');
 
 			// save the results!
 			Settings_Form::save_db($config_vars);
@@ -162,7 +159,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 	private function _initEngineSettingsForm()
 	{
 		// This is really quite wanting.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Instantiate the form
 		$this->_engineSettings = new Settings_Form();
@@ -186,6 +183,9 @@ class ManageSearchEngines_Controller extends Action_Controller
 			'spider_group' => array('select', 'spider_group', 'subtext' => $txt['spider_group_note'], array($txt['spider_group_none'], $txt['membergroups_members'])),
 			array('select', 'show_spider_online', array($txt['show_spider_online_no'], $txt['show_spider_online_summary'], $txt['show_spider_online_detail'], $txt['show_spider_online_detail_admin'])),
 		);
+
+		// Notify the integration that we're preparing to mess up with search engine settings...
+		call_integration_hook('integrate_modify_search_engine_settings', array(&$config_vars));
 
 		return $config_vars;
 	}
@@ -330,6 +330,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'bottom_of_list',
 					'value' => '
 						<input type="submit" name="removeSpiders" value="' . $txt['spiders_remove_selected'] . '" onclick="return confirm(\'' . $txt['spider_remove_selected_confirm'] . '\');" class="right_submit" />
@@ -339,7 +340,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'show_list';
@@ -357,6 +358,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 		$context['id_spider'] = !empty($_GET['sid']) ? (int) $_GET['sid'] : 0;
 		$context['page_title'] = $context['id_spider'] ? $txt['spiders_edit'] : $txt['spiders_add'];
 		$context['sub_template'] = 'spider_edit';
+		require_once(SUBSDIR . '/SearchEngines.subs.php');
 
 		// Are we saving?
 		if (!empty($_POST['save']))
@@ -379,7 +381,6 @@ class ManageSearchEngines_Controller extends Action_Controller
 			updateSpider($context['id_spider'], $_POST['spider_name'], $_POST['spider_agent'], $ips);
 
 			// Order by user agent length.
-			require_once(SUBSDIR . '/SearchEngines.subs.php');
 			sortSpiderTable();
 
 			cache_put_data('spider_search', null, 300);
@@ -414,13 +415,14 @@ class ManageSearchEngines_Controller extends Action_Controller
 		loadLanguage('Search');
 		loadTemplate('ManageSearch');
 
-		// Did they want to delete some entries?
-		if (!empty($_POST['delete_entries']) && isset($_POST['older']))
+		// Did they want to delete some or all entries?
+		if ((!empty($_POST['delete_entries']) && isset($_POST['older'])) || !empty($_POST['removeAll']))
 		{
 			checkSession();
 			validateToken('admin-sl');
 
-			$deleteTime = time() - (((int) $_POST['older']) * 24 * 60 * 60);
+			$since = isset($_POST['older']) ? (int) $_POST['older'] : 0;
+			$deleteTime = time() - ($since * 24 * 60 * 60);
 
 			// Delete the entires.
 			require_once(SUBSDIR . '/SearchEngines.subs.php');
@@ -497,7 +499,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 
 		createToken('admin-sl');
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		// Now determine the actions of the URLs.
@@ -656,7 +658,7 @@ class ManageSearchEngines_Controller extends Action_Controller
 
 		createToken('admin-ss');
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'show_spider_stats';

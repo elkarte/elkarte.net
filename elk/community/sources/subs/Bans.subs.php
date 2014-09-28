@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -22,14 +22,17 @@ if (!defined('ELK'))
 
 /**
  * Saves one or more ban triggers into a ban item: according to the suggestions
- * checks the $_POST variable to verify if the trigger is present
- * If
  *
- * @param array $suggestions
+ * What it does:
+ * - Checks the $_POST variable to verify if the trigger is present
+ * - Load triggers in to an array for validation
+ * - Validates and saves/updates the triggers for a given ban
+ *
+ * @package Bans
+ * @param mixed[] $suggestions  array of ban triggers to values
  * @param int $ban_group
  * @param int $member
  * @param int $ban_id
- *
  * @return mixed array with the saved triggers or false on failure
  */
 function saveTriggers($suggestions, $ban_group, $member = 0, $ban_id = 0)
@@ -42,12 +45,13 @@ function saveTriggers($suggestions, $ban_group, $member = 0, $ban_id = 0)
 			'id' => $member,
 		)
 	);
-	$ban_triggers = array();
+
 	$ban_errors = Error_Context::context('ban', 1);
 
 	if (!is_array($suggestions))
 		return false;
 
+	// What triggers are we adding (like ip, host, email, etc)
 	foreach ($suggestions as $key => $value)
 	{
 		if (is_array($value))
@@ -56,9 +60,10 @@ function saveTriggers($suggestions, $ban_group, $member = 0, $ban_id = 0)
 			$triggers[$value] = !empty($_POST[$value]) ? $_POST[$value] : '';
 	}
 
+	// Make sure the triggers for this ban are valid
 	$ban_triggers = validateTriggers($triggers);
 
-	// Time to save!
+	// Time to save or update!
 	if (!empty($ban_triggers['ban_triggers']) && !$ban_errors->hasErrors())
 	{
 		if (empty($ban_id))
@@ -66,6 +71,8 @@ function saveTriggers($suggestions, $ban_group, $member = 0, $ban_id = 0)
 		else
 			updateTriggers($ban_id, $ban_group, array_shift($ban_triggers['ban_triggers']), $ban_triggers['log_info']);
 	}
+
+	// No errors, then return the ban triggers
 	if ($ban_errors->hasErrors())
 		return $triggers;
 	else
@@ -73,11 +80,15 @@ function saveTriggers($suggestions, $ban_group, $member = 0, $ban_id = 0)
 }
 
 /**
- * This function removes a bunch of triggers based on ids
- * Doesn't clean the inputs
+ * This function removes a batch of triggers based on ids
  *
- * @param array $items_ids
- * @param boolean $group_id
+ * What it does:
+ * - Doesn't clean the inputs, expects valid input
+ * - Removes the ban triggers by id or group
+ *
+ * @package Bans
+ * @param int[]|int $items_ids
+ * @param int|boolean $group_id
  * @return bool
  */
 function removeBanTriggers($items_ids = array(), $group_id = false)
@@ -93,6 +104,11 @@ function removeBanTriggers($items_ids = array(), $group_id = false)
 	if (!is_array($items_ids))
 		$items_ids = array($items_ids);
 
+	// Log the ban removals so others know
+	$log_info = banLogItems(banDetails($items_ids, $group_id));
+	logTriggersUpdates($log_info, 'remove');
+
+	// Remove the ban triggers by id's or groups
 	if ($group_id !== false)
 	{
 		$db->query('', '
@@ -120,10 +136,14 @@ function removeBanTriggers($items_ids = array(), $group_id = false)
 }
 
 /**
- * This function removes a bunch of ban groups based on ids
- * Doesn't clean the inputs
+ * This function removes a batch of ban groups based on ids
  *
- * @param array $group_ids
+ * What it does:
+ * - Doesn't clean the inputs
+ * - Removes entries from the ban group list, one or many
+ *
+ * @package Bans
+ * @param int[]|int $group_ids
  * @return bool
  */
 function removeBanGroups($group_ids)
@@ -150,16 +170,21 @@ function removeBanGroups($group_ids)
 }
 
 /**
- * Removes logs - by default truncate the table
- * Doesn't clean the inputs
+ * Removes ban logs
  *
- * @param array $ids (optional)
+ * What it does:
+ * - By default (no id's passed) truncate the table
+ * - Doesn't clean the inputs
+ *
+ * @package Bans
+ * @param int[]|int|null $ids (optional)
  * @return bool
  */
 function removeBanLogs($ids = array())
 {
 	$db = database();
 
+	// No specific id's passed, we truncate the entire table
 	if (empty($ids))
 		$db->query('truncate_table', '
 			TRUNCATE {db_prefix}log_banned',
@@ -171,11 +196,13 @@ function removeBanLogs($ids = array())
 		if (!is_array($ids))
 			$ids = array($ids);
 
+		// Can only remove it once
 		$ids = array_unique($ids);
 
 		if (empty($ids))
 			return false;
 
+		// Remove this grouping
 		$db->query('', '
 			DELETE FROM {db_prefix}log_banned
 			WHERE id_ban_log IN ({array_int:ban_list})',
@@ -191,8 +218,8 @@ function removeBanLogs($ids = array())
 /**
  * This function validates the ban triggers
  *
- * @param array $triggers
- * @return array triggers and logs info ready to be used
+ * @package Bans
+ * @param mixed[] $triggers
  */
 function validateTriggers(&$triggers)
 {
@@ -205,6 +232,7 @@ function validateTriggers(&$triggers)
 	$ban_triggers = array();
 	$log_info = array();
 
+	// Go through each trigger and make sure its valid
 	foreach ($triggers as $key => $value)
 	{
 		if (!empty($value))
@@ -308,9 +336,11 @@ function validateTriggers(&$triggers)
 			{
 				// Special case, those two are arrays themselves
 				$values = array_unique($value);
+
 				// Don't add the main IP again.
 				if (isset($triggers['main_ip']))
 					$values = array_diff($values, array($triggers['main_ip']));
+
 				unset($value);
 				foreach ($values as $val)
 				{
@@ -356,16 +386,18 @@ function validateTriggers(&$triggers)
 				);
 		}
 	}
+
 	return array('ban_triggers' => $ban_triggers, 'log_info' => $log_info);
 }
 
 /**
  * This function actually inserts the ban triggers into the database
  *
+ * @package Bans
  * @param int $group_id
- * @param array $triggers
- * @param array $logs
- * @return nothing
+ * @param mixed[] $triggers associative array of trigger keys and the values
+ * @param mixed[] $logs
+ * @return boolean
  */
 function addTriggers($group_id = 0, $triggers = array(), $logs = array())
 {
@@ -374,7 +406,7 @@ function addTriggers($group_id = 0, $triggers = array(), $logs = array())
 	$ban_errors = Error_Context::context('ban', 1);
 
 	if (empty($group_id))
-		$ban_errors->addError('ban_group_id_empty');
+		$ban_errors->addError('ban_not_found');
 
 	// Preset all values that are required.
 	$values = array(
@@ -455,11 +487,11 @@ function addTriggers($group_id = 0, $triggers = array(), $logs = array())
 /**
  * This function updates an existing ban trigger into the database
  *
+ * @package Bans
  * @param int $ban_item
  * @param int $group_id
- * @param array $trigger
- * @param array $logs
- * @return nothing
+ * @param mixed[] $trigger associative array of ban trigger => value
+ * @param mixed[] $logs
  */
 function updateTriggers($ban_item = 0, $group_id = 0, $trigger = array(), $logs = array())
 {
@@ -470,10 +502,11 @@ function updateTriggers($ban_item = 0, $group_id = 0, $trigger = array(), $logs 
 	if (empty($ban_item))
 		$ban_errors->addError('ban_ban_item_empty');
 	if (empty($group_id))
-		$ban_errors->addError('ban_group_id_empty');
+		$ban_errors->addError('ban_not_found');
 	if (empty($trigger))
 		$ban_errors->addError('ban_no_triggers');
 
+	// Any errors then we are not updating it
 	if ($ban_errors->hasErrors())
 		return;
 
@@ -529,10 +562,12 @@ function updateTriggers($ban_item = 0, $group_id = 0, $trigger = array(), $logs 
 /**
  * A small function to unify logging of triggers (updates and new)
  *
- * @param array $logs an array of logs, each log contains the following keys:
- *                - bantype: a known type of ban (ip_range, hostname, email, user, main_ip)
- *                - value: the value of the bantype (e.g. the IP or the email address banned)
- * @param bool $new if the trigger is new or an update of an existing one
+ * @package Bans
+ * @param mixed[] $logs an array of logs, each log contains the following keys:
+ * - bantype: a known type of ban (ip_range, hostname, email, user, main_ip)
+ * - value: the value of the bantype (e.g. the IP or the email address banned)
+ * @param boolean|string $new type of trigger
+ * - if the trigger is new (true), an update (false), or a removal ('remove') of an existing one
  */
 function logTriggersUpdates($logs, $new = true)
 {
@@ -551,32 +586,37 @@ function logTriggersUpdates($logs, $new = true)
 	foreach ($logs as $log)
 		logAction('ban', array(
 			$log_name_map[$log['bantype']] => $log['value'],
-			'new' => empty($new) ? 0 : 1,
+			'new' => empty($new) ? 0 : ($new === true ? 1 : -1),
 			'type' => $log['bantype'],
 		));
 }
 
 /**
  * Updates an existing ban group
- * If the name doesn't exists a new one is created
  *
- * @param array $ban_info
+ * - If the name doesn't exists a new one is created
+ *
+ * @package Bans
+ * @param mixed[] $ban_info
  * @return nothing
  */
 function updateBanGroup($ban_info = array())
 {
 	$db = database();
 
+	// Lets check for errors first
 	$ban_errors = Error_Context::context('ban', 1);
 
 	if (empty($ban_info['name']))
 		$ban_errors->addError('ban_name_empty');
+
 	if (empty($ban_info['id']))
 		$ban_errors->addError('ban_id_empty');
 
 	if ($ban_errors->hasErrors())
 		return false;
 
+	// No problems found, so lets add this to the ban list
 	$request = $db->query('', '
 		SELECT id_ban_group
 		FROM {db_prefix}ban_groups
@@ -622,10 +662,13 @@ function updateBanGroup($ban_info = array())
 
 /**
  * Creates a new ban group
- * If a ban group with the same name already exists or the group s successfully created the ID is returned
- * On error the error code is returned or false
  *
- * @param array $ban_info
+ * What it does:
+ * - If a ban group with the same name already exists or the group s successfully created the ID is returned
+ * - On error the error code is returned or false
+ *
+ * @package Bans
+ * @param mixed[] $ban_info
  * @return int the ban group's ID
  */
 function insertBanGroup($ban_info = array())
@@ -636,6 +679,7 @@ function insertBanGroup($ban_info = array())
 
 	if (empty($ban_info['name']))
 		$ban_errors->addError('ban_name_empty');
+
 	if (empty($ban_info['cannot']['access']) && empty($ban_info['cannot']['register']) && empty($ban_info['cannot']['post']) && empty($ban_info['cannot']['login']))
 		$ban_errors->addError('ban_unknown_restriction_type');
 
@@ -685,24 +729,26 @@ function insertBanGroup($ban_info = array())
 
 /**
  * Convert a range of given IP number into a single string.
- * It's practically the reverse function of ip2range().
+ *
+ * - It's practically the reverse function of ip2range().
  *
  * @example
  * range2ip(array(10, 10, 10, 0), array(10, 10, 20, 255)) returns '10.10.10-20.*
- *
- * @param array $low IPv4 format
- * @param array $high IPv4 format
+ * @package Bans
+ * @param int[] $low IPv4 format
+ * @param int[] $high IPv4 format
  * @return string
  */
 function range2ip($low, $high)
 {
+	$ip = array();
+
 	// IPv6 check.
 	if (!empty($high[4]) || !empty($high[5]) || !empty($high[6]) || !empty($high[7]))
 	{
 		if (count($low) != 8 || count($high) != 8)
 			return '';
 
-		$ip = array();
 		for ($i = 0; $i < 8; $i++)
 		{
 			if ($low[$i] == $high[$i])
@@ -740,10 +786,14 @@ function range2ip($low, $high)
 
 /**
  * Checks whether a given IP range already exists in the trigger list.
- * If yes, it returns an error message. Otherwise, it returns an array
- *  optimized for the database.
  *
- * @param array $ip_array
+ * What it does:
+ * - If yes, it returns an error message.
+ * - Otherwise, it returns an array
+ * - optimized for the database.
+ *
+ * @package Bans
+ * @param int[] $ip_array array of ip array ints
  * @param string $fullip
  * @return boolean
  */
@@ -806,7 +856,10 @@ function checkExistingTriggerIP($ip_array, $fullip = '')
 
 /**
  * As it says... this tries to review the list of banned members, to match new bans.
- * Note: is_activated >= 10: a member is banned.
+ *
+ * - Note: is_activated >= 10: a member is banned.
+ *
+ * @package Bans
  */
 function updateBanMembers()
 {
@@ -857,11 +910,13 @@ function updateBanMembers()
 		$queryPart[] = 'mem.id_member IN ({array_string:member_ids})';
 		$queryValues['member_ids'] = $memberIDs;
 	}
+
 	if (!empty($memberEmails))
 	{
 		$queryPart[] = 'mem.email_address IN ({array_string:member_emails})';
 		$queryValues['member_emails'] = $memberEmails;
 	}
+
 	$count = 0;
 	foreach ($memberEmailWild as $email)
 	{
@@ -936,8 +991,9 @@ function updateBanMembers()
 
 /**
  * Returns member data for a given member id in a suggestion format used by bans
- * @uses getBasicMemberData
  *
+ * @package Bans
+ * @uses getBasicMemberData
  * @param int $id
  */
 function getMemberData($id)
@@ -963,6 +1019,7 @@ function getMemberData($id)
 /**
  * Get ban triggers for the given parameters.
  *
+ * @package Bans
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1004,8 +1061,10 @@ function list_getBanTriggers($start, $items_per_page, $sort, $trigger_type)
 
 /**
  * Used to see if a user is banned
- * Checks banning by ip, hostname, email or member id
  *
+ * - Checks banning by ip, hostname, email or member id
+ *
+ * @package Bans
  * @param int $memID
  * @param string $hostname
  * @param string $email
@@ -1089,6 +1148,7 @@ function BanCheckUser($memID, $hostname = '', $email = '')
 /**
  * This returns the total number of ban triggers of the given type.
  *
+ * @package Bans
  * @param string $trigger_type
  * @return int
  */
@@ -1119,8 +1179,10 @@ function list_getNumBanTriggers($trigger_type)
 
 /**
  * Load a list of ban log entries from the database.
- * (no permissions check)
  *
+ * - no permissions checks are done
+ *
+ * @package Bans
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1150,6 +1212,8 @@ function list_getBanLogEntries($start, $items_per_page, $sort)
 
 /**
  * This returns the total count of ban log entries.
+ *
+ * @package Bans
  */
 function list_getNumBanLogEntries()
 {
@@ -1170,6 +1234,7 @@ function list_getNumBanLogEntries()
 /**
  * Get the total number of ban from the ban group table
  *
+ * @package Bans
  * @return int
  */
 function list_getNumBans()
@@ -1191,9 +1256,10 @@ function list_getNumBans()
 /**
  * Retrieves all the ban items belonging to a certain ban group
  *
+ * @package Bans
  * @param int $start
  * @param int $items_per_page
- * @param string $sort
+ * @param int $sort
  * @param int $ban_group_id
  * @return array
  */
@@ -1224,7 +1290,6 @@ function list_getBanItems($start = 0, $items_per_page = 0, $sort = 0, $ban_group
 	);
 	if ($db->num_rows($request) == 0)
 		fatal_lang_error('ban_not_found', false);
-
 	while ($row = $db->fetch_assoc($request))
 	{
 		if (!isset($context['ban']))
@@ -1297,6 +1362,7 @@ function list_getBanItems($start = 0, $items_per_page = 0, $sort = 0, $ban_group
 /**
  * Get bans, what else? For the given options.
  *
+ * @package Bans
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -1331,6 +1397,7 @@ function list_getBans($start, $items_per_page, $sort)
 /**
  * Gets the number of ban items belonging to a certain ban group
  *
+ * @package Bans
  * @return int
  */
 function list_getNumBanItems()
@@ -1360,6 +1427,7 @@ function list_getNumBanItems()
 /**
  * Load other IPs the given member has used on forum while posting.
  *
+ * @package Bans
  * @param int $member_id
  */
 function banLoadAdditionalIPsMember($member_id)
@@ -1389,6 +1457,7 @@ function banLoadAdditionalIPsMember($member_id)
 /**
  * Load other IPs the given member has received errors logged while they were using them.
  *
+ * @package Bans
  * @param int $member_id
  */
 function banLoadAdditionalIPsError($member_id)
@@ -1417,6 +1486,7 @@ function banLoadAdditionalIPsError($member_id)
 /**
  * Finds additional IPs related to a certain user
  *
+ * @package Bans
  * @param int $member_id
  * @return array
  */
@@ -1440,12 +1510,16 @@ function banLoadAdditionalIPs($member_id)
 /**
  * Fetches ban details
  *
- * @param int $ban_id
- * @param int $ban_group
+ * @package Bans
+ * @param int[]|int $ban_ids
+ * @param int|false $ban_group
  */
-function banDetails($ban_id, $ban_group)
+function banDetails($ban_ids, $ban_group = false)
 {
 	$db = database();
+
+	if (!is_array($ban_ids))
+		$ban_ids = array($ban_ids);
 
 	$request = $db->query('', '
 		SELECT
@@ -1455,16 +1529,71 @@ function banDetails($ban_id, $ban_group)
 			mem.member_name, mem.real_name
 		FROM {db_prefix}ban_items AS bi
 			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = bi.id_member)
-		WHERE bi.id_ban = {int:ban_item}
-			AND bi.id_ban_group = {int:ban_group}
-		LIMIT 1',
+		WHERE bi.id_ban IN ({array_int:ban_items})' . ($ban_group !== false ? '
+			AND bi.id_ban_group = {int:ban_group}' : ''),
 		array(
-			'ban_item' => $ban_id,
+			'ban_items' => $ban_ids,
 			'ban_group' => $ban_group,
 		)
 	);
-	$details = $db->fetch_assoc($request);
+	$details = array();
+	while ($row = $db->fetch_assoc($request))
+		$details[$row['id_ban']] = $row;
 	$db->free_result($request);
 
 	return $details;
+}
+
+/**
+ * When removing a ban trigger, this will return the specifics of whats being
+ * removed so it can be logged
+ *
+ * @package Bans
+ * @param mixed[] $ban_details
+ */
+function banLogItems($ban_details)
+{
+	$log_info = array();
+
+	// For each ban, get the details for logging
+	foreach ($ban_details as $row)
+	{
+		// An ip ban
+		if (!empty($row['ip_high1']))
+		{
+			$ip = range2ip(array($row['ip_low1'], $row['ip_low2'], $row['ip_low3'], $row['ip_low4'], $row['ip_low5'], $row['ip_low6'], $row['ip_low7'], $row['ip_low8']), array($row['ip_high1'], $row['ip_high2'], $row['ip_high3'], $row['ip_high4'], $row['ip_high5'], $row['ip_high6'], $row['ip_high7'], $row['ip_high8']));
+			$is_range = (strpos($ip, '-') !== false || strpos($ip, '*') !== false);
+
+			$log_info[] = array(
+				'bantype' => ($is_range ? 'ip_range' : 'main_ip'),
+				'value' => $ip,
+			);
+		}
+		// Hostname
+		elseif (!empty($row['hostname']))
+		{
+			$log_info[] = array(
+				'bantype' => 'hostname',
+				'value' => $row['hostname'],
+			);
+		}
+		// Email Address
+		elseif (!empty($row['email_address']))
+		{
+			$log_info[] = array(
+				'bantype' => 'email',
+				'value' => str_replace('%', '*', $row['email_address']),
+			);
+		}
+		// Member ID
+		elseif (!empty($row['id_member']))
+		{
+			$log_info[] = array(
+				'bantype' => 'user',
+				'value' => $row['id_member'],
+			);
+		}
+	}
+
+	return $log_info;
 }

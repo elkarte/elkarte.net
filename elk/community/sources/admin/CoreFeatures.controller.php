@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -22,9 +22,12 @@ if (!defined('ELK'))
 
 /**
  * This class takes care of the Core Features admin screen.
- * It sets up the context, initializes the features info for display,
- * updates the settings for enabled/disabled core features as requested.
  *
+ * What it does:
+ * - It sets up the context, initializes the features info for display
+ * - updates the settings for enabled/disabled core features as requested.
+ *
+ * @package CoreFeatures
  */
 class CoreFeatures_Controller extends Action_Controller
 {
@@ -42,14 +45,16 @@ class CoreFeatures_Controller extends Action_Controller
 	/**
 	 * This is an overall control panel enabling/disabling lots of the forums key features.
 	 *
-	 * Uses internally an array of all the features that can be enabled/disabled.
-	 *  $core_features, each option can have the following:
-	 *    title - Text title of this item (If standard string does not exist).
-	 *    desc - Description of this feature (If standard string does not exist).
-	 *    settings - Array of settings to change (For each name => value) on enable - reverse is done for disable. If > 1 will not change value if set.
-	 *    setting_callback - Function that returns an array of settings to save - takes one parameter which is value for this feature.
-	 *    save_callback - Function called on save, takes state as parameter.
-	 *
+	 * What it does:
+	 * - Uses internally an array of all the features that can be enabled/disabled.
+	 * - $core_features, each option can have the following:
+	 *    - title - Text title of this item (If standard string does not exist).
+	 *    - desc - Description of this feature (If standard string does not exist).
+	 *    - settings - Array of settings to change (For each name => value) on enable
+	 *      reverse is done for disable. If value > 1 will not change value if set.
+	 *    - setting_callback - Function that returns an array of settings to save
+	 *      takes one parameter which is value for this feature.
+	 *    - save_callback - Function called on save, takes state as parameter.
 	 */
 	public function action_features()
 	{
@@ -96,6 +101,7 @@ class CoreFeatures_Controller extends Action_Controller
 							$setting_changes[$key] = !empty($_POST['feature_' . $id]) ? $value : !$value;
 					}
 				}
+
 				// Is there a call back for settings?
 				if (isset($feature['setting_callback']))
 				{
@@ -146,6 +152,7 @@ class CoreFeatures_Controller extends Action_Controller
 		// Are they a new user?
 		$context['is_new_install'] = !isset($modSettings['admin_features']);
 		$context['force_disable_tabs'] = $context['is_new_install'];
+
 		// Don't show them this twice!
 		if ($context['is_new_install'])
 			updateSettings(array('admin_features' => ''));
@@ -335,9 +342,10 @@ class CoreFeatures_Controller extends Action_Controller
 
 	/**
 	 * Return the array of core features in the format expected by search.
-	 * Callback for admin internal search.
 	 *
-	 * @return array in a config_var format
+	 * - Callback for admin internal search.
+	 *
+	 * @return mixed[] array in a config_var format
 	 */
 	public function config_vars()
 	{
@@ -355,9 +363,10 @@ class CoreFeatures_Controller extends Action_Controller
 	}
 
 	/**
-	 * This function makes sure the requested subaction does exists, if it doesn't, it sets a default action or.
+	 * This function makes sure the requested subaction does exists, if it
+	 * doesn't, it sets a default action.
 	 *
-	 * @param array $subActions = array() An array containing all possible subactions.
+	 * @param mixed[] $subActions = array() An array containing all possible subactions.
 	 * @param string $defaultAction = '' the default action to be called if no valid subaction was found.
 	 */
 	public function loadGeneralSettingParameters($subActions = array(), $defaultAction = '')
@@ -371,12 +380,16 @@ class CoreFeatures_Controller extends Action_Controller
 		loadLanguage('ManageSettings');
 
 		// Will need the utility functions from here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		$context['sub_template'] = 'show_settings';
 
 		// By default do the basic settings.
-		$_REQUEST['sa'] = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : (!empty($defaultAction) ? $defaultAction : array_pop($temp = array_keys($subActions)));
-		$context['sub_action'] = $_REQUEST['sa'];
+		if (isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]))
+			$context['sub_action'] = $_REQUEST['sa'];
+		elseif (!empty($defaultAction))
+			$context['sub_action'] = $defaultAction;
+		else
+			$context['sub_action'] = array_pop($temp = array_keys($subActions));
 	}
 }

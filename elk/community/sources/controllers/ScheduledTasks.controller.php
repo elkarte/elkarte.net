@@ -2,12 +2,12 @@
 
 /**
  * This handles the execution of scheduled tasks, mail queue scheduling included.
- * 
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -26,7 +26,7 @@ class ScheduledTasks_Controller
 	 *  - runs next tasks
 	 *  - update the database for the next round
 	 */
-	function action_autotask()
+	public function action_autotask()
 	{
 		// Include the ScheduledTasks subs worker.
 		require_once(SUBSDIR . '/ScheduledTasks.subs.php');

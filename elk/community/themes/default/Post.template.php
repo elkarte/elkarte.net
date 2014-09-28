@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -113,32 +113,32 @@ function template_postarea_above()
 	{
 		echo '
 							<dt>
-								<span', isset($context['post_error']['long_name']) || isset($context['post_error']['no_name']) || isset($context['post_error']['bad_name']) ? ' class="error"' : '', ' id="caption_guestname">', $txt['name'], ':</span>
+								<label for="guestname"', isset($context['post_error']['long_name']) || isset($context['post_error']['no_name']) || isset($context['post_error']['bad_name']) ? ' class="error"' : '', ' id="caption_guestname">', $txt['name'], ':</label>
 							</dt>
 							<dd>
-								<input type="text" name="guestname" size="25" value="', $context['name'], '" tabindex="', $context['tabindex']++, '" class="input_text" />
+								<input type="text" id="guestname" name="guestname" size="25" value="', $context['name'], '" tabindex="', $context['tabindex']++, '" class="input_text" required="required" />
 							</dd>';
 
 		if (empty($modSettings['guest_post_no_email']))
 			echo '
 							<dt>
-								<span', isset($context['post_error']['no_email']) || isset($context['post_error']['bad_email']) ? ' class="error"' : '', ' id="caption_email">', $txt['email'], ':</span>
+								<label for="email"', isset($context['post_error']['no_email']) || isset($context['post_error']['bad_email']) ? ' class="error"' : '', ' id="caption_email">', $txt['email'], ':</label>
 							</dt>
 							<dd>
-								<input type="text" name="email" size="25" value="', $context['email'], '" tabindex="', $context['tabindex']++, '" class="input_text" />
+								<input type="email" id="email" name="email" size="25" value="', $context['email'], '" tabindex="', $context['tabindex']++, '" class="input_text" required="required" />
 							</dd>';
 	}
 
 	// Now show the subject box for this post.
 	echo '
 							<dt class="clear">
-								<span', isset($context['post_error']['no_subject']) ? ' class="error"' : '', ' id="caption_subject">', $txt['subject'], ':</span>
+								<label for="post_subject"', isset($context['post_error']['no_subject']) ? ' class="error"' : '', ' id="caption_subject">', $txt['subject'], ':</label>
 							</dt>
 							<dd>
 								<input id="post_subject" type="text" name="subject"', $context['subject'] == '' ? '' : ' value="' . $context['subject'] . '"', ' tabindex="', $context['tabindex']++, '" size="80" maxlength="80"', isset($context['post_error']['no_subject']) ? ' class="error"' : ' class="input_text"', ' placeholder="', $txt['subject'], '" required="required" />
 							</dd>
 							<dt class="clear_left">
-								', $txt['message_icon'], ':
+								<label for="icon">', $txt['message_icon'], '</label>:
 							</dt>
 							<dd>
 								<select name="icon" id="icon" onchange="showimage()">';
@@ -156,7 +156,7 @@ function template_postarea_above()
 	if (!empty($context['show_boards_dropdown']))
 		echo '
 							<dt class="clear_left">
-								', $txt['post_in_board'], ':
+								<label for="post_in_board">', $txt['post_in_board'], '</label>:
 							</dt>
 							<dd>', template_select_boards('post_in_board'), '
 							</dd>';
@@ -192,10 +192,11 @@ function template_make_event_above()
 					<hr class="clear" />
 					<div id="post_event">
 						<fieldset id="event_main">
-							<legend><span', isset($context['post_error']['no_event']) ? ' class="error"' : '', ' id="caption_evtitle">', $txt['calendar_event_title'], '</span></legend>
-							<input type="text" name="evtitle" maxlength="255" size="55" value="', $context['event']['title'], '" tabindex="', $context['tabindex']++, '" class="input_text" />
-							<div class="smalltext" id="datepicker">
-								<input type="hidden" name="calendar" value="1" />', $txt['calendar_year'], '
+							<legend>', $txt['calendar_event_options'], '</legend>
+							<label for="evtitle"', isset($context['post_error']['no_event']) ? ' class="error"' : '', ' id="caption_evtitle">', $txt['calendar_event_title'], ':</label>
+							<input type="text" id="evtitle" name="evtitle" maxlength="255" size="55" value="', $context['event']['title'], '" tabindex="', $context['tabindex']++, '" class="input_text" />
+							<div id="datepicker">
+								<input type="hidden" name="calendar" value="1" /><label for="year">', $txt['calendar_year'], '</label>
 								<select name="year" id="year" tabindex="', $context['tabindex']++, '" onchange="generateDays();">';
 
 	// Show a list of all the years we allow...
@@ -205,7 +206,7 @@ function template_make_event_above()
 
 	echo '
 								</select>
-									', $txt['calendar_month'], '
+								<label for="month">', $txt['calendar_month'], '</label>
 								<select name="month" id="month" onchange="generateDays();">';
 
 	// There are 12 months per year - ensure that they all get listed.
@@ -215,7 +216,7 @@ function template_make_event_above()
 
 	echo '
 								</select>
-									', $txt['calendar_day'], '
+								<label for="day">', $txt['calendar_day'], '</label>
 								<select name="day" id="day">';
 
 	// This prints out all the days in the current month - this changes dynamically as we switch months.
@@ -225,54 +226,49 @@ function template_make_event_above()
 
 	echo '
 								</select>
-							</div>
-						</fieldset>';
+							</div>';
 
 	if (!empty($modSettings['cal_allowspan']) || ($context['event']['new'] && $context['is_new_post']))
 	{
 		echo '
-						<fieldset id="event_options">
-							<legend>', $txt['calendar_event_options'], '</legend>
-							<div class="event_options smalltext">
-								<ul class="event_options">';
+							<ul class="event_options">';
 
 		// If events can span more than one day then allow the user to select how long it should last.
 		if (!empty($modSettings['cal_allowspan']))
 		{
 			echo '
-									<li>
-										', $txt['calendar_numb_days'], '
-										<select name="span">';
+								<li>
+									<label for="span">', $txt['calendar_numb_days'], '</label>
+									<select id="span" name="span">';
 
 			for ($days = 1; $days <= $modSettings['cal_maxspan']; $days++)
 				echo '
-											<option value="', $days, '"', $days == $context['event']['span'] ? ' selected="selected"' : '', '>', $days, '&nbsp;</option>';
+										<option value="', $days, '"', $days == $context['event']['span'] ? ' selected="selected"' : '', '>', $days, '&nbsp;</option>';
 
 			echo '
-										</select>
-									</li>';
+									</select>
+								</li>';
 		}
 
 		// If this is a new event let the user specify which board they want the linked post to be put into.
 		if ($context['event']['new'] && $context['is_new_post'])
 		{
 			echo '
-									<li>
-										', template_select_boards('board', $txt['calendar_post_in']), '
-									</li>';
+								<li>
+									', template_select_boards('board', $txt['calendar_post_in']), '
+								</li>';
 		}
 
 		echo '
-								</ul>
-							</div>
-						</fieldset>';
+							</ul>';
 	}
 
 	if ($context['make_event'] && (!$context['event']['new'] || !empty($context['current_board'])))
 		echo '
-			<input type="hidden" name="eventid" value="', $context['event']['id'], '" />';
+							<input type="hidden" name="eventid" value="', $context['event']['id'], '" />';
 
 	echo '
+						</fieldset>
 					</div>';
 }
 
@@ -301,13 +297,6 @@ function template_post_page()
 							</div>';
 	}
 
-	// If this message has been edited in the past - display when it was.
-	if (isset($context['last_modified']))
-		echo '
-					<div class="smalltext">
-						', $context['last_modified_text'], '
-					</div>';
-
 	// Show our submit buttons before any more options
 	echo '
 						<div id="post_confirm_buttons" class="submitbutton">
@@ -321,7 +310,7 @@ function template_post_page()
 	// Option to add a poll (javascript if enabled, otherwise preview with poll)
 	if (!$context['make_poll'] && $context['can_add_poll'])
 		echo '
-							<input type="submit" name="poll" value="', $txt['add_poll'], '" onclick="return loadAddNewPoll(this, ', empty($context['current_board']) ? '' : $context['current_board'], ', \'postmodify\');" class="button_submit" />';
+							<input type="submit" name="poll" value="', $txt['add_poll'], '" onclick="return loadAddNewPoll(this, ', empty($context['current_board']) ? '0' : $context['current_board'], ', \'postmodify\');" class="button_submit" />';
 
 	echo '
 						</div>';
@@ -332,7 +321,7 @@ function template_post_page()
  */
 function template_additional_options_below()
 {
-	global $context, $settings, $options, $txt, $modSettings;
+	global $context, $settings, $options, $txt;
 
 	// If the admin has enabled the hiding of the additional options - show a link and image for it.
 	if (!empty($settings['additional_options_collapsible']))
@@ -341,101 +330,19 @@ function template_additional_options_below()
 						<span id="category_toggle">&nbsp;
 							<span id="postMoreExpand" class="', empty($context['minmax_preferences']['pmdraft']) ? 'collapse' : 'expand', '" style="display: none;" title="', $txt['hide'], '"></span>
 						</span>
-						<a href="#" id="postMoreExpandLink">', $context['can_post_attachment'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt'], '</a>
+						<a href="#" id="postMoreExpandLink">', $context['attachments']['can']['post'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt'], '</a>
 					</h3>';
 
 	echo '
 					<div id="', empty($settings['additional_options_collapsible']) ? 'postAdditionalOptionsNC"' : 'postAdditionalOptions"', empty($settings['additional_options_collapsible']) || empty($context['minmax_preferences']['post']) ? '' : ' style="display: none;"', '>';
 
 	// If this post already has attachments on it - give information about them.
-	if (!empty($context['current_attachments']))
-	{
-		echo '
-						<dl id="postAttachment">
-							<dt>
-								', $txt['attached'], ':
-							</dt>
-							<dd class="smalltext" style="width: 100%;">
-								<input type="hidden" name="attach_del[]" value="0" />
-								', $txt['uncheck_unwatchd_attach'], ':
-							</dd>';
-
-		foreach ($context['current_attachments'] as $attachment)
-			echo '
-							<dd class="smalltext">
-								<label for="attachment_', $attachment['id'], '"><input type="checkbox" id="attachment_', $attachment['id'], '" name="attach_del[]" value="', $attachment['id'], '"', empty($attachment['unchecked']) ? ' checked="checked"' : '', ' class="input_check" /> ', $attachment['name'], (empty($attachment['approved']) ? ' (' . $txt['awaiting_approval'] . ')' : ''),
-			!empty($modSettings['attachmentPostLimit']) || !empty($modSettings['attachmentSizeLimit']) ? sprintf($txt['attach_kb'], comma_format(round(max($attachment['size'], 1028) / 1028), 0)) : '', '</label>
-							</dd>';
-
-		echo '
-						</dl>';
-
-		if (!empty($context['files_in_session_warning']))
-			echo '
-						<div class="smalltext">', $context['files_in_session_warning'], '</div>';
-	}
+	if (!empty($context['attachments']['current']))
+		$context['attachments']['templates']['existing']();
 
 	// Is the user allowed to post any additional ones? If so give them the boxes to do it!
-	if ($context['can_post_attachment'])
-	{
-		echo '
-						<dl id="postAttachment2">';
-
-		// But, only show them if they haven't reached a limit. Or a mod author hasn't hidden them.
-		if ($context['num_allowed_attachments'] > 0 || !empty($context['dont_show_them']))
-		{
-			echo '
-							<dt>
-								', $txt['attach'], ':
-							</dt>
-							<dd class="smalltext">
-								', empty($modSettings['attachmentSizeLimit']) ? '' : ('<input type="hidden" name="MAX_FILE_SIZE" value="' . $modSettings['attachmentSizeLimit'] * 1028 . '" />'), '
-								<input type="file" multiple="multiple" name="attachment[]" id="attachment1" class="input_file" /> (<a href="javascript:void(0);" onclick="cleanFileInput(\'attachment1\');">', $txt['clean_attach'], '</a>)';
-
-			// Show more boxes if they aren't approaching that limit.
-			if ($context['num_allowed_attachments'] > 1)
-				echo '
-								<script><!-- // --><![CDATA[
-									var allowed_attachments = ', $context['num_allowed_attachments'], ',
-										current_attachment = 1,
-										txt_more_attachments_error = "', $txt['more_attachments_error'], '",
-										txt_more_attachments = "', $txt['more_attachments'], '",
-										txt_clean_attach = "', $txt['clean_attach'], '";
-								// ]]></script>
-							</dd>
-							<dd class="smalltext" id="moreAttachments"><a href="#" onclick="addAttachment(); return false;">(', $txt['more_attachments'], ')</a></dd>';
-			else
-				echo '
-							</dd>';
-		}
-
-		// Add any template changes for an alternative upload system here.
-		call_integration_hook('integrate_upload_template');
-
-		echo '
-							<dd class="smalltext">';
-
-		// Show some useful information such as allowed extensions, maximum size and amount of attachments allowed.
-		if (!empty($modSettings['attachmentCheckExtensions']))
-			echo '
-								', $txt['allowed_types'], ': ', $context['allowed_extensions'], '<br />';
-
-		if (!empty($context['attachment_restrictions']))
-			echo '
-								', $txt['attach_restrictions'], ' ', implode(', ', $context['attachment_restrictions']), '<br />';
-
-		if ($context['num_allowed_attachments'] == 0)
-			echo '
-								', $txt['attach_limit_nag'], '<br />';
-
-		if (!$context['can_post_attachment_unapproved'])
-			echo '
-								<span class="alert">', $txt['attachment_requires_approval'], '</span>', '<br />';
-
-		echo '
-							</dd>
-						</dl>';
-	}
+	if ($context['attachments']['can']['post'])
+		$context['attachments']['templates']['add_new']();
 
 	// Display the check boxes for all the standard options - if they are available to the user!
 	echo '
@@ -454,6 +361,107 @@ function template_additional_options_below()
 
 	echo '
 					</div>';
+}
+
+/**
+ * Creates a list of attachments already attached to this message
+ */
+function template_show_existing_attachments()
+{
+	global $context, $txt, $modSettings;
+
+	echo '
+						<dl id="postAttachment">
+							<dt>
+								', $txt['attached'], ':
+							</dt>
+							<dd class="smalltext" style="width: 100%;">
+								<input type="hidden" name="attach_del[]" value="0" />
+								', $txt['uncheck_unwatchd_attach'], ':
+							</dd>';
+
+	foreach ($context['attachments']['current'] as $attachment)
+		echo '
+							<dd class="smalltext">
+								<label for="attachment_', $attachment['id'], '"><input type="checkbox" id="attachment_', $attachment['id'], '" name="attach_del[]" value="', $attachment['id'], '"', empty($attachment['unchecked']) ? ' checked="checked"' : '', ' class="input_check" /> ', $attachment['name'], (empty($attachment['approved']) ? ' (' . $txt['awaiting_approval'] . ')' : ''),
+		!empty($modSettings['attachmentPostLimit']) || !empty($modSettings['attachmentSizeLimit']) ? sprintf($txt['attach_kb'], comma_format(round(max($attachment['size'], 1028) / 1028), 0)) : '', '</label>
+							</dd>';
+
+	echo '
+						</dl>';
+
+	if (!empty($context['files_in_session_warning']))
+		echo '
+						<div class="smalltext">', $context['files_in_session_warning'], '</div>';
+}
+
+/**
+ * Creates the interface to upload attachments
+ */
+function template_add_new_attachments()
+{
+	global $context, $txt, $modSettings;
+
+	echo '
+						<dl id="postAttachment2">';
+
+	// But, only show them if they haven't reached a limit. Or a mod author hasn't hidden them.
+	if ($context['attachments']['num_allowed'] > 0 || !empty($context['dont_show_them']))
+	{
+		echo '
+							<dt class="drop_area">
+								<i class="fa fa-upload"></i> ', $txt['attach_drop_files'], '
+								<input class="drop_area_fileselect" type="file" multiple="multiple" name="attachment_click[]" id="attachment_click" class="input_file" />
+							</dt>
+							<dd class="progress_tracker"></dd>
+							<dd class="drop_attachments_error"></dd>
+							<dt class="drop_attachments_no_js">
+								', $txt['attach'], ':
+							</dt>
+							<dd class="smalltext drop_attachments_no_js">
+								', empty($modSettings['attachmentSizeLimit']) ? '' : ('<input type="hidden" name="MAX_FILE_SIZE" value="' . $modSettings['attachmentSizeLimit'] * 1028 . '" />'), '
+								<input type="file" multiple="multiple" name="attachment[]" id="attachment1" class="input_file" /> (<a href="javascript:void(0);" onclick="cleanFileInput(\'attachment1\');">', $txt['clean_attach'], '</a>)';
+
+		// Show more boxes if they aren't approaching that limit.
+		if ($context['attachments']['num_allowed'] > 1)
+			echo '
+								<script><!-- // --><![CDATA[
+									var allowed_attachments = ', $context['attachments']['num_allowed'], ',
+										current_attachment = 1,
+										txt_more_attachments_error = "', $txt['more_attachments_error'], '",
+										txt_more_attachments = "', $txt['more_attachments'], '",
+										txt_clean_attach = "', $txt['clean_attach'], '";
+								// ]]></script>
+							</dd>
+							<dd class="smalltext drop_attachments_no_js" id="moreAttachments"><a href="#" onclick="addAttachment(); return false;">(', $txt['more_attachments'], ')</a></dd>';
+		else
+			echo '
+							</dd>';
+	}
+
+	echo '
+							<dd class="smalltext">';
+
+	// Show some useful information such as allowed extensions, maximum size and amount of attachments allowed.
+	if (!empty($context['attachments']['allowed_extensions']))
+		echo '
+								', $txt['allowed_types'], ': ', $context['attachments']['allowed_extensions'], '<br />';
+
+	if (!empty($context['attachments']['restrictions']))
+		echo '
+								', $txt['attach_restrictions'], ' ', implode(', ', $context['attachments']['restrictions']), '<br />';
+
+	if ($context['attachments']['num_allowed'] == 0)
+		echo '
+								', $txt['attach_limit_nag'], '<br />';
+
+	if (!$context['attachments']['can']['post_unapproved'])
+		echo '
+								<span class="alert">', $txt['attachment_requires_approval'], '</span>', '<br />';
+
+	echo '
+							</dd>
+						</dl>';
 }
 
 /**
@@ -619,7 +627,7 @@ function template_postarea_below()
 	// Is visual verification enabled?
 	if ($context['require_verification'])
 	{
-		template_control_verification($context['visual_verification_id'], '
+		template_verification_controls($context['visual_verification_id'], '
 						<div class="post_verification">
 							<span' . (!empty($context['post_error']['need_qr_verification']) ? ' class="error"' : '') . '>
 								<strong>' . $txt['verification'] . ':</strong>
@@ -695,8 +703,8 @@ function template_postarea_below()
 				aSwapLinks: [
 					{
 						sId: \'postMoreExpandLink\',
-						msgExpanded: ', JavaScriptEscape($context['can_post_attachment'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt']), ',
-						msgCollapsed: ', JavaScriptEscape($context['can_post_attachment'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt']), '
+						msgExpanded: ', JavaScriptEscape($context['attachments']['can']['post'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt']), ',
+						msgCollapsed: ', JavaScriptEscape($context['attachments']['can']['post'] ? $txt['post_additionalopt_attach'] : $txt['post_additionalopt']), '
 					}
 				],
 				oThemeOptions: {
@@ -727,7 +735,8 @@ function template_spellcheck()
 	<head>
 		<title>', $txt['spell_check'], '</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?beta10" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index.css', CACHE_STALE, '" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/', $context['theme_variant_url'], 'index', $context['theme_variant'], '.css', CACHE_STALE, '" />
 		<style>
 			body, td {
 				font-size: small;
@@ -769,14 +778,14 @@ function template_spellcheck()
 			<div id="spellview">&nbsp;</div>
 			<table class="table_grid">
 				<tr class="windowbg">
-					<td style="width:50%;vertical-align:top">
-						', $txt['spellcheck_change_to'], '<br />
-						<input type="text" name="changeto" style="width: 98%;" class="input_text" />
+					<td style="width: 50%;vertical-align: top;">
+						<label for="changeto">', $txt['spellcheck_change_to'], '</label><br />
+						<input type="text" id="changeto" name="changeto" style="width: 98%;" class="input_text" />
 					</td>
-					<td style="width:50%">
+					<td style="width: 50%;">
 						', $txt['spellcheck_suggest'], '<br />
-						<select name="suggestions" style="width: 98%;" size="5" onclick="if (this.selectedIndex != -1) this.form.changeto.value = this.options[this.selectedIndex].text;" ondblclick="replaceWord();">
-						</select>
+							<select name="suggestions" style="width: 98%;" size="5" onclick="if (this.selectedIndex != -1) this.form.changeto.value = this.options[this.selectedIndex].text;" ondblclick="replaceWord();">
+							</select>
 					</td>
 				</tr>
 			</table>

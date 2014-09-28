@@ -48,7 +48,7 @@ $txt['repair_operation_stats_topics3'] = 'Topics with the wrong unapproved post 
 $txt['repair_operation_missing_boards'] = 'Topics in a non-existent board';
 $txt['repair_operation_missing_categories'] = 'Boards in a non-existent category';
 $txt['repair_operation_missing_posters'] = 'Messages linked to non-existent members';
-$txt['repair_operation_missing_parents'] = 'Child boards with non-existent parents';
+$txt['repair_operation_missing_parents'] = 'Sub-boards with non-existent parents';
 $txt['repair_operation_missing_polls'] = 'Topics linked to non-existent polls';
 $txt['repair_operation_missing_calendar_topics'] = 'Events linked to non-existent topics';
 $txt['repair_operation_missing_log_topics'] = 'Topic logs linked to non-existent topics';
@@ -83,9 +83,7 @@ $txt['database_numb_tables'] = 'Your database contains %1$d tables.';
 $txt['database_optimize_attempt'] = 'Attempting to optimize your database...';
 $txt['database_optimizing'] = 'Optimizing %1$s... %2$01.2f KB optimized.';
 $txt['database_already_optimized'] = 'All of the tables were already optimized.';
-$txt['database_opimize_unneeded'] = 'It wasn\'t necessary to optimize any tables.';
 $txt['database_optimized'] = ' table(s) optimized.';
-$txt['database_no_id'] = 'has a non-existent member ID';
 
 $txt['apply_filter'] = 'Apply Filter';
 $txt['applying_filter'] = 'Applying Filter';
@@ -146,25 +144,21 @@ $txt['maintain_backup_gz'] = 'Compress the file with gzip.';
 $txt['maintain_backup_save'] = 'Download';
 
 $txt['maintain_old'] = 'Remove Old Posts';
-$txt['maintain_old_since_days1'] = 'Remove all topics not posted in for ';
-$txt['maintain_old_since_days2'] = ' days, which are:';
+$txt['maintain_old_since_days'] = 'Remove all topics not posted in for %1$s  days, which are:';
 $txt['maintain_old_nothing_else'] = 'Any sort of topic.';
 $txt['maintain_old_are_moved'] = 'Moved topic notices.';
 $txt['maintain_old_are_locked'] = 'Locked.';
-$txt['maintain_old_are_not_stickied'] = 'But don\'t count stickied topics.';
+$txt['maintain_old_are_not_stickied'] = 'But don\'t count pinned topics.';
 $txt['maintain_old_all'] = 'All boards (click to select specific boards)';
 $txt['maintain_old_choose'] = 'Specific boards (click to select all)';
 $txt['maintain_old_remove'] = 'Remove now';
 $txt['maintain_old_confirm'] = 'Are you really sure you want to delete old posts now?\\n\\nThis cannot be undone!';
 
 $txt['maintain_old_drafts'] = 'Remove old drafts';
-$txt['maintain_old_drafts_days'] = 'Remove all drafts older than';
+$txt['maintain_old_drafts_days'] = 'Remove all drafts older than %1$s days';
 $txt['maintain_old_drafts_confirm'] = 'Are you really sure you want to delete old drafts now?\\n\\nThis cannot be undone!';
 $txt['maintain_members'] = 'Remove Inactive Members';
-$txt['maintain_members_ungrouped'] = 'Ungrouped Members <span class="smalltext">(Members with no assigned groups)</span>';
-$txt['maintain_members_since1'] = 'Remove all members who have not';
-$txt['maintain_members_since2'] = 'for';
-$txt['maintain_members_since3'] = 'days.';
+$txt['maintain_members_since'] = 'Remove all members who have not {select_conditions} for {num_days} days.';
 $txt['maintain_members_activated'] = 'activated their account';
 $txt['maintain_members_logged_in'] = 'logged in';
 $txt['maintain_members_all'] = 'All Membergroups';
@@ -183,7 +177,6 @@ $txt['convert_proceed'] = 'Proceed';
 
 // Move topics out.
 $txt['move_topics_maintenance'] = 'Move Topics';
-$txt['move_topics_select_board'] = 'Select Board';
 $txt['move_topics_from'] = 'Move topics from';
 $txt['move_topics_to'] = 'to';
 $txt['move_topics_now'] = 'Move now';

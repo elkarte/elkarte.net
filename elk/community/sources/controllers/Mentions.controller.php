@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -17,6 +17,8 @@ if (!defined('ELK'))
 /**
  * Mentions_Controller Class:  Add mention notificaions for various actions such
  * as liking a post, adding a buddy, @ calling a member in a post
+ *
+ * @package Mentions
  */
 class Mentions_Controller extends Action_Controller
 {
@@ -65,6 +67,41 @@ class Mentions_Controller extends Action_Controller
 	protected $_type = '';
 
 	/**
+	 * The url of the display mentions button (all, unread, etc)
+	 *
+	 * @var string
+	 */
+	protected $_url_param = '';
+
+	/**
+	 * Used for pagenation, keeps track of the current start point
+	 *
+	 * @var int
+	 */
+	protected $_page = 0;
+
+	/**
+	 * Number of items per page
+	 *
+	 * @var int
+	 */
+	protected $_items_per_page = 20;
+
+	/**
+	 * Default sorting column
+	 *
+	 * @var string
+	 */
+	protected $_default_sort = 'log_time';
+
+	/**
+	 * The sorting methods we know
+	 *
+	 * @var string[]
+	 */
+	protected $_known_sorting = array();
+
+	/**
 	 * Determine if we are looking only at unread mentions or any kind of
 	 *
 	 * @var boolean
@@ -107,6 +144,8 @@ class Mentions_Controller extends Action_Controller
 			'deleted' => 2,
 			'unapproved' => 3,
 		);
+
+		$this->_known_sorting = array('id_member_from', 'type', 'log_time');
 
 		call_integration_hook('integrate_add_mention', array(&$this->_known_mentions));
 	}
@@ -155,7 +194,7 @@ class Mentions_Controller extends Action_Controller
 		is_not_guest();
 
 		require_once(SUBSDIR . '/Mentions.subs.php');
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		loadLanguage('Mentions');
 
 		$this->_buildUrl();
@@ -163,9 +202,9 @@ class Mentions_Controller extends Action_Controller
 		$list_options = array(
 			'id' => 'list_mentions',
 			'title' => empty($this->_all) ? $txt['my_unread_mentions'] : $txt['my_mentions'],
-			'items_per_page' => 20,
+			'items_per_page' => $this->_items_per_page,
 			'base_href' => $scripturl . '?action=mentions;sa=list' . $this->_url_param,
-			'default_sort_col' => 'log_time',
+			'default_sort_col' => $this->_default_sort,
 			'default_sort_dir' => 'default',
 			'no_items_label' => $this->_all ? $txt['no_mentions_yet'] : $txt['no_new_mentions'],
 			'get_items' => array(
@@ -226,10 +265,12 @@ class Mentions_Controller extends Action_Controller
 				'log_time' => array(
 					'header' => array(
 						'value' => $txt['mentions_when'],
+						'class' => 'mention_log_time',
 					),
 					'data' => array(
 						'db' => 'log_time',
-						'timeformat' => true,
+						'timeformat' => 'html_time',
+						'class' => 'mention_log_time',
 					),
 					'sort' => array(
 						'default' => 'mtn.log_time DESC',
@@ -239,6 +280,7 @@ class Mentions_Controller extends Action_Controller
 				'action' => array(
 					'header' => array(
 						'value' => $txt['mentions_action'],
+						'class' => 'listaction',
 					),
 					'data' => array(
 						'function' => create_function('$row', '
@@ -247,14 +289,14 @@ class Mentions_Controller extends Action_Controller
 							$opts = \'\';
 
 							if (empty($row[\'status\']))
-								$opts = \'<a href="?action=mentions;sa=updatestatus;mark=read;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_read.png" alt="*" /></a>&nbsp;\';
+								$opts = \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=read;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_read.png" alt="*" /></a>&nbsp;\';
 							else
-								$opts = \'<a href="?action=mentions;sa=updatestatus;mark=unread;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markunread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_unread.png" alt="*" /></a>&nbsp;\';
+								$opts = \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=unread;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'mentions_markunread\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/mark_unread.png" alt="*" /></a>&nbsp;\';
 
-							return $opts . \'<a href="?action=mentions;sa=updatestatus;mark=delete;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'delete\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/delete.png" alt="*" /></a>\';
+							return $opts . \'<a href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=delete;item=\' . $row[\'id_mention\'] . \';\' . $context[\'session_var\'] . \'=\' . $context[\'session_id\'] . \';"><img title="\' . $txt[\'delete\'] . \'" src="\' . $settings[\'images_url\'] . \'/icons/delete.png" alt="*" /></a>\';
 						'),
+						'class' => 'listaction',
 					),
-					'class' => 'listaction',
 				),
 			),
 			'list_menu' => array(
@@ -271,6 +313,10 @@ class Mentions_Controller extends Action_Controller
 				array(
 					'position' => 'top_of_list',
 					'value' => '<a class="floatright linkbutton" href="' . $scripturl . '?action=mentions' . (!empty($this->_all) ? '' : ';all') . str_replace(';all', '', $this->_url_param) . '">' . (!empty($this->_all) ? $txt['mentions_unread'] : $txt['mentions_all']) . '</a>',
+				),
+				array(
+					'position' => 'bottom_of_list',
+					'value' => '<a class="floatright linkbutton" href="' . $scripturl . '?action=mentions;sa=updatestatus;mark=readall' . str_replace(';all', '', $this->_url_param) . ';' . $context['session_var'] . '=' . $context['session_id'] . '">' . $txt['mentions_mark_all_read'] . '</a>',
 				),
 			),
 		);
@@ -364,16 +410,19 @@ class Mentions_Controller extends Action_Controller
 			$start += $limit;
 		}
 
+		if ($round !== 0)
+			countUserMentions();
+
 		return $mentions;
 	}
 
 	/**
 	 * Callback used to prepare the mention message for mentions, likes, removed likes and buddies
 	 *
-	 * @param array $mentions : Mentions retrieved from the database by getUserMentions
+	 * @param mixed[] $mentions : Mentions retrieved from the database by getUserMentions
 	 * @param string $type : the type of the mention
 	 */
-	function prepareMentionMessage(&$mentions, $type)
+	public function prepareMentionMessage(&$mentions, $type)
 	{
 		global $txt, $scripturl, $context, $modSettings, $user_info;
 
@@ -409,7 +458,7 @@ class Mentions_Controller extends Action_Controller
 		{
 			require_once(SUBSDIR . '/Boards.subs.php');
 
-			$accessibleBoards = accessibleBoards(null, $boards);
+			$accessibleBoards = accessibleBoards($boards);
 
 			foreach ($boards as $key => $board)
 			{
@@ -481,7 +530,7 @@ class Mentions_Controller extends Action_Controller
 	/**
 	 * Sets the specifics of a mention call in this instance
 	 *
-	 * @param array $data must contain uid, type and msg at a minimum
+	 * @param mixed[] $data must contain uid, type and msg at a minimum
 	 */
 	public function setData($data)
 	{
@@ -530,7 +579,7 @@ class Mentions_Controller extends Action_Controller
 		checkSession('request');
 
 		$this->setData(array(
-			'id_mention' => $_REQUEST['item'],
+			'id_mention' => isset($_REQUEST['item']) ? $_REQUEST['item'] : 0,
 			'mark' => $_REQUEST['mark'],
 		));
 
@@ -550,10 +599,37 @@ class Mentions_Controller extends Action_Controller
 				case 'delete':
 					changeMentionStatus($this->_validator->id_mention, $this->_known_status['deleted']);
 					break;
+				case 'readall':
+					$mentions = $this->list_loadMentions((int) $this->_page, $this->_items_per_page, $this->_sort, $this->_all, $this->_type);
+					$this->_markMentionsRead($mentions);
+					break;
 			}
 		}
 
 		redirectexit('action=mentions;sa=list' . $this->_url_param);
+	}
+
+	/**
+	 * Marks an array of mentions as read
+	 *
+	 * @param int[] $mention_ids An array of mention ids. Each of them will be
+	 *              validated independently
+	 */
+	protected function _markMentionsRead($mention_ids)
+	{
+		if (empty($mention_ids))
+			return;
+
+		foreach ($mention_ids as $mention)
+		{
+			$this->setData(array(
+				'id_mention' => $mention['id_mention'],
+				'mark' => 'read',
+			));
+
+			if ($this->_isAccessible())
+				changeMentionStatus($this->_validator->id_mention, $this->_known_status['read']);
+		}
 	}
 
 	/**
@@ -562,6 +638,7 @@ class Mentions_Controller extends Action_Controller
 	protected function _buildUrl()
 	{
 		$this->_all = isset($_REQUEST['all']);
+		$this->_sort = isset($_REQUEST['sort']) && in_array($_REQUEST['sort'], $this->_known_sorting) ? $_REQUEST['sort'] : $this->_default_sort;
 		$this->_type = isset($_REQUEST['type']) && isset($this->_known_mentions[$_REQUEST['type']]) ? $_REQUEST['type'] : '';
 		$this->_page = isset($_REQUEST['start']) ? $_REQUEST['start'] : '';
 
@@ -583,16 +660,13 @@ class Mentions_Controller extends Action_Controller
 		);
 		$validation = array(
 			'id_mention' => 'validate_ownmention',
-			'mark' => 'trim|contains[read,unread,delete]',
+			'mark' => 'contains[read,unread,delete,readall]',
 		);
 
 		$this->_validator->sanitation_rules($sanitization);
 		$this->_validator->validation_rules($validation);
 
-		if (!$this->_validator->validate($this->_data))
-			return false;
-
-		return true;
+		return $this->_validator->validate($this->_data);
 	}
 
 	/**

@@ -7,7 +7,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -18,9 +18,10 @@ if (!defined('ELK'))
  * Count the mentions of the current user
  * callback for createList in action_list of Mentions_Controller
  *
+ * @package Mentions
  * @param bool $all : if true counts all the mentions, otherwise only the unread
- * @param mixed $type : the type of the mention can be a string or an array of strings.
- * @param string $id_member : the id of the member the counts are for, defaults to user_info['id']
+ * @param string[]|string $type : the type of the mention can be a string or an array of strings.
+ * @param string|null $id_member : the id of the member the counts are for, defaults to user_info['id']
  */
 function countUserMentions($all = false, $type = '', $id_member = null)
 {
@@ -51,7 +52,7 @@ function countUserMentions($all = false, $type = '', $id_member = null)
 
 	// Counts as maintenance! :P
 	if ($all === false && empty($type))
-		updateMemberdata($id_member, array('mentions' => $counts[$id_member]));
+		updateMemberData($id_member, array('mentions' => $counts[$id_member]));
 
 	return $counts[$id_member];
 }
@@ -60,11 +61,12 @@ function countUserMentions($all = false, $type = '', $id_member = null)
  * Retrieve all the info to render the mentions page for the current user
  * callback for createList in action_list of Mentions_Controller
  *
+ * @package Mentions
  * @param int $start Query starts sending results from here
  * @param int $limit Number of mentions returned
  * @param string $sort Sorting
  * @param bool $all if show all mentions or only unread ones
- * @param mixed $type : the type of the mention can be a string or an array of strings.
+ * @param string[]|string $type : the type of the mention can be a string or an array of strings.
  */
 function getUserMentions($start, $limit, $sort, $all = false, $type = '')
 {
@@ -108,17 +110,17 @@ function getUserMentions($start, $limit, $sort, $all = false, $type = '')
 	return $mentions;
 }
 
-
 /**
  * Inserts a new mention
  * Checks if the mention already exists (in any status) to prevent any duplicates
  *
+ * @package Mentions
  * @param int $member_from the id of the member mentioning
- * @param array $members_to an array of ids of the members mentioned
+ * @param int[] $members_to an array of ids of the members mentioned
  * @param int $msg the id of the message involved in the mention
  * @param string $type the type of mention
- * @param string $time optional value to set the time of the mention, defaults to now
- * @param string $status optional value to set a status, defaults to 0
+ * @param string|null $time optional value to set the time of the mention, defaults to now
+ * @param string|null $status optional value to set a status, defaults to 0
  */
 function addMentions($member_from, $members_to, $msg, $type, $time = null, $status = null)
 {
@@ -184,11 +186,12 @@ function addMentions($member_from, $members_to, $msg, $type, $time = null, $stat
 /**
  * Softly and gently removes a 'like' mention when the post is unliked
  *
+ * @package Mentions
  * @param int $member_from the id of the member mentioning
- * @param array $members_to an array of ids of the members mentioned
+ * @param int[] $members_to an array of ids of the members mentioned
  * @param int $msg the id of the message involved in the mention
- * @param int $newstatus status to change the mention to if found as unread, default
- *  is to set it as read (status = 1)
+ * @param int $newstatus status to change the mention to if found as unread,
+ *             - default is to set it as read (status = 1)
  */
 function rlikeMentions($member_from, $members_to, $msg, $newstatus = 1)
 {
@@ -220,13 +223,14 @@ function rlikeMentions($member_from, $members_to, $msg, $newstatus = 1)
 
 /**
  * Changes a specific mention status for a member
- * Can be used to mark as read, new, deleted, etc
  *
- * note that delete is a "soft-delete" because otherwise anyway we have to remember
- * when a user was already mentioned for a certain message (e.g. in case of editing)
+ * - Can be used to mark as read, new, deleted, etc
+ * - note that delete is a "soft-delete" because otherwise anyway we have to remember
+ * - when a user was already mentioned for a certain message (e.g. in case of editing)
  *
+ * @package Mentions
  * @param int $id_mention the mention id in the db
- * @param int $status status to update, 'new' => 0,	'read' => 1, 'deleted' => 2, 'unapproved' => 3
+ * @param int $status status to update, 'new' => 0, 'read' => 1, 'deleted' => 2, 'unapproved' => 3
  */
 function changeMentionStatus($id_mention, $status = 1)
 {
@@ -254,9 +258,11 @@ function changeMentionStatus($id_mention, $status = 1)
 
 /**
  * Toggles a mention on/off
- * This is used to turn mentions on when a message is approved
  *
- * @param array $msgs array of messages that you want to toggle
+ * - This is used to turn mentions on when a message is approved
+ *
+ * @package Mentions
+ * @param int[] $msgs array of messages that you want to toggle
  * @param bool $approved direction of the toggle read / unread
  */
 function toggleMentionsApproval($msgs, $approved)
@@ -289,9 +295,12 @@ function toggleMentionsApproval($msgs, $approved)
 }
 
 /**
- * Toggles a mention visibility on/off (if off is restored to visible,
- * if on is switched to unvisible) for all the users
+ * Toggles a mention visibility on/off
  *
+ * - if off is restored to visible,
+ * - if on is switched to unvisible) for all the users
+ *
+ * @package Mentions
  * @param string $type type of the mention that you want to toggle
  * @param bool $enable if true enables the mentions, otherwise disables them
  */
@@ -329,7 +338,8 @@ function toggleMentionsVisibility($type, $enable)
 /**
  * Toggles a bunch of mentions accessibility on/off
  *
- * @param array $mentions an array of mention id
+ * @package Mentions
+ * @param int[] $mentions an array of mention id
  * @param bool $access if true make the mentions accessible (if visible and other things), otherwise marks them as inaccessible
  */
 function toggleMentionsAccessibility($mentions, $access)
@@ -350,11 +360,13 @@ function toggleMentionsAccessibility($mentions, $access)
 
 /**
  * To validate access to read/unread/delete mentions
- * Called from the validation class
  *
+ * - Called from the validation class
+ *
+ * @package Mentions
  * @param string $field
- * @param array $input
- * @param array $validation_parameters
+ * @param mixed[] $input
+ * @param string|null $validation_parameters
  */
 function validate_ownmention($field, $input, $validation_parameters = null)
 {
@@ -375,9 +387,9 @@ function validate_ownmention($field, $input, $validation_parameters = null)
 }
 
 /**
- * Provided a mentions id and a member id,
- * checks if the mentions belongs to that user
+ * Provided a mentions id and a member id, checks if the mentions belongs to that user
  *
+ * @package Mentions
  * @param integer $id_mention the id of an existing mention
  * @param integer $id_member id of a member
  * @return bool true if the mention belongs to the member, false otherwise
@@ -406,6 +418,7 @@ function findMemberMention($id_mention, $id_member)
 /**
  * Updates the mention count as a result of an action, read, new, delete, etc
  *
+ * @package Mentions
  * @param int $status
  * @param int $member_id
  */
@@ -419,5 +432,5 @@ function updateMentionMenuCount($status, $member_id)
 		updateMemberdata($member_id, array('mentions' => '-'));
 	// Deleting or unapproving may have been read or not, so a count is required
 	else
-		countUserMentions(false, 0, $member_id);
+		countUserMentions(false, '', $member_id);
 }

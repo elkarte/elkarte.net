@@ -7,12 +7,16 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
 if (!defined('ELK'))
 	die('No access...');
+
+// It should be already defined in Db-type.class.php, but better have it twice
+if (!defined('DB_TYPE'))
+	define('DB_TYPE', 'PostgreSQL');
 
 /**
  * PostgreSQL implementation of DbSearch
@@ -21,7 +25,7 @@ class DbSearch_PostgreSQL implements DbSearch
 {
 	/**
 	 * This instance of the search
-	 * @var instance
+	 * @var DbSearch_PostgreSQL
 	 */
 	private static $_search = null;
 
@@ -30,7 +34,7 @@ class DbSearch_PostgreSQL implements DbSearch
 	 *
 	 * @param string $search_type
 	 */
-	function search_support($search_type)
+	public function search_support($search_type)
 	{
 		$supported_types = array('custom');
 
@@ -43,10 +47,10 @@ class DbSearch_PostgreSQL implements DbSearch
 	 *
 	 * @param string $identifier
 	 * @param string $db_string
-	 * @param array $db_values default array()
-	 * @param resource $connection
+	 * @param mixed[] $db_values default array()
+	 * @param resource|null $connection
 	 */
-	function search_query($identifier, $db_string, $db_values = array(), $connection = null)
+	public function search_query($identifier, $db_string, $db_values = array(), $connection = null)
 	{
 		$db = database();
 
@@ -57,7 +61,7 @@ class DbSearch_PostgreSQL implements DbSearch
 				'~ENGINE=MEMORY~i' => '',
 			),
 			'create_tmp_log_search_messages' => array(
-				'~mediumint\(\d\)' => 'int',
+				'~mediumint\(\d\)~i' => 'int',
 				'~unsigned~i' => '',
 				'~ENGINE=MEMORY~i' => '',
 			),
@@ -161,9 +165,9 @@ class DbSearch_PostgreSQL implements DbSearch
 	/**
 	 * Make a custom word index.
 	 *
-	 * @param $size
+	 * @param string $size
 	 */
-	function create_word_search($size)
+	public function create_word_search($size)
 	{
 		$db = database();
 

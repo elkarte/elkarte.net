@@ -15,7 +15,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -46,15 +46,14 @@ class Register_Controller extends Action_Controller
 	 *
 	 * @uses Register template, registration_agreement or registration_form sub template
 	 * @uses Login language file
-	 * @param array $reg_errors = array()
 	 */
-	function action_register()
+	public function action_register()
 	{
 		global $txt, $context, $modSettings, $user_info, $language, $scripturl, $cur_profile;
 
 		// Is this an incoming AJAX check?
 		if (isset($_GET['sa']) && $_GET['sa'] == 'usernamecheck')
-			return registerCheckUsername();
+			return $this->_registerCheckUsername();
 
 		// Check if the administrator has it disabled.
 		if (!empty($modSettings['registration_method']) && $modSettings['registration_method'] == '3')
@@ -75,6 +74,7 @@ class Register_Controller extends Action_Controller
 
 		// Do we need them to agree to the registration agreement, first?
 		$context['require_agreement'] = !empty($modSettings['requireAgreement']);
+		$context['checkbox_agreement'] = !empty($modSettings['checkboxAgreement']);
 		$context['registration_passed_agreement'] = !empty($_SESSION['registration_agreed']);
 		$context['show_coppa'] = !empty($modSettings['coppaAge']);
 		$context['show_contact_button'] = !empty($modSettings['enable_contactform']) && $modSettings['enable_contactform'] == 'registration';
@@ -88,7 +88,7 @@ class Register_Controller extends Action_Controller
 		}
 
 		// What step are we at?
-		$current_step = isset($_REQUEST['step']) ? (int) $_REQUEST['step'] : ($context['require_agreement'] ? 1 : 2);
+		$current_step = isset($_REQUEST['step']) ? (int) $_REQUEST['step'] : ($context['require_agreement'] && !$context['checkbox_agreement'] ? 1 : 2);
 
 		// Does this user agree to the registration agreement?
 		if ($current_step == 1 && (isset($_POST['accept_agreement']) || isset($_POST['accept_agreement_coppa'])))
@@ -110,13 +110,14 @@ class Register_Controller extends Action_Controller
 			}
 		}
 		// Make sure they don't squeeze through without agreeing.
-		elseif ($current_step > 1 && $context['require_agreement'] && !$context['registration_passed_agreement'])
+		elseif ($current_step > 1 && $context['require_agreement'] && !$context['checkbox_agreement'] && !$context['registration_passed_agreement'])
 			$current_step = 1;
 
 		// Show the user the right form.
 		$context['sub_template'] = $current_step == 1 ? 'registration_agreement' : 'registration_form';
 		$context['page_title'] = $current_step == 1 ? $txt['registration_agreement'] : $txt['registration_form'];
 		loadJavascriptFile('register.js');
+		addInlineJavascript('disableAutoComplete();', true);
 
 		// Add the register chain to the link tree.
 		$context['linktree'][] = array(
@@ -251,7 +252,7 @@ class Register_Controller extends Action_Controller
 	 *
 	 * @param bool $verifiedOpenID = false
 	 */
-	function action_register2($verifiedOpenID = false)
+	public function action_register2($verifiedOpenID = false)
 	{
 		global $txt, $modSettings, $context, $user_info;
 
@@ -276,6 +277,10 @@ class Register_Controller extends Action_Controller
 		// You can't register if it's disabled.
 		if (!empty($modSettings['registration_method']) && $modSettings['registration_method'] == 3)
 			fatal_lang_error('registration_disabled', false);
+
+		// If we're using an agreement checkbox, did they check it?
+		if (!empty($modSettings['checkboxAgreement']) && !empty($_POST['checkbox_agreement']))
+			$_SESSION['registration_agreed'] = true;
 
 		// Things we don't do for people who have already confirmed their OpenID allegances via register.
 		if (!$verifiedOpenID)
@@ -544,7 +549,7 @@ class Register_Controller extends Action_Controller
 
 		// If there are "important" errors and you are not an admin: log the first error
 		// Otherwise grab all of them and don't log anything
-		if ($reg_errors->hasErrors(1) && !$user_info['is_admin']);
+		if ($reg_errors->hasErrors(1) && !$user_info['is_admin'])
 			foreach ($reg_errors->prepareErrors(1) as $error)
 				fatal_error($error, 'general');
 
@@ -584,7 +589,7 @@ class Register_Controller extends Action_Controller
 		{
 			call_integration_hook('integrate_activate', array($regOptions['username']));
 
-			setLoginCookie(60 * $modSettings['cookieTime'], $memberID, sha1(sha1(strtolower($regOptions['username']) . $regOptions['password']) . $regOptions['register_vars']['password_salt']));
+			setLoginCookie(60 * $modSettings['cookieTime'], $memberID, hash('sha256', Util::strtolower($regOptions['username']) . $regOptions['password'] . $regOptions['register_vars']['password_salt']));
 
 			redirectexit('action=auth;sa=check;member=' . $memberID, $context['server']['needs_login_fix']);
 		}
@@ -594,7 +599,7 @@ class Register_Controller extends Action_Controller
 	 * Verify the activation code, and activate the user if correct.
 	 * Accessed by ?action=activate
 	 */
-	function action_activate()
+	public function action_activate()
 	{
 		global $context, $txt, $modSettings, $scripturl, $language, $user_info;
 
@@ -606,6 +611,7 @@ class Register_Controller extends Action_Controller
 
 		loadLanguage('Login');
 		loadTemplate('Login');
+		loadJavascriptFile('sha256.js', array('defer' => true));
 
 		if (empty($_REQUEST['u']) && empty($_POST['user']))
 		{
@@ -623,8 +629,8 @@ class Register_Controller extends Action_Controller
 
 		// Get the code from the database...
 		$row = findUser(empty($_REQUEST['u']) ? '
-			WHERE member_name = {string:email_address} OR email_address = {string:email_address}' : '
-			WHERE id_member = {int:id_member}', array(
+			member_name = {string:email_address} OR email_address = {string:email_address}' : '
+			id_member = {int:id_member}', array(
 				'id_member' => isset($_REQUEST['u']) ? (int) $_REQUEST['u'] : 0,
 				'email_address' => isset($_POST['user']) ? $_POST['user'] : '',
 			), false
@@ -641,7 +647,9 @@ class Register_Controller extends Action_Controller
 		}
 
 		// Change their email address? (they probably tried a fake one first :P.)
-		if (isset($_POST['new_email'], $_REQUEST['passwd']) && sha1(strtolower($row['member_name']) . $_REQUEST['passwd']) == $row['passwd'] && ($row['is_activated'] == 0 || $row['is_activated'] == 2))
+		require_once(SUBSDIR . '/Auth.subs.php');
+
+		if (isset($_POST['new_email'], $_REQUEST['passwd']) && validateLoginPassword($_REQUEST['passwd'], $row['passwd'], $row['member_name'], true) && ($row['is_activated'] == 0 || $row['is_activated'] == 2))
 		{
 			if (empty($modSettings['registration_method']) || $modSettings['registration_method'] == 3)
 				fatal_lang_error('no_access', false);
@@ -738,7 +746,7 @@ class Register_Controller extends Action_Controller
 	 * This function will display the contact information for the forum, as well a form to fill in.
 	 * Accessed by action=coppa
 	 */
-	function action_coppa()
+	public function action_coppa()
 	{
 		global $context, $modSettings, $txt;
 
@@ -753,8 +761,8 @@ class Register_Controller extends Action_Controller
 		require_once(SUBSDIR . '/Members.subs.php');
 		$member = getBasicMemberData((int) $_GET['member'], array('authentication' => true));
 
-		// If doesn't exist or pending coppa
-		if (empty($member) || $member['is_activated'] == 5)
+		// If doesn't exist or not pending coppa
+		if (empty($member) || $member['is_activated'] != 5)
 			fatal_lang_error('no_access', false);
 
 		if (isset($_GET['form']))
@@ -770,8 +778,8 @@ class Register_Controller extends Action_Controller
 				$context['ul'] = '<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>';
 				Template_Layers::getInstance()->removeAll();
 				$context['sub_template'] = 'coppa_form';
-				$context['page_title'] = $txt['coppa_form_title'];
-				$context['coppa_body'] = str_replace(array('{PARENT_NAME}', '{CHILD_NAME}', '{USER_NAME}'), array($context['ul'], $context['ul'], $member['member_name']), $txt['coppa_form_body']);
+				$context['page_title'] = replaceBasicActionUrl($txt['coppa_form_title']);
+				$context['coppa_body'] = str_replace(array('{PARENT_NAME}', '{CHILD_NAME}', '{USER_NAME}'), array($context['ul'], $context['ul'], $member['member_name']), replaceBasicActionUrl($txt['coppa_form_body']));
 			}
 			// Downloading.
 			else
@@ -779,7 +787,7 @@ class Register_Controller extends Action_Controller
 				// The data.
 				$ul = '                ';
 				$crlf = "\r\n";
-				$data = $context['forum_contacts'] . $crlf . $txt['coppa_form_address'] . ':' . $crlf . $txt['coppa_form_date'] . ':' . $crlf . $crlf . $crlf . $txt['coppa_form_body'];
+				$data = $context['forum_contacts'] . $crlf . $txt['coppa_form_address'] . ':' . $crlf . $txt['coppa_form_date'] . ':' . $crlf . $crlf . $crlf . replaceBasicActionUrl($txt['coppa_form_body']);
 				$data = str_replace(array('{PARENT_NAME}', '{CHILD_NAME}', '{USER_NAME}', '<br>', '<br />'), array($ul, $ul, $member['member_name'], $crlf, $crlf), $data);
 
 				// Send the headers.
@@ -800,7 +808,7 @@ class Register_Controller extends Action_Controller
 			);
 
 			$context['coppa'] = array(
-				'body' => str_replace('{MINIMUM_AGE}', $modSettings['coppaAge'], $txt['coppa_after_registration']),
+				'body' => str_replace('{MINIMUM_AGE}', $modSettings['coppaAge'], replaceBasicActionUrl($txt['coppa_after_registration'])),
 				'many_options' => !empty($modSettings['coppaPost']) && !empty($modSettings['coppaFax']),
 				'post' => empty($modSettings['coppaPost']) ? '' : $modSettings['coppaPost'],
 				'fax' => empty($modSettings['coppaFax']) ? '' : $modSettings['coppaFax'],
@@ -814,7 +822,7 @@ class Register_Controller extends Action_Controller
 	 * Show the verification code or let it hear.
 	 * Accessed by ?action=verificationcode
 	 */
-	function action_verificationcode()
+	public function action_verificationcode()
 	{
 		global $context, $scripturl;
 
@@ -879,7 +887,7 @@ class Register_Controller extends Action_Controller
 	 * Shows the contact form for the user to fill out
 	 * Needs to be enabled to be used
 	 */
-	function action_contact()
+	public function action_contact()
 	{
 		global $context, $txt, $user_info, $modSettings;
 
@@ -890,12 +898,12 @@ class Register_Controller extends Action_Controller
 
 		loadLanguage('Login');
 		loadTemplate('Register');
-		spamProtection('contact');
 
 		if (isset($_REQUEST['send']))
 		{
 			checkSession('post');
 			validateToken('contact');
+			spamProtection('contact');
 
 			// No errors, yet.
 			$context['errors'] = array();
@@ -962,6 +970,7 @@ class Register_Controller extends Action_Controller
 		else
 		{
 			$context['sub_template'] = 'contact_form';
+			$context['page_title'] = $txt['admin_contact_form'];
 
 			require_once(SUBSDIR . '/VerificationControls.class.php');
 			$verificationOptions = array(
@@ -973,28 +982,28 @@ class Register_Controller extends Action_Controller
 
 		createToken('contact');
 	}
-}
 
-/**
- * See if a username already exists.
- */
-function registerCheckUsername()
-{
-	global $context;
+	/**
+	 * See if a username already exists.
+	 */
+	private function _registerCheckUsername()
+	{
+		global $context;
 
-	// This is XML!
-	loadTemplate('Xml');
-	$context['sub_template'] = 'check_username';
-	$context['checked_username'] = isset($_GET['username']) ? un_htmlspecialchars($_GET['username']) : '';
-	$context['valid_username'] = true;
+		// This is XML!
+		loadTemplate('Xml');
+		$context['sub_template'] = 'check_username';
+		$context['checked_username'] = isset($_GET['username']) ? un_htmlspecialchars($_GET['username']) : '';
+		$context['valid_username'] = true;
 
-	// Clean it up like mother would.
-	$context['checked_username'] = preg_replace('~[\t\n\r \x0B\0\x{A0}\x{AD}\x{2000}-\x{200F}\x{201F}\x{202F}\x{3000}\x{FEFF}]+~u', ' ', $context['checked_username']);
+		// Clean it up like mother would.
+		$context['checked_username'] = preg_replace('~[\t\n\r \x0B\0\x{A0}\x{AD}\x{2000}-\x{200F}\x{201F}\x{202F}\x{3000}\x{FEFF}]+~u', ' ', $context['checked_username']);
 
-	$errors = Error_Context::context('valid_username', 0);
+		$errors = Error_Context::context('valid_username', 0);
 
-	require_once(SUBSDIR . '/Auth.subs.php');
-	validateUsername(0, $context['checked_username'], 'valid_username');
+		require_once(SUBSDIR . '/Auth.subs.php');
+		validateUsername(0, $context['checked_username'], 'valid_username', true, false);
 
-	$context['valid_username'] = !$errors->hasErrors();
+		$context['valid_username'] = !$errors->hasErrors();
+	}
 }

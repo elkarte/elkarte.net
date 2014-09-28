@@ -7,14 +7,17 @@
  * perhaps for use of addons in a similar way they were using some
  * SSI functions.
  *
- * The purpose of this file is experimental and might be deprecated in
- * favor of a better solution.
- *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * This software is a derived product, based on:
+ *
+ * Simple Machines Forum (SMF)
+ * copyright:	2011 Simple Machines (http://www.simplemachines.org)
+ * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ *
+ * @version 1.0
  *
  */
 
@@ -23,6 +26,8 @@ if (!defined('ELK'))
 
 /**
  * Return the number of currently online members.
+ *
+ * @return double
  */
 function onlineCount()
 {
@@ -41,7 +46,9 @@ function onlineCount()
 }
 
 /**
- * Gets avarages for posts, topics, most online and new users.
+ * Gets totals for posts, topics, most online, new users, page views, emails
+ *
+ * - Can be used (and is) with days up value to generate averages.
  *
  * @return array
  */
@@ -52,7 +59,7 @@ function getAverages()
 	$result = $db->query('', '
 		SELECT
 			SUM(posts) AS posts, SUM(topics) AS topics, SUM(registers) AS registers,
-			SUM(most_on) AS most_on, MIN(date) AS date, SUM(hits) AS hits
+			SUM(most_on) AS most_on, MIN(date) AS date, SUM(hits) AS hits, SUM(email) AS email
 		FROM {db_prefix}log_activity',
 		array(
 		)
@@ -64,7 +71,7 @@ function getAverages()
 }
 
 /**
- * Get the amount of categories
+ * Get the count of categories
  *
  * @return int
  */
@@ -110,37 +117,11 @@ function mostOnline($date)
 }
 
 /**
- * Determines the male vs. female ratio
+ * Loads a list of top x posters
  *
- * @return array
- */
-function genderRatio()
-{
-	$db = database();
-	$gender = array();
-
-	$result = $db->query('', '
-		SELECT COUNT(*) AS total_members, gender
-		FROM {db_prefix}members
-		GROUP BY gender',
-		array(
-		)
-	);
-	while ($row = $db->fetch_assoc($result))
-	{
-		// Assuming we're telling... male or female?
-		if (!empty($row['gender']))
-			$gender[$row['gender'] == 2 ? 'females' : 'males'] = $row['total_members'];
-	}
-	$db->free_result($result);
-
-	return $gender;
-}
-
-/**
- * Loads a list of top x posters, x is configurable via $modSettings['stats_limit'].
+ * - x is configurable via $modSettings['stats_limit'].
  *
- * @param int $limit
+ * @param int|null $limit if empty defaults to 10
  * @return array
  */
 function topPosters($limit = null)
@@ -156,8 +137,7 @@ function topPosters($limit = null)
 	else
 		$limit = empty($limit) ? 10 : $limit;
 
-	$top_posters = array();
-
+	// Make the query to the the x number of top posters
 	$members_result = $db->query('', '
 		SELECT id_member, real_name, posts
 		FROM {db_prefix}members
@@ -169,9 +149,11 @@ function topPosters($limit = null)
 			'limit_posts' => $limit,
 		)
 	);
+	$top_posters = array();
 	$max_num_posts = 1;
 	while ($row_members = $db->fetch_assoc($members_result))
 	{
+		// Build general member information for each top poster
 		$top_posters[] = array(
 			'name' => $row_members['real_name'],
 			'id' => $row_members['id_member'],
@@ -184,6 +166,7 @@ function topPosters($limit = null)
 	}
 	$db->free_result($members_result);
 
+	// Determine the percents and then format the num_posts
 	foreach ($top_posters as $i => $poster)
 	{
 		$top_posters[$i]['post_percent'] = round(($poster['num_posts'] * 100) / $max_num_posts);
@@ -194,9 +177,11 @@ function topPosters($limit = null)
 }
 
 /**
- * Loads a list of top x boards, x is configurable via $modSettings['stats_limit'].
+ * Loads a list of top x boards with number of board posts and board topics
  *
- * @param int $limit if not supplied, defaults to 10
+ * - x is configurable via $modSettings['stats_limit'].
+ *
+ * @param int|null $limit if not supplied, defaults to 10
  * @param boolean $read_status
  * @return array
  */
@@ -234,6 +219,7 @@ function topBoards($limit = null, $read_status = false)
 	$max_num_posts = 1;
 	while ($row_board = $db->fetch_assoc($boards_result))
 	{
+		// Load the boards info, number of posts, topics etc
 		$top_boards[$row_board['id_board']] = array(
 			'id' => $row_board['id_board'],
 			'name' => $row_board['name'],
@@ -249,6 +235,8 @@ function topBoards($limit = null, $read_status = false)
 			$max_num_posts = $row_board['num_posts'];
 	}
 	$db->free_result($boards_result);
+
+	// Determine the post percentages for the boards, then format the numbers
 	foreach ($top_boards as $i => $board)
 	{
 		$top_boards[$i]['post_percent'] = round(($board['num_posts'] * 100) / $max_num_posts);
@@ -260,9 +248,11 @@ function topBoards($limit = null, $read_status = false)
 }
 
 /**
- * Loads a list of top x topic replies, x is configurable via $modSettings['stats_limit'].
+ * Loads a list of top x topics by replies
  *
- * @param int $limit if not supplied, defaults to 10
+ * - x is configurable via $modSettings['stats_limit'].
+ *
+ * @param int|null $limit if not supplied, defaults to 10
  * @return array
  */
 function topTopicReplies($limit = null)
@@ -301,6 +291,7 @@ function topTopicReplies($limit = null)
 	else
 		$topic_ids = array();
 
+	// Find the top x topics by number of replys
 	$topic_reply_result = $db->query('', '
 		SELECT m.subject, t.num_replies, t.num_views, t.id_board, t.id_topic, b.name
 		FROM {db_prefix}topics AS t
@@ -323,6 +314,7 @@ function topTopicReplies($limit = null)
 	$max_num_replies = 1;
 	while ($row_topic_reply = $db->fetch_assoc($topic_reply_result))
 	{
+		// Build out this topics details for controller use
 		censorText($row_topic_reply['subject']);
 		$top_topics_replies[$row_topic_reply['id_topic']] = array(
 			'id' => $row_topic_reply['id_topic'],
@@ -343,19 +335,23 @@ function topTopicReplies($limit = null)
 			$max_num_replies = $row_topic_reply['num_replies'];
 	}
 	$db->free_result($topic_reply_result);
-			foreach ($top_topics_replies as $i => $topic)
-		{
-			$top_topics_replies[$i]['post_percent'] = round(($topic['num_replies'] * 100) / $max_num_replies);
-			$top_topics_replies[$i]['num_replies'] = comma_format($top_topics_replies[$i]['num_replies']);
-		}
+
+	// Calculate the percentages and final formating of the number
+	foreach ($top_topics_replies as $i => $topic)
+	{
+		$top_topics_replies[$i]['post_percent'] = round(($topic['num_replies'] * 100) / $max_num_replies);
+		$top_topics_replies[$i]['num_replies'] = comma_format($top_topics_replies[$i]['num_replies']);
+	}
 
 	return $top_topics_replies;
 }
 
 /**
- * Loads a list of top x topic views, x is configurable via $modSettings['stats_limit'].
+ * Loads a list of top x topics by number of views
  *
- * @param int $limit if not supplied, defaults to 10
+ * - x is configurable via $modSettings['stats_limit'].
+ *
+ * @param int|null $limit if not supplied, defaults to 10
  * @return array
  */
 function topTopicViews($limit = null)
@@ -392,7 +388,7 @@ function topTopicViews($limit = null)
 	else
 		$topic_ids = array();
 
-		$topic_view_result = $db->query('', '
+	$topic_view_result = $db->query('', '
 		SELECT m.subject, t.num_views, t.num_replies, t.id_board, t.id_topic, b.name
 		FROM {db_prefix}topics AS t
 			INNER JOIN {db_prefix}messages AS m ON (m.id_msg = t.id_first_msg)
@@ -414,8 +410,8 @@ function topTopicViews($limit = null)
 	$max_num_views = 1;
 	while ($row_topic_views = $db->fetch_assoc($topic_view_result))
 	{
+		// Build the topic result array
 		censorText($row_topic_views['subject']);
-
 		$top_topics_views[$row_topic_views['id_topic']] = array(
 			'id' => $row_topic_views['id_topic'],
 			'board' => array(
@@ -436,6 +432,7 @@ function topTopicViews($limit = null)
 	}
 	$db->free_result($topic_view_result);
 
+	// Percentages and final formattting
 	foreach ($top_topics_views as $i => $topic)
 	{
 		$top_topics_views[$i]['post_percent'] = round(($topic['num_views'] * 100) / $max_num_views);
@@ -446,7 +443,9 @@ function topTopicViews($limit = null)
 }
 
 /**
- * Loads a list of top x topic starters, x is configurable via $modSettings['stats_limit'].
+ * Loads a list of top x topic starters
+ *
+ * - x is configurable via $modSettings['stats_limit'].
  *
  * @return array
  */
@@ -481,6 +480,7 @@ function topTopicStarter()
 	if (empty($members))
 		$members = array(0 => 0);
 
+	// Find the top starters of topics
 	$members_result = $db->query('top_topic_starters', '
 		SELECT id_member, real_name
 		FROM {db_prefix}members
@@ -497,6 +497,7 @@ function topTopicStarter()
 	$max_num_topics = 1;
 	while ($row_members = $db->fetch_assoc($members_result))
 	{
+		// Our array of spammers, er topic starters !
 		$top_starters[] = array(
 			'name' => $row_members['real_name'],
 			'id' => $row_members['id_member'],
@@ -510,17 +511,20 @@ function topTopicStarter()
 	}
 	$db->free_result($members_result);
 
+	// Finish of with the determing the percentages
 	foreach ($top_starters as $i => $topic)
-		{
-			$top_starters[$i]['post_percent'] = round(($topic['num_topics'] * 100) / $max_num_topics);
-			$top_starters[$i]['num_topics'] = comma_format($top_starters[$i]['num_topics']);
-		}
+	{
+		$top_starters[$i]['post_percent'] = round(($topic['num_topics'] * 100) / $max_num_topics);
+		$top_starters[$i]['num_topics'] = comma_format($top_starters[$i]['num_topics']);
+	}
 
 	return $top_starters;
 }
 
 /**
- * Loads a list of top x users by online time, x is configurable via $modSettings['stats_limit'].
+ * Loads a list of top users by online time
+ *
+ * - x is configurable via $modSettings['stats_limit'], defaults to 10
  *
  * @return array
  */
@@ -531,7 +535,11 @@ function topTimeOnline()
 	$db = database();
 
 	$max_members = isset($modSettings['stats_limit']) ? $modSettings['stats_limit'] : 10;
+
+	// Do we have something cached that will help speed this up?
 	$temp = cache_get_data('stats_total_time_members', 600);
+
+	// Get the member data, sorted by total time logged in
 	$members_result = $db->query('', '
 		SELECT id_member, real_name, total_time_logged_in
 		FROM {db_prefix}members' . (!empty($temp) ? '
@@ -566,6 +574,7 @@ function topTimeOnline()
 
 		$timelogged .= floor(($row_members['total_time_logged_in'] % 3600) / 60) . $txt['totalTimeLogged7'];
 
+		// Finally add it to the stats array
 		$top_time_online[] = array(
 			'id' => $row_members['id_member'],
 			'name' => $row_members['real_name'],
@@ -580,18 +589,22 @@ function topTimeOnline()
 	}
 	$db->free_result($members_result);
 
+	// As always percentages are next
 	foreach ($top_time_online as $i => $member)
 		$top_time_online[$i]['time_percent'] = round(($member['seconds_online'] * 100) / $max_time_online);
 
 	// Cache the ones we found for a bit, just so we don't have to look again.
 	if ($temp !== $temp2)
-		cache_put_data('stats_total_time_members', $temp2, 480);
+		cache_put_data('stats_total_time_members', $temp2, 600);
 
 	return $top_time_online;
 }
 
 /**
- * Loads the monthly statistics in $context.
+ * Loads the monthly statistics and returns them in $context
+ *
+ * - page views, new registrations, topics posts, most on etc
+ *
  */
 function monthlyActivity()
 {
@@ -655,15 +668,15 @@ function monthlyActivity()
 	}
 
 	krsort($context['yearly']);
-
 }
 
 /**
  * Loads the statistics on a daily basis in $context.
- * called by action_stats().
- * 
+ *
+ * - called by action_stats().
+ *
  * @param string $condition_string
- * @param array $condition_parameters = array()
+ * @param mixed[] $condition_parameters = array()
  */
 function getDailyStats($condition_string, $condition_parameters = array())
 {
@@ -696,7 +709,8 @@ function getDailyStats($condition_string, $condition_parameters = array())
 /**
  * Returns the number of topics a user has started, including ones on boards
  * they may no longer have access on.
- * Does not count topics that are in the recycle board
+ *
+ * - Does not count topics that are in the recycle board
  *
  * @param int $memID
  */
@@ -726,7 +740,8 @@ function UserStatsTopicsStarted($memID)
 /**
  * Returns the number of polls a user has started, including ones on boards
  * they may no longer have access on.
- * Does not count topics that are in the recycle board
+ *
+ * - Does not count topics that are in the recycle board
  *
  * @param int $memID
  */
@@ -782,7 +797,8 @@ function UserStatsPollsVoted($memID)
 
 /**
  * Finds the 1-N list of boards that a user posts in most often
- * Returns array with some basic stats of post percent per board
+ *
+ * - Returns array with some basic stats of post percent per board
  *
  * @param int $memID
  * @param int $limit
@@ -814,6 +830,7 @@ function UserStatsMostPostedBoard($memID, $limit = 10)
 	$popular_boards = array();
 	while ($row = $db->fetch_assoc($result))
 	{
+		// Build the board details that this member is responsible for
 		$popular_boards[$row['id_board']] = array(
 			'id' => $row['id_board'],
 			'posts' => $row['message_count'],
@@ -831,7 +848,8 @@ function UserStatsMostPostedBoard($memID, $limit = 10)
 
 /**
  * Finds the 1-N list of boards that a user participates in most often
- * Returns array with some basic stats of post percent per board as a percent of board activity
+ *
+ * - Returns array with some basic stats of post percent per board as a percent of board activity
  *
  * @param int $memID
  * @param int $limit
@@ -862,6 +880,7 @@ function UserStatsMostActiveBoard($memID, $limit = 10)
 	$board_activity = array();
 	while ($row = $db->fetch_assoc($result))
 	{
+		// What have they been doing in this board
 		$board_activity[$row['id_board']] = array(
 			'id' => $row['id_board'],
 			'posts' => $row['message_count'],
@@ -879,7 +898,8 @@ function UserStatsMostActiveBoard($memID, $limit = 10)
 
 /**
  * Finds the users posting activity by time of day
- * Returns array with some basic stats of post percent per hour
+ *
+ * - Returns array with some basic stats of post percent per hour
  *
  * @param int $memID
  */
@@ -915,6 +935,7 @@ function UserStatsPostingTime($memID)
 		$maxPosts = max($row['post_count'], $maxPosts);
 		$realPosts += $row['post_count'];
 
+		// When they post, hour by hour
 		$posts_by_time[$row['hour']] = array(
 			'hour' => $row['hour'],
 			'hour_format' => stripos($user_info['time_format'], '%p') === false ? $row['hour'] : date('g a', mktime($row['hour'])),

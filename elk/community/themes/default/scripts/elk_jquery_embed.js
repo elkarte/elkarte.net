@@ -3,7 +3,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  * Original code from Aziz, redone and refactored for ElkArte
  *
@@ -225,7 +225,7 @@
 			links = $('[id^=msg_] a');
 
 		// Create the show/hide button
-		var	showhideBtn = $('<a class="floatright" title="' + oSettings.hide_video + '"><img src="' + elk_images_url + '/selected.png"></a>').click(function() {
+		var showhideBtn = $('<a class="floatright" title="' + oSettings.hide_video + '"><img src="' + elk_images_url + '/selected.png"></a>').click(function() {
 				var $img = $(this).find("img"),
 					$vid = $(this).parent().next();
 

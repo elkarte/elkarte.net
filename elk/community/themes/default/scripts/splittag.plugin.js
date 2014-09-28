@@ -11,7 +11,7 @@
  * Original code author: Aziz
  * License: http://opensource.org/licenses/Zlib
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -37,7 +37,7 @@
 		 * Monitor for a ctrl+enter keypress, this is our keystroke cue to split the tag(s)
 		 */
 		base.signalKeypressEvent = function(e) {
-			if (e.keyCode === 13 && e.ctrlKey)
+			if ((e.keyCode === 10 || e.keyCode === 13) && e.ctrlKey)
 				oSplitTags.split();
 		};
 	};
@@ -69,9 +69,11 @@
 		else
 		{
 			var i = 0,
-				tagText = "",
+				tagTextStart = "",
+				tagTextEnd = "",
 				contents = base.val(),
 				editor = $(".sceditor-container").find("textarea")[0],
+				startPos = Math.min(editor.selectionEnd, contents.length),
 				endPos = Math.min(editor.selectionStart, contents.length);
 
 			// Determine what bbc tag(s) we may be inside of
@@ -82,14 +84,22 @@
 			{
 				// Traverse in reverse and build closing tags.
 				for (i = this.tagStack.length - 1; i >= 0; i--)
-					tagText += '[/' + this.tagStack[i].name + "]";
+					tagTextStart += '[/' + this.tagStack[i].name + ']';
 
 				// Traverse forward and build opening tags (with attr's)
 				for (i = 0; i < this.tagStack.length; i++)
-					tagText += '\n[' + this.tagStack[i].name + this.tagStack[i].attributes + "]";
+				{
+					if (i === 0)
+						tagTextEnd += "\n";
+					tagTextEnd += '[' + this.tagStack[i].name + this.tagStack[i].attributes + "]";
+				}
 
+				// Did someone select text that they expect to be wrapped in tags as well?
+				if (startPos !== endPos)
+					base.insertText(tagTextStart + tagTextEnd, tagTextStart + tagTextEnd);
 				// Insert the new close/open tags at the cursor position
-				base.insert(tagText);
+				else
+					base.insertText(tagTextStart, tagTextEnd);
 			}
 		}
 	};

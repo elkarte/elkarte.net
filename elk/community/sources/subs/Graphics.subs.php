@@ -17,7 +17,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -29,10 +29,11 @@ if (!defined('ELK'))
  *
  * @uses resizeImageFile() function to achieve the resize.
  *
+ * @package Graphics
  * @param string $source
  * @param int $max_width
  * @param int $max_height
- * @return boolean, whether the thumbnail creation was successful.
+ * @return boolean whether the thumbnail creation was successful.
  */
 function createThumbnail($source, $max_width, $max_height)
 {
@@ -61,13 +62,15 @@ function createThumbnail($source, $max_width, $max_height)
 
 /**
  * Used to re-econodes an image to a specifed image format
+ *
  * - creates a copy of the file at the same location as fileName.
  * - the file would have the format preferred_format if possible, otherwise the default format is jpeg.
  * - the function makes sure that all non-essential image contents are disposed.
  *
+ * @package Graphics
  * @param string $fileName
  * @param int $preferred_format = 0
- * @return boolean, true on success, false on failure.
+ * @return boolean true on success, false on failure.
  */
 function reencodeImage($fileName, $preferred_format = 0)
 {
@@ -84,15 +87,18 @@ function reencodeImage($fileName, $preferred_format = 0)
 
 	if (!rename($fileName . '.tmp', $fileName))
 		return false;
+
+	return true;
 }
 
 /**
  * Searches through the file to see if there's potentialy harmful non-binary content.
+ *
  * - if extensiveCheck is true, searches for asp/php short tags as well.
  *
+ * @package Graphics
  * @param string $fileName
  * @param bool $extensiveCheck = false
- * @return true on success, false on failure.
  */
 function checkImageContents($fileName, $extensiveCheck = false)
 {
@@ -109,7 +115,7 @@ function checkImageContents($fileName, $extensiveCheck = false)
 		if (!empty($extensiveCheck))
 		{
 			// Paranoid check. Some like it that way.
-			if (preg_match('~(iframe|\\<\\?|\\<%|html|eval|body|script\W|[CF]WS[\x01-\x0C])~i', $prev_chunk . $cur_chunk) === 1)
+			if (preg_match('~(iframe|\\<\\?|\\<%|html|eval|body|script\W|(?-i)[CFZ]WS[\x01-\x0E])~i', $prev_chunk . $cur_chunk) === 1)
 			{
 				fclose($fp);
 				return false;
@@ -118,7 +124,7 @@ function checkImageContents($fileName, $extensiveCheck = false)
 		else
 		{
 			// Check for potential infection
-			if (preg_match('~(iframe|(?<!cellTextIs)html|eval|body|script\W|[CF]WS[\x01-\x0C])~i', $prev_chunk . $cur_chunk) === 1)
+			if (preg_match('~(iframe|(?<!cellTextIs)html|eval|body|script\W|(?-i)[CFZ]WS[\x01-\x0E])~i', $prev_chunk . $cur_chunk) === 1)
 			{
 				fclose($fp);
 				return false;
@@ -135,7 +141,7 @@ function checkImageContents($fileName, $extensiveCheck = false)
  * Sets a global $gd2 variable needed by some functions to determine
  * whether the GD2 library is present.
  *
- * @return whether or not GD1 is available.
+ * @package Graphics
  */
 function checkGD()
 {
@@ -154,7 +160,7 @@ function checkGD()
 /**
  * Checks whether the Imagick class is present.
  *
- * @return whether or not Imagick is available.
+ * @package Graphics
  */
 function checkImagick()
 {
@@ -164,8 +170,8 @@ function checkImagick()
 /**
  * See if we have enough memory to thumbnail an image
  *
- * @param array $sizes image size
- * @return whether we do
+ * @package Graphics
+ * @param int[] $sizes image size
  */
 function imageMemoryCheck($sizes)
 {
@@ -178,9 +184,11 @@ function imageMemoryCheck($sizes)
 		return true;
 	}
 
-	// Determine the memory requirements for this image, note: if you want to use an image formula W x H x bits/8 x channels x Overhead factor
-	// you will need to account for single bit images as GD expands them to an 8 bit and will greatly overun the calculated value.  The 5 is
-	// simply a shortcut of 8bpp, 3 channels, 1.66 overhead
+	// Determine the memory requirements for this image, note: if you want to use an image formula
+	// W x H x bits/8 x channels x Overhead factor
+	// You will need to account for single bit images as GD expands them to an 8 bit and will greatly
+	// overun the calculated value.
+	// The 5 below is simply a shortcut of 8bpp, 3 channels, 1.66 overhead
 	$needed_memory = ($sizes[0] * $sizes[1] * 5);
 
 	// If we need more, lets try to get it
@@ -189,16 +197,17 @@ function imageMemoryCheck($sizes)
 
 /**
  * Resizes an image from a remote location or a local file.
- * Puts the resized image at the destination location.
- * The file would have the format preferred_format if possible,
+ *
+ * - Puts the resized image at the destination location.
+ * - The file would have the format preferred_format if possible,
  * otherwise the default format is jpeg.
  *
+ * @package Graphics
  * @param string $source
  * @param string $destination
  * @param int $max_width
  * @param int $max_height
  * @param int $preferred_format = 0
- * @return whether it succeeded.
  */
 function resizeImageFile($source, $destination, $max_width, $max_height, $preferred_format = 0)
 {
@@ -265,17 +274,18 @@ function resizeImageFile($source, $destination, $max_width, $max_height, $prefer
 
 /**
  * Resizes an image proportionally to fit within the defined max_width and max_height limits
- * Will do nothing to the image if the file fits within the size limits
  *
- * If Image Magick is present it will use those function over any GD solutions
- * If GD2 is present, it'll use it to achieve better quality (imagecopyresampled)
- * It saves the new image to destination_filename, in the preferred_format
+ * - Will do nothing to the image if the file fits within the size limits
+ * - If Image Magick is present it will use those function over any GD solutions
+ * - If GD2 is present, it'll use it to achieve better quality (imagecopyresampled)
+ * - Saves the new image to destination_filename, in the preferred_format
  * if possible, default is jpeg.
  *
  * @uses GD
  * @uses Imagick
  *
- * @param resource $src_img
+ * @package Graphics
+ * @param resource|null $src_img null for Imagick images, resource form imagecreatefrom for GD
  * @param string $destName
  * @param int $src_width
  * @param int $src_height
@@ -300,19 +310,34 @@ function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $
 		);
 		$preferred_format = empty($preferred_format) || !isset($default_formats[$preferred_format]) ? 2 : $preferred_format;
 
-		// Get a new instance of Image Magick for use
-		$imagick = new Imagick($destName);
-		$src_width = empty($src_width) ? $imagick->getImageWidth() : $src_width;
-		$src_height = empty($src_height) ? $imagick->getImageHeight() : $src_height;
-		$dest_width = empty($max_width) ? $src_width : $max_width;
-		$dest_height = empty($max_height) ? $src_height : $max_height;
+		// Since Imagick can throw exceptions, lets catch them
+		try
+		{
+			// Get a new instance of Imagick for use
+			$imagick = new Imagick($destName);
 
-		// Create a new image in our prefered format and resize it if needed
-		$imagick->setImageFormat($default_formats[$preferred_format]);
-		$imagick->resizeImage($dest_width, $dest_height, Imagick::FILTER_LANCZOS, 1, true);
+			// Set the input and output image size
+			$src_width = empty($src_width) ? $imagick->getImageWidth() : $src_width;
+			$src_height = empty($src_height) ? $imagick->getImageHeight() : $src_height;
+			$dest_width = empty($max_width) ? $src_width : $max_width;
+			$dest_height = empty($max_height) ? $src_height : $max_height;
 
-		// Save the new image in the destination location
-		$success = $imagick->writeImage($destName);
+			// Create a new image in our prefered format and resize it if needed
+			$imagick->setImageFormat($default_formats[$preferred_format]);
+			$imagick->resizeImage($dest_width, $dest_height, Imagick::FILTER_LANCZOS, 1, true);
+
+			// Save the new image in the destination location
+			$success = $imagick->writeImage($destName);
+
+			// Free resources associated with the Imagick object
+			$imagick->destroy();
+		}
+		catch(Exception $e)
+		{
+			// Not currently used, but here is the error
+			$success = $e->getMessage();
+			$success = false;
+		}
 
 		return !empty($success);
 	}
@@ -371,7 +396,7 @@ function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $
 		elseif (!empty($preferred_format) && ($preferred_format == 1) && function_exists('imagegif'))
 			$success = imagegif($dst_img, $destName);
 		elseif (function_exists('imagejpeg'))
-			$success = imagejpeg($dst_img, $destName);
+			$success = imagejpeg($dst_img, $destName, 80);
 
 		// Free the memory.
 		imagedestroy($src_img);
@@ -380,15 +405,18 @@ function resizeImage($src_img, $destName, $src_width, $src_height, $max_width, $
 
 		return $success;
 	}
-	// Without Image Magick or GD, no image resizing at all.
+	// Without Imagick or GD, no image resizing at all.
 	else
 		return false;
 }
 
 /**
- * Copy image.
- * Used when imagecopyresample() is not available.
-
+ * Copy / resize an image using GD bicubic methods
+ *
+ * - Used when imagecopyresample() is not available
+ * - Uses bicubic resizing methods which are lower quality then imagecopyresample
+ *
+ * @package Graphics
  * @param resource $dst_img
  * @param resource $src_img
  * @param int $dst_x
@@ -446,15 +474,20 @@ function imagecopyresamplebicubic($dst_img, $src_img, $dst_x, $dst_y, $src_x, $s
 		}
 	}
 }
+
 if (!function_exists('imagecreatefrombmp'))
 {
 	/**
 	 * It is set only if it doesn't already exist (for forwards compatiblity.)
-	 * It only supports uncompressed bitmaps.
 	 *
-	 * @param string $filename
-	 * @return resource, an image identifier representing the bitmap image
+	 * - It only supports uncompressed bitmaps.
+	 * - It only supports standard windows bitmaps (no os/2 varients)
+	 * - Returns an image identifier representing the bitmap image
 	 * obtained from the given filename.
+	 *
+	 * @package Graphics
+	 * @param string $filename
+	 * @return resource
 	 */
 	function imagecreatefrombmp($filename)
 	{
@@ -464,31 +497,41 @@ if (!function_exists('imagecreatefrombmp'))
 
 		$errors = error_reporting(0);
 
+		// Unpack the general information about the Bitmap Image File, first 14 Bytes
 		$header = unpack('vtype/Vsize/Vreserved/Voffset', fread($fp, 14));
+
+		// Upack the DIB header, it stores detailed information about the bitmap image the pixel format, 40 Bytes long
 		$info = unpack('Vsize/Vwidth/Vheight/vplanes/vbits/Vcompression/Vimagesize/Vxres/Vyres/Vncolor/Vcolorimportant', fread($fp, 40));
 
+		// Not a standard bitmap, bail out
 		if ($header['type'] != 0x4D42)
-			false;
+			return false;
 
+		// Create our image canvas with the given WxH
 		if ($gd2)
 			$dst_img = imagecreatetruecolor($info['width'], $info['height']);
 		else
 			$dst_img = imagecreate($info['width'], $info['height']);
 
-		$palette_size = $header['offset'] - 54;
-		$info['ncolor'] = $palette_size / 4;
-
-		$palette = array();
-
-		$palettedata = fread($fp, $palette_size);
-		$n = 0;
-		for ($j = 0; $j < $palette_size; $j++)
+		// Color bitCounts 1,4,8 have palette information we use
+		if ($info['bits'] == 1 || $info['bits'] == 4 || $info['bits'] == 8)
 		{
-			$b = ord($palettedata{$j++});
-			$g = ord($palettedata{$j++});
-			$r = ord($palettedata{$j++});
+			$palette_size = $header['offset'] - 54;
 
-			$palette[$n++] = imagecolorallocate($dst_img, $r, $g, $b);
+			// Read the palette data
+			$palettedata = fread($fp, $palette_size);
+
+			// Create the rgb color array
+			$palette = array();
+			$n = 0;
+			for ($j = 0; $j < $palette_size; $j++)
+			{
+				$b = ord($palettedata[$j++]);
+				$g = ord($palettedata[$j++]);
+				$r = ord($palettedata[$j++]);
+
+				$palette[$n++] = imagecolorallocate($dst_img, $r, $g, $b);
+			}
 		}
 
 		$scan_line_size = ($info['bits'] * $info['width'] + 7) >> 3;
@@ -502,14 +545,15 @@ if (!function_exists('imagecreatefrombmp'))
 			if (strlen($scan_line) < $scan_line_size)
 				continue;
 
+			// 32 bits per pixel
 			if ($info['bits'] == 32)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
-					$b = ord($scan_line{$j++});
-					$g = ord($scan_line{$j++});
-					$r = ord($scan_line{$j++});
+					$b = ord($scan_line[$j++]);
+					$g = ord($scan_line[$j++]);
+					$r = ord($scan_line[$j++]);
 					$j++;
 
 					$color = imagecolorexact($dst_img, $r, $g, $b);
@@ -525,14 +569,15 @@ if (!function_exists('imagecreatefrombmp'))
 					imagesetpixel($dst_img, $x, $y, $color);
 				}
 			}
+			// 24 bits per pixel
 			elseif ($info['bits'] == 24)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
-					$b = ord($scan_line{$j++});
-					$g = ord($scan_line{$j++});
-					$r = ord($scan_line{$j++});
+					$b = ord($scan_line[$j++]);
+					$g = ord($scan_line[$j++]);
+					$r = ord($scan_line[$j++]);
 
 					$color = imagecolorexact($dst_img, $r, $g, $b);
 					if ($color == -1)
@@ -547,13 +592,14 @@ if (!function_exists('imagecreatefrombmp'))
 					imagesetpixel($dst_img, $x, $y, $color);
 				}
 			}
+			// 16 bits per pixel
 			elseif ($info['bits'] == 16)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
-					$b1 = ord($scan_line{$j++});
-					$b2 = ord($scan_line{$j++});
+					$b1 = ord($scan_line[$j++]);
+					$b2 = ord($scan_line[$j++]);
 
 					$word = $b2 * 256 + $b1;
 
@@ -575,30 +621,33 @@ if (!function_exists('imagecreatefrombmp'))
 					imagesetpixel($dst_img, $x, $y, $color);
 				}
 			}
+			// 8 bits per pixel
 			elseif ($info['bits'] == 8)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
-					imagesetpixel($dst_img, $x, $y, $palette[ord($scan_line{$j++})]);
+					imagesetpixel($dst_img, $x, $y, $palette[ord($scan_line[$j++])]);
 			}
+			// 4 bits per pixel
 			elseif ($info['bits'] == 4)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
-					$byte = ord($scan_line{$j++});
+					$byte = ord($scan_line[$j++]);
 
 					imagesetpixel($dst_img, $x, $y, $palette[(int) ($byte / 16)]);
 					if (++$x < $info['width'])
 						imagesetpixel($dst_img, $x, $y, $palette[$byte & 15]);
 				}
 			}
+			// 1 bit
 			elseif ($info['bits'] == 1)
 			{
 				$x = 0;
 				for ($j = 0; $j < $scan_line_size; $x++)
 				{
-					$byte = ord($scan_line{$j++});
+					$byte = ord($scan_line[$j++]);
 
 					imagesetpixel($dst_img, $x, $y, $palette[(($byte) & 128) != 0]);
 					for ($shift = 1; $shift < 8; $shift++)
@@ -619,47 +668,23 @@ if (!function_exists('imagecreatefrombmp'))
 }
 
 /**
- * Writes a gif file to disk as a png file.
-
- * @param resource $gif
- * @param string $lpszFileName
- * @param int $background_color = -1
- * @return boolean, whether it was successful or not.
- */
-function gif_outputAsPng($gif, $lpszFileName, $background_color = -1)
-{
-	if (!isset($gif) || @get_class($gif) != 'cgif' || !$gif->loaded || $lpszFileName == '')
-		return false;
-
-	$fd = $gif->get_png_data($background_color);
-	if (strlen($fd) <= 0)
-		return false;
-
-	if (!($fh = @fopen($lpszFileName, 'wb')))
-		return false;
-
-	fwrite($fh, $fd, strlen($fd));
-	fflush($fh);
-	fclose($fh);
-
-	return true;
-}
-
-/**
  * Show an image containing the visual verification code for registration.
- * Requires the GD extension.
- * Uses a random font for each letter from default_theme_dir/fonts.
- * Outputs a png if possible, otherwise a gif.
  *
+ * - Requires the GD extension.
+ * - Uses a random font for each letter from default_theme_dir/fonts.
+ * - Outputs a png if possible, otherwise a gif.
+ *
+ * @package Graphics
  * @param string $code
- * @return false if something goes wrong.
+ * @return false|null if something goes wrong.
  */
 function showCodeImage($code)
 {
 	global $gd2, $settings, $user_info, $modSettings;
 
-	// Note: The higher the value of visual_verification_type the harder the verification is - from 0 as disabled through to 4 as "Very hard".
 	// What type are we going to be doing?
+	// Note: The higher the value of visual_verification_type the harder the verification is
+	// from 0 as disabled through to 4 as "Very hard".
 	$imageType = $modSettings['visual_verification_type'];
 
 	// Special case to allow the admin center to show samples.
@@ -755,7 +780,7 @@ function showCodeImage($code)
 	for ($i = 0; $i < $str_len; $i++)
 	{
 		$characters[$i] = array(
-			'id' => $code{$i},
+			'id' => $code[$i],
 			'font' => array_rand($can_do_ttf ? $ttfont_list : $font_list),
 		);
 
@@ -807,7 +832,8 @@ function showCodeImage($code)
 		$foreground_color[$i] = mt_rand(max($foreground_color[$i] - 3, 0), min($foreground_color[$i] + 3, 255));
 	$fg_color = imagecolorallocate($code_image, $foreground_color[0], $foreground_color[1], $foreground_color[2]);
 
-	// Color for the dots.
+	// Color for the noise dots.
+	$dotbgcolor = array();
 	for ($i = 0; $i < 3; $i++)
 		$dotbgcolor[$i] = $background_color[$i] < $foreground_color[$i] ? mt_rand(0, max($foreground_color[$i] - 20, 0)) : mt_rand(min($foreground_color[$i] + 20, 255), 255);
 	$randomness_color = imagecolorallocate($code_image, $dotbgcolor[0], $dotbgcolor[1], $dotbgcolor[2]);
@@ -992,9 +1018,11 @@ function showCodeImage($code)
 
 /**
  * Show a letter for the visual verification code.
- * Alternative function for showCodeImage() in case GD is missing.
- * Includes an image from a random sub directory of default_theme_dir/fonts.
  *
+ * - Alternative function for showCodeImage() in case GD is missing.
+ * - Includes an image from a random sub directory of default_theme_dir/fonts.
+ *
+ * @package Graphics
  * @param string $letter
  */
 function showLetterImage($letter)

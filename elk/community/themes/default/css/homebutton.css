@@ -1,0 +1,6 @@
+/* This one does 480px screens at default font size. */
+@media screen and (max-width: 30em) {
+	#button_base {
+		display: none;
+	}
+}

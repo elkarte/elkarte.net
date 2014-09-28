@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -23,16 +23,19 @@ if (!defined('ELK'))
 
 /**
  * Check if the user is who he/she says he is.
- * This function makes sure the user is who they claim to be by requiring a password to be typed in every hour.
- * This check can be turned on and off by the securityDisable setting.
- * Uses the adminLogin() function of subs/Auth.subs.php if they need to login, which saves all request
- *  (POST and GET) data.
+ *
+ * What it does:
+ * - This function makes sure the user is who they claim to be by requiring a
+ * password to be typed in every hour.
+ * - This check can be turned on and off by the securityDisable setting.
+ * - Uses the adminLogin() function of subs/Auth.subs.php if they need to login,
+ * which saves all request (POST and GET) data.
  *
  * @param string $type = admin
  */
 function validateSession($type = 'admin')
 {
-	global $modSettings, $user_info, $sc, $user_settings;
+	global $modSettings, $user_info, $user_settings;
 
 	// Guests are not welcome here.
 	is_not_guest();
@@ -68,40 +71,49 @@ function validateSession($type = 'admin')
 	if (!empty($modSettings['securityDisable' . ($type != 'admin' ? '_' . $type : '')]))
 		return;
 
-	// If their admin or moderator session hasn't expired yet, let it pass.
+	// If their admin or moderator session hasn't expired yet, let it pass, let the admin session trump a moderation one as well
 	if ((!empty($_SESSION[$type . '_time']) && $_SESSION[$type . '_time'] + $refreshTime >= time()) || (!empty($_SESSION['admin_time']) && $_SESSION['admin_time'] + $refreshTime >= time()))
 		return;
 
 	require_once(SUBSDIR . '/Auth.subs.php');
 
-	// Hashed password, ahoy!
-	if (isset($_POST[$type . '_hash_pass']) && strlen($_POST[$type . '_hash_pass']) == 40)
+	// Comming from the login screen
+	if (isset($_POST[$type . '_pass']) || isset($_POST[$type . '_hash_pass']))
 	{
 		checkSession();
+		validateToken('admin-login');
 
-		$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($user_info['username'], $_POST[$type . '_hash_pass'], true)), true);
-
-		if ($good_password || $_POST[$type . '_hash_pass'] == sha1($user_info['passwd'] . $sc))
+		// Hashed password, ahoy!
+		if (isset($_POST[$type . '_hash_pass']) && strlen($_POST[$type . '_hash_pass']) === 64)
 		{
-			$_SESSION[$type . '_time'] = time();
-			unset($_SESSION['request_referer']);
-			return;
+			// Allow integration to verify the password
+			$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($user_info['username'], $_POST[$type . '_hash_pass'], true)), true);
+
+			$password = $_POST[$type . '_hash_pass'];
+			if ($good_password || validateLoginPassword($password, $user_info['passwd']))
+			{
+				$_SESSION[$type . '_time'] = time();
+				unset($_SESSION['request_referer']);
+
+				return;
+			}
 		}
-	}
 
-	// Posting the password... check it.
-	if (isset($_POST[$type. '_pass']))
-	{
-		checkSession();
-
-		$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($user_info['username'], $_POST[$type . '_pass'], false)), true);
-
-		// Password correct?
-		if ($good_password || sha1(strtolower($user_info['username']) . $_POST[$type . '_pass']) == $user_info['passwd'])
+		// Posting the password... check it.
+		if (isset($_POST[$type. '_pass']) && str_replace('*', '', $_POST[$type. '_pass']) !== '')
 		{
-			$_SESSION[$type . '_time'] = time();
-			unset($_SESSION['request_referer']);
-			return;
+			// Give integrated systems a chance to verify this password
+			$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($user_info['username'], $_POST[$type . '_pass'], false)), true);
+
+			// Password correct?
+			$password = $_POST[$type . '_pass'];
+			if ($good_password || validateLoginPassword($password, $user_info['passwd'], $user_info['username']))
+			{
+				$_SESSION[$type . '_time'] = time();
+				unset($_SESSION['request_referer']);
+
+				return;
+			}
 		}
 	}
 
@@ -132,11 +144,13 @@ function validateSession($type = 'admin')
 
 /**
  * Require a user who is logged in. (not a guest.)
- * Checks if the user is currently a guest, and if so asks them to login with a message telling them why.
- * Message is what to tell them when asking them to login.
+ *
+ * What it does:
+ * - Checks if the user is currently a guest, and if so asks them to login with a message telling them why.
+ * - Message is what to tell them when asking them to login.
  *
  * @param string $message = ''
- * @param bollean $is_fatal = true
+ * @param boolean $is_fatal = true
  */
 function is_not_guest($message = '', $is_fatal = true)
 {
@@ -178,6 +192,7 @@ function is_not_guest($message = '', $is_fatal = true)
 	else
 	{
 		loadTemplate('Login');
+		loadJavascriptFile('sha256.js', array('defer' => true));
 		$context['sub_template'] = 'kick_guest';
 		$context['robot_no_index'] = true;
 	}
@@ -194,16 +209,17 @@ function is_not_guest($message = '', $is_fatal = true)
 
 /**
  * Apply restrictions for banned users. For example, disallow access.
- * If he user is banned, it dies with an error.
- * Caches this information for optimization purposes.
- * Forces a recheck if force_check is true.
+ *
+ * What it does:
+ * - If the user is banned, it dies with an error.
+ * - Caches this information for optimization purposes.
+ * - Forces a recheck if force_check is true.
  *
  * @param bool $forceCheck = false
  */
 function is_not_banned($forceCheck = false)
 {
-	global $txt, $modSettings, $context, $user_info;
-	global $cookiename, $user_settings;
+	global $txt, $modSettings, $context, $user_info, $cookiename, $user_settings;
 
 	$db = database();
 
@@ -233,6 +249,7 @@ function is_not_banned($forceCheck = false)
 			if ($ip_number == 'ip2' && $user_info['ip2'] == $user_info['ip'])
 				continue;
 			$ban_query[] = constructBanQueryIP($user_info[$ip_number]);
+
 			// IP was valid, maybe there's also a hostname...
 			if (empty($modSettings['disableHostnameLookup']) && $user_info[$ip_number] != 'unknown')
 			{
@@ -314,6 +331,7 @@ function is_not_banned($forceCheck = false)
 		$bans = explode(',', $_COOKIE[$cookiename . '_']);
 		foreach ($bans as $key => $value)
 			$bans[$key] = (int) $value;
+
 		$request = $db->query('', '
 			SELECT bi.id_ban, bg.reason
 			FROM {db_prefix}ban_items AS bi
@@ -351,7 +369,11 @@ function is_not_banned($forceCheck = false)
 
 		// We don't wanna see you!
 		if (!$user_info['is_guest'])
-			logOnline($user_info['id'], false);
+		{
+			require_once(CONTROLLERDIR . '/Auth.controller.php');
+			$controller = new Auth_Controller();
+			$controller->action_logout(true, false);
+		}
 
 		// 'Log' the user out.  Can't have any funny business... (save the name!)
 		$old_name = isset($user_info['name']) && $user_info['name'] != '' ? $user_info['name'] : $txt['guest_title'];
@@ -427,10 +449,12 @@ function is_not_banned($forceCheck = false)
 		$_GET['topic'] = '';
 		writeLog(true);
 
+		// Log them out
 		require_once(CONTROLLERDIR . '/Auth.controller.php');
 		$controller = new Auth_Controller();
 		$controller->action_logout(true, false);
 
+		// Tell them thanks
 		fatal_error(sprintf($txt['your_ban'], $old_name) . (empty($_SESSION['ban']['cannot_login']['reason']) ? '' : '<br />' . $_SESSION['ban']['cannot_login']['reason']) . '<br />' . (!empty($_SESSION['ban']['expire_time']) ? sprintf($txt['your_ban_expires'], standardTime($_SESSION['ban']['expire_time'], false)) : $txt['your_ban_expires_never']) . '<br />' . $txt['ban_continue_browse'], 'user');
 	}
 
@@ -441,7 +465,10 @@ function is_not_banned($forceCheck = false)
 
 /**
  * Fix permissions according to ban status.
- * Applies any states of banning by removing permissions the user cannot have.
+ *
+ * What it does:
+ * - Applies any states of banning by removing permissions the user cannot have.
+ * @package Bans
  */
 function banPermissions()
 {
@@ -525,11 +552,14 @@ function banPermissions()
 
 /**
  * Log a ban in the database.
- * Log the current user in the ban logs.
- * Increment the hit counters for the specified ban ID's (if any.)
  *
- * @param array $ban_ids = array()
- * @param string $email = null
+ * What it does:
+ * - Log the current user in the ban logs.
+ * - Increment the hit counters for the specified ban ID's (if any.)
+ *
+ * @package Bans
+ * @param int[] $ban_ids = array()
+ * @param string|null $email = null
  */
 function log_ban($ban_ids = array(), $email = null)
 {
@@ -562,9 +592,12 @@ function log_ban($ban_ids = array(), $email = null)
 
 /**
  * Checks if a given email address might be banned.
- * Check if a given email is banned.
- * Performs an immediate ban if the turns turns out positive.
  *
+ * What it does:
+ * - Check if a given email is banned.
+ * - Performs an immediate ban if the turns turns out positive.
+ *
+ * @package Bans
  * @param string $email
  * @param string $restriction
  * @param string $error
@@ -631,11 +664,13 @@ function isBannedEmail($email, $restriction, $error)
 
 /**
  * Make sure the user's correct session was passed, and they came from here.
- * Checks the current session, verifying that the person is who he or she should be.
- * Also checks the referrer to make sure they didn't get sent here.
- * Depends on the disableCheckUA setting, which is usually missing.
- * Will check GET, POST, or REQUEST depending on the passed type.
- * Also optionally checks the referring action if passed. (note that the referring action must be by GET.)
+ *
+ * What it does:
+ * - Checks the current session, verifying that the person is who he or she should be.
+ * - Also checks the referrer to make sure they didn't get sent here.
+ * - Depends on the disableCheckUA setting, which is usually missing.
+ * - Will check GET, POST, or REQUEST depending on the passed type.
+ * - Also optionally checks the referring action if passed. (note that the referring action must be by GET.)
  *
  * @param string $type = 'post' (post, get, request)
  * @param string $from_action = ''
@@ -656,7 +691,6 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 		if ($check !== $sc)
 			$error = 'session_timeout';
 	}
-
 	// How about $_GET['sesc']?
 	elseif ($type === 'get')
 	{
@@ -664,7 +698,6 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 		if ($check !== $sc)
 			$error = 'session_verify_fail';
 	}
-
 	// Or can it be in either?
 	elseif ($type == 'request')
 	{
@@ -681,7 +714,7 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 	// Make sure a page with session check requirement is not being prefetched.
 	if (isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch')
 	{
-		ob_end_clean();
+		@ob_end_clean();
 		header('HTTP/1.1 403 Forbidden');
 		die;
 	}
@@ -737,7 +770,7 @@ function checkSession($type = 'post', $from_action = '', $is_fatal = true)
 	{
 		if (isset($_GET['xml']) || isset($_REQUEST['api']))
 		{
-			ob_end_clean();
+			@ob_end_clean();
 			header('HTTP/1.1 403 Forbidden - Session timeout');
 			die;
 		}
@@ -779,7 +812,7 @@ function checkConfirm($action)
  *
  * @param string $action
  * @param string $type = 'post'
- * @return array
+ * @return string[] array of token var and token
  */
 function createToken($action, $type = 'post')
 {
@@ -829,9 +862,9 @@ function validateToken($action, $type = 'post', $reset = true, $fatal = true)
 	// This nasty piece of code validates a token.
 	// 1. The token exists in session.
 	// 2. The {$type} variable should exist.
-	// 3. We concat the variable we received with the user agent
+	// 3. We concatenate the variable we received with the user agent
 	// 4. Match that result against what is in the session.
-	// 5. If it matchs, success, otherwise we fallout.
+	// 5. If it matches, success, otherwise we fallout.
 
 	// we use user agent
 	$req = request();
@@ -870,8 +903,10 @@ function validateToken($action, $type = 'post', $reset = true, $fatal = true)
 
 /**
  * Removes old unused tokens from session
- * defaults to 3 hours before a token is considered expired
- * if $complete = true will remove all tokens
+ *
+ * What it does:
+ * - defaults to 3 hours before a token is considered expired
+ * - if $complete = true will remove all tokens
  *
  * @param bool $complete = false
  * @param string $suffix = false
@@ -897,11 +932,13 @@ function cleanTokens($complete = false, $suffix = '')
 
 /**
  * Check whether a form has been submitted twice.
- * Registers a sequence number for a form.
- * Checks whether a submitted sequence number is registered in the current session.
- * Depending on the value of is_fatal shows an error or returns true or false.
- * Frees a sequence number from the stack after it's been checked.
- * Frees a sequence number without checking if action == 'free'.
+ *
+ * What it does:
+ * - Registers a sequence number for a form.
+ * - Checks whether a submitted sequence number is registered in the current session.
+ * - Depending on the value of is_fatal shows an error or returns true or false.
+ * - Frees a sequence number from the stack after it's been checked.
+ * - Frees a sequence number without checking if action == 'free'.
  *
  * @param string $action
  * @param bool $is_fatal = true
@@ -944,11 +981,13 @@ function checkSubmitOnce($action, $is_fatal = true)
 
 /**
  * This function checks whether the user is allowed to do permission. (ie. post_new.)
- * If boards parameter is specified, checks those boards instead of the current one (if applicable).
- * Always returns true if the user is an administrator.
  *
- * @param string $permission permission
- * @param array $boards = null array of board IDs
+ * What it does:
+ * - If boards parameter is specified, checks those boards instead of the current one (if applicable).
+ * - Always returns true if the user is an administrator.
+ *
+ * @param string[]|string $permission permission
+ * @param int[]|int|null $boards array of board IDs, a single id or null
  * @return boolean if the user can do the permission
  */
 function allowedTo($permission, $boards = null)
@@ -969,20 +1008,16 @@ function allowedTo($permission, $boards = null)
 	if ($user_info['is_admin'])
 		return true;
 
+	// Make sure permission is a valid array
+	if (!is_array($permission))
+		$permission = array($permission);
+
 	// Are we checking the _current_ board, or some other boards?
 	if ($boards === null)
-	{
-		// Check if they can do it.
-		if (!is_array($permission) && in_array($permission, $user_info['permissions']))
-			return true;
-		// Search for any of a list of permissions.
-		elseif (is_array($permission) && count(array_intersect($permission, $user_info['permissions'])) != 0)
-			return true;
-		// You aren't allowed, by default.
-		else
-			return false;
-	}
-	elseif (!is_array($boards))
+		// Check if they can do it, you aren't allowed, by default.
+		return count(array_intersect($permission, $user_info['permissions'])) !== 0 ? true : false;
+
+	if (!is_array($boards))
 		$boards = array($boards);
 
 	$request = $db->query('', '
@@ -992,7 +1027,7 @@ function allowedTo($permission, $boards = null)
 			LEFT JOIN {db_prefix}moderators AS mods ON (mods.id_board = b.id_board AND mods.id_member = {int:current_member})
 		WHERE b.id_board IN ({array_int:board_list})
 			AND bp.id_group IN ({array_int:group_list}, {int:moderator_group})
-			AND bp.permission {raw:permission_list}
+			AND bp.permission IN ({array_string:permission_list})
 			AND (mods.id_member IS NOT NULL OR bp.id_group != {int:moderator_group})
 		GROUP BY b.id_board',
 		array(
@@ -1000,7 +1035,7 @@ function allowedTo($permission, $boards = null)
 			'board_list' => $boards,
 			'group_list' => $user_info['groups'],
 			'moderator_group' => 3,
-			'permission_list' => (is_array($permission) ? 'IN (\'' . implode('\', \'', $permission) . '\')' : ' = \'' . $permission . '\''),
+			'permission_list' => $permission,
 		)
 	);
 
@@ -1019,13 +1054,15 @@ function allowedTo($permission, $boards = null)
 
 /**
  * This function returns fatal error if the user doesn't have the respective permission.
- * Uses allowedTo() to check if the user is allowed to do permission.
- * Checks the passed boards or current board for the permission.
- * If they are not, it loads the Errors language file and shows an error using $txt['cannot_' . $permission].
- * If they are a guest and cannot do it, this calls is_not_guest().
  *
- * @param string $permission
- * @param array $boards = null
+ * What it does:
+ * - Uses allowedTo() to check if the user is allowed to do permission.
+ * - Checks the passed boards or current board for the permission.
+ * - If they are not, it loads the Errors language file and shows an error using $txt['cannot_' . $permission].
+ * - If they are a guest and cannot do it, this calls is_not_guest().
+ *
+ * @param string[]|string $permission array of or single string, of persmission to check
+ * @param int[]|null $boards = null
  */
 function isAllowedTo($permission, $boards = null)
 {
@@ -1079,12 +1116,14 @@ function isAllowedTo($permission, $boards = null)
 
 /**
  * Return the boards a user has a certain (board) permission on. (array(0) if all.)
- *  - returns a list of boards on which the user is allowed to do the specified permission.
- *  - returns an array with only a 0 in it if the user has permission to do this on every board.
- *  - returns an empty array if he or she cannot do this on any board.
- * If check_access is true will also make sure the group has proper access to that board.
  *
- * @param array $permissions
+ * What it does:
+ * - returns a list of boards on which the user is allowed to do the specified permission.
+ * - returns an array with only a 0 in it if the user has permission to do this on every board.
+ * - returns an empty array if he or she cannot do this on any board.
+ * - If check_access is true will also make sure the group has proper access to that board.
+ *
+ * @param string[]|string $permissions array of permission names to check access against
  * @param bool $check_access = true
  * @param bool $simple = true
  */
@@ -1099,7 +1138,7 @@ function boardsAllowedTo($permissions, $check_access = true, $simple = true)
 		$permissions = array($permissions);
 
 	/*
-	 * Set $simple to true to use this function in compatability mode
+	 * Set $simple to true to use this function in compatibility mode
 	 * Otherwise, the resultant array becomes split into the multiple
 	 * permissions that were passed. Other than that, it's just the normal
 	 * state of play that you're used to.
@@ -1166,7 +1205,7 @@ function boardsAllowedTo($permissions, $check_access = true, $simple = true)
 	{
 		foreach ($permissions as $permission)
 		{
-			// never had it to start with
+			// Never had it to start with
 			if (empty($boards[$permission]))
 				$boards[$permission] = array();
 			else
@@ -1183,13 +1222,14 @@ function boardsAllowedTo($permissions, $check_access = true, $simple = true)
 
 /**
  * Returns whether an email address should be shown and how.
- * Possible outcomes are
- *  'yes': show the full email address
- *  'yes_permission_override': show the full email address, either you
- *   are a moderator or it's your own email address.
- *  'no_through_forum': don't show the email address, but do allow
- *    things to be mailed using the built-in forum mailer.
- *  'no': keep the email address hidden.
+ *
+ * Possible outcomes are:
+ * - 'yes': show the full email address
+ * - 'yes_permission_override': show the full email address, either you
+ * are a moderator or it's your own email address.
+ * - 'no_through_forum': don't show the email address, but do allow
+ * things to be mailed using the built-in forum mailer.
+ * - 'no': keep the email address hidden.
  *
  * @param bool $userProfile_hideEmail
  * @param int $userProfile_id
@@ -1197,32 +1237,32 @@ function boardsAllowedTo($permissions, $check_access = true, $simple = true)
  */
 function showEmailAddress($userProfile_hideEmail, $userProfile_id)
 {
-	global $modSettings, $user_info;
+	global $user_info;
 
 	// Should this user's email address be shown?
-	// If you're guest and the forum is set to hide email for guests: no.
+	// If you're guest: no.
 	// If the user is post-banned: no.
-	// If it's your own profile and you've set your address hidden: yes_permission_override.
+	// If it's your own profile and you've not set your address hidden: yes_permission_override.
 	// If you're a moderator with sufficient permissions: yes_permission_override.
-	// If the user has set their email address to be hidden: no.
-	// If the forum is set to show full email addresses: yes.
-	// Otherwise: no_through_forum.
+	// If the user has set their profile to do not email me: no.
+	// Otherwise: no_through_forum. (don't show it but allow emailing the member)
 
 	if ($user_info['is_guest'] || isset($_SESSION['ban']['cannot_post']))
 		return 'no';
-	elseif ((!$user_info['is_guest'] && $user_info['id'] == $userProfile_id && !$userProfile_hideEmail) || allowedTo('moderate_forum'))
+	elseif ((!$user_info['is_guest'] && $user_info['id'] == $userProfile_id && !$userProfile_hideEmail))
+		return 'yes_permission_override';
+	elseif (allowedTo('moderate_forum'))
 		return 'yes_permission_override';
 	elseif ($userProfile_hideEmail)
 		return 'no';
-	elseif (!empty($modSettings['make_email_viewable']) )
-		return 'yes';
 	else
 		return 'no_through_forum';
 }
 
 /**
  * This function attempts to protect from spammed messages and the like.
- * The time taken depends on error_type - generally uses the modSetting.
+ *
+ * - The time taken depends on error_type - generally uses the modSetting.
  *
  * @param string $error_type used also as a $txt index. (not an actual string.)
  * @param boolean $fatal is the spam check a fatal error on failure
@@ -1238,6 +1278,7 @@ function spamProtection($error_type, $fatal = true)
 		'login' => 2,
 		'register' => 2,
 		'remind' => 30,
+		'contact' => 30,
 		'sendtopic' => $modSettings['spamWaitTime'] * 4,
 		'sendmail' => $modSettings['spamWaitTime'] * 5,
 		'reporttm' => $modSettings['spamWaitTime'] * 4,
@@ -1292,7 +1333,7 @@ function spamProtection($error_type, $fatal = true)
  *
  * @param string $path the (absolute) directory path
  * @param boolean $attachments if the directory is an attachments directory or not
- * @return true on success error string if anything fails
+ * @return string|boolean on success error string if anything fails
  */
 function secureDirectory($path, $attachments = false)
 {
@@ -1363,7 +1404,8 @@ else
 
 /**
  * Helper function that puts together a ban query for a given ip
- * builds the query for ipv6, ipv4 or 255.255.255.255 depending on whats supplied
+ *
+ * - Builds the query for ipv6, ipv4 or 255.255.255.255 depending on whats supplied
  *
  * @param string $fullip An IP address either IPv6 or not
  * @return string A SQL condition
@@ -1402,6 +1444,8 @@ function constructBanQueryIP($fullip)
 
 /**
  * Decide if we are going to enable bad behavior scanning for this user
+ *
+ * What it does:
  * - Admins and Moderators get a free pass
  * - Optionally existing users with post counts over a limit are bypassed
  * - Others get a humane frisking
@@ -1409,8 +1453,6 @@ function constructBanQueryIP($fullip)
 function loadBadBehavior()
 {
 	global $modSettings, $user_info, $bb2_results;
-
-	$bb_run = false;
 
 	// Bad Behavior Enabled?
 	if (!empty($modSettings['badbehavior_enabled']))
@@ -1440,11 +1482,12 @@ function loadBadBehavior()
 
 /**
  * This protects against brute force attacks on a member's password.
- * Importantly, even if the password was right we DON'T TELL THEM!
  *
- * @param $id_member
- * @param $password_flood_value = false
- * @param $was_correct = false
+ * - Importantly, even if the password was right we DON'T TELL THEM!
+ *
+ * @param int $id_member
+ * @param string|false $password_flood_value = false or string joined on |'s
+ * @param boolean $was_correct = false
  */
 function validatePasswordFlood($id_member, $password_flood_value = false, $was_correct = false)
 {
@@ -1493,13 +1536,12 @@ function validatePasswordFlood($id_member, $password_flood_value = false, $was_c
 
 	// Otherwise set the members data. If they correct on their first attempt then we actually clear it, otherwise we set it!
 	updateMemberData($id_member, array('passwd_flood' => $was_correct && $number_tries == 1 ? '' : $time_stamp . '|' . $number_tries));
-
 }
 
 /**
  * This sets the X-Frame-Options header.
  *
- * @param string $override the frame option, defaults to deny.
+ * @param string|null $override the frame option, defaults to deny.
  */
 function frameOptionsHeader($override = null)
 {
@@ -1509,7 +1551,7 @@ function frameOptionsHeader($override = null)
 
 	if (is_null($override) && !empty($modSettings['frame_security']))
 		$option = $modSettings['frame_security'];
-	elseif (in_array($override, array('SAMEORIGIN', 'DENY', 'SAMEORIGIN')))
+	elseif (in_array($override, array('SAMEORIGIN', 'DENY')))
 		$option = $override;
 
 	// Don't bother setting the header if we have disabled it.
@@ -1523,21 +1565,20 @@ function frameOptionsHeader($override = null)
 /**
  * This adds additional security headers that may prevent browsers from doing something they should not
  *
- * X-XSS-Protection header - This header enables the Cross-site scripting (XSS) filter
+ * - X-XSS-Protection header - This header enables the Cross-site scripting (XSS) filter
  * built into most recent web browsers. It's usually enabled by default, so the role of this
  * header is to re-enable the filter for this particular website if it was disabled by the user.
- *
- * X-Content-Type-Options header - It prevents the browser from doing MIME-type sniffing,
+ * - X-Content-Type-Options header - It prevents the browser from doing MIME-type sniffing,
  * only IE and Chrome are honouring this header. This reduces exposure to drive-by download attacks
  * and sites serving user uploaded content that could be treated as executable or dynamic HTML files.
  *
- * @param boolean $override
+ * @param boolean|null $override
  */
 function securityOptionsHeader($override = null)
 {
 	if ($override !== true)
 	{
-		header('X-XSS-Protection: 1; mode=block');
+		header('X-XSS-Protection: 1');
 		header('X-Content-Type-Options: nosniff');
 	}
 }

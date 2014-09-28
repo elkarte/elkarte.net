@@ -26,9 +26,7 @@ $txt['search_visual_verification_desc'] = 'Please enter the code in the image ab
 
 $txt['search_specific_topic'] = 'Searching only posts in the topic';
 
-$txt['mods_cat_search'] = 'Search';
 $txt['groups_search_posts'] = 'Membergroups with access to the search function';
-$txt['simpleSearch'] = 'Enable simple search';
 $txt['search_dropdown'] = 'Enable the Quick Search dropdown';
 $txt['search_results_per_page'] = 'Number of search results per page';
 $txt['search_weight_frequency'] = 'Relative search weight for number of matching messages within a topic';
@@ -36,12 +34,13 @@ $txt['search_weight_age'] = 'Relative search weight for age of last matching mes
 $txt['search_weight_length'] = 'Relative search weight for topic length';
 $txt['search_weight_subject'] = 'Relative search weight for a matching subject';
 $txt['search_weight_first_message'] = 'Relative search weight for a first message match';
-$txt['search_weight_sticky'] = 'Relative search weight for a sticky topic';
+$txt['search_weight_sticky'] = 'Relative search weight for a pinned topic';
 
-$txt['search_settings_desc'] = 'Here you can changes the basic settings of the search function.';
+$txt['search_settings_desc'] = 'Here you can change the basic settings of the search function.';
 $txt['search_settings_title'] = 'Search Settings';
 
-$txt['search_weights_desc'] = 'Here you can change the individual components of the relevance rating. ';
+$txt['search_weights_desc'] = 'Here you can change the individual components of the relevance rating.';
+$txt['search_weights_sphinx'] = 'To update weight factors with Sphinx, you must generate and install a new sphinx.conf file.';
 $txt['search_weights_title'] = 'Search - weights';
 $txt['search_weights_total'] = 'Total';
 $txt['search_weights_save'] = 'Save';
@@ -74,9 +73,9 @@ $txt['search_index_create_custom'] = 'create custom index';
 $txt['search_index_custom_remove'] = 'remove custom index';
 
 $txt['search_index_sphinx'] = 'Sphinx';
-$txt['search_index_sphinx_desc'] = 'To adjust Sphinx settings, use [<a href="' . $scripturl . '?action=admin;area=managesearch;sa=managesphinx">Configure Sphinx</a>]';
+$txt['search_index_sphinx_desc'] = 'To adjust Sphinx settings, use [<a href="{managesearch_url}">Configure Sphinx</a>]';
 $txt['search_index_sphinxql'] = 'SphinxQL';
-$txt['search_index_sphinxql_desc'] = 'To adjust SphinxQL settings, use [<a href="' . $scripturl . '?action=admin;area=managesearch;sa=managesphinx">Configure Sphinx</a>]';
+$txt['search_index_sphinxql_desc'] = 'To adjust SphinxQL settings, use [<a href="{managesearch_url}">Configure Sphinx</a>]';
 
 $txt['search_force_index'] = 'Force the use of a search index';
 $txt['search_match_words'] = 'Match whole words only';
@@ -106,8 +105,8 @@ $txt['search_error_indexed_chars'] = 'Invalid number of indexed characters. At l
 $txt['search_error_max_percentage'] = 'Invalid percentage of words to be skipped. Use a value of at least 5%.';
 $txt['error_string_too_long'] = 'Search string must be less than %1$d characters long.';
 
-$txt['search_warning_ignored_word'] = 'This term has been ignored in your search';
-$txt['search_warning_ignored_words'] = 'These terms have been ignored in your search';
+$txt['search_warning_ignored_word'] = 'The following term has been ignored in your search';
+$txt['search_warning_ignored_words'] = 'The following terms have been ignored in your search';
 
 $txt['search_adjust_query'] = 'Adjust Search Parameters';
 $txt['search_adjust_submit'] = 'Revise Search';
@@ -150,7 +149,6 @@ $txt['spider_name_desc'] = 'Name by which the spider will be referred.';
 $txt['spider_agent_desc'] = 'User agent associated with this spider.';
 $txt['spider_ip_info_desc'] = 'Comma separated list of IP addresses associated with this spider.';
 
-$txt['spider'] = 'Spider';
 $txt['spider_time'] = 'Time';
 $txt['spider_viewing'] = 'Viewing';
 $txt['spider_logs_empty'] = 'There are currently no spider log entries.';

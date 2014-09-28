@@ -1,7 +1,7 @@
 <?php
 
 /**
- * The Xml_Array class is an xml parser.
+ * The Ftp_Connection class is a Simple FTP protocol implementation.
  *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -29,25 +29,25 @@ class Ftp_Connection
 {
 	/**
 	 * holds the connection response
-	 * @var type
+	 * @var resource
 	 */
 	public $connection;
 
 	/**
 	 * holds any errors
-	 * @var type
+	 * @var string|boolean
 	 */
 	public $error;
 
 	/**
 	 * holds last message from the server
-	 * @var type
+	 * @var string
 	 */
 	public $last_message;
 
 	/**
 	 * Passive connection
-	 * @var type
+	 * @var mixed[]
 	 */
 	public $pasv;
 
@@ -203,7 +203,7 @@ class Ftp_Connection
 	/**
 	 * Reads the response to the command from the server
 	 *
-	 * @param mixed $desired string or array of acceptable return values
+	 * @param string[]|string $desired string or array of acceptable return values
 	 */
 	public function check_response($desired)
 	{
@@ -233,7 +233,7 @@ class Ftp_Connection
 		$time = time();
 		do
 			$response = fgets($this->connection, 1024);
-		while (strpos($response, ' ', 3) !== 3 && time() - $time < 5);
+		while (substr($response, 3, 1) !== ' ' && time() - $time < 5);
 
 		// If it's not 227, we weren't given an IP and port, which means it failed.
 		if (strpos($response, '227 ') !== 0)
@@ -298,8 +298,8 @@ class Ftp_Connection
 	 * Generates a direcotry listing for the current directory
 	 *
 	 * @param string $ftp_path
-	 * @param string $search
-	 * @return boolean
+	 * @param string|boolean $search
+	 * @return false|string
 	 */
 	public function list_dir($ftp_path = '', $search = false)
 	{
@@ -343,8 +343,8 @@ class Ftp_Connection
 	 * Determins the current dirctory we are in
 	 *
 	 * @param string $file
-	 * @param array $listing
-	 * @return string|boolean
+	 * @param string|null $listing
+	 * @return string|false
 	 */
 	public function locate($file, $listing = null)
 	{
@@ -356,7 +356,7 @@ class Ftp_Connection
 		$time = time();
 		do
 			$response = fgets($this->connection, 1024);
-		while ($response[3] != ' ' && time() - $time < 5);
+		while (substr($response, 3, 1) !== ' ' && time() - $time < 5);
 
 		// Check for 257!
 		if (preg_match('~^257 "(.+?)" ~', $response, $match) != 0)
@@ -413,7 +413,8 @@ class Ftp_Connection
 	 * Detects the current path
 	 *
 	 * @param string $filesystem_path
-	 * @param string $lookup_file
+	 * @param string|null $lookup_file
+	 * @return string[] $username, $path, found_path
 	 */
 	public function detect_path($filesystem_path, $lookup_file = null)
 	{

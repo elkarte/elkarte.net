@@ -8,7 +8,7 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  */
 
@@ -17,16 +17,17 @@ if (!defined('ELK'))
 
 /**
  * Dispatch the request to the function or method registered to handle it.
- * Try first the critical functionality (maintenance, no guest access)
- * Then, in order:
- *   forum's main actions: board index, message index, display topic
- *   the current/legacy file/functions registered by ElkArte core
- * Fall back to naming patterns:
- *   filename=[action].php function=[sa]
- *   filename=[action].controller.php method=action_[sa]
- *   filename=[action]-Controller.php method=action_[sa]
  *
- * An addon files to handle custom actions will be called if they follow
+ * What it does:
+ * - Try first the critical functionality (maintenance, no guest access)
+ * - Then, in order:
+ *     * forum's main actions: board index, message index, display topic
+ *       the current/legacy file/functions registered by ElkArte core
+ * - Fall back to naming patterns:
+ *     * filename=[action].php function=[sa]
+ *     * filename=[action].controller.php method=action_[sa]
+ *     * filename=[action]-Controller.php method=action_[sa]
+ * - An addon files to handle custom actions will be called if they follow
  * any of these patterns.
  */
 class Site_Dispatcher
@@ -35,25 +36,25 @@ class Site_Dispatcher
 	 * File name to load
 	 * @var string
 	 */
-	private $_file_name;
+	protected $_file_name;
 
 	/**
 	 * Function or method to call
 	 * @var string
 	 */
-	private $_function_name;
+	protected $_function_name;
 
 	/**
 	 * Class name, for object oriented controllers
 	 * @var string
 	 */
-	private $_controller_name;
+	protected $_controller_name;
 
 	/**
 	 * Name of pre_dispatch function, for procedural controllers
 	 * @var string
 	 */
-	private $_pre_dispatch_func;
+	protected $_pre_dispatch_func;
 
 	/**
 	 * Create an instance and initialize it.
@@ -61,7 +62,7 @@ class Site_Dispatcher
 	 */
 	public function __construct()
 	{
-		global $board, $topic, $modSettings, $settings, $user_info, $maintenance;
+		global $board, $topic, $modSettings, $user_info, $maintenance;
 
 		// Default action of the forum: board index
 		// Everytime we don't know what to do, we'll do this :P
@@ -70,6 +71,9 @@ class Site_Dispatcher
 			'controller' => 'BoardIndex_Controller',
 			'function' => 'action_boardindex'
 		);
+
+		// Reminder: hooks need to account for multiple addons setting this hook.
+		call_integration_hook('integrate_action_frontpage', array(&$default_action));
 
 		// Maintenance mode: you're out of here unless you're admin
 		if (!empty($maintenance) && !allowedTo('admin_forum'))
@@ -101,9 +105,6 @@ class Site_Dispatcher
 			// Home page: board index
 			if (empty($board) && empty($topic))
 			{
-				// Reminder: hooks need to account for multiple addons setting this hook.
-				call_integration_hook('integrate_frontpage', array(&$default_action));
-
 				// Was it, wasn't it....
 				if (empty($this->_function_name))
 				{
@@ -146,6 +147,7 @@ class Site_Dispatcher
 			'contact' => array('Register.controller.php', 'Register_Controller', 'action_contact'),
 			'coppa' => array('Register.controller.php', 'Register_Controller', 'action_coppa'),
 			'deletemsg' => array('RemoveTopic.controller.php', 'RemoveTopic_Controller', 'action_deletemsg'),
+			// @todo: move this to attachment action also
 			'dlattach' => array('Attachment.controller.php', 'Attachment_Controller', 'action_index'),
 			'unwatchtopic' => array('Notify.controller.php', 'Notify_Controller', 'action_unwatchtopic'),
 			'editpoll' => array('Poll.controller.php', 'Poll_Controller', 'action_editpoll'),
@@ -154,7 +156,6 @@ class Site_Dispatcher
 			'quickhelp' => array('Help.controller.php', 'Help_Controller', 'action_quickhelp'),
 			'jsmodify' => array('Post.controller.php', 'Post_Controller', 'action_jsmodify'),
 			'jsoption' => array('ManageThemes.controller.php', 'ManageThemes_Controller', 'action_jsoption'),
-			'loadeditorlocale' => array('subs/Editor.subs.php', 'action_loadlocale'),
 			'lockvoting' => array('Poll.controller.php', 'Poll_Controller', 'action_lockvoting'),
 			'login' => array('Auth.controller.php', 'Auth_Controller', 'action_login'),
 			'login2' => array('Auth.controller.php', 'Auth_Controller', 'action_login2'),
@@ -171,21 +172,20 @@ class Site_Dispatcher
 			'openidreturn' => array('OpenID.controller.php', 'OpenID_Controller', 'action_openidreturn'),
 			'xrds' => array('OpenID.controller.php', 'OpenID_Controller', 'action_xrds'),
 			'pm' => array('PersonalMessage.controller.php', 'PersonalMessage_Controller', 'action_index'),
-// 			'post' => array('Post.controller.php', 'Post_Controller', 'action_post'),
 			'post2' => array('Post.controller.php', 'Post_Controller', 'action_post2'),
 			'profile' => array('Profile.controller.php', 'Profile_Controller', 'action_index'),
 			'quotefast' => array('Post.controller.php', 'Post_Controller', 'action_quotefast'),
 			'quickmod' => array('MessageIndex.controller.php', 'MessageIndex_Controller', 'action_quickmod'),
 			'quickmod2' => array('Display.controller.php', 'Display_Controller', 'action_quickmod2'),
-			'recent' => array('Recent.controller.php', 'Recent_Controller', 'action_recent'),
+// 			'recent' => array('Recent.controller.php', 'Recent_Controller', 'action_recent'),
 			'register' => array('Register.controller.php', 'Register_Controller', 'action_register'),
 			'register2' => array('Register.controller.php', 'Register_Controller', 'action_register2'),
-			'removepoll' => array('Poll.controller.php', 'Poll_Controller', 'action_removepoll'),
+// 			'removepoll' => array('Poll.controller.php', 'Poll_Controller', 'action_removepoll'),
 			'removetopic2' => array('RemoveTopic.controller.php', 'RemoveTopic_Controller', 'action_removetopic2'),
 			'reporttm' => array('Emailuser.controller.php', 'Emailuser_Controller', 'action_reporttm'),
 			'restoretopic' => array('RemoveTopic.controller.php', 'RemoveTopic_Controller', 'action_restoretopic'),
-			'search' => array('Search.controller.php', 'Search_Controller', 'action_plushsearch1'),
-			'search2' => array('Search.controller.php', 'Search_Controller', 'action_plushsearch2'),
+// 			'search' => array('Search.controller.php', 'Search_Controller', 'action_plushsearch1'),
+// 			'search2' => array('Search.controller.php', 'Search_Controller', 'action_plushsearch2'),
 			'suggest' => array('Suggest.controller.php', 'Suggest_Controller', 'action_suggest'),
 			'spellcheck' => array('Post.controller.php', 'Post_Controller', 'action_spellcheck'),
 			'splittopics' => array('SplitTopics.controller.php', 'SplitTopics_Controller', 'action_splittopics'),
@@ -196,7 +196,7 @@ class Site_Dispatcher
 			'unreadreplies' => array('Recent.controller.php', 'Recent_Controller', 'action_unread'),
 			'verificationcode' => array('Register.controller.php', 'Register_Controller', 'action_verificationcode'),
 			'viewprofile' => array('Profile.controller.php', 'Profile_Controller', 'action_index'),
-			'vote' => array('Poll.controller.php', 'Poll_Controller', 'action_vote'),
+// 			'vote' => array('Poll.controller.php', 'Poll_Controller', 'action_vote'),
 			'viewquery' => array('AdminDebug.controller.php', 'AdminDebug_Controller', 'action_viewquery'),
 			'viewadminfile' => array('AdminDebug.controller.php', 'AdminDebug_Controller', 'action_viewadminfile'),
 			'.xml' => array('News.controller.php', 'News_Controller', 'action_showfeed'),
@@ -276,20 +276,11 @@ class Site_Dispatcher
 		if (empty($this->_file_name) || empty($this->_function_name))
 		{
 			// Catch the action with the theme?
-			// @todo remove this?
-			if (!empty($settings['catch_action']))
-			{
-				$this->_file_name = SUBSDIR . '/Themes.subs.php';
-				$this->_function_name = 'WrapAction';
-			}
-			else
-			{
-				// We still haven't found what we're looking for...
-				$this->_file_name = $default_action['file'];
-				if (isset($default_action['controller']))
-					$this->_controller_name = $default_action['controller'];
-				$this->_function_name = $default_action['function'];
-			}
+			// We still haven't found what we're looking for...
+			$this->_file_name = $default_action['file'];
+			if (isset($default_action['controller']))
+				$this->_controller_name = $default_action['controller'];
+			$this->_function_name = $default_action['function'];
 		}
 
 		if (isset($_REQUEST['api']))
@@ -311,8 +302,9 @@ class Site_Dispatcher
 			if (method_exists($controller, 'pre_dispatch'))
 				$controller->pre_dispatch();
 
-			$hook = substr($this->_function_name, -1) == 2 ? substr($this->_function_name, 0, -1) : $this->_function_name;
-			call_integration_hook('integrate_' . $hook . '_before');
+			$hook = strtolower(str_replace('_Controller', '', $this->_controller_name));
+			$hook = substr($hook, -1) == 2 ? substr($hook, 0, -1) : $hook;
+			call_integration_hook('integrate_action_' . $hook . '_before', array($this->_function_name));
 
 			// 3, 2, ... and go
 			if (method_exists($controller, $this->_function_name))
@@ -331,10 +323,11 @@ class Site_Dispatcher
 				require_once(CONTROLLERDIR . '/BoardIndex.controller.php');
 				call_integration_hook('integrate_action_boardindex_before');
 				$controller = new BoardIndex_Controller();
-				$this->action_boardindex();
+				$controller->action_boardindex();
 				call_integration_hook('integrate_action_boardindex_after');
 			}
-			call_integration_hook('integrate_' . $hook . '_after');
+
+			call_integration_hook('integrate_action_' . $hook . '_after', array($this->_function_name));
 		}
 		else
 		{
@@ -346,5 +339,21 @@ class Site_Dispatcher
 			// It must be a good ole' function
 			call_user_func($this->_function_name);
 		}
+	}
+
+	/**
+	 * Returns the current action for the system
+	 *
+	 * @return string
+	 */
+	public function site_action()
+	{
+		if (!empty($this->_controller_name))
+		{
+			$action  = strtolower(str_replace('_Controller', '', $this->_controller_name));
+			$action = substr($action, -1) == 2 ? substr($action, 0, -1) : $action;
+		}
+
+		return isset($action) ? $action : '';
 	}
 }

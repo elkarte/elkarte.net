@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -50,19 +50,19 @@ function template_move_topic()
 						<label for="reset_subject"><input type="checkbox" name="reset_subject" id="reset_subject" onclick="document.getElementById(\'subjectArea\').style.display = this.checked ? \'block\' : \'none\';" class="input_check" /> ', $txt['moveTopic2'], '.</label><br />
 						<fieldset id="subjectArea" style="display: none;">
 							<dl class="settings">
-								<dt><strong>', $txt['moveTopic3'], ':</strong></dt>
-								<dd><input type="text" name="custom_subject" size="30" value="', $context['subject'], '" class="input_text" /></dd>
+								<dt><strong><label for="custom_subject">', $txt['moveTopic3'], '</label>:</strong></dt>
+								<dd><input type="text" id="custom_subject" name="custom_subject" size="30" value="', $context['subject'], '" class="input_text" /></dd>
 							</dl>
 							<label for="enforce_subject"><input type="checkbox" name="enforce_subject" id="enforce_subject" class="input_check" /> ', $txt['moveTopic4'], '.</label>
 						</fieldset>
 						<label for="postRedirect"><input type="checkbox" name="postRedirect" id="postRedirect" ', $context['is_approved'] ? 'checked="checked"' : '', ' onclick="', $context['is_approved'] ? '' : 'if (this.checked && !confirm(\'' . $txt['move_topic_unapproved_js'] . '\')) return false; ', 'document.getElementById(\'reasonArea\').style.display = this.checked ? \'block\' : \'none\';" class="input_check" /> ', $txt['moveTopic1'], '.</label>
-						<fieldset id="reasonArea" style="margin-top: 1ex;', $context['is_approved'] ? '' : 'display: none;', '">
+						<fieldset id="reasonArea" style="', $context['is_approved'] ? '' : 'display: none;', '">
 							<dl class="settings">
 								<dt>
-									', $txt['moved_why'], '
+									<label for="reason">', $txt['moved_why'], '</label>
 								</dt>
 								<dd>
-									<textarea name="reason" rows="3" cols="40">', $txt['movetopic_default'], '</textarea>
+									<textarea id="reason" name="reason" rows="3" cols="40">', $txt['movetopic_default'], '</textarea>
 								</dd>
 								<dt>
 									<label for="redirect_topic">', $txt['movetopic_redirect'], '</label>
@@ -71,10 +71,10 @@ function template_move_topic()
 									<input type="checkbox" name="redirect_topic" id="redirect_topic" ', !empty($context['redirect_topic']) ? 'checked="checked"' : '', ' class="input_check" />
 								</dd>
 								<dt>
-									', $txt['movetopic_expires'], '
+									<label for="redirect_expires">', $txt['movetopic_expires'], '</label>
 								</dt>
 								<dd>
-									<select name="redirect_expires">
+									<select id="redirect_expires" name="redirect_expires">
 										<option value="0"', empty($context['redirect_expires']) ? ' selected="selected"' : '', '>', $txt['never'], '</option>
 										<option value="1440"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 1440 ? ' selected="selected"' : '', '>', $txt['one_day'], '</option>
 										<option value="10080"', !empty($context['redirect_expires']) && $context['redirect_expires'] == 10080 ? ' selected="selected"' : '', '>', $txt['one_week'], '</option>

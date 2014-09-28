@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  * This file contains functions that are specifically done by administrators.
  *
@@ -25,11 +25,12 @@ if (!defined('ELK'))
 /**
  * Get a list of versions that are currently installed on the server.
  *
- * @param array $checkFor
+ * @package Admin
+ * @param string[] $checkFor
  */
 function getServerVersions($checkFor)
 {
-	global $txt, $_PHPA, $memcached, $modSettings;
+	global $txt, $memcached, $modSettings;
 
 	$db = database();
 
@@ -67,29 +68,51 @@ function getServerVersions($checkFor)
 
 	// If we're using memcache we need the server info.
 	if (empty($memcached) && function_exists('memcache_get') && isset($modSettings['cache_memcached']) && trim($modSettings['cache_memcached']) != '')
+	{
+		require_once(SUBSDIR . '/Cache.subs.php');
 		get_memcached_server();
+	}
+	else
+	{
+		if (($key = array_search('memcache', $checkFor)) !== false)
+			unset($checkFor[$key]);
+	}
 
 	// Check to see if we have any accelerators installed...
 	if (in_array('mmcache', $checkFor) && defined('MMCACHE_VERSION'))
 		$versions['mmcache'] = array('title' => 'Turck MMCache', 'version' => MMCACHE_VERSION);
 	if (in_array('eaccelerator', $checkFor) && defined('EACCELERATOR_VERSION'))
 		$versions['eaccelerator'] = array('title' => 'eAccelerator', 'version' => EACCELERATOR_VERSION);
-	if (in_array('phpa', $checkFor) && isset($_PHPA))
-		$versions['phpa'] = array('title' => 'ionCube PHP-Accelerator', 'version' => $_PHPA['VERSION']);
+	if (in_array('zend', $checkFor) && function_exists('zend_shm_cache_store'))
+		$versions['zend'] = array('title' => 'Zend SHM Accelerator', 'version' => zend_version());
 	if (in_array('apc', $checkFor) && extension_loaded('apc'))
 		$versions['apc'] = array('title' => 'Alternative PHP Cache', 'version' => phpversion('apc'));
 	if (in_array('memcache', $checkFor) && function_exists('memcache_set'))
 		$versions['memcache'] = array('title' => 'Memcached', 'version' => empty($memcached) ? '???' : memcache_get_version($memcached));
 	if (in_array('xcache', $checkFor) && function_exists('xcache_set'))
 		$versions['xcache'] = array('title' => 'XCache', 'version' => XCACHE_VERSION);
+	if (in_array('opcache', $checkFor) && extension_loaded('Zend OPcache'))
+	{
+		$opcache_config = @opcache_get_configuration();
+		if (!empty($opcache_config['directives']['opcache.enable']))
+			$versions['opcache'] = array('title' => $opcache_config['version']['opcache_product_name'], 'version' => $opcache_config['version']['version']);
+	}
 
+	// PHP Version
 	if (in_array('php', $checkFor))
-		$versions['php'] = array('title' => 'PHP', 'version' => PHP_VERSION, 'more' => '?action=admin;area=serversettings;sa=phpinfo');
+		$versions['php'] = array('title' => 'PHP', 'version' => PHP_VERSION . ' (' . php_sapi_name() . ')', 'more' => '?action=admin;area=serversettings;sa=phpinfo');
 
+	// Server info
 	if (in_array('server', $checkFor))
 	{
 		$req = request();
 		$versions['server'] = array('title' => $txt['support_versions_server'], 'version' => $req->server_software());
+
+		// Compute some system info, if we can
+		$versions['server_name'] = array('title' => $txt['support_versions'], 'version' => php_uname());
+		$loading = detectServerLoad();
+		if ($loading !== false)
+			$versions['server_load'] = array('title' => $txt['load_balancing_settings'], 'version' => $loading);
 	}
 
 	return $versions;
@@ -97,9 +120,12 @@ function getServerVersions($checkFor)
 
 /**
  * Builds the availalble tasks for this admin / moderator
- * Sets up the support resource txt stings
  *
- * Called from Admin.controller action_home and action_credits
+ * What it does:
+ * - Sets up the support resource txt stings
+ * - Called from Admin.controller action_home and action_credits
+ *
+ * @package Admin
  */
 function getQuickAdminTasks()
 {
@@ -171,13 +197,15 @@ function getQuickAdminTasks()
  * Search through source, theme and language files to determine their version.
  * Get detailed version information about the physical Elk files on the server.
  *
+ * What it does:
  * - the input parameter allows to set whether to include SSI.php and whether
  *   the results should be sorted.
  * - returns an array containing information on source files, templates and
  *   language files found in the default theme directory (grouped by language).
+ * - options include include_ssi, include_subscriptions, sort_results
  *
- * @param array $versionOptions
- *
+ * @package Admin
+ * @param mixed[] $versionOptions associative array of options
  * @return array
  */
 function getFileVersions(&$versionOptions)
@@ -205,7 +233,7 @@ function getFileVersions(&$versionOptions)
 	// Find the version in SSI.php's file header.
 	if (!empty($versionOptions['include_ssi']) && file_exists(BOARDDIR . '/SSI.php'))
 	{
-		$header = file_get_contents(BOARDDIR . '/SSI.php', null, null, 0, 768);
+		$header = file_get_contents(BOARDDIR . '/SSI.php', false, null, 0, 768);
 		if (preg_match($version_regex, $header, $match) == 1)
 			$version_info['file_versions']['SSI.php'] = $match[1];
 		// Not found!  This is bad.
@@ -216,7 +244,7 @@ function getFileVersions(&$versionOptions)
 	// Do the paid subscriptions handler?
 	if (!empty($versionOptions['include_subscriptions']) && file_exists(BOARDDIR . '/subscriptions.php'))
 	{
-		$header = file_get_contents(BOARDDIR . '/subscriptions.php', null, null, 0, 768);
+		$header = file_get_contents(BOARDDIR . '/subscriptions.php', false, null, 0, 768);
 		if (preg_match($version_regex, $header, $match) == 1)
 			$version_info['file_versions']['subscriptions.php'] = $match[1];
 		// If we haven't how do we all get paid?
@@ -241,7 +269,7 @@ function getFileVersions(&$versionOptions)
 			if (substr($entry, -4) === '.php' && !is_dir($dir . '/' . $entry) && $entry !== 'index.php' && $entry !== 'sphinxapi.php')
 			{
 				// Read the first 4k from the file.... enough for the header.
-				$header = file_get_contents($dir . '/' . $entry, null, null, 0, 768);
+				$header = file_get_contents($dir . '/' . $entry, false, null, 0, 768);
 
 				// Look for the version comment in the file header.
 				if (preg_match($version_regex, $header, $match))
@@ -267,7 +295,7 @@ function getFileVersions(&$versionOptions)
 			if (substr($entry, -12) == 'template.php' && !is_dir($dirname . '/' . $entry))
 			{
 				// Read the first 768 bytes from the file.... enough for the header.
-				$header = file_get_contents($dirname . '/' . $entry, null, null, 0, 768);
+				$header = file_get_contents($dirname . '/' . $entry, false, null, 0, 768);
 
 				// Look for the version comment in the file header.
 				if (preg_match($version_regex, $header, $match) == 1)
@@ -282,22 +310,34 @@ function getFileVersions(&$versionOptions)
 
 	// Load up all the files in the default language directory and sort by language.
 	$this_dir = dir($lang_dir);
-	while ($entry = $this_dir->read())
+	while ($path = $this_dir->read())
 	{
-		if (substr($entry, -4) == '.php' && $entry != 'index.php' && !is_dir($lang_dir . '/' . $entry))
+		if ($path == '.' || $path == '..')
+			continue;
+
+		if (is_dir($lang_dir . '/' . $path))
 		{
-			// Read the first 768 bytes from the file.... enough for the header.
-			$header = file_get_contents($lang_dir . '/' . $entry, null, null, 0, 768);
+			$language = $path;
+			$this_lang_path = $lang_dir . '/' . $language;
+			$this_lang = dir($this_lang_path);
+			while ($entry = $this_lang->read())
+			{
+				if (substr($entry, -4) == '.php' && $entry != 'index.php' && !is_dir($this_lang_path . '/' . $entry))
+				{
+					// Read the first 768 bytes from the file.... enough for the header.
+					$header = file_get_contents($this_lang_path . '/' . $entry, false, null, 0, 768);
 
-			// Split the file name off into useful bits.
-			list ($name, $language) = explode('.', $entry);
+					// Split the file name off into useful bits.
+					list ($name, $language) = explode('.', $entry);
 
-			// Look for the version comment in the file header.
-			if (preg_match('~(?://|/\*)\s*Version:\s+(.+?);\s*' . preg_quote($name, '~') . '(?:[\s]{2}|\*/)~i', $header, $match) == 1)
-				$version_info['default_language_versions'][$language][$name] = $match[1];
-			// It wasn't found, but the file was... show a '??'.
-			else
-				$version_info['default_language_versions'][$language][$name] = $unknown_version;
+					// Look for the version comment in the file header.
+					if (preg_match('~(?://|/\*)\s*Version:\s+(.+?);\s*' . preg_quote($name, '~') . '(?:[\s]{2}|\*/)~i', $header, $match) == 1)
+						$version_info['default_language_versions'][$language][$name] = $match[1];
+					// It wasn't found, but the file was... show a '??'.
+					else
+						$version_info['default_language_versions'][$language][$name] = $unknown_version;
+				}
+			}
 		}
 	}
 	$this_dir->close();
@@ -324,10 +364,13 @@ function getFileVersions(&$versionOptions)
 
 /**
  * Saves the time of the last db error for the error log
+ *
+ * What it does:
  * - Done separately from Settings_Form::save_file() to avoid race conditions
- *   which can occur during a db error
+ * which can occur during a db error
  * - If it fails Settings.php will assume 0
  *
+ * @package Admin
  * @param int $time
  */
 function updateDbLastError($time)
@@ -339,6 +382,8 @@ function updateDbLastError($time)
 
 /**
  * Saves the admins current preferences to the database.
+ *
+ * @package Admin
  */
 function updateAdminPreferences()
 {
@@ -364,13 +409,16 @@ function updateAdminPreferences()
 
 /**
  * Send all the administrators a lovely email.
- * It loads all users who are admins or have the admin forum permission.
- * It uses the email template and replacements passed in the parameters.
- * It sends them an email.
  *
+ * What it does:
+ * - It loads all users who are admins or have the admin forum permission.
+ * - It uses the email template and replacements passed in the parameters.
+ * - It sends them an email.
+ *
+ * @package Admin
  * @param string $template
- * @param array $replacements
- * @param array $additional_recipients
+ * @param mixed[] $replacements
+ * @param int[] $additional_recipients
  */
 function emailAdmins($template, $replacements = array(), $additional_recipients = array())
 {
@@ -452,8 +500,10 @@ function emailAdmins($template, $replacements = array(), $additional_recipients 
 /**
  * Callback used in the core features page when the custom profiles
  * are enabled or disabled.
+ *
+ * @package Admin
  * @param bool $value the "new" status of the profile fields
- *            (true => enabled, false => disabled)
+ * (true => enabled, false => disabled)
  */
 function custom_profiles_toggle_callback($value)
 {
@@ -471,8 +521,10 @@ function custom_profiles_toggle_callback($value)
 /**
  * Callback used in the core features page when the drafts
  * are enabled or disabled.
+ *
+ * @package Admin
  * @param bool $value the "new" status of the drafts
- *            (true => enabled, false => disabled)
+ * (true => enabled, false => disabled)
  */
 function drafts_toggle_callback($value)
 {
@@ -487,8 +539,10 @@ function drafts_toggle_callback($value)
 /**
  * Callback used in the core features page when the paid subscriptions
  * are enabled or disabled.
+ *
+ * @package Admin
  * @param bool $value the "new" status of the paid subscriptions
- *            (true => enabled, false => disabled)
+ * (true => enabled, false => disabled)
  */
 function subscriptions_toggle_callback($value)
 {
@@ -503,8 +557,10 @@ function subscriptions_toggle_callback($value)
 /**
  * Callback used in the core features page when the post-by-email feature
  * is enabled or disabled.
+ *
+ * @package Admin
  * @param bool $value the "new" status of the post-by-email
- *            (true => enabled, false => disabled)
+ * (true => enabled, false => disabled)
  */
 function postbyemail_toggle_callback($value)
 {

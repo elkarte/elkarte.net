@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -22,8 +22,14 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * SearchAPI-Sphinx.class.php, Sphinx API, used when an Sphinx search daemon is running
- * Access is via the Sphinx native search API (SphinxAPI)
+ * SearchAPI-Sphinx.class.php, Sphinx API,
+ *
+ * What it does:
+ * - used when a Sphinx search daemon is running
+ * - Access is via the Sphinx native search API (SphinxAPI)
+ * - sphinxapi.php is part of the Sphinx package, the file must be addded to SOURCDIR
+ *
+ * @package Search
  */
 class Sphinx_Search
 {
@@ -31,13 +37,13 @@ class Sphinx_Search
 	 * This is the last version of ElkArte that this was tested on, to protect against API changes.
 	 * @var string
 	 */
-	public $version_compatible = 'ElkArte 1.0 Beta';
+	public $version_compatible = 'ElkArte 1.0';
 
 	/**
 	 * This won't work with versions of ElkArte less than this.
 	 * @var string
 	 */
-	public $min_elk_version = 'ElkArte 1.0 Alpha';
+	public $min_elk_version = 'ElkArte 1.0 Beta 1';
 
 	/**
 	 * Is it supported?
@@ -84,7 +90,7 @@ class Sphinx_Search
 	 * Check whether the method can be performed by this API.
 	 *
 	 * @param string $methodName
-	 * @param mixed $query_params
+	 * @param mixed[]|null $query_params
 	 */
 	public function supportsMethod($methodName, $query_params = null)
 	{
@@ -93,7 +99,6 @@ class Sphinx_Search
 			case 'isValid':
 			case 'searchSort':
 			case 'prepareIndexes':
-			case 'indexedWordQuery':
 				return true;
 			break;
 			case 'searchQuery':
@@ -116,7 +121,7 @@ class Sphinx_Search
 	}
 
 	/**
-	 * callback function for usort used to sort the results.
+	 * Callback function for usort used to sort the results.
 	 * the order of sorting is: large words, small words, large words that
 	 * are excluded from the search, small words that are excluded.
 	 *
@@ -137,10 +142,10 @@ class Sphinx_Search
 	/**
 	 * Do we have to do some work with the words we are searching for to prepare them?
 	 *
-	 * @param array $word
-	 * @param array $wordsSearch
-	 * @param array $wordsExclude
-	 * @param array $isExcluded
+	 * @param mixed[] $word
+	 * @param mixed[] $wordsSearch
+	 * @param string[] $wordsExclude
+	 * @param boolean $isExcluded
 	 */
 	public function prepareIndexes($word, &$wordsSearch, &$wordsExclude, $isExcluded)
 	{
@@ -155,11 +160,11 @@ class Sphinx_Search
 	/**
 	 * This has it's own custom search.
 	 *
-	 * @param array $search_params
-	 * @param array $search_words
-	 * @param array $excluded_words
-	 * @param array $participants
-	 * @param array $search_results
+	 * @param mixed[] $search_params
+	 * @param mixed[] $search_words
+	 * @param string[] $excluded_words
+	 * @param int[] $participants
+	 * @param string[] $search_results
 	 */
 	public function searchQuery($search_params, $search_words, $excluded_words, &$participants, &$search_results)
 	{
@@ -175,15 +180,26 @@ class Sphinx_Search
 			$mySphinx = new SphinxClient();
 			$mySphinx->SetServer($modSettings['sphinx_searchd_server'], (int) $modSettings['sphinx_searchd_port']);
 			$mySphinx->SetLimits(0, (int) $modSettings['sphinx_max_results'], (int) $modSettings['sphinx_max_results']);
-			$mySphinx->SetMatchMode(SPH_MATCH_EXTENDED);
 
-			// Put together a sort string; besides the main column sort (relevance, id_topic, or num_replies), add secondary sorting based on relevance value (if not the main sort method) and age
-			$sphinx_sort = ($search_params['sort'] === 'id_msg' ? 'id_topic' : $search_params['sort']) . ' ' . $search_params['sort_dir'] . ($search_params['sort'] === 'relevance' ? '' : ', relevance desc') . ', poster_time desc';
+			// Put together a sort string; besides the main column sort (relevance, id_topic, or num_replies),
+			$search_params['sort_dir'] = strtoupper($search_params['sort_dir']);
+			$sphinx_sort = $search_params['sort'] === 'id_msg' ? 'id_topic' : $search_params['sort'];
+
+			// Add secondary sorting based on relevance value (if not the main sort method) and age
+			$sphinx_sort .= ' ' . $search_params['sort_dir'] . ($search_params['sort'] === 'relevance' ? '' : ', relevance DESC') . ', poster_time DESC';
+
+			// Include the engines weight values in the group sort
+			$sphinx_sort = str_replace('relevance ', '@weight ' . $search_params['sort_dir'] . ', relevance ', $sphinx_sort);
 
 			// Grouping by topic id makes it return only one result per topic, so don't set that for in-topic searches
-			if (empty($search_params['topic']) && empty($search_params['show_complete']))
+			if (empty($search_params['topic']) )
 				$mySphinx->SetGroupBy('id_topic', SPH_GROUPBY_ATTR, $sphinx_sort);
-			$mySphinx->SetSortMode(SPH_SORT_EXTENDED, $sphinx_sort);
+
+			// Set up the sort expresssion
+			$mySphinx->SetSortMode(SPH_SORT_EXPR, '(@weight + (relevance / 1000))');
+
+			// Update the field weights for subject vs body
+			$mySphinx->SetFieldWeights(array('subject' => !empty($modSettings['search_weight_subject']) ? $modSettings['search_weight_subject'] * 200 : 1000, 'body' => 1000));
 
 			// Set the limits based on the search parameters.
 			if (!empty($search_params['min_msg_id']) || !empty($search_params['max_msg_id']))
@@ -198,7 +214,7 @@ class Sphinx_Search
 			if (!empty($search_params['memberlist']))
 				$mySphinx->SetFilter('id_member', $search_params['memberlist']);
 
-			// Construct the (binary mode) query.
+			// Construct the (binary mode & |) query while accounting for excluded words
 			$orResults = array();
 			$inc_words = array();
 			foreach ($search_words as $orIndex => $words)
@@ -210,15 +226,30 @@ class Sphinx_Search
 				$orResults[] = substr($andResult, 0, -3);
 			}
 
-			// If no search terms are left after comparing against excluded words (i.e. "test -test" or "test last -test -last"), sending that to Sphinx would result in a fatal error
+			// If no search terms are left after comparing against excluded words (i.e. "test -test" or "test last -test -last"),
+			// sending that to Sphinx would result in a fatal error
 			if (!count(array_diff($inc_words, $excluded_words)))
 				// Instead, fail gracefully (return "no results")
 				return 0;
+
 			$query = count($orResults) === 1 ? $orResults[0] : '(' . implode(') | (', $orResults) . ')';
 
 			// Subject only searches need to be specified.
 			if ($search_params['subject_only'])
 				$query = '@(subject) ' . $query;
+
+			// Choose an appropriate matching mode
+			$mode = SPH_MATCH_ALL;
+
+			// Over two words and searching for any (since we build a binary string, this will never get set)
+			if (substr_count($query, ' ') > 1 && (!empty($search_params['searchtype']) && $search_params['searchtype'] == 2))
+				   $mode = SPH_MATCH_ANY;
+			// Binary search?
+			if (preg_match('~[\|\(\)\^\$\?"\/=-]~', $query))
+				$mode = SPH_MATCH_EXTENDED;
+
+			// Set the matching mode
+			$mySphinx->SetMatchMode($mode);
 
 			// Execute the search query.
 			$request = $mySphinx->Query($query, 'elkarte_index');
@@ -229,6 +260,7 @@ class Sphinx_Search
 				// Just log the error.
 				if ($mySphinx->GetLastError())
 					log_error($mySphinx->GetLastError());
+
 				fatal_lang_error('error_no_search_daemon');
 			}
 
@@ -243,7 +275,7 @@ class Sphinx_Search
 				foreach ($request['matches'] as $msgID => $match)
 					$cached_results['matches'][$msgID] = array(
 						'id' => $match['attrs']['id_topic'],
-						'relevance' => round($match['attrs']['relevance'] / 10000, 1) . '%',
+						'relevance' => round($match['attrs']['@count'] + $match['attrs']['relevance'] / 10000, 1) . '%',
 						'num_matches' => empty($search_params['topic']) ? $match['attrs']['@count'] : 0,
 						'matches' => array(),
 					);
@@ -272,7 +304,7 @@ class Sphinx_Search
 	 * Clean up a search word/phrase/term for Sphinx.
 	 *
 	 * @param string $sphinx_term
-	 * @param string $sphinx_client
+	 * @param SphinxClient $sphinx_client
 	 */
 	private function _cleanWordSphinx($sphinx_term, $sphinx_client)
 	{

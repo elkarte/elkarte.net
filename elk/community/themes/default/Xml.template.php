@@ -11,12 +11,12 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
 /**
- * depreciated?
+ * @deprecated since 1.0
  */
 function template_sendbody()
 {
@@ -132,8 +132,7 @@ function template_post()
 		<caption name="email" class="', isset($context['post_error']['no_email']) || isset($context['post_error']['bad_email']) ? 'error' : '', '" />
 		<caption name="evtitle" class="', isset($context['post_error']['no_event']) ? 'error' : '', '" />
 		<caption name="subject" class="', isset($context['post_error']['no_subject']) ? 'error' : '', '" />
-		<caption name="question" class="', isset($context['post_error']['no_question']) ? 'error' : '', '" />', isset($context['post_error']['no_message']) || isset($context['post_error']['long_message']) ? '
-		<post_error />' : '', '
+		<caption name="question" class="', isset($context['post_error']['no_question']) ? 'error' : '', '" />
 	</errors>
 	<last_msg>', isset($context['topic_last_message']) ? $context['topic_last_message'] : '0', '</last_msg>';
 
@@ -312,7 +311,7 @@ function template_results()
 }
 
 /**
- * Build the jump to box, depreciated?
+ * Build the jump to box
  */
 function template_jump_to()
 {

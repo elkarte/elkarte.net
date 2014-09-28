@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -29,18 +29,18 @@ function template_whos_selection_above()
 			<h2 class="category_header">', $txt['who_title'], '</h2>';
 
 	$extra = '
-				<div class="selectbox floatright">' . $txt['who_show1'] . '
-					<select name="show_top" onchange="document.forms.whoFilter.show.value = this.value; document.forms.whoFilter.submit();">';
+			<div class="selectbox floatright"><label for="show_top">' . $txt['who_show1'] . '</label>
+				<select name="show_top" id="show_top" onchange="document.forms.whoFilter.show.value = this.value; document.forms.whoFilter.submit();">';
 
 	foreach ($context['show_methods'] as $value => $label)
 		$extra .= '
-						<option value="' . $value . '" ' . ($value == $context['show_by'] ? ' selected="selected"' : '') . '>' . $label . '</option>';
+					<option value="' . $value . '" ' . ($value == $context['show_by'] ? ' selected="selected"' : '') . '>' . $label . '</option>';
 	$extra .= '
-					</select>
-					<noscript>
-						<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit submitgo" />
-					</noscript>
-				</div>';
+				</select>
+				<noscript>
+					<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit submitgo" />
+				</noscript>
+			</div>';
 
 	template_pagesection(false, false, array('extra' => $extra));
 }
@@ -53,62 +53,51 @@ function template_whos_online()
 	global $context, $settings, $scripturl, $txt;
 
 	echo '
-			<div class="topic_table" id="mlist">
-				<table class="table_grid" >
-					<thead>
-						<tr class="table_head">
-							<th scope="col" class="lefttext" style="width:40%">
-								<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=user', $context['sort_direction'] != 'down' && $context['sort_by'] == 'user' ? '' : ';asc', '" rel="nofollow">', $txt['who_user'], $context['sort_by'] == 'user' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
-							</th>
-							<th scope="col" class="lefttext" style="width:10%">
-								<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=time', $context['sort_direction'] == 'down' && $context['sort_by'] == 'time' ? ';asc' : '', '" rel="nofollow">', $txt['who_time'], $context['sort_by'] == 'time' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
-							</th>
-							<th scope="col" class="lefttext" style="width:50%">', $txt['who_action'], '</th>
-						</tr>
-					</thead>
-					<tbody>';
+			<div id="mlist">
+				<dl class="whos_online', empty($context['members']) ? ' no_members' : '', '">
+					<dt class="table_head">
+						<div class="online_member">
+							<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=user', $context['sort_direction'] != 'down' && $context['sort_by'] == 'user' ? '' : ';asc', '" rel="nofollow">', $txt['who_user'], $context['sort_by'] == 'user' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
+						</div>
+						<div class="online_time">
+							<a href="', $scripturl, '?action=who;start=', $context['start'], ';show=', $context['show_by'], ';sort=time', $context['sort_direction'] == 'down' && $context['sort_by'] == 'time' ? ';asc' : '', '" rel="nofollow">', $txt['who_time'], $context['sort_by'] == 'time' ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '', '</a>
+						</div>
+						<div class="online_action">', $txt['who_action'], '</div>
+					</dt>';
 
 	// For every member display their name, time and action (and more for admin).
-	$alternate = 0;
-
 	foreach ($context['members'] as $member)
 	{
 		// $alternate will either be true or false. If it's true, use "windowbg2" and otherwise use "windowbg".
 		echo '
-						<tr class="windowbg', $alternate ? '2' : '', '">
-							<td>
-								<span class="member', $member['is_hidden'] ? ' hidden' : '', '">
-									', $member['is_guest'] ? $member['name'] : '<a href="' . $member['href'] . '" title="' . $txt['profile_of'] . ' ' . $member['name'] . '"' . (empty($member['color']) ? '' : ' style="color: ' . $member['color'] . '"') . '>' . $member['name'] . '</a>', '
-								</span>';
+					<dd class="online_row">
+						<div class="online_member">
+							<span class="member', $member['is_hidden'] ? ' hidden' : '', '">
+								', $member['is_guest'] ? $member['name'] : '<a href="' . $member['href'] . '" title="' . $txt['profile_of'] . ' ' . $member['name'] . '"' . (empty($member['color']) ? '' : ' style="color: ' . $member['color'] . '"') . '>' . $member['name'] . '</a>', '
+							</span>';
 
 		if (!empty($member['ip']))
 			echo '
-								(<a href="' . $scripturl . '?action=', ($member['is_guest'] ? 'trackip' : 'profile;area=history;sa=ip;u=' . $member['id']), ';searchip=' . $member['ip'] . '">' . $member['ip'] . '</a>)';
+							<a class="track_ip" href="' . $scripturl . '?action=', ($member['is_guest'] ? 'trackip' : 'profile;area=history;sa=ip;u=' . $member['id']), ';searchip=' . $member['ip'] . '">' . $member['ip'] . '</a>';
 
 		echo '
-							</td>
-							<td nowrap="nowrap">', $member['time'], '</td>
-							<td>', $member['action'], '</td>
-						</tr>';
-
-		// Switch alternate to whatever it wasn't this time. (true -> false -> true -> false, etc.)
-		$alternate = !$alternate;
-	}
-
-	// No members?
-	if (empty($context['members']))
-	{
-		echo '
-						<tr class="windowbg2">
-							<td colspan="3" class="centertext">
-							', $txt['who_no_online_' . ($context['show_by'] == 'guests' || $context['show_by'] == 'spiders' ? $context['show_by'] : 'members')], '
-							</td>
-						</tr>';
+						</div>
+						<div class="online_time">', $member['time'], '</div>
+						<div class="online_action">', $member['action'], '</div>
+					</dd>';
 	}
 
 	echo '
-					</tbody>
-				</table>
+				</dl>';
+
+// No members?
+	if (empty($context['members']))
+		echo '
+				<div class="centertext">
+					', $txt['who_no_online_' . ($context['show_by'] == 'guests' || $context['show_by'] == 'spiders' ? $context['show_by'] : 'members')], '
+				</div>';
+
+	echo '
 			</div>';
 }
 
@@ -119,21 +108,21 @@ function template_whos_selection_below()
 {
 	global $context, $txt;
 
-	$extra_bottom = '
-			<div class="selectbox floatright">' . $txt['who_show1'] . '
-				<select name="show" onchange="document.forms.whoFilter.submit();">';
+	$extra = '
+			<div class="selectbox floatright"><label for="show">' . $txt['who_show1'] . '</label>
+				<select name="show" id="show" onchange="document.forms.whoFilter.submit();">';
 
 	foreach ($context['show_methods'] as $value => $label)
-		$extra_bottom .= '
+		$extra .= '
 					<option value="' . $value . '" ' . ($value == $context['show_by'] ? ' selected="selected"' : '') . '>' . $label . '</option>';
-	$extra_bottom .= '
+	$extra .= '
 				</select>
 				<noscript>
 					<input type="submit" name="submit_top" value="' . $txt['go'] . '" class="button_submit submitgo" />
 				</noscript>
 			</div>';
 
-	template_pagesection(false, false, array('extra' => $extra_bottom));
+	template_pagesection(false, false, array('extra' => $extra));
 
 	echo '
 		</form>

@@ -11,12 +11,19 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * copyright:	2004-2011, GreyWyvern - All rights reserved.
+ * license:  	BSD, See included LICENSE.TXT for terms and conditions.
+ *
+ * @version 1.0
  *
  */
 
 if (!defined('ELK'))
 	die('No access...');
+
+// Let's define the name of the class so that we will be able to use it in the instantiations
+if (!defined('DB_TYPE'))
+	define('DB_TYPE', 'MySQL');
 
 /**
  * SQL database class, implements database class to control mysql functions
@@ -25,7 +32,7 @@ class Database_MySQL implements Database
 {
 	/**
 	 * Holds current instance of the class
-	 * @var instance
+	 * @var Database_MySQL
 	 */
 	private static $_db = null;
 
@@ -52,11 +59,11 @@ class Database_MySQL implements Database
 	 * @param string $db_user
 	 * @param string $db_passwd
 	 * @param string $db_prefix
-	 * @param array $db_options
+	 * @param mixed[] $db_options
 	 *
 	 * @return resource
 	 */
-	static function initiate($db_server, $db_name, $db_user, $db_passwd, $db_prefix, $db_options = array())
+	public static function initiate($db_server, $db_name, $db_user, $db_passwd, $db_prefix, $db_options = array())
 	{
 		global $mysql_set_mode;
 
@@ -74,7 +81,7 @@ class Database_MySQL implements Database
 		if (empty($db_options['dont_select_db']))
 			$connection = @mysqli_connect((!empty($db_options['persist']) ? 'p:' : '') . $db_server, $db_user, $db_passwd, $db_name, $db_port);
 		else
-			$connection = @mysqli_connect((!empty($db_options['persist']) ? 'p:' : '') . $db_server, $db_user, $db_passwd, "", $db_port);
+			$connection = @mysqli_connect((!empty($db_options['persist']) ? 'p:' : '') . $db_server, $db_user, $db_passwd, '', $db_port);
 
 		// Something's wrong, show an error if its fatal (which we assume it is)
 		if (!$connection)
@@ -87,12 +94,19 @@ class Database_MySQL implements Database
 
 		// This makes it possible to automatically change the sql_mode and autocommit if needed.
 		if (isset($mysql_set_mode) && $mysql_set_mode === true)
-			$this->query('', 'SET sql_mode = \'\', AUTOCOMMIT = 1',
+			self::$_db->query('', 'SET sql_mode = \'\', AUTOCOMMIT = 1',
 			array(),
 			false
 		);
 
 		self::$_db->_connection = $connection;
+
+		// Few databases still have not set UTF-8 as their default input charset
+		self::$_db->query('', '
+			SET NAMES UTF8',
+			array(
+			)
+		);
 
 		return $connection;
 	}
@@ -105,7 +119,7 @@ class Database_MySQL implements Database
 	 *
 	 * @return string
 	 */
-	function fix_prefix($db_prefix, $db_name)
+	public function fix_prefix($db_prefix, $db_name)
 	{
 		$db_prefix = is_numeric(substr($db_prefix, 0, 1)) ? $db_name . '.' . $db_prefix : '`' . $db_name . '`.' . $db_prefix;
 
@@ -118,9 +132,9 @@ class Database_MySQL implements Database
 	 * their current values from $user_info.
 	 * In addition, it performs checks and sanitization on the values sent to the database.
 	 *
-	 * @param $matches
+	 * @param mixed[] $matches
 	 */
-	function replacement__callback($matches)
+	public function replacement__callback($matches)
 	{
 		global $db_callback, $user_info, $db_prefix;
 
@@ -139,14 +153,8 @@ class Database_MySQL implements Database
 		if ($matches[1] === 'query_wanna_see_board')
 			return $user_info['query_wanna_see_board'];
 
-		if ($matches[1] === 'empty')
-			return '\'\'';
-
 		if (!isset($matches[2]))
 			$this->error_backtrace('Invalid value inserted or no type specified.', '', E_USER_ERROR, __FILE__, __LINE__);
-
-		if ($matches[1] === 'literal')
-			return '\'' . mysql_real_escape_string($matches[2], $connection) . '\'';
 
 		if (!isset($values[$matches[2]]))
 			$this->error_backtrace('The database value you\'re trying to insert does not exist: ' . htmlspecialchars($matches[2], ENT_COMPAT, 'UTF-8'), '', E_USER_ERROR, __FILE__, __LINE__);
@@ -163,6 +171,8 @@ class Database_MySQL implements Database
 
 			case 'string':
 			case 'text':
+				$replacement = $this->_clean_4byte_chars($replacement);
+
 				return sprintf('\'%1$s\'', mysqli_real_escape_string($connection, $replacement));
 			break;
 
@@ -194,7 +204,10 @@ class Database_MySQL implements Database
 						$this->error_backtrace('Database error, given array of string values is empty. (' . $matches[2] . ')', '', E_USER_ERROR, __FILE__, __LINE__);
 
 					foreach ($replacement as $key => $value)
+					{
+						$value = $this->_clean_4byte_chars($value);
 						$replacement[$key] = sprintf('\'%1$s\'', mysqli_real_escape_string($connection, $value));
+					}
 
 					return implode(', ', $replacement);
 				}
@@ -234,10 +247,10 @@ class Database_MySQL implements Database
 	 * Just like the db_query, escape and quote a string, but not executing the query.
 	 *
 	 * @param string $db_string
-	 * @param array $db_values
-	 * @param resource $connection = null
+	 * @param mixed[] $db_values
+	 * @param resource|null $connection = null
 	 */
-	function quote($db_string, $db_values, $connection = null)
+	public function quote($db_string, $db_values, $connection = null)
 	{
 		global $db_callback;
 
@@ -262,10 +275,10 @@ class Database_MySQL implements Database
 	 *
 	 * @param string $identifier
 	 * @param string $db_string
-	 * @param array $db_values = array()
-	 * @param resource $connection = null
+	 * @param mixed[]|false $db_values = array()
+	 * @param resource|false|null $connection = null
 	 */
-	function query($identifier, $db_string, $db_values = array(), $connection = null)
+	public function query($identifier, $db_string, $db_values = array(), $connection = null)
 	{
 		global $db_cache, $db_count, $db_show_debug, $time_start;
 		global $db_unbuffered, $db_callback, $modSettings;
@@ -368,26 +381,21 @@ class Database_MySQL implements Database
 
 					$pos = $pos2 + 1;
 				}
-				$clean .= ' %s ';
 
+				$clean .= ' %s ';
 				$old_pos = $pos + 1;
 			}
+
 			$clean .= substr($db_string, $old_pos);
 			$clean = trim(strtolower(preg_replace($allowed_comments_from, $allowed_comments_to, $clean)));
 
-			// We don't use UNION in Elk, at least so far.  But it's useful for injections.
-			if (strpos($clean, 'union') !== false && preg_match('~(^|[^a-z])union($|[^[a-z])~s', $clean) != 0)
-				$fail = true;
 			// Comments?  We don't use comments in our queries, we leave 'em outside!
-			elseif (strpos($clean, '/*') > 2 || strpos($clean, '--') !== false || strpos($clean, ';') !== false)
+			if (strpos($clean, '/*') > 2 || strpos($clean, '--') !== false || strpos($clean, ';') !== false)
 				$fail = true;
 			// Trying to change passwords, slow us down, or something?
 			elseif (strpos($clean, 'sleep') !== false && preg_match('~(^|[^a-z])sleep($|[^[_a-z])~s', $clean) != 0)
 				$fail = true;
 			elseif (strpos($clean, 'benchmark') !== false && preg_match('~(^|[^a-z])benchmark($|[^[a-z])~s', $clean) != 0)
-				$fail = true;
-			// Sub selects?  We don't use those either.
-			elseif (preg_match('~\([^)]*?select~s', $clean) != 0)
 				$fail = true;
 
 			if (!empty($fail) && function_exists('log_error'))
@@ -410,11 +418,90 @@ class Database_MySQL implements Database
 	}
 
 	/**
+	 * Checks if the string contains any 4byte chars and if so,
+	 * converts them into HTML entities.
+	 *
+	 * This is necessary because MySQL utf8 doesn't knw how to store such
+	 * characters and would generate an error any time one is used.
+	 * The 4byte chars are used by emoji
+	 *
+	 * @param string $string
+	 * @return string
+	 */
+	private function _clean_4byte_chars($string)
+	{
+		global $modSettings;
+
+		if (!empty($modSettings['using_utf8mb4']))
+			return $string;
+
+		$result = $string;
+		$ord = array_map('ord', str_split($string));
+
+		// If we are in the 4-byte range
+		if (max($ord) >= 240)
+		{
+			// Byte length
+			$length = strlen($string);
+			$result = '';
+
+			// Look for a 4byte marker
+			for ($i = 0; $i < $length; $i++)
+			{
+				// The first byte of a 4-byte character encoding starts with the bytes 0xF0-0xF4 (240 <-> 244)
+				// but look all the way to 247 for safe measure
+				$ord1 = $ord[$i];
+				if ($ord1 >= 240 && $ord1 <= 247)
+				{
+					// Replace it with the corresponding html entity
+					$entity = $this->_uniord(chr($ord[$i]) . chr($ord[$i + 1]) . chr($ord[$i + 2]) . chr($ord[$i + 3]));
+					if ($entity === false)
+						$result .= "\xEF\xBF\xBD";
+					else
+						$result .= '&#x' . dechex($entity) . ';';
+					$i += 3;
+				}
+				else
+					$result .= $string[$i];
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Converts a 4byte char into the corresponding HTML entity code.
+	 *
+	 * This function is derived from:
+	 * http://www.greywyvern.com/code/php/utf8_html.phps
+	 *
+	 * @param string $c
+	 * @return string|false
+	 */
+	private function _uniord($c)
+	{
+		if (ord($c[0]) >= 0 && ord($c[0]) <= 127)
+			return ord($c[0]);
+		if (ord($c[0]) >= 192 && ord($c[0]) <= 223)
+			return (ord($c[0]) - 192) * 64 + (ord($c[1]) - 128);
+		if (ord($c[0]) >= 224 && ord($c[0]) <= 239)
+			return (ord($c[0]) - 224) * 4096 + (ord($c[1]) - 128) * 64 + (ord($c[2]) - 128);
+		if (ord($c[0]) >= 240 && ord($c[0]) <= 247)
+			return (ord($c[0]) - 240) * 262144 + (ord($c[1]) - 128) * 4096 + (ord($c[2]) - 128) * 64 + (ord($c[3]) - 128);
+		if (ord($c[0]) >= 248 && ord($c[0]) <= 251)
+			return (ord($c[0]) - 248) * 16777216 + (ord($c[1]) - 128) * 262144 + (ord($c[2]) - 128) * 4096 + (ord($c[3]) - 128) * 64 + (ord($c[4]) - 128);
+		if (ord($c[0]) >= 252 && ord($c[0]) <= 253)
+			return (ord($c[0]) - 252) * 1073741824 + (ord($c[1]) - 128) * 16777216 + (ord($c[2]) - 128) * 262144 + (ord($c[3]) - 128) * 4096 + (ord($c[4]) - 128) * 64 + (ord($c[5]) - 128);
+		if (ord($c[0]) >= 254 && ord($c[0]) <= 255)
+			return false;
+	}
+
+	/**
 	 * Affected rows from previous operation.
 	 *
-	 * @param resource $connection
+	 * @param resource|null $connection
 	 */
-	function affected_rows($connection = null)
+	public function affected_rows($connection = null)
 	{
 		return mysqli_affected_rows($connection === null ? $this->_connection : $connection);
 	}
@@ -423,15 +510,11 @@ class Database_MySQL implements Database
 	 * Last inserted id.
 	 *
 	 * @param string $table
-	 * @param string $field = null
-	 * @param resource $connection = null
+	 * @param string|null $field = null
+	 * @param resource|null $connection = null
 	 */
-	function insert_id($table, $field = null, $connection = null)
+	public function insert_id($table, $field = null, $connection = null)
 	{
-		global $db_prefix;
-
-		$table = str_replace('{db_prefix}', $db_prefix, $table);
-
 		// MySQL doesn't need the table or field information.
 		return mysqli_insert_id($connection === null ? $this->_connection : $connection);
 	}
@@ -443,7 +526,7 @@ class Database_MySQL implements Database
 	 * @param resource $result
 	 * @param boolean $counter = false
 	 */
-	function fetch_row($result, $counter = false)
+	public function fetch_row($result, $counter = false)
 	{
 		// Just delegate to MySQL's function
 		return mysqli_fetch_row($result);
@@ -454,7 +537,7 @@ class Database_MySQL implements Database
 	 *
 	 * @param resource $result
 	 */
-	function free_result($result)
+	public function free_result($result)
 	{
 		// Just delegate to MySQL's function
 		mysqli_free_result($result);
@@ -465,9 +548,9 @@ class Database_MySQL implements Database
 	 *
 	 * @param resource $result
 	 */
-	function num_rows($result)
+	public function num_rows($result)
 	{
-		// simply delegate to the native function
+		// Simply delegate to the native function
 		return mysqli_num_rows($result);
 	}
 
@@ -476,7 +559,7 @@ class Database_MySQL implements Database
 	 *
 	 * @param resource $request
 	 */
-	function num_fields($request)
+	public function num_fields($request)
 	{
 		return mysqli_num_fields($request);
 	}
@@ -484,12 +567,12 @@ class Database_MySQL implements Database
 	/**
 	 * Reset the internal result pointer.
 	 *
-	 * @param $request
-	 * @param $counter
+	 * @param resource $request
+	 * @param integer $counter
 	 */
-	function data_seek($request, $counter)
+	public function data_seek($request, $counter)
 	{
-		// delegate to native mysql function
+		// Delegate to native mysql function
 		return mysqli_data_seek($request, $counter);
 	}
 
@@ -497,9 +580,9 @@ class Database_MySQL implements Database
 	 * Do a transaction.
 	 *
 	 * @param string $type - the step to perform (i.e. 'begin', 'commit', 'rollback')
-	 * @param resource $connection = null
+	 * @param resource|null $connection = null
 	 */
-	function db_transaction($type = 'commit', $connection = null)
+	public function db_transaction($type = 'commit', $connection = null)
 	{
 		// Decide which connection to use
 		$connection = $connection === null ? $this->_connection : $connection;
@@ -517,9 +600,9 @@ class Database_MySQL implements Database
 	/**
 	 * Return last error string from the database server
 	 *
-	 * @param resource $connection = null
+	 * @param resource|null $connection = null
 	 */
-	function last_error($connection = null)
+	public function last_error($connection = null)
 	{
 		// Decide which connection to use
 		$connection = $connection === null ? $this->_connection : $connection;
@@ -533,9 +616,9 @@ class Database_MySQL implements Database
 	 * Backtrace, log, try to fix.
 	 *
 	 * @param string $db_string
-	 * @param resource $connection = null
+	 * @param resource|null $connection = null
 	 */
-	function error($db_string, $connection = null)
+	public function error($db_string, $connection = null)
 	{
 		global $txt, $context, $webmaster_email, $modSettings;
 		global $db_last_error, $db_persist;
@@ -733,14 +816,14 @@ class Database_MySQL implements Database
 	 * Insert data.
 	 *
 	 * @param string $method - options 'replace', 'ignore', 'insert'
-	 * @param $table
-	 * @param $columns
-	 * @param $data
-	 * @param $keys
+	 * @param string $table
+	 * @param mixed[] $columns
+	 * @param mixed[] $data
+	 * @param mixed[] $keys
 	 * @param bool $disable_trans = false
-	 * @param resource $connection = null
+	 * @param resource|null $connection = null
 	 */
-	function insert($method = 'replace', $table, $columns, $data, $keys, $disable_trans = false, $connection = null)
+	public function insert($method = 'replace', $table, $columns, $data, $keys, $disable_trans = false, $connection = null)
 	{
 		global $db_prefix;
 
@@ -775,7 +858,7 @@ class Database_MySQL implements Database
 		// Here's where the variables are injected to the query.
 		$insertRows = array();
 		foreach ($data as $dataRow)
-			$insertRows[] = $this->quote($insertData, array_combine($indexed_columns, $dataRow), $connection);
+			$insertRows[] = $this->quote($insertData, $this->_array_combine($indexed_columns, $dataRow), $connection);
 
 		// Determine the method of insertion.
 		$queryTitle = $method == 'replace' ? 'REPLACE' : ($method == 'ignore' ? 'INSERT IGNORE' : 'INSERT');
@@ -795,15 +878,41 @@ class Database_MySQL implements Database
 	}
 
 	/**
+	 * This function combines the keys and values of the data passed to db::insert.
+	 *
+	 * @param mixed[] $keys
+	 * @param mixed[] $values
+	 * @return mixed[]
+	 */
+	private function _array_combine($keys, $values)
+	{
+		$is_numeric = array_filter(array_keys($values), 'is_numeric');
+		if ($is_numeric)
+			return array_combine($keys, $values);
+		else
+		{
+			$combined = array();
+			foreach ($keys as $key)
+			{
+				if (isset($values[$key]))
+					$combined[$key] = $values[$key];
+			}
+
+			// @todo should throws an E_WARNING if count($combined) != count($keys)
+			return $combined;
+		}
+	}
+
+	/**
 	 * This function tries to work out additional error information from a back trace.
 	 *
-	 * @param $error_message
-	 * @param $log_message
-	 * @param $error_type
-	 * @param $file
-	 * @param $line
+	 * @param string $error_message
+	 * @param string $log_message
+	 * @param string|boolean $error_type
+	 * @param string|null $file
+	 * @param integer|null $line
 	 */
-	function error_backtrace($error_message, $log_message = '', $error_type = false, $file = null, $line = null)
+	public function error_backtrace($error_message, $log_message = '', $error_type = false, $file = null, $line = null)
 	{
 		if (empty($log_message))
 			$log_message = $error_message;
@@ -848,10 +957,10 @@ class Database_MySQL implements Database
 	/**
 	 * Escape the LIKE wildcards so that they match the character and not the wildcard.
 	 *
-	 * @param $string
+	 * @param string $string
 	 * @param bool $translate_human_wildcards = false, if true, turns human readable wildcards into SQL wildcards.
 	 */
-	function escape_wildcard_string($string, $translate_human_wildcards=false)
+	public function escape_wildcard_string($string, $translate_human_wildcards = false)
 	{
 		$replacements = array(
 			'%' => '\%',
@@ -870,9 +979,9 @@ class Database_MySQL implements Database
 	/**
 	 * Unescape an escaped string!
 	 *
-	 * @param $string
+	 * @param string $string
 	 */
-	function unescape_string($string)
+	public function unescape_string($string)
 	{
 		return stripslashes($string);
 	}
@@ -880,9 +989,9 @@ class Database_MySQL implements Database
 	/**
 	 * Returns whether the database system supports ignore.
 	 *
-	 * @return bool
+	 * @return true
 	 */
-	function support_ignore()
+	public function support_ignore()
 	{
 		return true;
 	}
@@ -893,9 +1002,10 @@ class Database_MySQL implements Database
 	 *
 	 * @param string $tableName - the table to create the inserts for.
 	 * @param bool $new_table
+	 *
 	 * @return string the query to insert the data back in, or an empty string if the table was empty.
 	 */
-	function insert_sql($tableName, $new_table = false)
+	public function insert_sql($tableName, $new_table = false)
 	{
 		global $db_prefix;
 
@@ -969,9 +1079,10 @@ class Database_MySQL implements Database
 	 * Dumps the schema (CREATE) for a table.
 	 *
 	 * @param string $tableName - the table
+	 *
 	 * @return string - the CREATE statement as string
 	 */
-	function db_table_sql($tableName)
+	public function db_table_sql($tableName)
 	{
 		global $db_prefix;
 
@@ -1035,7 +1146,7 @@ class Database_MySQL implements Database
 		$indexes = array();
 		while ($row = $this->fetch_assoc($result))
 		{
-			// IS this a primary key, unique index, or regular index?
+			// Is this a primary key, unique index, or regular index?
 			$row['Key_name'] = $row['Key_name'] == 'PRIMARY' ? 'PRIMARY KEY' : (empty($row['Non_unique']) ? 'UNIQUE ' : ($row['Comment'] == 'FULLTEXT' || (isset($row['Index_type']) && $row['Index_type'] == 'FULLTEXT') ? 'FULLTEXT ' : 'KEY ')) . '`' . $row['Key_name'] . '`';
 
 			// Is this the first column in the index?
@@ -1056,7 +1167,7 @@ class Database_MySQL implements Database
 			// Ensure the columns are in proper order.
 			ksort($columns);
 
-			$schema_create .= ',' . $crlf . ' ' . $keyname . ' (' . implode($columns, ', ') . ')';
+			$schema_create .= ',' . $crlf . ' ' . $keyname . ' (' . implode(', ', $columns) . ')';
 		}
 
 		// Now just get the comment and type... (MyISAM, etc.)
@@ -1080,11 +1191,12 @@ class Database_MySQL implements Database
 	 * This function lists all tables in the database.
 	 * The listing could be filtered according to $filter.
 	 *
-	 * @param mixed $db_name_str string holding the database name, or false, default false
-	 * @param mixed $filter string to filter by, or false, default false
-	 * @return array, an array of table names. (strings)
+	 * @param string|false $db_name_str string holding the database name, or false, default false
+	 * @param string|false $filter string to filter by, or false, default false
+	 *
+	 * @return string[] an array of table names. (strings)
 	 */
-	function db_list_tables($db_name_str = false, $filter = false)
+	public function db_list_tables($db_name_str = false, $filter = false)
 	{
 		global $db_name;
 
@@ -1113,9 +1225,10 @@ class Database_MySQL implements Database
 	 * This function optimizes a table.
 	 *
 	 * @param string $table - the table to be optimized
-	 * @return how much it was gained
+	 *
+	 * @return int how much it was gained
 	 */
-	function db_optimize_table($table)
+	public function db_optimize_table($table)
 	{
 		global $db_prefix;
 
@@ -1123,35 +1236,43 @@ class Database_MySQL implements Database
 
 		// Get how much overhead there is.
 		$request = $this->query('', '
-				SHOW TABLE STATUS LIKE {string:table_name}',
-				array(
-					'table_name' => str_replace('_', '\_', $table),
-				)
-			);
+			SHOW TABLE STATUS LIKE {string:table_name}',
+			array(
+				'table_name' => str_replace('_', '\_', $table),
+			)
+		);
 		$row = $this->fetch_assoc($request);
 		$this->free_result($request);
 
-		$data_before = isset($row['Data_free']) ? $row['Data_free'] : 0;
-		$request = $this->query('', '
+		// Optimize tables that will benefit from this operation.  We don't know what users may
+		// have "tweaked" in their installation nor what addons may have installed we simply check
+		if (isset($row['Engine']) && $row['Engine'] === 'MyISAM')
+		{
+			$data_before = isset($row['Data_free']) ? $row['Data_free'] : 0;
+			$request = $this->query('', '
 				OPTIMIZE TABLE `{raw:table}`',
 				array(
 					'table' => $table,
 				)
 			);
-		if (!$request)
-			return -1;
+			if (!$request)
+				return -1;
 
-		// How much left?
-		$request = $this->query('', '
+			// Check again to see what we have saved
+			$request = $this->query('', '
 				SHOW TABLE STATUS LIKE {string:table}',
 				array(
 					'table' => str_replace('_', '\_', $table),
 				)
 			);
-		$row = $this->fetch_assoc($request);
-		$this->free_result($request);
+			$row = $this->fetch_assoc($request);
+			$this->free_result($request);
 
-		$total_change = isset($row['Data_free']) && $data_before > $row['Data_free'] ? $data_before / 1024 : 0;
+			// Savings for this table
+			$total_change = isset($row['Data_free']) && $data_before > $row['Data_free'] ? $data_before / 1024 : 0;
+		}
+		else
+			$total_change = 0;
 
 		return $total_change;
 	}
@@ -1161,9 +1282,10 @@ class Database_MySQL implements Database
 	 *
 	 * @param string $table
 	 * @param string $backup_table
+	 *
 	 * @return resource - the request handle to the table creation query
 	 */
-	function db_backup_table($table, $backup_table)
+	public function db_backup_table($table, $backup_table)
 	{
 		global $db_prefix;
 
@@ -1214,6 +1336,7 @@ class Database_MySQL implements Database
 		$create = preg_split('/[\n\r]/', $create);
 
 		$auto_inc = '';
+
 		// Default engine type.
 		$engine = 'MyISAM';
 		$charset = '';
@@ -1295,7 +1418,7 @@ class Database_MySQL implements Database
 	 *
 	 * @return string - the version
 	 */
-	function db_server_version()
+	public function db_server_version()
 	{
 		$request = $this->query('', '
 			SELECT VERSION()',
@@ -1310,8 +1433,10 @@ class Database_MySQL implements Database
 
 	/**
 	 * Get the name (title) of the database system.
+	 *
+	 * @return string
 	 */
-	function db_title()
+	public function db_title()
 	{
 		return 'MySQL';
 	}
@@ -1319,9 +1444,9 @@ class Database_MySQL implements Database
 	/**
 	 * Whether the database system is case sensitive.
 	 *
-	 * @return bool
+	 * @return false
 	 */
-	function db_case_sensitive()
+	public function db_case_sensitive()
 	{
 		return false;
 	}
@@ -1331,7 +1456,7 @@ class Database_MySQL implements Database
 	 *
 	 * @param string $string
 	 */
-	function escape_string($string)
+	public function escape_string($string)
 	{
 		return addslashes($string);
 	}
@@ -1342,9 +1467,9 @@ class Database_MySQL implements Database
 	 * It ignores $counter parameter.
 	 *
 	 * @param resource $request
-	 * @param mixed $counter = false
+	 * @param int|false $counter = false
 	 */
-	function fetch_assoc($request, $counter = false)
+	public function fetch_assoc($request, $counter = false)
 	{
 		return mysqli_fetch_assoc($request);
 	}
@@ -1352,10 +1477,11 @@ class Database_MySQL implements Database
 	/**
 	 * Return server info.
 	 *
-	 * @param resource $connection
+	 * @param resource|null $connection
+	 *
 	 * @return string
 	 */
-	function db_server_info($connection = null)
+	public function db_server_info($connection = null)
 	{
 		// Decide which connection to use
 		$connection = $connection === null ? $this->_connection : $connection;
@@ -1368,7 +1494,7 @@ class Database_MySQL implements Database
 	 *
 	 *  @return string - the version
 	 */
-	function db_client_version()
+	public function db_client_version()
 	{
 		$request = $this->query('', '
 			SELECT VERSION()',
@@ -1384,10 +1510,10 @@ class Database_MySQL implements Database
 	/**
 	 * Select database.
 	 *
-	 * @param string $dbName = null
-	 * @param resource $connection = null
+	 * @param string|null $dbName = null
+	 * @param resource|null $connection = null
 	 */
-	function select_db($dbName = null, $connection = null)
+	public function select_db($dbName = null, $connection = null)
 	{
 		// Decide which connection to use
 		$connection = $connection === null ? $this->_connection : $connection;
@@ -1398,9 +1524,9 @@ class Database_MySQL implements Database
 	/**
 	 * Retrieve the connection object
 	 *
-	 * @return mysqli
+	 * @return resource
 	 */
-	function connection()
+	public function connection()
 	{
 		// find it, find it
 		return $this->_connection;
@@ -1409,7 +1535,7 @@ class Database_MySQL implements Database
 	/**
 	 * Returns a reference to the existing instance
 	 */
-	static function db()
+	public static function db()
 	{
 		return self::$_db;
 	}

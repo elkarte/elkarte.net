@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -37,18 +37,20 @@ class Display_Controller
 
 	/**
 	 * The central part of the board - topic display.
-	 * This function loads the posts in a topic up so they can be displayed.
-	 * It uses the main sub template of the Display template.
-	 * It requires a topic, and can go to the previous or next topic from it.
-	 * It jumps to the correct post depending on a number/time/IS_MSG passed.
-	 * It depends on the messages_per_page, defaultMaxMessages and enableAllMessages settings.
-	 * It is accessed by ?topic=id_topic.START.
+	 *
+	 * What it does:
+	 * - This function loads the posts in a topic up so they can be displayed.
+	 * - It uses the main sub template of the Display template.
+	 * - It requires a topic, and can go to the previous or next topic from it.
+	 * - It jumps to the correct post depending on a number/time/IS_MSG passed.
+	 * - It depends on the messages_per_page, defaultMaxMessages and enableAllMessages settings.
+	 * - It is accessed by ?topic=id_topic.START.
 	 */
 	public function action_display()
 	{
 		global $scripturl, $txt, $modSettings, $context, $settings;
 		global $options, $user_info, $board_info, $topic, $board;
-		global $attachments, $messages_request, $language;
+		global $attachments, $messages_request;
 
 		// What are you gonna display if these are empty?!
 		if (empty($topic))
@@ -60,11 +62,12 @@ class Display_Controller
 
 		// And the topic functions
 		require_once(SUBSDIR . '/Topic.subs.php');
+		require_once(SUBSDIR . '/Messages.subs.php');
 
 		// Not only does a prefetch make things slower for the server, but it makes it impossible to know if they read it.
 		if (isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch')
 		{
-			ob_end_clean();
+			@ob_end_clean();
 			header('HTTP/1.1 403 Prefetch Forbidden');
 			die;
 		}
@@ -73,6 +76,7 @@ class Display_Controller
 		$context['messages_per_page'] = empty($modSettings['disableCustomPerPage']) && !empty($options['messages_per_page']) ? $options['messages_per_page'] : $modSettings['defaultMaxMessages'];
 		$template_layers = Template_Layers::getInstance();
 		$template_layers->addEnd('messages_informations');
+		$includeUnapproved = !$modSettings['postmod_active'] || allowedTo('approve_posts');
 
 		// Let's do some work on what to search index.
 		if (count($_GET) > 2)
@@ -93,7 +97,6 @@ class Display_Controller
 			// No use in calculating the next topic if there's only one.
 			if ($board_info['num_topics'] > 1)
 			{
-				$includeUnapproved = (!$modSettings['postmod_active'] || allowedTo('approve_posts'));
 				$includeStickies = !empty($modSettings['enableStickyTopics']);
 				$topic = $_REQUEST['prev_next'] === 'prev' ? previousTopic($topic, $board, $user_info['id'], $includeUnapproved, $includeStickies) : nextTopic($topic, $board, $user_info['id'], $includeUnapproved, $includeStickies);
 				$context['current_topic'] = $topic;
@@ -151,14 +154,14 @@ class Display_Controller
 		if ($modSettings['postmod_active'] && allowedTo('approve_posts'))
 			$context['real_num_replies'] += $topicinfo['unapproved_posts'] - ($topicinfo['approved'] ? 0 : 1);
 
-		// If this topic has unapproved posts, we need to work out how many posts the user can see, for page indexing.
-		$includeUnapproved = !$modSettings['postmod_active'] || allowedTo('approve_posts');
+		// If this topic was derived from another, set the followup details
 		if (!empty($topicinfo['derived_from']))
 		{
 			require_once(SUBSDIR . '/FollowUps.subs.php');
 			$context['topic_derived_from'] = topicStartedHere($topic, $includeUnapproved);
 		}
 
+		// If this topic has unapproved posts, we need to work out how many posts the user can see, for page indexing.
 		if (!$includeUnapproved && $topicinfo['unapproved_posts'] && !$user_info['is_guest'])
 		{
 			$myUnapprovedPosts = unapprovedPosts($topic, $user_info['id']);
@@ -171,9 +174,13 @@ class Display_Controller
 			$context['total_visible_posts'] = $context['num_replies'] + $topicinfo['unapproved_posts'] + ($topicinfo['approved'] ? 1 : 0);
 
 		// When was the last time this topic was replied to?  Should we warn them about it?
-		require_once(SUBSDIR . '/Messages.subs.php');
-		$mgsOptions = basicMessageInfo($topicinfo['id_last_msg'], true);
-		$context['oldTopicError'] = !empty($modSettings['oldTopicDays']) && $mgsOptions['poster_time'] + $modSettings['oldTopicDays'] * 86400 < time() && empty($topicinfo['is_sticky']);
+		if (!empty($modSettings['oldTopicDays']))
+		{
+			$mgsOptions = basicMessageInfo($topicinfo['id_last_msg'], true);
+			$context['oldTopicError'] = $mgsOptions['poster_time'] + $modSettings['oldTopicDays'] * 86400 < time() && empty($topicinfo['is_sticky']);
+		}
+		else
+			$context['oldTopicError'] = false;
 
 		// The start isn't a number; it's information about what to do, where to go.
 		if (!is_numeric($_REQUEST['start']))
@@ -185,7 +192,7 @@ class Display_Controller
 				if ($user_info['is_guest'])
 				{
 					$context['start_from'] = $context['total_visible_posts'] - 1;
-					$_REQUEST['start'] = empty($options['view_newest_first']) ? $context['start_from'] : 0;
+					$_REQUEST['start'] = $context['start_from'];
 				}
 				else
 				{
@@ -204,8 +211,7 @@ class Display_Controller
 				{
 					// Find the number of messages posted before said time...
 					$context['start_from'] = countNewPosts($topic, $topicinfo, $timestamp);
-					// Handle view_newest_first options, and get the correct start value.
-					$_REQUEST['start'] = empty($options['view_newest_first']) ? $context['start_from'] : $context['total_visible_posts'] - $context['start_from'] - 1;
+					$_REQUEST['start'] = $context['start_from'];
 				}
 			}
 			// Link to a message...
@@ -223,7 +229,7 @@ class Display_Controller
 				}
 
 				// We need to reverse the start as well in this case.
-				$_REQUEST['start'] = empty($options['view_newest_first']) ? $context['start_from'] : $context['total_visible_posts'] - $context['start_from'] - 1;
+				$_REQUEST['start'] = $context['start_from'];
 			}
 		}
 
@@ -246,6 +252,8 @@ class Display_Controller
 				'go_prev' => $scripturl . '?topic=' . $topic . '.0;prev_next=prev#new',
 				'go_next' => $scripturl . '?topic=' . $topic . '.0;prev_next=next#new'
 			);
+
+		// Derived from, set the link back
 		if (!empty($context['topic_derived_from']))
 			$context['links']['derived_from'] = $scripturl . '?msg=' . $context['topic_derived_from']['derived_from'];
 
@@ -339,23 +347,13 @@ class Display_Controller
 		$context['moderators'] = &$board_info['moderators'];
 		$context['link_moderators'] = array();
 
-		if (!empty($board_info['moderators']))
-		{
-			// Add a link for each moderator...
-			foreach ($board_info['moderators'] as $mod)
-				$context['link_moderators'][] = '<a href="' . $scripturl . '?action=profile;u=' . $mod['id'] . '" title="' . $txt['board_moderator'] . '">' . $mod['name'] . '</a>';
-
-			// And show it after the board's name.
-			$context['linktree'][count($context['linktree']) - 2]['extra_after'] = '<span class="board_moderators"> (' . (count($context['link_moderators']) == 1 ? $txt['moderator'] : $txt['moderators']) . ': ' . implode(', ', $context['link_moderators']) . ')</span>';
-		}
-
 		// Information about the current topic...
 		$context['is_locked'] = $topicinfo['locked'];
 		$context['is_sticky'] = $topicinfo['is_sticky'];
 		$context['is_very_hot'] = $topicinfo['num_replies'] >= $modSettings['hotTopicVeryPosts'];
 		$context['is_hot'] = $topicinfo['num_replies'] >= $modSettings['hotTopicPosts'];
 		$context['is_approved'] = $topicinfo['approved'];
-		$context['is_poll'] = $topicinfo['id_poll'] > 0 && $modSettings['pollMode'] == '1' && allowedTo('poll_view');
+		$context['is_poll'] = $topicinfo['id_poll'] > 0 && !empty($modSettings['pollMode']) && allowedTo('poll_view');
 		determineTopicClass($context);
 
 		// Did this user start the topic or not?
@@ -372,18 +370,7 @@ class Display_Controller
 		$context['canonical_url'] = $scripturl . '?topic=' . $topic . '.' . $context['start'];
 
 		// For quick reply we need a response prefix in the default forum language.
-		if (!isset($context['response_prefix']) && !($context['response_prefix'] = cache_get_data('response_prefix', 600)))
-		{
-			if ($language === $user_info['language'])
-				$context['response_prefix'] = $txt['response_prefix'];
-			else
-			{
-				loadLanguage('index', $language, false);
-				$context['response_prefix'] = $txt['response_prefix'];
-				loadLanguage('index');
-			}
-			cache_put_data('response_prefix', $context['response_prefix'], 600);
-		}
+		$context['response_prefix'] = response_prefix();
 
 		// If we want to show event information in the topic, prepare the data.
 		if (allowedTo('calendar_view') && !empty($modSettings['cal_showInTopic']) && !empty($modSettings['cal_enabled']))
@@ -443,10 +430,10 @@ class Display_Controller
 			$context['poll_buttons'] = array(
 				'vote' => array('test' => 'allow_return_vote', 'text' => 'poll_return_vote', 'image' => 'poll_options.png', 'lang' => true, 'url' => $scripturl . '?topic=' . $context['current_topic'] . '.' . $context['start']),
 				'results' => array('test' => 'allow_poll_view', 'text' => 'poll_results', 'image' => 'poll_results.png', 'lang' => true, 'url' => $scripturl . '?topic=' . $context['current_topic'] . '.' . $context['start'] . ';viewresults'),
-				'change_vote' => array('test' => 'allow_change_vote', 'text' => 'poll_change_vote', 'image' => 'poll_change_vote.png', 'lang' => true, 'url' => $scripturl . '?action=vote;topic=' . $context['current_topic'] . '.' . $context['start'] . ';poll=' . $context['poll']['id'] . ';' . $context['session_var'] . '=' . $context['session_id']),
+				'change_vote' => array('test' => 'allow_change_vote', 'text' => 'poll_change_vote', 'image' => 'poll_change_vote.png', 'lang' => true, 'url' => $scripturl . '?action=poll;sa=vote;topic=' . $context['current_topic'] . '.' . $context['start'] . ';poll=' . $context['poll']['id'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 				'lock' => array('test' => 'allow_lock_poll', 'text' => (!$context['poll']['is_locked'] ? 'poll_lock' : 'poll_unlock'), 'image' => 'poll_lock.png', 'lang' => true, 'url' => $scripturl . '?action=lockvoting;topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 				'edit' => array('test' => 'allow_edit_poll', 'text' => 'poll_edit', 'image' => 'poll_edit.png', 'lang' => true, 'url' => $scripturl . '?action=editpoll;topic=' . $context['current_topic'] . '.' . $context['start']),
-				'remove_poll' => array('test' => 'can_remove_poll', 'text' => 'poll_remove', 'image' => 'admin_remove_poll.png', 'lang' => true, 'custom' => 'onclick="return confirm(\'' . $txt['poll_remove_warn'] . '\');"', 'url' => $scripturl . '?action=removepoll;topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
+				'remove_poll' => array('test' => 'can_remove_poll', 'text' => 'poll_remove', 'image' => 'admin_remove_poll.png', 'lang' => true, 'custom' => 'onclick="return confirm(\'' . $txt['poll_remove_warn'] . '\');"', 'url' => $scripturl . '?action=poll;sa=remove;topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 			);
 
 			// Allow mods to add additional buttons here
@@ -454,7 +441,7 @@ class Display_Controller
 		}
 
 		// Calculate the fastest way to get the messages!
-		$ascending = empty($options['view_newest_first']);
+		$ascending = true;
 		$start = $_REQUEST['start'];
 		$limit = $context['messages_per_page'];
 		$firstIndex = 0;
@@ -538,7 +525,7 @@ class Display_Controller
 			);
 			$msg_selects = array();
 			$msg_tables = array();
-			call_integration_hook('integrate_query_message', array(&$msg_selects, &$msg_tables, &$msg_parameters));
+			call_integration_hook('integrate_message_query', array(&$msg_selects, &$msg_tables, &$msg_parameters));
 
 			// What?  It's not like it *couldn't* be only guests in this topic...
 			if (!empty($posters))
@@ -549,9 +536,33 @@ class Display_Controller
 			{
 				require_once(SUBSDIR . '/Likes.subs.php');
 				$context['likes'] = loadLikes($messages, true);
+
+				// ajax controller for likes
+				loadJavascriptFile('like_posts.js', array('defer' => true));
+				loadLanguage('Errors');
+
+				// Initiate likes and the tooltips for likes
+				addInlineJavascript('
+				$(document).ready(function () {
+					var likePostInstance = likePosts.prototype.init({
+						oTxt: ({
+							btnText : ' . JavaScriptEscape($txt['ok_uppercase']) . ',
+							likeHeadingError : ' . JavaScriptEscape($txt['like_heading_error']) . ',
+							error_occurred : ' . JavaScriptEscape($txt['error_occurred']) . '
+						}),
+					});
+
+					$(".like_button, .unlike_button").SiteTooltip({
+						hoverIntent: {
+							sensitivity: 10,
+							interval: 150,
+							timeout: 50
+						}
+					});
+				});', true);
 			}
 
-			$messages_request = loadMessageDetails($msg_selects, $msg_tables, $msg_parameters, $options);
+			$messages_request = loadMessageRequest($msg_selects, $msg_tables, $msg_parameters);
 
 			if (!empty($modSettings['enableFollowup']))
 			{
@@ -565,10 +576,7 @@ class Display_Controller
 
 			// Since the anchor information is needed on the top of the page we load these variables beforehand.
 			$context['first_message'] = isset($messages[$firstIndex]) ? $messages[$firstIndex] : $messages[0];
-			if (empty($options['view_newest_first']))
-				$context['first_new_message'] = isset($context['start_from']) && $_REQUEST['start'] == $context['start_from'];
-			else
-				$context['first_new_message'] = isset($context['start_from']) && $_REQUEST['start'] == $topicinfo['num_replies'] - $context['start_from'];
+			$context['first_new_message'] = isset($context['start_from']) && $_REQUEST['start'] == $context['start_from'];
 		}
 		else
 		{
@@ -624,9 +632,9 @@ class Display_Controller
 		// Cleanup all the permissions with extra stuff...
 		$context['can_mark_notify'] &= !$context['user']['is_guest'];
 		$context['can_sticky'] &= !empty($modSettings['enableStickyTopics']);
-		$context['calendar_post'] &= !empty($modSettings['cal_enabled']);
-		$context['can_add_poll'] &= $modSettings['pollMode'] == '1' && $topicinfo['id_poll'] <= 0;
-		$context['can_remove_poll'] &= $modSettings['pollMode'] == '1' && $topicinfo['id_poll'] > 0;
+		$context['calendar_post'] &= !empty($modSettings['cal_enabled']) && (allowedTo('modify_any') || ($context['user']['started'] && allowedTo('modify_own')));
+		$context['can_add_poll'] &= !empty($modSettings['pollMode']) && $topicinfo['id_poll'] <= 0;
+		$context['can_remove_poll'] &= !empty($modSettings['pollMode']) && $topicinfo['id_poll'] > 0;
 		$context['can_reply'] &= empty($topicinfo['locked']) || allowedTo('moderate_board');
 		$context['can_reply_unapproved'] &= $modSettings['postmod_active'] && (empty($topicinfo['locked']) || allowedTo('moderate_board'));
 		$context['can_issue_warning'] &= in_array('w', $context['admin_features']) && !empty($modSettings['warning_enable']);
@@ -664,7 +672,7 @@ class Display_Controller
 
 			// Just using the plain text quick reply and not the editor
 			if (empty($options['use_editor_quick_reply']))
-				loadJavascriptFile(array('jquery.atwho.js', 'jquery.caret.js', 'mentioning.js'));
+				loadJavascriptFile(array('jquery.atwho.js', 'jquery.caret.min.js', 'mentioning.js'));
 
 			loadCSSFile('jquery.atwho.css');
 
@@ -742,7 +750,7 @@ class Display_Controller
 			'notify' => array( 'test' => 'can_mark_notify', 'text' => $context['is_marked_notify'] ? 'unnotify' : 'notify', 'image' => ($context['is_marked_notify'] ? 'un' : '') . 'notify.png', 'lang' => true, 'custom' => 'onclick="return notifyButton(this);"', 'url' => $scripturl . '?action=notify;sa=' . ($context['is_marked_notify'] ? 'off' : 'on') . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 			'mark_unread' => array('test' => 'can_mark_unread', 'text' => 'mark_unread', 'image' => 'markunread.png', 'lang' => true, 'url' => $scripturl . '?action=markasread;sa=topic;t=' . $context['mark_unread_time'] . ';topic=' . $context['current_topic'] . '.' . $context['start'] . ';' . $context['session_var'] . '=' . $context['session_id']),
 			'unwatch' => array('test' => 'can_unwatch', 'text' => ($context['topic_unwatched'] ? '' : 'un') . 'watch', 'image' => ($context['topic_unwatched'] ? '' : 'un') . 'watched.png', 'lang' => true, 'custom' => 'onclick="return unwatchButton(this);"', 'url' => $scripturl . '?action=unwatchtopic;topic=' . $context['current_topic'] . '.' . $context['start'] . ';sa=' . ($context['topic_unwatched'] ? 'off' : 'on') . ';' . $context['session_var'] . '=' . $context['session_id']),
-			'send' => array('test' => 'can_send_topic', 'text' => 'send_topic', 'image' => 'sendtopic.png', 'lang' => true, 'url' => $scripturl . '?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.0', 'custom' => 'onclick="return sendtopicOverlayDiv(this.href, \'' . $txt['send_topic'] . '\', \'\');"'),
+			'send' => array('test' => 'can_send_topic', 'text' => 'send_topic', 'image' => 'sendtopic.png', 'lang' => true, 'url' => $scripturl . '?action=emailuser;sa=sendtopic;topic=' . $context['current_topic'] . '.0', 'custom' => 'onclick="return sendtopicOverlayDiv(this.href, \'' . $txt['send_topic'] . '\');"'),
 			'print' => array('test' => 'can_print', 'text' => 'print', 'image' => 'print.png', 'lang' => true, 'custom' => 'rel="nofollow"', 'class' => 'new_win', 'url' => $scripturl . '?action=topic;sa=printpage;topic=' . $context['current_topic'] . '.0'),
 		);
 
@@ -864,7 +872,7 @@ class Display_Controller
 
 		// Remember which message this is.  (ie. reply #83)
 		if ($counter === null || $reset)
-			$counter = empty($options['view_newest_first']) ? $context['start'] : $context['total_visible_posts'] - $context['start'];
+			$counter = $context['start'];
 
 		// Start from the beginning...
 		if ($reset)
@@ -984,10 +992,7 @@ class Display_Controller
 
 		call_integration_hook('integrate_prepare_display_context', array(&$output, &$message));
 
-		if (empty($options['view_newest_first']))
-			$counter++;
-		else
-			$counter--;
+		$counter++;
 
 		return $output;
 	}

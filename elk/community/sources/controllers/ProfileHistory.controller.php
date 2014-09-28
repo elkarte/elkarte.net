@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -52,13 +52,6 @@ class ProfileHistory_Controller extends Action_Controller
 			'logins' => array('controller' => $this, 'function' => 'action_tracklogin', 'label' => $txt['trackLogins']),
 		);
 
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'activity';
-
-		// Set up action/subaction stuff.
-		$action = new Action();
-		$action->initialize($subActions, 'activity');
-		$context['sub_action'] = $subAction;
-
 		// Create the tabs for the template.
 		$context[$context['profile_menu_name']]['tab_data'] = array(
 			'title' => $txt['history'],
@@ -70,6 +63,11 @@ class ProfileHistory_Controller extends Action_Controller
 				'edits' => array(),
 			),
 		);
+
+		// Set up action/subaction stuff.
+		$action = new Action();
+		$subAction = $action->initialize($subActions, 'activity');
+		$context['sub_action'] = $subAction;
 
 		// Moderation must be on to track edits.
 		if (empty($modSettings['modlog_enabled']))
@@ -180,7 +178,7 @@ class ProfileHistory_Controller extends Action_Controller
 		);
 
 		// Create the list for viewing.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		// Get all IP addresses this user has used for his messages.
@@ -269,7 +267,7 @@ class ProfileHistory_Controller extends Action_Controller
 		ksort($context['ips']);
 
 		// Gonna want this for the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// Start with the user messages.
 		$listOptions = array(
@@ -508,7 +506,7 @@ class ProfileHistory_Controller extends Action_Controller
 		$memID = $this->memID;
 
 		// Gonna want this for the list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		if ($memID == 0)
 			$context['base_url'] = $scripturl . '?action=trackip';
@@ -586,7 +584,7 @@ class ProfileHistory_Controller extends Action_Controller
 		$db = database();
 		$memID = $this->memID;
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// Get the names of any custom fields.
 		$request = $db->query('', '
@@ -683,7 +681,7 @@ class ProfileHistory_Controller extends Action_Controller
 	 * Callback for createList in action_trackip() and action_trackactivity()
 	 *
 	 * @param string $where
-	 * @param array $where_vars = array()
+	 * @param mixed[] $where_vars = array() or values used in the where statement
 	 * @return string number of user errors
 	 */
 	public function list_getUserErrorCount($where, $where_vars = array())
@@ -709,8 +707,8 @@ class ProfileHistory_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param string $where
-	 * @param array $where_vars
-	 * @return array error messages
+	 * @param mixed[] $where_vars array of values used in the where statement
+	 * @return mixed[] error messages array
 	 */
 	public function list_getUserErrors($start, $items_per_page, $sort, $where, $where_vars = array())
 	{
@@ -752,7 +750,7 @@ class ProfileHistory_Controller extends Action_Controller
 	 * Callback for createList() in TrackIP()
 	 *
 	 * @param string $where
-	 * @param array $where_vars
+	 * @param mixed[] $where_vars array of values used in the where statement
 	 * @return string count of messages matching the IP
 	 */
 	public function list_getIPMessageCount($where, $where_vars = array())
@@ -779,8 +777,8 @@ class ProfileHistory_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param string $where
-	 * @param array $where_vars
-	 * @return array an array of messages
+	 * @param mixed[] $where_vars array of values used in the where statement
+	 * @return mixed[] an array of basic messages / details
 	 */
 	public function list_getIPMessages($start, $items_per_page, $sort, $where, $where_vars = array())
 	{
@@ -829,7 +827,7 @@ class ProfileHistory_Controller extends Action_Controller
 	 * (createList() in TrackLogins())
 	 *
 	 * @param string $where
-	 * @param array $where_vars
+	 * @param mixed[] $where_vars array of values used in the where statement
 	 * @return string count of messages matching the IP
 	 */
 	public function list_getLoginCount($where, $where_vars = array())
@@ -857,8 +855,8 @@ class ProfileHistory_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param string $where
-	 * @param array $where_vars
-	 * @return array an array of messages
+	 * @param mixed[] $where_vars array of values used in the where statement
+	 * @return mixed[] an array of messages
 	 */
 	public function list_getLogins($start, $items_per_page, $sort, $where, $where_vars = array())
 	{
@@ -920,7 +918,7 @@ class ProfileHistory_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param int $memID
-	 * @return array
+	 * @return mixed[] array of profile edits
 	 */
 	public function list_getProfileEdits($start, $items_per_page, $sort, $memID)
 	{

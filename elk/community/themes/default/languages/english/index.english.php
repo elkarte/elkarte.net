@@ -1,7 +1,7 @@
 <?php
 // Version: 1.0; index
 
-global $forum_copyright, $forum_version, $webmaster_email, $scripturl, $context, $boardurl;
+global $forum_copyright;
 
 // Locale (strftime, pspell_new) and spelling. (pspell_new, can be left as '' normally.)
 // For more information see:
@@ -21,20 +21,63 @@ $txt['lang_capitalize_dates'] = true;
 // Number format.
 $txt['number_format'] = '1,234.00';
 
-$txt['days'] = array('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
-$txt['days_short'] = array('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
-// Months must start with 1 => 'January'. (or translated, of course.)
-$txt['months'] = array(1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
-$txt['months_titles'] = array(1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
-$txt['months_short'] = array(1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+$txt['sunday'] = 'Sunday';
+$txt['monday'] = 'Monday';
+$txt['tuesday'] = 'Tuesday';
+$txt['wednesday'] = 'Wednesday';
+$txt['thursday'] = 'Thursday';
+$txt['friday'] = 'Friday';
+$txt['saturday'] = 'Saturday';
+
+$txt['sunday_short'] = 'Sun';
+$txt['monday_short'] = 'Mon';
+$txt['tuesday_short'] = 'Tue';
+$txt['wednesday_short'] = 'Wed';
+$txt['thursday_short'] = 'Thu';
+$txt['friday_short'] = 'Fri';
+$txt['saturday_short'] = 'Sat';
+
+$txt['january'] = 'January';
+$txt['february'] = 'February';
+$txt['march'] = 'March';
+$txt['april'] = 'April';
+$txt['may'] = 'May';
+$txt['june'] = 'June';
+$txt['july'] = 'July';
+$txt['august'] = 'August';
+$txt['september'] = 'September';
+$txt['october'] = 'October';
+$txt['november'] = 'November';
+$txt['december'] = 'December';
+
+$txt['january_titles'] = 'January';
+$txt['february_titles'] = 'February';
+$txt['march_titles'] = 'March';
+$txt['april_titles'] = 'April';
+$txt['may_titles'] = 'May';
+$txt['june_titles'] = 'June';
+$txt['july_titles'] = 'July';
+$txt['august_titles'] = 'August';
+$txt['september_titles'] = 'September';
+$txt['october_titles'] = 'October';
+$txt['november_titles'] = 'November';
+$txt['december_titles'] = 'December';
+
+$txt['january_short'] = 'Jan';
+$txt['february_short'] = 'Feb';
+$txt['march_short'] = 'Mar';
+$txt['april_short'] = 'Apr';
+$txt['may_short'] = 'May';
+$txt['june_short'] = 'Jun';
+$txt['july_short'] = 'Jul';
+$txt['august_short'] = 'Aug';
+$txt['september_short'] = 'Sep';
+$txt['october_short'] = 'Oct';
+$txt['november_short'] = 'Nov';
+$txt['december_short'] = 'Dec';
 
 $txt['time_am'] = 'am';
 $txt['time_pm'] = 'pm';
-
-$txt['newmessages0'] = 'is new'; //Deprecated
-$txt['newmessages1'] = 'are new'; //Deprecated
-$txt['newmessages3'] = 'New'; //Deprecated
-$txt['newmessages4'] = ','; //Deprecated
 
 // Let's get all the main menu strings in one place.
 $txt['home'] = 'Home';
@@ -106,7 +149,7 @@ $txt['username_no_exist'] = 'That username does not exist.';
 $txt['no_user_with_email'] = 'There are no usernames associated with that email.';
 
 $txt['board_moderator'] = 'Board Moderator';
-$txt['remove_topic'] = 'Remove Topic';
+$txt['remove_topic'] = 'Remove';
 $txt['topics'] = 'Topics';
 $txt['modify_msg'] = 'Modify message';
 $txt['name'] = 'Name';
@@ -115,7 +158,6 @@ $txt['user_email_address'] = 'Email Address';
 $txt['subject'] = 'Subject';
 $txt['message'] = 'Message';
 $txt['redirects'] = 'Redirects';
-$txt['quick_modify'] = 'Modify Inline';
 
 $txt['choose_pass'] = 'Choose password';
 $txt['verify_pass'] = 'Verify password';
@@ -139,31 +181,32 @@ $txt['warning_issue'] = 'Warn';
 $txt['message_index'] = 'Message Index';
 $txt['news'] = 'News';
 $txt['page'] = 'Page';
-$txt['prev'] = 'previous page';
-$txt['next'] = 'next page';
+$txt['prev'] = 'previous';
+$txt['next'] = 'next';
 
-$txt['lock_unlock'] = 'Lock/Unlock Topic';
 $txt['post'] = 'Post';
 $txt['error_occurred'] = 'An Error Has Occurred';
 $txt['send_error_occurred'] = 'An error has occurred, <a href="{href}">please click here to try again</a>.';
 $txt['require_field'] = 'This is a required field.';
-$txt['at'] = 'at';
-$txt['started_by'] = 'Started by';
-$txt['topic_started_by'] = 'Started by <strong>%1$s</strong> in <em>%2$s</em>';
+$txt['started_by'] = 'Started by author';
+$txt['topic_started_by'] = 'Started by %1$s';
+$txt['topic_started_by_in'] = 'Started by %1$s in %2$s';
 $txt['replies'] = 'Replies';
 $txt['last_post'] = 'Last post';
 $txt['first_post'] = 'First post';
-$txt['last_poster'] = 'Last post by';
-//$txt['last_post_message'] = '<strong>Last post</strong> by %1$s<br />in %2$s<br />on %3$s';
+$txt['last_poster'] = 'Last post author';
+
 // @todo - Clean this up a bit. See notes in template.
 // Just moved a space, so the output looks better when things break to an extra line.
 $txt['last_post_message'] = '<span class="lastpost_link">%2$s </span><span class="board_lastposter">by %1$s</span><span class="board_lasttime"><strong>Last post: </strong>%3$s</span>';
-$txt['boardindex_total_posts'] = '%1$s Posts in %2$d Topics by %3$d Members';
+$txt['boardindex_total_posts'] = '%1$s Posts in %2$s Topics by %3$s Members';
 $txt['show'] = 'Show';
 $txt['hide'] = 'Hide';
 $txt['sort_by'] = 'Sort By';
+$txt['sort_asc'] = 'Sort ascending';
+$txt['sort_desc'] = 'Sort descending';
 
-$txt['admin_login'] = 'Administration Login';
+$txt['admin_login'] = 'Administration Log in';
 // Use numeric entities in the below string.
 $txt['topic'] = 'Topic';
 $txt['help'] = 'Help';
@@ -171,16 +214,15 @@ $txt['notify'] = 'Notify';
 $txt['unnotify'] = 'Unnotify';
 $txt['notify_request'] = 'Do you want a notification email if someone replies to this topic?';
 // Use numeric entities in the below string.
-$txt['regards_team'] = "Regards,\nThe " . $context['forum_name'] . ' Team.';
+$txt['regards_team'] = "Regards,\nThe {forum_name} Team.";
 $txt['notify_replies'] = 'Notify of replies';
-$txt['move_topic'] = 'Move Topic';
+$txt['move_topic'] = 'Move';
 $txt['move_to'] = 'Move to';
 $txt['pages'] = 'Pages';
 $txt['users_active'] = 'Active in past %1$d minutes';
 $txt['personal_messages'] = 'Personal Messages';
 $txt['reply_quote'] = 'Reply with quote';
 $txt['reply'] = 'Reply';
-$txt['reply_noun'] = 'Reply';
 $txt['reply_number'] = 'Reply #%1$s';
 $txt['approve'] = 'Approve';
 $txt['unapprove'] = 'Unapprove';
@@ -188,11 +230,9 @@ $txt['approve_all'] = 'approve all';
 $txt['awaiting_approval'] = 'Awaiting Approval';
 $txt['attach_awaiting_approve'] = 'Attachments awaiting approval';
 $txt['post_awaiting_approval'] = 'Note: This message is awaiting approval by a moderator.';
-$txt['there_are_unapproved_topics'] = 'There are %1$s topics and %2$s posts awaiting approval in this board. <a href="%3$s">Click here to view them all</a>.';
+$txt['there_are_unapproved_topics'] = 'There are %1$s topics and %2$s posts awaiting approval in this board. <a href="%3$s">Click here to view them</a>.';
 $txt['send_message'] = 'Send message';
 
-$txt['msg_alert_you_have'] = 'you have'; //Deprecated
-$txt['msg_alert_messages'] = 'messages'; //Deprecated
 $txt['msg_alert_no_messages'] = 'you don\'t have any message';
 $txt['msg_alert_one_message'] = 'you have <a href="%1$s">1 message</a>';
 $txt['msg_alert_many_message'] = 'you have <a href="%1$s">%2$d messages</a>';
@@ -212,7 +252,7 @@ $txt['are_sure_remove_topic'] = 'Are you sure you want to remove this topic?';
 $txt['yes'] = 'Yes';
 $txt['no'] = 'No';
 
-$txt['search_end_results'] = 'End of results';
+// @todo this string seems a good candidate for deprecation
 $txt['search_on'] = 'on';
 
 $txt['search'] = 'Search';
@@ -228,8 +268,6 @@ $txt['password_reminder'] = 'Password reminder';
 $txt['topic_started'] = 'Topic started by';
 $txt['title'] = 'Title';
 $txt['post_by'] = 'Post by';
-$txt['memberlist_searchable'] = 'Searchable list of all registered members.';
-$txt['welcome_member'] = 'Please welcome'; //Deprecated
 $txt['welcome_newest_member'] = 'Please welcome %1$s, our newest member.';
 $txt['admin_center'] = 'Administration Center';
 $txt['admin_session_active'] = 'You have an active admin session in place. We recommend to <strong><a class="strong" href="%1$s">end this session</a></strong> once you have finished your administrative tasks.';
@@ -237,7 +275,6 @@ $txt['admin_maintenance_active'] = 'Your forum is currently in maintenance mode,
 $txt['query_command_denied'] = 'The following MySQL errors are occurring, please verify your setup:';
 $txt['query_command_denied_guests'] = 'It seems something has gone sour on the forum with the database. This problem should only be temporary, so please come back later and try again.  If you continue to see this message, please report the following message to the administrator:';
 $txt['query_command_denied_guests_msg'] = 'the command %1$s is denied on the database';
-$txt['last_edit'] = 'Last Edit'; //Deprecated
 $txt['last_edit_by'] = '<span class="lastedit">Last Edit</span>: %1$s by %2$s';
 $txt['notify_deactivate'] = 'Would you like to deactivate notification on this topic?';
 
@@ -247,7 +284,6 @@ $txt['personal_text'] = 'Personal Text';
 $txt['date_registered'] = 'Date Registered';
 
 $txt['recent_view'] = 'View all recent posts.';
-$txt['recent_updated'] = 'is the most recently updated topic';
 $txt['is_recent_updated'] = '%1$s is the most recently updated topic';
 
 $txt['male'] = 'Male';
@@ -255,21 +291,14 @@ $txt['female'] = 'Female';
 
 $txt['error_invalid_characters_username'] = 'Invalid character used in user name.';
 
-$txt['welcome_guest'] = 'Welcome, <strong>%1$s</strong>. Please <a href="%2$s">login</a>.';
+$txt['welcome_guest'] = 'Welcome, <strong>Guest</strong>. Please <a href="{login_url}">login</a>.';
+$txt['welcome_guest_register'] = 'Welcome to <strong>{forum_name}</strong>. Please <a href="{login_url}">login</a> or <a href="{register_url}">register</a>.';
+$txt['welcome_guest_activate'] = '<br />Did you miss your <a href="{activate_url}">activation email</a>?';
 
-//$txt['welcome_guest_register'] = 'Welcome, <strong>%1$s</strong>. Please <a href="' . $scripturl . '?action=login">login</a> or <a href="' . $scripturl . '?action=register">register</a>.';
-$txt['welcome_guest_register'] = 'Welcome to <strong>'. $context['forum_name']. '</strong>. Please <a href="' . $scripturl . '?action=login">login</a> or <a href="' . $scripturl . '?action=register">register</a>.';
-
-$txt['please_login'] = 'Please <a href="' . $scripturl . '?action=login">login</a>.';
-$txt['login_or_register'] = 'Please <a href="' . $scripturl . '?action=login">login</a> or <a href="' . $scripturl . '?action=register">register</a>.';
-$txt['welcome_guest_activate'] = '<br />Did you miss your <a href="' . $scripturl . '?action=activate">activation email</a>?';
 // @todo the following to sprintf
 $txt['hello_member'] = 'Hey,';
 // Use numeric entities in the below string.
 $txt['hello_guest'] = 'Welcome,';
-$txt['welmsg_hey'] = 'Hey,';
-$txt['welmsg_welcome'] = 'Welcome,';
-$txt['welmsg_please'] = 'Please';
 $txt['select_destination'] = 'Please select a destination';
 
 // Escape any single quotes in here twice.. 'it\'s' -> 'it\\\'s'.
@@ -297,7 +326,6 @@ $txt['icon_angel'] = 'Innocent';
 $txt['moderator'] = 'Moderator';
 $txt['moderators'] = 'Moderators';
 
-$txt['mark_board_read'] = 'Mark Topics as Read for this Board';
 $txt['views'] = 'Views';
 $txt['new'] = 'New';
 $txt['no_redir'] = 'Redirected from %1$s';
@@ -313,7 +341,6 @@ $txt['forgot_your_password'] = 'Forgot your password?';
 $txt['date'] = 'Date';
 // Use numeric entities in the below string.
 $txt['from'] = 'From';
-$txt['check_new_messages'] = 'Check for new messages';
 $txt['to'] = 'To';
 
 $txt['board_topics'] = 'Topics';
@@ -330,8 +357,6 @@ $txt['topic_sent'] = 'Your email has been sent successfully.';
 $txt['time_offset'] = 'Time Offset';
 $txt['or'] = 'or';
 
-$txt['no_matches'] = 'Sorry, no matches were found';
-
 $txt['mention'] = 'Mentions';
 $txt['notifications'] = 'Notifications';
 
@@ -342,18 +367,13 @@ $txt['ban_continue_browse'] = 'You may continue to browse the forum as a guest.'
 
 $txt['mark_as_read'] = 'Mark ALL messages as read';
 
-$txt['hot_topics'] = 'Hot Topic (More than %1$d replies)';
-$txt['very_hot_topics'] = 'Very Hot Topic (More than %1$d replies)';
 $txt['locked_topic'] = 'Locked Topic';
 $txt['normal_topic'] = 'Normal Topic';
 $txt['participation_caption'] = 'Topic you have posted in';
 
-$txt['go_caps'] = 'GO';
-
 $txt['print'] = 'Print';
 $txt['topic_summary'] = 'Topic Summary';
 $txt['not_applicable'] = 'N/A';
-$txt['message_lowercase'] = 'message'; //Deprecated
 $txt['name_in_use'] = 'The name %1$s is already in use by another member.';
 
 $txt['total_members'] = 'Total Members';
@@ -370,6 +390,7 @@ $txt['logged'] = 'Logged';
 $txt['ip'] = 'IP';
 
 $txt['www'] = 'WWW';
+$txt['link'] = 'Link';
 
 $txt['by'] = 'by'; //Deprecated
 
@@ -398,10 +419,7 @@ $txt['latest_member'] = 'Latest Member';
 $txt['total_cats'] = 'Total Categories';
 $txt['latest_post'] = 'Latest Post';
 
-$txt['you_have'] = 'You\'ve';
-$txt['click'] = 'Click';
 $txt['here'] = 'here';
-$txt['to_view'] = 'to view them.';
 $txt['you_have_no_msg'] = 'You don\'t have any message...';
 $txt['you_have_one_msg'] = 'You\'ve 1 message...<a href="%1$s">Click here to view it</a>';
 $txt['you_have_many_msgs'] = 'You\'ve %2$d messages...<a href="%1$s">Click here to view them</a>';
@@ -416,7 +434,7 @@ $txt['valid_email'] = 'This must be a valid email address.';
 
 $txt['info_center_title'] = '%1$s - Info Center';
 
-$txt['send_topic'] = 'Send this topic';
+$txt['send_topic'] = 'Share';
 $txt['unwatch'] = 'Unwatch';
 $txt['watch'] = 'Watch';
 
@@ -436,17 +454,19 @@ $txt['database_error'] = 'Database Error';
 $txt['try_again'] = 'Please try again.  If you come back to this error screen, report the error to an administrator.';
 $txt['file'] = 'File';
 $txt['line'] = 'Line';
+
 // Use numeric entities in the below string.
 $txt['tried_to_repair'] = 'ElkArte has detected and automatically tried to repair an error in your database.  If you continue to have problems, or continue to receive these emails, please contact your host.';
 $txt['database_error_versions'] = '<strong>Note:</strong> Your database version is %1$s.';
 $txt['template_parse_error'] = 'Template Parse Error!';
 $txt['template_parse_error_message'] = 'It seems something has gone sour on the forum with the template system.  This problem should only be temporary, so please come back later and try again.  If you continue to see this message, please contact the administrator.<br /><br />You can also try <a href="javascript:location.reload();">refreshing this page</a>.';
-$txt['template_parse_error_details'] = 'There was a problem loading the <span class="tt"><strong>%1$s</strong></span> template or language file.  Please check the syntax and try again - remember, single quotes (<span class="tt">\'</span>) often have to be escaped with a backslash (<span class="tt">\\</span>).  To see more specific error information from PHP, try <a href="' . $boardurl . '%1$s">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="' . $scripturl . '?theme=1">use the default theme</a>.';
+$txt['template_parse_error_details'] = 'There was a problem loading the <span class="tt"><strong>%1$s</strong></span> template or language file.  Please check the syntax and try again - remember, single quotes (<span class="tt">\'</span>) often have to be escaped with a backslash (<span class="tt">\\</span>).  To see more specific error information from PHP, try <a href="%2$s%1$s">accessing the file directly</a>.<br /><br />You may want to try to <a href="javascript:location.reload();">refresh this page</a> or <a href="%3$s">use the default theme</a>.';
+$txt['template_parse_undefined'] = 'An undefined error occurred during the parsing of this template';
 
-$txt['today'] = 'Today at ';
-$txt['yesterday'] = 'Yesterday at ';
+$txt['today'] = 'Today at %1$s';
+$txt['yesterday'] = 'Yesterday at %1$s';
 
-//Relative times
+// Relative times
 $txt['rt_now'] = 'just now';
 $txt['rt_minute'] = 'A minute ago';
 $txt['rt_minutes'] = '%s minutes ago';
@@ -463,12 +483,9 @@ $txt['rt_years'] = '%s years ago';
 
 $txt['new_poll'] = 'New poll';
 $txt['poll_question'] = 'Question';
+$txt['poll_question_options'] = 'Question and Options';
 $txt['poll_vote'] = 'Submit Vote';
 $txt['poll_total_voters'] = 'Total Members Voted';
-$txt['shortcuts'] = 'shortcuts: alt+s submit/post, alt+p preview';
-$txt['shortcuts_firefox'] = 'shortcuts: shift+alt+s submit/post, shift+alt+p preview';
-$txt['shortcuts_drafts'] = ', alt+d save draft';
-$txt['shortcuts_drafts_firefox'] = ', shift+alt+d save draft';
 $txt['draft_saved_on'] = 'Draft last saved';
 $txt['poll_results'] = 'View results';
 $txt['poll_lock'] = 'Lock Voting';
@@ -487,12 +504,10 @@ $txt['moved'] = 'MOVED';
 $txt['moved_why'] = 'Please enter a brief description as to<br />why this topic is being moved.';
 $txt['board'] = 'Board';
 $txt['in'] = 'in';
-$txt['sticky_topic'] = 'Sticky Topic';
+$txt['sticky_topic'] = 'Pinned Topic';
 $txt['split'] = 'SPLIT';
 
 $txt['delete'] = 'Delete';
-
-$txt['your_pms'] = 'Your Personal Messages';
 
 $txt['kilobyte'] = 'KB';
 $txt['megabyte'] = 'MB';
@@ -507,15 +522,14 @@ $txt['quote'] = 'Quote';
 $txt['quote_new'] = 'New topic';
 $txt['follow_ups'] = 'Follow-ups';
 $txt['topic_derived_from'] = 'Topic derived from %1$s';
-$txt['fulledit'] = 'Full&nbsp;edit';
 $txt['edit'] = 'Edit';
 $txt['quick_edit'] = 'Quick Edit';
 $txt['post_options'] = 'More...';
 
-$txt['set_sticky'] = 'Set topic sticky';
-$txt['set_nonsticky'] = 'Set topic non-sticky';
-$txt['set_lock'] = 'Lock topic';
-$txt['set_unlock'] = 'Unlock topic';
+$txt['set_sticky'] = 'Pin';
+$txt['set_nonsticky'] = 'Unpin';
+$txt['set_lock'] = 'Lock';
+$txt['set_unlock'] = 'Unlock';
 
 $txt['search_advanced'] = 'Show advanced options';
 $txt['search_simple'] = 'Hide advanced options';
@@ -528,9 +542,6 @@ $txt['agreement_missing'] = 'You are requiring new users to accept a registratio
 
 $txt['cache_writable'] = 'The cache directory is not writable - this will adversely affect the performance of your forum.';
 
-$txt['page_created'] = 'Page created in '; //Deprecated
-$txt['seconds_with'] = ' seconds with '; //Deprecated
-$txt['queries'] = ' queries.'; //Deprecated
 $txt['page_created_full'] = 'Page created in %1$.3f seconds with %2$d queries.';
 
 $txt['report_to_mod_func'] = 'Use this function to inform the moderators and administrators of an abusive or wrongly posted message.<br /><em>Please note that your email address will be revealed to the moderators if you use this.</em>';
@@ -543,11 +554,11 @@ $txt['pm_online'] = 'Personal Message (Online)';
 $txt['pm_offline'] = 'Personal Message (Offline)';
 $txt['status'] = 'Status';
 
-$txt['skip_nav'] = 'Skip Navigation';
+$txt['skip_nav'] = 'Skip to main content';
 $txt['go_up'] = 'Go Up';
 $txt['go_down'] = 'Go Down';
 
-$forum_copyright = '<a href="' . $scripturl . '?action=who;sa=credits" title="ElkArte Forum" target="_blank" class="new_win">%1$s</a> | <a href="https://github.com/elkarte/ElkArte/blob/master/license.md" title="License" target="_blank" class="new_win">ElkArte &copy; 2013</a>';
+$forum_copyright = '<a href="http://www.elkarte.net" title="ElkArte Forum" target="_blank" class="new_win">powered by %1$s</a> | <a href="{credits_url}" title="Credits" target="_blank" class="new_win">credits</a>';
 
 $txt['birthdays'] = 'Birthdays:';
 $txt['events'] = 'Events:';
@@ -585,20 +596,24 @@ $txt['moveTopic4'] = 'Change every message\'s subject';
 $txt['move_topic_unapproved_js'] = 'Warning! This topic has not yet been approved.\\n\\nIt is not recommended that you create a redirection topic unless you intend to approve the post immediately following the move.';
 $txt['movetopic_auto_board'] = '[BOARD]';
 $txt['movetopic_auto_topic'] = '[TOPIC LINK]';
-$txt['movetopic_default'] = 'This topic has been moved to ' . $txt['movetopic_auto_board'] . ".\n\n" . $txt['movetopic_auto_topic'];
+$txt['movetopic_default'] = 'This topic has been moved to [BOARD]
+
+[TOPIC LINK]';
 $txt['movetopic_redirect'] = 'Redirect to the moved topic';
 $txt['movetopic_expires'] = 'Automatically remove the redirection topic';
 
 $txt['merge_to_topic_id'] = 'ID of target topic';
-$txt['split_topic'] = 'Split Topic';
-$txt['merge'] = 'Merge Topics';
+$txt['split_topic'] = 'Split';
+$txt['merge'] = 'Merge';
 $txt['subject_new_topic'] = 'Subject For New Topic';
 $txt['split_this_post'] = 'Only split this post.';
 $txt['split_after_and_this_post'] = 'Split topic after and including this post.';
 $txt['select_split_posts'] = 'Select posts to split.';
 
 $txt['splittopic_notification'] = 'Post a message when the topic is split';
-$txt['splittopic_default'] = 'One or more of the messages of this topic have been moved to ' . $txt['movetopic_auto_board'] . ".\n\n" . $txt['movetopic_auto_topic'];
+$txt['splittopic_default'] = 'One or more of the messages of this topic have been moved to [BOARD]
+
+[TOPIC LINK]';
 $txt['splittopic_move'] = 'Move the new topic to another board';
 
 $txt['new_topic'] = 'New Topic';
@@ -617,7 +632,7 @@ $txt['merge_desc'] = 'This function will merge the messages of two topics into o
 $txt['theme_template_error'] = 'Unable to load the \'%1$s\' template.';
 $txt['theme_language_error'] = 'Unable to load the \'%1$s\' language file.';
 
-$txt['parent_boards'] = 'Child Boards';
+$txt['parent_boards'] = 'Sub-boards';
 
 $txt['smtp_no_connect'] = 'Could not connect to SMTP host';
 $txt['smtp_port_ssl'] = 'SMTP port setting incorrect; it should be 465 for SSL servers.';
@@ -627,14 +642,12 @@ $txt['mail_send_unable'] = 'Unable to send mail to the email address \'%1$s\'';
 
 $txt['mlist_search'] = 'Search For Members';
 $txt['mlist_search_again'] = 'Search again';
-$txt['mlist_search_filter'] = 'Search Options';
 $txt['mlist_search_email'] = 'Search by email address';
 $txt['mlist_search_group'] = 'Search by position';
 $txt['mlist_search_name'] = 'Search by name';
 $txt['mlist_search_website'] = 'Search by website';
 $txt['mlist_search_results'] = 'Search results for';
 $txt['mlist_search_by'] = 'Search by %1$s';
-$txt['mlist_menu_view'] = 'View the memberlist';
 
 $txt['attach_downloaded'] = 'downloaded %1$d times';
 $txt['attach_viewed'] = 'viewed %1$d times';
@@ -646,8 +659,6 @@ $txt['more'] = 'more';
 $txt['hostname'] = 'Hostname';
 $txt['you_are_post_banned'] = 'Sorry %1$s, you are banned from posting and sending personal messages on this forum.';
 $txt['ban_reason'] = 'Reason';
-
-$txt['tables_optimized'] = 'Database tables optimized';
 
 $txt['add_poll'] = 'Add poll';
 $txt['poll_options6'] = 'You may only select up to %1$s options.';
@@ -663,7 +674,7 @@ $txt['poll_cannot_see'] = 'You cannot see the results of this poll at the moment
 $txt['quick_mod_approve'] = 'Approve selected';
 $txt['quick_mod_remove'] = 'Remove selected';
 $txt['quick_mod_lock'] = 'Lock/Unlock selected';
-$txt['quick_mod_sticky'] = 'Sticky/Unsticky selected';
+$txt['quick_mod_sticky'] = 'Pin/Unpin selected';
 $txt['quick_mod_move'] = 'Move selected to';
 $txt['quick_mod_merge'] = 'Merge selected';
 $txt['quick_mod_markread'] = 'Mark selected read';
@@ -673,7 +684,6 @@ $txt['quickmod_confirm'] = 'Are you sure you want to do this?';
 $txt['spell_check'] = 'Spell Check';
 
 $txt['quick_reply'] = 'Quick Reply';
-$txt['quick_reply_desc'] = 'With <em>Quick-Reply</em> you can write a post when viewing a topic without loading a new page. You can still use bulletin board code and smileys as you would in a normal post.';
 $txt['quick_reply_warning'] = 'Warning! This topic is currently locked, only admins and moderators can reply.';
 $txt['quick_reply_verification'] = 'After submitting your post you will be directed to the regular post page to verify your post %1$s.';
 $txt['quick_reply_verification_guests'] = '(required for all guests)';
@@ -688,15 +698,15 @@ $txt['notification_disable_topic'] = 'Are you sure you wish to disable notificat
 $txt['report_to_mod'] = 'Report Post';
 $txt['issue_warning_post'] = 'Issue a warning because of this message';
 
-$txt['like_post'] = 'Like Post';
-$txt['unlike_post'] = 'Unlike Post';
+$txt['like_post'] = 'Like';
+$txt['unlike_post'] = 'Unlike';
 $txt['likes'] = 'Likes';
 $txt['liked_by'] = 'Liked by:';
 $txt['liked_you'] = 'You';
 $txt['liked_more'] = 'more';
 
 $txt['unread_topics_visit'] = 'Recent Unread Topics';
-$txt['unread_topics_visit_none'] = 'No unread topics found since your last visit. <a href="' . $scripturl . '?action=unread;all" class="linkbutton">Click here to try all unread topics</a>';
+$txt['unread_topics_visit_none'] = 'No unread topics found since your last visit. <a href="{unread_all_url}" class="linkbutton">Click here to try all unread topics</a>';
 $txt['unread_topics_all'] = 'All Unread Topics';
 $txt['unread_replies'] = 'Updated Topics';
 
@@ -705,11 +715,6 @@ $txt['who_and'] = ' and ';
 $txt['who_viewing_topic'] = ' are viewing this topic.';
 $txt['who_viewing_board'] = ' are viewing this board.';
 $txt['who_member'] = 'Member';
-
-// No longer used by default theme, but for backwards compat
-$txt['powered_by_php'] = 'Powered by PHP';
-$txt['powered_by_mysql'] = 'Powered by MySQL';
-$txt['valid_css'] = 'Valid CSS';
 
 // Current footer strings
 $txt['valid_html'] = 'Valid HTML 5';
@@ -740,8 +745,8 @@ $txt['merge_check'] = 'Merge?';
 $txt['merge_no_poll'] = 'No poll';
 
 $txt['response_prefix'] = 'Re: ';
-$txt['current_icon'] = 'Current Icon';
-$txt['message_icon'] = 'Message Icon';
+$txt['current_icon'] = 'Current icon';
+$txt['message_icon'] = 'Message icon';
 
 $txt['smileys_current'] = 'Current Smiley Set';
 $txt['smileys_none'] = 'No Smileys';
@@ -750,7 +755,6 @@ $txt['smileys_forum_board_default'] = 'Forum/Board Default';
 $txt['search_results'] = 'Search Results';
 $txt['search_no_results'] = 'Sorry, no matches were found';
 
-$txt['totalTimeLogged1'] = 'Total time logged in: '; //Deprecated
 $txt['totalTimeLogged2'] = ' days, ';
 $txt['totalTimeLogged3'] = ' hours and ';
 $txt['totalTimeLogged4'] = ' minutes.';
@@ -769,8 +773,6 @@ $txt['approve_many_members_waiting'] = 'There are <a href="%1$s">%2$d members</a
 $txt['notifyboard_turnon'] = 'Do you want a notification email when someone posts a new topic in this board?';
 $txt['notifyboard_turnoff'] = 'Are you sure you do not want to receive new topic notifications for this board?';
 
-$txt['activate_code'] = 'Your activation code is';
-
 $txt['find_members'] = 'Find Members';
 $txt['find_username'] = 'Name, username, or email address';
 $txt['find_buddies'] = 'Show Buddies Only?';
@@ -778,11 +780,6 @@ $txt['find_wildcards'] = 'Allowed Wildcards: *, ?';
 $txt['find_no_results'] = 'No results found';
 $txt['find_results'] = 'Results';
 $txt['find_close'] = 'Close';
-
-$txt['unread_since_visit'] = 'Show unread posts since last visit.';
-$txt['show_unread_replies'] = 'Show new replies to your posts.';
-
-$txt['change_color'] = 'Change Color';
 
 $txt['quickmod_delete_selected'] = 'Remove Selected';
 $txt['quickmod_split_selected'] = 'Split Selected';
@@ -805,8 +802,8 @@ $txt['ssi_session_broken'] = 'SSI.php was unable to load a session!  This may ca
 // Escape any single quotes in here twice.. 'it\'s' -> 'it\\\'s'.
 $txt['preview_title'] = 'Preview post';
 $txt['preview_fetch'] = 'Fetching preview...';
-$txt['preview_new'] = 'New message';
 $txt['pm_error_while_submitting'] = 'The following error or errors occurred while sending this personal message:';
+$txt['warning_while_submitting'] = 'Something happened, review it here:';
 $txt['error_while_submitting'] = 'The message has the following error or errors that must be corrected before continuing:';
 $txt['error_old_topic'] = 'Warning: this topic has not been posted in for at least %1$d days.<br />Unless you\'re sure you want to reply, please consider starting a new topic.';
 
@@ -831,9 +828,6 @@ $txt['visual_verification_hidden'] = 'Please leave this box empty';
 $txt['visual_verification_description'] = 'Type the letters shown in the picture';
 $txt['visual_verification_sound'] = 'Listen to the letters';
 $txt['visual_verification_request_new'] = 'Request another image';
-
-// Sub menu labels
-$txt['calendar_menu'] = 'View Calendar';
 
 // @todo Send email strings - should move?
 $txt['send_email'] = 'Send email';
@@ -890,6 +884,10 @@ $txt['debug_hide_queries'] = '[Hide Queries]';
 $txt['debug_tokens'] = 'Tokens: ';
 $txt['debug_browser'] = 'Browser ID: ';
 $txt['debug_hooks'] = 'Hooks called: ';
+$txt['debug_system_type'] = 'System: ';
+$txt['debug_server_load'] = 'Server Load: ';
+$txt['debug_script_mem_load'] = 'Script Memory Usage: ';
+$txt['debug_script_cpu_load'] = 'Script CPU Time (user/system): ';
 
 // Video embedding
 $txt['preview_image'] = 'Video Preview Image';
@@ -901,3 +899,10 @@ $txt['dailymotion'] = 'Dailymotion video:';
 
 // Spoiler BBC
 $txt['spoiler'] = 'Spoiler (click to show/hide)';
+
+$txt['ok_uppercase'] = 'OK';
+
+// Title of box for warnings that admins should see
+$txt['admin_warning_title'] = 'Warning';
+
+$txt['via'] = 'via';

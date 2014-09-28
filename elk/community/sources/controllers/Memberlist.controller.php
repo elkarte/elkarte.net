@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -71,7 +71,7 @@ class Memberlist_Controller extends Action_Controller
 		$context['columns'] = array(
 			'online' => array(
 				'label' => $txt['status'],
-				'width' => 60,
+				'class' => 'status',
 				'sort' => array(
 					'down' => allowedTo('moderate_forum') ? 'IFNULL(lo.log_time, 1) ASC, real_name ASC' : 'CASE WHEN mem.show_online THEN IFNULL(lo.log_time, 1) ELSE 1 END ASC, real_name ASC',
 					'up' => allowedTo('moderate_forum') ? 'IFNULL(lo.log_time, 1) DESC, real_name DESC' : 'CASE WHEN mem.show_online THEN IFNULL(lo.log_time, 1) ELSE 1 END DESC, real_name DESC'
@@ -79,7 +79,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'real_name' => array(
 				'label' => $txt['username'],
-				'class' => "lefttext",
+				'class' => 'username',
 				'sort' => array(
 					'down' => 'mem.real_name DESC',
 					'up' => 'mem.real_name ASC'
@@ -87,6 +87,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'email_address' => array(
 				'label' => $txt['email'],
+				'class' => 'email',
 				'sort' => array(
 					'down' => allowedTo('moderate_forum') ? 'mem.email_address DESC' : 'mem.hide_email DESC, mem.email_address DESC',
 					'up' => allowedTo('moderate_forum') ? 'mem.email_address ASC' : 'mem.hide_email ASC, mem.email_address ASC'
@@ -94,6 +95,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'website_url' => array(
 				'label' => $txt['website'],
+				'class' => 'website',
 				'link_with' => 'website',
 				'sort' => array(
 					'down' => 'LENGTH(mem.website_url) > 0 ASC, IFNULL(mem.website_url, 1=1) DESC, mem.website_url DESC',
@@ -102,7 +104,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'id_group' => array(
 				'label' => $txt['position'],
-				'class' => "lefttext",
+				'class' => 'group',
 				'sort' => array(
 					'down' => 'IFNULL(mg.group_name, 1=1) DESC, mg.group_name DESC',
 					'up' => 'IFNULL(mg.group_name, 1=1) ASC, mg.group_name ASC'
@@ -110,7 +112,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'date_registered' => array(
 				'label' => $txt['date_registered'],
-				'class' => "lefttext",
+				'class' => 'date_registered',
 				'sort' => array(
 					'down' => 'mem.date_registered DESC',
 					'up' => 'mem.date_registered ASC'
@@ -118,6 +120,7 @@ class Memberlist_Controller extends Action_Controller
 			),
 			'posts' => array(
 				'label' => $txt['posts'],
+				'class' => 'posts',
 				'default_sort_rev' => true,
 				'sort' => array(
 					'down' => 'mem.posts DESC',
@@ -154,7 +157,7 @@ class Memberlist_Controller extends Action_Controller
 
 		// Build the memberlist button array.
 		$context['memberlist_buttons'] = array(
-			'view_all_members' => array('text' => 'view_all_members', 'image' => 'mlist.png', 'lang' => true, 'url' => $scripturl . '?action=memberlist;sa=all', 'active'=> true),
+			'view_all_members' => array('text' => 'view_all_members', 'image' => 'mlist.png', 'lang' => true, 'url' => $scripturl . '?action=memberlist;sa=all', 'active' => true),
 		);
 
 		// Are there custom fields they can search?
@@ -257,6 +260,8 @@ class Memberlist_Controller extends Action_Controller
 
 			$context['columns'][$col]['link'] = '<a href="' . $context['columns'][$col]['href'] . '" rel="nofollow">' . $context['columns'][$col]['label'] . '</a>';
 			$context['columns'][$col]['selected'] = $_REQUEST['sort'] == $col;
+			if ($context['columns'][$col]['selected'])
+				$context['columns'][$col]['class'] .= ' selected';
 		}
 
 		// Are we sorting the results
@@ -352,15 +357,15 @@ class Memberlist_Controller extends Action_Controller
 		// They're searching..
 		if (isset($_REQUEST['search']) && isset($_REQUEST['fields']))
 		{
-			$_POST['search'] = trim(isset($_GET['search']) ? $_GET['search'] : $_POST['search']);
-			$_POST['fields'] = isset($_GET['fields']) ? explode(',', $_GET['fields']) : $_POST['fields'];
+			$search = Util::htmlspecialchars(trim(isset($_GET['search']) ? $_GET['search'] : $_POST['search']), ENT_QUOTES);
+			$input_fields = isset($_GET['fields']) ? explode(',', $_GET['fields']) : $_POST['fields'];
 
 			$context['old_search'] = $_REQUEST['search'];
 			$context['old_search_value'] = urlencode($_REQUEST['search']);
 
 			// No fields?  Use default...
-			if (empty($_POST['fields']))
-				$_POST['fields'] = array('name');
+			if (empty($input_fields))
+				$input_fields = array('name');
 
 			// Set defaults for how the results are sorted
 			if (!isset($_REQUEST['sort']) || !isset($context['columns'][$_REQUEST['sort']]))
@@ -374,8 +379,7 @@ class Memberlist_Controller extends Action_Controller
 				if ((!isset($_REQUEST['desc']) && $col == $_REQUEST['sort']) || ($col != $_REQUEST['sort'] && !empty($column_details['default_sort_rev'])))
 					$context['columns'][$col]['href'] .= ';desc';
 
-				if (isset($_POST['search']) && isset($_POST['fields']))
-					$context['columns'][$col]['href'] .= ';search=' . $_POST['search'] . ';fields=' . implode(',', $_POST['fields']);
+				$context['columns'][$col]['href'] .= ';search=' . $search . ';fields=' . implode(',', $input_fields);
 
 				$context['columns'][$col]['link'] = '<a href="' . $context['columns'][$col]['href'] . '" rel="nofollow">' . $context['columns'][$col]['label'] . '</a>';
 				$context['columns'][$col]['selected'] = $_REQUEST['sort'] == $col;
@@ -389,26 +393,26 @@ class Memberlist_Controller extends Action_Controller
 				'regular_id_group' => 0,
 				'is_activated' => 1,
 				'blank_string' => '',
-				'search' => '%' . strtr(Util::htmlspecialchars($_POST['search'], ENT_QUOTES), array('_' => '\\_', '%' => '\\%', '*' => '%')) . '%',
+				'search' => '%' . strtr($search, array('_' => '\\_', '%' => '\\%', '*' => '%')) . '%',
 				'sort' => $context['columns'][$_REQUEST['sort']]['sort'][$context['sort_direction']],
 			);
 
 			// Search for a name
-			if (in_array('name', $_POST['fields']))
+			if (in_array('name', $input_fields))
 				$fields = allowedTo('moderate_forum') ? array('member_name', 'real_name') : array('real_name');
 			else
 				$fields = array();
 
 			// Search for websites.
-			if (in_array('website', $_POST['fields']))
+			if (in_array('website', $input_fields))
 				$fields += array(7 => 'website_title', 'website_url');
 
 			// Search for groups.
-			if (in_array('group', $_POST['fields']))
+			if (in_array('group', $input_fields))
 				$fields += array(9 => 'IFNULL(group_name, {string:blank_string})');
 
 			// Search for an email address?
-			if (in_array('email', $_POST['fields']))
+			if (in_array('email', $input_fields))
 			{
 				$fields += array(2 => allowedTo('moderate_forum') ? 'email_address' : '(hide_email = 0 AND email_address');
 				$condition = allowedTo('moderate_forum') ? '' : ')';
@@ -424,9 +428,10 @@ class Memberlist_Controller extends Action_Controller
 
 			$customJoin = array();
 			$customCount = 10;
+			$validFields = array();
 
 			// Any custom fields to search for - these being tricky?
-			foreach ($_POST['fields'] as $field)
+			foreach ($input_fields as $field)
 			{
 				$curField = substr($field, 5);
 				if (substr($field, 0, 5) === 'cust_' && isset($context['custom_search_fields'][$curField]))
@@ -434,15 +439,19 @@ class Memberlist_Controller extends Action_Controller
 					$customJoin[] = 'LEFT JOIN {db_prefix}custom_fields_data AS cfd' . $curField . ' ON (cfd' . $curField . '.variable = {string:cfd' . $curField . '} AND cfd' . $curField . '.id_member = mem.id_member)';
 					$query_parameters['cfd' . $curField] = $curField;
 					$fields += array($customCount++ => 'IFNULL(cfd' . $curField . '.value, {string:blank_string})');
+					$validFields[] = $field;
 				}
 			}
 
-			$query = $_POST['search'] == '' ? '= {string:blank_string}' : (defined('DB_CASE_SENSITIVE') ? 'LIKE LOWER({string:search})' : 'LIKE {string:search}');
+			if (empty($fields))
+				redirectexit('action=memberlist');
+
+			$query = $search == '' ? '= {string:blank_string}' : (defined('DB_CASE_SENSITIVE') ? 'LIKE LOWER({string:search})' : 'LIKE {string:search}');
 			$where = implode(' ' . $query . ' OR ', $fields) . ' ' . $query . $condition;
 
 			// Find the members from the database.
 			$numResults = ml_searchMembers($query_parameters, $customJoin, $where, $_REQUEST['start']);
-			$context['page_index'] = constructPageIndex($scripturl . '?action=memberlist;sa=search;search=' . $_POST['search'] . ';fields=' . implode(',', $_POST['fields']), $_REQUEST['start'], $numResults, $modSettings['defaultMaxMembers']);
+			$context['page_index'] = constructPageIndex($scripturl . '?action=memberlist;sa=search;search=' . $search . ';fields=' . implode(',', $validFields), $_REQUEST['start'], $numResults, $modSettings['defaultMaxMembers']);
 		}
 		else
 			redirectexit('action=memberlist');

@@ -17,7 +17,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -70,6 +70,7 @@ class Reports_Controller extends Action_Controller
 		);
 
 		call_integration_hook('integrate_report_types');
+
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
 			'title' => $txt['generate_reports'],
@@ -93,6 +94,7 @@ class Reports_Controller extends Action_Controller
 			$context['sub_template'] = 'report_type';
 			return;
 		}
+
 		$context['report_type'] = $_REQUEST['rt'];
 		$context['sub_template'] = 'generate_report';
 
@@ -127,7 +129,7 @@ class Reports_Controller extends Action_Controller
 		// Build the reports button array.
 		$context['report_buttons'] = array(
 			'generate_reports' => array('text' => 'generate_reports', 'image' => 'print.png', 'lang' => true, 'url' => $scripturl . '?action=admin;area=reports', 'active' => true),
-			'print' => array('text' => 'print', 'image' => 'print.png', 'lang' => true, 'url' => $scripturl . '?action=admin;area=reports;rt=' . $context['report_type']. ';st=print', 'custom' => 'target="_blank"'),
+			'print' => array('text' => 'print', 'image' => 'print.png', 'lang' => true, 'url' => $scripturl . '?action=admin;area=reports;rt=' . $context['report_type'] . ';st=print', 'custom' => 'target="_blank"'),
 		);
 
 		// Allow mods to add additional buttons here
@@ -157,6 +159,7 @@ class Reports_Controller extends Action_Controller
 		require_once(SUBSDIR . '/Boards.subs.php');
 		require_once(SUBSDIR . '/Membergroups.subs.php');
 		require_once(SUBSDIR . '/Reports.subs.php');
+
 		loadLanguage('ManagePermissions');
 		loadPermissionProfiles();
 
@@ -185,6 +188,7 @@ class Reports_Controller extends Action_Controller
 			'moderators' => $txt['board_moderators'],
 			'groups' => $txt['board_groups'],
 		);
+
 		if (!empty($modSettings['deny_boards_access']))
 			$boardSettings['disallowed_groups'] = $txt['board_disallowed_groups'];
 
@@ -227,7 +231,9 @@ class Reports_Controller extends Action_Controller
 				else
 					unset($allowedGroups[$key]);
 			}
+
 			$boardData['groups'] = implode(', ', $allowedGroups);
+
 			if (!empty($modSettings['deny_boards_access']))
 			{
 				$disallowedGroups = explode(',', $row['deny_member_groups']);
@@ -238,6 +244,7 @@ class Reports_Controller extends Action_Controller
 					else
 						unset($disallowedGroups[$key]);
 				}
+
 				$boardData['disallowed_groups'] = implode(', ', $disallowedGroups);
 			}
 
@@ -264,6 +271,9 @@ class Reports_Controller extends Action_Controller
 		// Boards, first.
 		require_once(SUBSDIR . '/Boards.subs.php');
 		require_once(SUBSDIR . '/Membergroups.subs.php');
+
+		// Lets get started
+		$query_boards = array();
 
 		if (isset($_REQUEST['boards']))
 		{
@@ -364,9 +374,7 @@ class Reports_Controller extends Action_Controller
 					}
 					// Otherwise means it's set to disallow..
 					else
-					{
 						$curData[$id_group] = 'x';
-					}
 
 					// Now actually make the data for the group look right.
 					if (empty($curData[$id_group]))
@@ -375,10 +383,6 @@ class Reports_Controller extends Action_Controller
 						$curData[$id_group] = '<span class="success">' . $txt['board_perms_allow'] . '</span>';
 					else
 						$curData[$id_group] = 'x';
-
-					// Embolden those permissions different from global (makes it a lot easier!)
-					if (@$board_permissions[0][$id_group][$ID_PERM] != @$group_permissions[$ID_PERM])
-						$curData[$id_group] = '<strong>' . $curData[$id_group] . '</strong>';
 				}
 
 				// Now add the data for this permission.
@@ -689,19 +693,18 @@ function newTable($title = '', $default_value = '', $shading = 'all', $width_nor
 
 /**
  * Adds an array of data into an existing table.
- * if there are no existing tables, will create one with default
- * attributes.
- * if custom_table isn't specified, it will use the last table created,
- * if it is specified and doesn't exist the function will return false.
- * if a set of keys have been specified, the function will check each
+ * - if there are no existing tables, will create one with default attributes.
+ * - if custom_table isn't specified, it will use the last table created,
+ * - if it is specified and doesn't exist the function will return false.
+ * - if a set of keys have been specified, the function will check each
  * required key is present in the incoming data. If this data is missing
  * the current tables default value will be used.
- * if any key in the incoming data begins with '#sep#', the function
+ * - if any key in the incoming data begins with '#sep#', the function
  * will add a separator accross the table at this point.
  * once the incoming data has been sanitized, it is added to the table.
  *
- * @param array $inc_data
- * @param int $custom_table = null
+ * @param mixed[] $inc_data
+ * @param int|null $custom_table = null
  */
 function addData($inc_data, $custom_table = null)
 {
@@ -720,6 +723,7 @@ function addData($inc_data, $custom_table = null)
 		$table = $context['current_table'];
 
 	// If we have keys, sanitise the data...
+	$data = array();
 	if (!empty($context['keys']))
 	{
 		// Basically, check every key exists!
@@ -741,6 +745,7 @@ function addData($inc_data, $custom_table = null)
 			$data[$key] = array(
 				'v' => $value,
 			);
+
 			if (substr($key, 0, 5) == '#sep#')
 				$data[$key]['separator'] = true;
 		}
@@ -764,9 +769,9 @@ function addData($inc_data, $custom_table = null)
  * Add a separator row, only really used when adding data by rows.
  *
  * @param string $title = ''
- * @param string $custom_table = null
+ * @param string|null $custom_table = null
  *
- * @return boolean returns false if there are no tables
+ * @return null|false false if there are no tables
  */
 function addSeparator($title = '', $custom_table = null)
 {
@@ -785,10 +790,12 @@ function addSeparator($title = '', $custom_table = null)
 		$table = $context['current_table'];
 
 	// Plumb in the separator
-	$context['tables'][$table]['data'][] = array(0 => array(
-		'separator' => true,
-		'v' => $title
-	));
+	$context['tables'][$table]['data'][] = array(
+		0 => array(
+			'separator' => true,
+			'v' => $title
+		)
+	);
 }
 
 /**
@@ -825,19 +832,18 @@ function finishTables()
 }
 
 /**
- * Set the keys in use by the tables - these ensure entries MUST exist if the data isn't sent.
- *
- * sets the current set of "keys" expected in each data array passed to
- * addData. It also sets the way we are adding data to the data table.
- * method specifies whether the data passed to addData represents a new
+ * Set the keys in use by the tables - these ensure entries MUST exist if the data isn't sent
+ *  - sets the current set of "keys" expected in each data array passed to
+ * addData.
+ * - It also sets the way we are adding data to the data table.
+ * - method specifies whether the data passed to addData represents a new
  * column, or a new row.
- * keys is an array whose keys are the keys for data being passed to
- * addData().
- * if reverse is set to true, then the values of the variable "keys"
+ * - keys is an array whose keys are the keys for data being passed to addData().
+ * - if reverse is set to true, then the values of the variable "keys"
  * are used as oppossed to the keys(!
  *
  * @param string $method = 'rows' rows or cols
- * @param array $keys = array()
+ * @param mixed[] $keys = array()
  * @param bool $reverse = false
  */
 function setKeys($method = 'rows', $keys = array(), $reverse = false)

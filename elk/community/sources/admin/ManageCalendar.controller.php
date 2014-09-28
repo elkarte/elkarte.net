@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -23,6 +23,8 @@ if (!defined('ELK'))
 /**
  * This class controls execution for actions in the manage calendar area
  * of the admin panel.
+ *
+ * @package Calendar
  */
 class ManageCalendar_Controller extends Action_Controller
 {
@@ -46,7 +48,7 @@ class ManageCalendar_Controller extends Action_Controller
 		loadLanguage('ManageCalendar');
 
 		// We're working with them settings here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Default text.
 		$context['explain_text'] = $txt['calendar_desc'];
@@ -58,9 +60,8 @@ class ManageCalendar_Controller extends Action_Controller
 			'settings' => array($this, 'action_calendarSettings_display', 'permission' => 'admin_forum')
 		);
 
-		call_integration_hook('integrate_manage_calendar', array(&$subActions));
-
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'holidays';
+		// Action control
+		$action = new Action('manage_calendar');
 
 		// Set up the two tabs here...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -76,10 +77,12 @@ class ManageCalendar_Controller extends Action_Controller
 				),
 			),
 		);
+
+		// Set up the default subaction, call integrate_sa_manage_calendar
+		$subAction = $action->initialize($subActions, 'settings');
 		$context['sub_action'] = $subAction;
 
-		$action = new Action();
-		$action->initialize($subActions, 'settings');
+		// Off we go
 		$action->dispatch($subAction);
 	}
 
@@ -182,13 +185,14 @@ class ManageCalendar_Controller extends Action_Controller
 			'additional_rows' => array(
 				array(
 					'position' => 'below_table_data',
-					'value' => '<input type="submit" name="delete" value="' . $txt['quickmod_delete_selected'] . '" class="right_submit" />
-					<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=managecalendar;sa=editholiday">' . $txt['holidays_add'] . '</a>',
+					'class' => 'submitbutton',
+					'value' => '<input type="submit" name="delete" value="' . $txt['quickmod_delete_selected'] . '" class="right_submit" onclick="return confirm(\'' . $txt['holidays_delete_confirm'] . '\');" />
+					<a class="linkbutton" href="' . $scripturl . '?action=admin;area=managecalendar;sa=editholiday">' . $txt['holidays_add'] . '</a>',
 				),
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['page_title'] = $txt['manage_holidays'];
@@ -260,7 +264,8 @@ class ManageCalendar_Controller extends Action_Controller
 
 	/**
 	 * Show and allow to modify calendar settings.
-	 * The method uses a Settings_Form to do the work.
+	 *
+	 * - The method uses a Settings_Form to do the work.
 	 */
 	public function action_calendarSettings_display()
 	{
@@ -271,10 +276,8 @@ class ManageCalendar_Controller extends Action_Controller
 
 		$config_vars = $this->_calendarSettings->settings();
 
-		call_integration_hook('integrate_modify_calendar_settings', array(&$config_vars));
-
 		// Get the settings template fired up.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Get the final touches in place.
 		$context['post_url'] = $scripturl . '?action=admin;area=managecalendar;save;sa=settings';
@@ -317,6 +320,11 @@ class ManageCalendar_Controller extends Action_Controller
 		// Some important context stuff
 		$context['page_title'] = $txt['calendar_settings'];
 		$context['sub_template'] = 'show_settings';
+
+		// Lets start off with the premission blocks collapsed
+		addInlineJavascript('var legend = $(\'legend\');
+			legend.siblings().slideToggle("fast");
+			legend.parent().toggleClass("collapsed")', true);
 
 		return $this->_calendarSettings->settings($config_vars);
 	}
@@ -365,6 +373,9 @@ class ManageCalendar_Controller extends Action_Controller
 				array('check', 'cal_allowspan'),
 				array('int', 'cal_maxspan', 6, 'postinput' => $txt['days_word']),
 		);
+
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_calendar_settings', array(&$config_vars));
 
 		return $config_vars;
 	}

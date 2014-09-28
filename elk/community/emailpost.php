@@ -2,15 +2,20 @@
 <?php
 
 /**
+ * Handles the replying and posting of messages by email
+ *
+ * Note the shebang #!/usr/local/bin/php -q needs to point to the installed
+ * location of php, this is the typical location but yours may be different
+ *
  * @name      ElkArte Forum
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Alpha
+ * @version 1.0
  *
  */
 
-// Only do anything for a pipe and direct calling
+// Only do something for a pipe and direct calling
 if (!defined('STDIN'))
 	return;
 

@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -96,9 +96,6 @@ function template_announcement_send()
 		</form>
 	</div>
 	<script><!-- // --><![CDATA[
-		var countdown = 3,
-			txt_message = "', $txt['announce_continue'], '";
-
-		doAutoSubmit();
+		doAutoSubmit(3, ', JavaScriptEscape($txt['announce_continue']), ');
 	// ]]></script>';
 }

@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -22,6 +22,8 @@ if (!defined('ELK'))
 
 /**
  * Manage languages controller class.
+ *
+ * @package Languages
  */
 class ManageLanguages_Controller extends Action_Controller
 {
@@ -33,8 +35,10 @@ class ManageLanguages_Controller extends Action_Controller
 
 	/**
 	 * This is the main function for the languages area.
-	 * It dispatches the requests.
-	 * Loads the ManageLanguages template. (sub-actions will use it)
+	 *
+	 * What it does:
+	 * - It dispatches the requests.
+	 * - Loads the ManageLanguages template. (sub-actions will use it)
 	 *
 	 * @uses ManageSettings language file
 	 * @see Action_Controller::action_index()
@@ -48,19 +52,13 @@ class ManageLanguages_Controller extends Action_Controller
 
 		$subActions = array(
 			'edit' => array($this, 'action_edit', 'permission' => 'admin_forum'),
-// 			'add' => array($this, 'action_add', 'permission' => 'admin_forum'),
 			'settings' => array($this, 'action_languageSettings_display', 'permission' => 'admin_forum'),
 			'downloadlang' => array($this, 'action_downloadlang', 'permission' => 'admin_forum'),
 			'editlang' => array($this, 'action_editlang', 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_languages', array(&$subActions));
-
-		// By default we're managing languages.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'edit';
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['edit_languages'];
-		$context['sub_template'] = 'show_settings';
+		// Get ready for action
+		$action = new Action('manage_languages');
 
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -68,9 +66,15 @@ class ManageLanguages_Controller extends Action_Controller
 			'description' => $txt['language_description'],
 		);
 
+		// By default we're managing languages, call integrate_sa_manage_languages
+		$subAction = $action->initialize($subActions, 'edit');
+
+		// Some final bits
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['edit_languages'];
+		$context['sub_template'] = 'show_settings';
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'edit');
 		$action->dispatch($subAction);
 	}
 
@@ -143,7 +147,7 @@ class ManageLanguages_Controller extends Action_Controller
 				),
 			);
 
-			require_once(SUBSDIR . '/List.class.php');
+			require_once(SUBSDIR . '/GenericList.class.php');
 			createList($listOptions);
 		}
 
@@ -178,7 +182,7 @@ class ManageLanguages_Controller extends Action_Controller
 
 			if ($_POST['def_language'] != $language && $lang_exists)
 			{
-				require_once(SUBSDIR . '/Settings.class.php');
+				require_once(SUBSDIR . '/SettingsForm.class.php');
 				Settings_Form::save_file(array('language' => '\'' . $_POST['def_language'] . '\''));
 				$language = $_POST['def_language'];
 			}
@@ -192,6 +196,14 @@ class ManageLanguages_Controller extends Action_Controller
 			'items_per_page' => 20,
 			'base_href' => $scripturl . '?action=admin;area=languages',
 			'title' => $txt['edit_languages'],
+			'data_check' => array(
+				'class' => create_function('$rowData', '
+					if ($rowData[\'default\'])
+						return \'highlight2\';
+					else
+						return \'\';
+				')
+			),
 			'get_items' => array(
 				'function' => 'list_getLanguages',
 			),
@@ -206,7 +218,7 @@ class ManageLanguages_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							return \'<input type="radio" name="def_language" value="\' . $rowData[\'id\'] . \'" \' . ($rowData[\'default\'] ? \'checked="checked"\' : \'\') . \' onclick="highlightSelected(\\\'list_language_list_\' . $rowData[\'id\'] . \'\\\');" class="input_radio" />\';
+							return \'<input type="radio" name="def_language" value="\' . $rowData[\'id\'] . \'" \' . ($rowData[\'default\'] ? \'checked="checked"\' : \'\') . \' class="input_radio" />\';
 						'),
 						'style' => 'width: 8%;',
 						'class' => 'centertext',
@@ -218,18 +230,10 @@ class ManageLanguages_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							global $scripturl, $context;
+							global $scripturl;
 
 							return sprintf(\'<a href="%1$s?action=admin;area=languages;sa=editlang;lid=%2$s">%3$s</a>\', $scripturl, $rowData[\'id\'], $rowData[\'name\']);
 						'),
-					),
-				),
-				'character_set' => array(
-					'header' => array(
-						'value' => $txt['languages_character_set'],
-					),
-					'data' => array(
-						'db_htmlsafe' => 'char_set',
 					),
 				),
 				'count' => array(
@@ -263,9 +267,7 @@ class ManageLanguages_Controller extends Action_Controller
 			),
 			// For highlighting the default.
 			'javascript' => '
-						var prevClass = "",
-							prevDiv = "";
-						highlightSelected("list_language_list_' . ($language == '' ? 'english' : $language) . '");
+				initHighlightSelection(\'language_list\');
 			',
 		);
 
@@ -277,7 +279,7 @@ class ManageLanguages_Controller extends Action_Controller
 				'class' => 'smalltext alert',
 			);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'show_list';
@@ -286,10 +288,12 @@ class ManageLanguages_Controller extends Action_Controller
 
 	/**
 	 * Download a language file from the website.
-	 * Requires a valid download ID ("did") in the URL.
-	 * Also handles installing language files.
-	 * Attempts to chmod things as needed.
-	 * Uses a standard list to display information about all the files and where they'll be put.
+	 *
+	 * What it does:
+	 * - Requires a valid download ID ("did") in the URL.
+	 * - Also handles installing language files.
+	 * - Attempts to chmod things as needed.
+	 * - Uses a standard list to display information about all the files and where they'll be put.
 	 *
 	 * @uses ManageLanguages template, download_language sub-template.
 	 * @uses Admin template, show_list sub-template.
@@ -297,6 +301,9 @@ class ManageLanguages_Controller extends Action_Controller
 	public function action_downloadlang()
 	{
 		global $context, $forum_version, $txt, $scripturl, $modSettings;
+
+		// @todo for the moment there is no facility to download packages, so better kill it here
+		fatal_lang_error('no_access', false);
 
 		loadLanguage('ManageSettings');
 		require_once(SUBSDIR . '/Package.subs.php');
@@ -341,7 +348,7 @@ class ManageLanguages_Controller extends Action_Controller
 			elseif (!empty($install_files))
 			{
 				// @todo retrieve the language pack per naming pattern from our sites
-				$archive_content = read_tgz_file('http://download.elkarte.net/fetch_language.php?version=' . urlencode(strtr($forum_version, array('ElkArte ' => ''))) . ';fetch=' . urlencode($_GET['did']), BOARDDIR, false, true, $install_files);
+				read_tgz_file('http://download.elkarte.net/fetch_language.php?version=' . urlencode(strtr($forum_version, array('ElkArte ' => ''))) . ';fetch=' . urlencode($_GET['did']), BOARDDIR, false, true, $install_files);
 
 				// Make sure the files aren't stuck in the cache.
 				package_flush_cache();
@@ -551,7 +558,7 @@ class ManageLanguages_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							global $context, $txt;
+							global $txt;
 
 							return \'<strong>\' . $rowData[\'name\'] . \'</strong><br /><span class="smalltext">\' . $txt[\'languages_download_dest\'] . \': \' . $rowData[\'destination\'] . \'</span>\' . ($rowData[\'version_compare\'] == \'older\' ? \'<br />\' . $txt[\'languages_download_older\'] : \'\');
 						'),
@@ -575,8 +582,6 @@ class ManageLanguages_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							global $txt;
-
 							return \'<span class="\' . ($rowData[\'version_compare\'] == \'older\' ? \'error\' : ($rowData[\'version_compare\'] == \'same\' ? \'softalert\' : \'success\')) . \';">\' . $rowData[\'version\'] . \'</span>\';
 						'),
 					),
@@ -613,7 +618,7 @@ class ManageLanguages_Controller extends Action_Controller
 		if (!empty($modSettings['cache_enable']))
 			cache_put_data('known_languages', null, !empty($modSettings['cache_enable']) && $modSettings['cache_enable'] < 1 ? 86400 : 3600);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		createToken('admin-dlang');
@@ -624,7 +629,7 @@ class ManageLanguages_Controller extends Action_Controller
 	 */
 	public function action_editlang()
 	{
-		global $settings, $context, $txt, $modSettings, $language;
+		global $settings, $context, $txt, $modSettings, $language, $scripturl;
 
 		require_once(SUBSDIR . '/Language.subs.php');
 		loadLanguage('ManageSettings');
@@ -647,6 +652,7 @@ class ManageLanguages_Controller extends Action_Controller
 
 		// This will be where we look
 		$lang_dirs = array();
+		$images_dirs = array();
 
 		// Check we have themes with a path and a name - just in case - and add the path.
 		foreach ($themes as $id => $data)
@@ -692,7 +698,19 @@ class ManageLanguages_Controller extends Action_Controller
 			usort($context['possible_files'][$theme]['files'], create_function('$val1, $val2', 'return strcmp($val1[\'name\'], $val2[\'name\']);'));
 		}
 
+		if ($context['lang_id'] != 'english')
+		{
+			$possiblePackage = findPossiblePackages($context['lang_id']);
+			if ($possiblePackage !== false)
+			{
+				$context['langpack_uninstall_link'] = $scripturl . '?action=admin;area=packages;sa=uninstall;package=' . $possiblePackage[1] . ';pid=' . $possiblePackage[0];
+			}
+		}
+
 		// We no longer wish to speak this language.
+		// @todo - languages have been moved to packages
+		// this may or may not be used in the future, for now it's not used at all
+		// @deprecated since 1.0
 		if (!empty($_POST['delete_main']) && $context['lang_id'] != 'english')
 		{
 			checkSession();
@@ -725,9 +743,14 @@ class ManageLanguages_Controller extends Action_Controller
 				unlink(BOARDDIR . '/agreement.' . $context['lang_id'] . '.txt');
 
 			// Fourth, a related images folder?
-			foreach ($images_dirs as $curPath)
-				if (is_dir($curPath))
-					deltree($curPath);
+			if (!empty($images_dirs))
+			{
+				foreach ($images_dirs as $curPath)
+				{
+					if (is_dir($curPath))
+						deltree($curPath);
+				}
+			}
 
 			// Members can no longer use this language.
 			removeLanguageFromMember($context['lang_id']);
@@ -739,7 +762,7 @@ class ManageLanguages_Controller extends Action_Controller
 			// Sixth, if we deleted the default language, set us back to english?
 			if ($context['lang_id'] == $language)
 			{
-				require_once(SUBSDIR . '/Settings.class.php');
+				require_once(SUBSDIR . '/SettingsForm.class.php');
 				$language = 'english';
 				Settings_Form::save_file(array('language' => '\'' . $language . '\''));
 			}
@@ -760,7 +783,6 @@ class ManageLanguages_Controller extends Action_Controller
 
 			// These are the replacements. old => new
 			$replace_array = array(
-				'~\$txt\[\'lang_character_set\'\]\s=\s(\'|")[^\r\n]+~' => '$txt[\'lang_character_set\'] = \'' . addslashes($_POST['character_set']) . '\';',
 				'~\$txt\[\'lang_locale\'\]\s=\s(\'|")[^\r\n]+~' => '$txt[\'lang_locale\'] = \'' . addslashes($_POST['locale']) . '\';',
 				'~\$txt\[\'lang_dictionary\'\]\s=\s(\'|")[^\r\n]+~' => '$txt[\'lang_dictionary\'] = \'' . addslashes($_POST['dictionary']) . '\';',
 				'~\$txt\[\'lang_spelling\'\]\s=\s(\'|")[^\r\n]+~' => '$txt[\'lang_spelling\'] = \'' . addslashes($_POST['spelling']) . '\';',
@@ -782,7 +804,6 @@ class ManageLanguages_Controller extends Action_Controller
 		// Setup the primary settings context.
 		$context['primary_settings'] = array(
 			'name' => Util::ucwords(strtr($context['lang_id'], array('_' => ' ', '-utf8' => ''))),
-			'character_set' => 'UTF-8',
 			'locale' => $txt['lang_locale'],
 			'dictionary' => $txt['lang_dictionary'],
 			'spelling' => $txt['lang_spelling'],
@@ -854,6 +875,9 @@ class ManageLanguages_Controller extends Action_Controller
 			$context['file_entries'] = array();
 			foreach ($entries as $entryKey => $entryValue)
 			{
+				// Nowadays some entries have fancy keys, so better use something "portable" for the form
+				$md5EntryKey = md5($entryKey);
+
 				// Ignore some things we set separately.
 				$ignore_files = array('lang_character_set', 'lang_locale', 'lang_dictionary', 'lang_spelling', 'lang_rtl');
 				if (in_array($entryKey, $ignore_files))
@@ -886,9 +910,9 @@ class ManageLanguages_Controller extends Action_Controller
 						$subValue = strtr($subValue, array('"' => '', '\'' => '', ')' => ''));
 
 						// Can we save?
-						if (isset($save_strings[$entryKey . '-+- ' . $cur_index]))
+						if (isset($save_strings[$md5EntryKey . '-+- ' . $cur_index]))
 						{
-							$save_cache['entries'][$cur_index] = strtr($save_strings[$entryKey . '-+- ' . $cur_index], array('\'' => ''));
+							$save_cache['entries'][$cur_index] = strtr($save_strings[$md5EntryKey . '-+- ' . $cur_index], array('\'' => ''));
 							$save_cache['enabled'] = true;
 						}
 						else
@@ -896,6 +920,7 @@ class ManageLanguages_Controller extends Action_Controller
 
 						$context['file_entries'][] = array(
 							'key' => $entryKey . '-+- ' . $cur_index,
+							'display_key' => $entryKey . '-+- ' . $cur_index,
 							'value' => $subValue,
 							'rows' => 1,
 						);
@@ -932,25 +957,26 @@ class ManageLanguages_Controller extends Action_Controller
 				else
 				{
 					// Saving?
-					if (isset($save_strings[$entryKey]) && $save_strings[$entryKey] != $entryValue['entry'])
+					if (isset($save_strings[$md5EntryKey]) && $save_strings[$md5EntryKey] != $entryValue['entry'])
 					{
 						// @todo Fix this properly.
-						if ($save_strings[$entryKey] == '')
-							$save_strings[$entryKey] = '\'\'';
+						if ($save_strings[$md5EntryKey] == '')
+							$save_strings[$md5EntryKey] = '\'\'';
 
 						// Set the new value.
-						$entryValue['entry'] = $save_strings[$entryKey];
+						$entryValue['entry'] = $save_strings[$md5EntryKey];
 
 						// And we know what to save now!
 						$final_saves[$entryKey] = array(
 							'find' => $entryValue['full'],
-							'replace' => '$' . $entryValue['type'] . '[\'' . $entryKey . '\'] = ' . $save_strings[$entryKey] . ';',
+							'replace' => '$' . $entryValue['type'] . '[\'' . $entryKey . '\'] = ' . $save_strings[$md5EntryKey] . ';',
 						);
 					}
 
 					$editing_string = cleanLangString($entryValue['entry'], true);
 					$context['file_entries'][] = array(
-						'key' => $entryKey,
+						'key' => $md5EntryKey,
+						'display_key' => $entryKey,
 						'value' => $editing_string,
 						'rows' => (int) (strlen($editing_string) / 38) + substr_count($editing_string, "\n") + 1,
 					);
@@ -988,9 +1014,8 @@ class ManageLanguages_Controller extends Action_Controller
 	/**
 	 * Edit language related settings.
 	 *
-	 * Accessed by ?action=admin;area=languages;sa=settings
-	 *
-	 * This method handles the display, allows to edit, and saves the result
+	 * - Accessed by ?action=admin;area=languages;sa=settings
+	 * - This method handles the display, allows to edit, and saves the result
 	 * for the _languageSettings form.
 	 */
 	public function action_languageSettings_display()
@@ -1004,15 +1029,12 @@ class ManageLanguages_Controller extends Action_Controller
 		$settings_not_writable = !is_writable(BOARDDIR . '/Settings.php');
 		$settings_backup_fail = !@is_writable(BOARDDIR . '/Settings_bak.php') || !@copy(BOARDDIR . '/Settings.php', BOARDDIR . '/Settings_bak.php');
 
-		$config_vars = $this->_languageSettings->settings();
-
 		// Saving settings?
 		if (isset($_REQUEST['save']))
 		{
 			checkSession();
 
-			// @todo review these hooks: do they need param and how else can we do this
-			call_integration_hook('integrate_save_language_settings', array(&$config_vars));
+			call_integration_hook('integrate_save_language_settings');
 
 			$this->_languageSettings->save();
 			redirectexit('action=admin;area=languages;sa=settings');
@@ -1040,7 +1062,8 @@ class ManageLanguages_Controller extends Action_Controller
 
 	/**
 	 * Administration settings for languages area:
-	 *  the method will initialize the form config array with all settings.
+	 *
+	 * - the method will initialize the form config array with all settings.
 	 *
 	 * Format of the array:
 	 *  - either, variable name, description, type (constant), size/possible values, helptext.
@@ -1052,7 +1075,7 @@ class ManageLanguages_Controller extends Action_Controller
 	private function _initLanguageSettingsForm()
 	{
 		// We'll want to use them someday. That is, right now.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		// Make it happen!
 		$this->_languageSettings = new Settings_Form();
@@ -1079,7 +1102,7 @@ class ManageLanguages_Controller extends Action_Controller
 			array('userLanguage', $txt['userLanguage'], 'db', 'check', null, 'userLanguage'),
 		);
 
-		call_integration_hook('integrate_language_settings', array(&$config_vars));
+		call_integration_hook('integrate_modify_language_settings', array(&$config_vars));
 
 		// Get our languages. No cache.
 		$languages = getLanguages(false);

@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -36,14 +36,14 @@ function template_view_scheduled_tasks()
 		{
 			echo '
 	<div id="errors" class="errorbox">
-		', $txt['scheduled_tasks_were_run_errors'], '<br>';
+		', $txt['scheduled_tasks_were_run_errors'], '<br />';
 
 			foreach ($context['scheduled_errors'] as $task => $errors)
 			{
 				echo
 				isset($txt['scheduled_task_' . $task]) ? $txt['scheduled_task_' . $task] : $task, '
 				<ul>
-					<li>', implode('</li><li>', $errors), '</li>
+					<li class="listlevel1">', implode('</li><li class="listlevel1">', $errors), '</li>
 				</ul>';
 			}
 

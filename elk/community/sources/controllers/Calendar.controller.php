@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -324,7 +324,7 @@ class Calendar_Controller extends Action_Controller
 
 		// Template, sub template, etc.
 		loadTemplate('Calendar');
-		$context['sub_template'] = 'event_post';
+		$context['sub_template'] = 'unlinked_event_post';
 
 		$context['page_title'] = isset($event_id) ? $txt['calendar_edit'] : $txt['calendar_post_event'];
 		$context['linktree'][] = array(
@@ -413,9 +413,9 @@ class Calendar_Controller extends Action_Controller
 		$filecontents .= 'END:VCALENDAR';
 
 		// Send some standard headers.
-		ob_end_clean();
+		@ob_end_clean();
 		if (!empty($modSettings['enableCompressedOutput']))
-			@ob_start('ob_gzhandler');
+			ob_start('ob_gzhandler');
 		else
 			ob_start();
 

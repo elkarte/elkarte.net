@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  * Original module by Mach8 - We'll never forget you.
  */
@@ -76,10 +76,8 @@ class SplitTopics_Controller extends Action_Controller
 		);
 
 		// ?action=splittopics;sa=LETSBREAKIT won't work, sorry.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'index';
-
 		$action = new Action();
-		$action->initialize($subActions, 'index');
+		$subAction = $action->initialize($subActions, 'index');
 		$action->dispatch($subAction);
 	}
 
@@ -330,7 +328,7 @@ class SplitTopics_Controller extends Action_Controller
 			$original_msgs = array(
 				'not_selected' => messageAt($context['not_selected']['start'], $topic, array(
 					'not_in' => empty($_SESSION['split_selection'][$topic]) ? array() : $_SESSION['split_selection'][$topic],
-					'only_approved' => !$modSettings['postmod_active'] || allowedTo('approve_posts'),
+					'only_approved' => !$modSettings['postmod_active'] || !allowedTo('approve_posts'),
 					'limit' => $context['messages_per_page'],
 				)),
 				'selected' => array(),
@@ -344,7 +342,7 @@ class SplitTopics_Controller extends Action_Controller
 			{
 				$original_msgs['selected'] = messageAt($context['selected']['start'], $topic, array(
 					'include' => empty($_SESSION['split_selection'][$topic]) ? array() : $_SESSION['split_selection'][$topic],
-					'only_approved' => !$modSettings['postmod_active'] || allowedTo('approve_posts'),
+					'only_approved' => !$modSettings['postmod_active'] || !allowedTo('approve_posts'),
 					'limit' => $context['messages_per_page'],
 				));
 			}
@@ -368,7 +366,7 @@ class SplitTopics_Controller extends Action_Controller
 		{
 			$_SESSION['split_selection'][$topic] = messageAt(0, $topic, array(
 				'include' => empty($_SESSION['split_selection'][$topic]) ? array() : $_SESSION['split_selection'][$topic],
-				'only_approved' => !$modSettings['postmod_active'] || allowedTo('approve_posts'),
+				'only_approved' => !$modSettings['postmod_active'] || !allowedTo('approve_posts'),
 				'limit' => false,
 			));
 			$selection = $_SESSION['split_selection'][$topic];

@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -93,7 +93,7 @@ function template_trackIP()
 						<label for="searchip"><strong>', $txt['enter_ip'], ':</strong></label>
 					</dt>
 					<dd>
-						<input type="text" name="searchip" value="', $context['ip'], '" class="input_text" />
+						<input type="text" id="searchip" name="searchip" value="', $context['ip'], '" class="input_text" />
 					</dd>
 				</dl>
 				<input type="submit" value="', $txt['trackIP'], '" class="right_submit" />

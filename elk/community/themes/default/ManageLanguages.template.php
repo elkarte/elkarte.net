@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -73,13 +73,13 @@ function template_download_language()
 						<th scope="col">
 							', $txt['languages_download_filename'], '
 						</th>
-						<th scope="col" style="width:100">
+						<th scope="col" style="width: 100px;">
 							', $txt['languages_download_writable'], '
 						</th>
-						<th scope="col" style="width:100">
+						<th scope="col" style="width: 100px;">
 							', $txt['languages_download_exists'], '
 						</th>
-						<th scope="col" style="width:4%">
+						<th scope="col" style="width: 4%;">
 							', $txt['languages_download_copy'], '
 						</th>
 					</tr>
@@ -253,12 +253,6 @@ function template_modify_language_entries()
 						<legend>', $context['primary_settings']['name'], '</legend>
 						<dl class="settings">
 							<dt>
-								<label for="character_set">', $txt['languages_character_set'], ':</label>
-							</dt>
-							<dd>
-								<input type="text" name="character_set" id="character_set" size="20" value="', $context['primary_settings']['character_set'], '"', (empty($context['file_entries']) ? '' : ' disabled="disabled"'), ' class="input_text" />
-							</dd>
-							<dt>
 								<label for="locale">', $txt['languages_locale'], ':</label>
 							</dt>
 							<dd>
@@ -290,11 +284,11 @@ function template_modify_language_entries()
 						<input type="submit" name="save_main" value="', $txt['save'], '"', $context['lang_file_not_writable_message'] || !empty($context['file_entries']) ? ' disabled="disabled"' : '', ' class="button_submit" />';
 
 	// Allow deleting entries.
-	if ($context['lang_id'] != 'english')
+	if (!empty($context['langpack_uninstall_link']))
 	{
 		// English can't be deleted though.
 		echo '
-						<input type="submit" name="delete_main" value="', $txt['delete'], '"', $context['lang_file_not_writable_message'] || !empty($context['file_entries']) ? ' disabled="disabled"' : '', ' onclick="return confirm(\'', $txt['languages_delete_confirm'], '\');" class="button_submit" />';
+						<a href="', $context['langpack_uninstall_link'], '" class="linkbutton">' . $txt['delete'] . '</a>';
 	}
 
 	echo '
@@ -309,8 +303,8 @@ function template_modify_language_entries()
 					', $txt['edit_language_entries'], '
 				</h3>
 				<div id="taskpad" class="floatright">
-					', $txt['edit_language_entries_file'], ':
-					<select name="tfid" onchange="if (this.value != -1) document.forms.entry_form.submit();">';
+					<label for="tfid">', $txt['edit_language_entries_file'], '</label>:
+					<select id="tfid" name="tfid" onchange="if (this.value != -1) document.forms.entry_form.submit();">';
 
 	foreach ($context['possible_files'] as $id_theme => $theme)
 	{
@@ -343,56 +337,20 @@ function template_modify_language_entries()
 	{
 		echo '
 			<div class="content">
-				<dl class="settings">';
+				<ul class="strings_edit settings">';
 
-		$cached = array();
 		foreach ($context['file_entries'] as $entry)
 		{
-			// Do it in two's!
-			if (empty($cached))
-			{
-				$cached = $entry;
-				continue;
-			}
-
 			echo '
-					<dt>
-						<span class="smalltext">', $cached['key'], '</span>
-					</dt>
-					<dd>
-						<span class="smalltext">', $entry['key'], '</span>
-					</dd>
-					<dt>
-						<input type="hidden" name="comp[', $cached['key'], ']" value="', $cached['value'], '" />
-						<textarea name="entry[', $cached['key'], ']" cols="40" rows="', $cached['rows'] < 2 ? 2 : $cached['rows'], '" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 96%; min-width: 96%' : 'width: 96%') . ';">', $cached['value'], '</textarea>
-					</dt>
-					<dd>
+					<li>
+						<label for="entry_', $entry['key'], '" class="smalltext">', $entry['display_key'], '</label>
 						<input type="hidden" name="comp[', $entry['key'], ']" value="', $entry['value'], '" />
-						<textarea name="entry[', $entry['key'], ']" cols="40" rows="', $entry['rows'] < 2 ? 2 : $entry['rows'], '" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 96%; min-width: 96%' : 'width: 96%') . ';">', $entry['value'], '</textarea>
-					</dd>';
-			$cached = array();
-		}
-
-		// Odd number?
-		if (!empty($cached))
-		{
-			// Alternative time
-			echo '
-					<dt>
-						<span class="smalltext">', $cached['key'], '</span>
-					</dt>
-					<dd>
-					</dd>
-					<dt>
-						<input type="hidden" name="comp[', $cached['key'], ']" value="', $cached['value'], '" />
-						<textarea name="entry[', $cached['key'], ']" cols="40" rows="2" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 96%; min-width: 96%' : 'width: 96%') . ';">', $cached['value'], '</textarea>
-					</dt>
-					<dd>
-					</dd>';
+						<textarea id="entry_', $entry['key'], '" name="entry[', $entry['key'], ']" cols="40" rows="', $entry['rows'] < 2 ? 2 : $entry['rows'], '" style="' . (isBrowser('is_ie8') ? 'width: 635px; max-width: 96%; min-width: 96%' : '') . ';">', $entry['value'], '</textarea>
+					</li>';
 		}
 
 		echo '
-				</dl>
+				</ul>
 				<input type="submit" name="save_entries" value="', $txt['save'], '"', !empty($context['entries_not_writable_message']) ? ' disabled="disabled"' : '', ' class="button_submit" />
 			</div>';
 	}
@@ -417,8 +375,8 @@ function template_add_language()
 				<div class="content">
 					<fieldset>
 						<legend>', $txt['add_language_elk'], '</legend>
-						<label class="smalltext">', $txt['add_language_elk_browse'], '</label>
-						<input type="text" name="lang_add" size="40" value="', !empty($context['elk_search_term']) ? $context['elk_search_term'] : '', '" class="input_text" />';
+						<label for="lang_add" class="smalltext">', $txt['add_language_elk_browse'], '</label>
+						<input type="text" id="lang_add" name="lang_add" size="40" value="', !empty($context['elk_search_term']) ? $context['elk_search_term'] : '', '" class="input_text" />';
 
 	// Do we have some errors? Too bad.
 	if (!empty($context['langfile_error']))

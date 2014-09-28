@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -168,17 +168,14 @@ function cleanRequest()
  */
 function isValidIPv6($ip)
 {
-	if (preg_match('~^((([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}:[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){5}:([0-9A-Fa-f]{1,4}:)?[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){4}:([0-9A-Fa-f]{1,4}:){0,2}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){3}:([0-9A-Fa-f]{1,4}:){0,3}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){2}:([0-9A-Fa-f]{1,4}:){0,4}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(([0-9A-Fa-f]{1,4}:){0,5}:((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(::([0-9A-Fa-f]{1,4}:){0,5}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|([0-9A-Fa-f]{1,4}::([0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4})|(::([0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){1,7}:))$~', $ip) === 0)
-		return false;
-
-	return true;
+	return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
 }
 
 /**
  * Converts IPv6s to numbers.  This makes ban checks much easier.
  *
  * @param string $ip ip address to be converted
- * @return array
+ * @return int[] array
  */
 function convertIPv6toInts($ip)
 {
@@ -206,7 +203,7 @@ function convertIPv6toInts($ip)
  *
  * @param string $addr ipv6 address string
  * @param boolean $strict_check checks lenght to expaned address for compliance
- * @return boolean/string expanded ipv6 address.
+ * @return boolean|string expanded ipv6 address.
  */
 function expandIPv6($addr, $strict_check = true)
 {
@@ -223,6 +220,20 @@ function expandIPv6($addr, $strict_check = true)
 		$part[0] = explode(':', $part[0]);
 		$part[1] = explode(':', $part[1]);
 		$missing = array();
+
+		// Looks like this is an IPv4 address
+		if (strpos($part[1][1], '.') !== false)
+		{
+			$ipoct = explode('.', $part[1][1]);
+			$p1 = dechex($ipoct[0]) . dechex($ipoct[1]);
+			$p2 = dechex($ipoct[2]) . dechex($ipoct[3]);
+
+			$part[1] = array(
+				$part[1][0],
+				$p1,
+				$p2
+			);
+		}
 
 		$limit = count($part[0]) + count($part[1]);
 		for ($i = 0; $i < (8 - $limit); $i++)
@@ -255,14 +266,15 @@ function expandIPv6($addr, $strict_check = true)
 
 /**
  * Adds html entities to the array/variable.  Uses two underscores to guard against overloading.
+ *
  * What it does:
  * - adds entities (&quot;, &lt;, &gt;) to the array or string var.
  * - importantly, does not effect keys, only values.
  * - calls itself recursively if necessary.
  *
- * @param array|string $var
+ * @param string[]|string $var
  * @param int $level = 0
- * @return array|string
+ * @return mixed[]|string
  */
 function htmlspecialchars__recursive($var, $level = 0)
 {
@@ -278,14 +290,15 @@ function htmlspecialchars__recursive($var, $level = 0)
 
 /**
  * Trim a string including the HTML space, character 160.  Uses two underscores to guard against overloading.
+ *
  * What it does:
  * - trims a string or an the var array using html characters as well.
  * - does not effect keys, only values.
  * - may call itself recursively if needed.
  *
- * @param array|string $var
+ * @param string[]|string $var
  * @param int $level = 0
- * @return array|string
+ * @return mixed[]|string
  */
 function htmltrim__recursive($var, $level = 0)
 {
@@ -302,6 +315,7 @@ function htmltrim__recursive($var, $level = 0)
 
 /**
  * Clean up the XML to make sure it doesn't contain invalid characters.
+ *
  * What it does:
  * - removes invalid XML characters to assure the input string being
  * - parsed properly.
@@ -341,6 +355,7 @@ function JavaScriptEscape($string)
 
 /**
  * Rewrite URLs to include the session ID.
+ *
  * What it does:
  * - rewrites the URLs outputted to have the session ID, if the user
  *   is not accepting cookies and is using a standard web browser.
@@ -359,7 +374,7 @@ function ob_sessrewrite($buffer)
 	if ($scripturl == '' || !defined('SID'))
 		return $buffer;
 
-	// Do nothing if the session is cookied, or they are a crawler - guests are caught by redirectexit().  This doesn't work below PHP 4.3.0, because it makes the output buffer bigger.
+	// Do nothing if the session is cookied, or they are a crawler - guests are caught by redirectexit().
 	if (empty($_COOKIE) && SID != '' && !isBrowser('possibly_robot'))
 		$buffer = preg_replace('/(?<!<link rel="canonical" href=)"' . preg_quote($scripturl, '/') . '(?!\?' . preg_quote(SID, '/') . ')\\??/', '"' . $scripturl . '?' . SID . '&amp;', $buffer);
 
@@ -371,12 +386,24 @@ function ob_sessrewrite($buffer)
 	if (!empty($modSettings['queryless_urls']) && (!$context['server']['is_cgi'] || ini_get('cgi.fix_pathinfo') == 1 || @get_cfg_var('cgi.fix_pathinfo') == 1) && ($context['server']['is_apache'] || $context['server']['is_lighttpd'] || $context['server']['is_litespeed']))
 	{
 		// Let's do something special for session ids!
-		if (defined('SID') && SID != '')
-			$buffer = preg_replace_callback('~"' . preg_quote($scripturl, '/') . '\?(?:' . SID . '(?:;|&|&amp;))((?:board|topic)=[^#"]+?)(#[^"]*?)?"~', create_function('$m', 'global $scripturl; return \'"\' . $scripturl . "/" . strtr("$m[1]", \'&;=\', \'//,\') . ".html?" . SID . (isset($m[2]) ? $m[2] : "") . \'"\';'), $buffer);
-		else
-			$buffer = preg_replace_callback('~"' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+?)(#[^"]*?)?"~', create_function('$m', 'global $scripturl; return \'"\' . $scripturl . "/" . strtr("$m[1]", \'&;=\', \'//,\') . ".html" . (isset($m[2]) ? $m[2] : "") . \'"\';'), $buffer);
+		$buffer = preg_replace_callback('~"' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+?)(#[^"]*?)?"~', 'buffer_callback', $buffer);
 	}
 
 	// Return the changed buffer.
 	return $buffer;
+}
+
+/**
+ * Callback function for the Rewrite URLs preg_replace_callback
+ *
+ * @param mixed[] $matches
+ */
+function buffer_callback($matches)
+{
+	global $scripturl;
+
+	if (defined('SID') && SID != '')
+		return '"' . $scripturl . '/' . strtr($matches[1], '&;=', '//,') . '.html?' . SID . (isset($matches[2]) ? $matches[2] : '') . '"';
+	else
+		return '"' . $scripturl . '/' . strtr($matches[1], '&;=', '//,') . '.html' . (isset($matches[2]) ? $matches[2] : '') . '"';
 }

@@ -7,15 +7,16 @@
  * @copyright ElkArte Forum contributors
  * @license   BSD http://opensource.org/licenses/BSD-3-Clause
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
 /**
  * Create PM draft in the database
  *
- * @param array $draft
- * @param array $recipientList
+ * @package Drafts
+ * @param mixed[] $draft
+ * @param string[] $recipientList
  */
 function create_pm_draft($draft, $recipientList)
 {
@@ -49,16 +50,15 @@ function create_pm_draft($draft, $recipientList)
 	);
 
 	// Return the new id
-	$draft['id_draft'] = $db->insert_id('{db_prefix}user_drafts', 'id_draft');
-
-	return $draft['id_draft'];
+	return $db->insert_id('{db_prefix}user_drafts', 'id_draft');
 }
 
 /**
  * Update an existing PM draft with the new data
  *
- * @param array $draft
- * @param array $recipientList
+ * @package Drafts
+ * @param mixed[] $draft
+ * @param string[] $recipientList
  */
 function modify_pm_draft($draft, $recipientList)
 {
@@ -89,7 +89,8 @@ function modify_pm_draft($draft, $recipientList)
 /**
  * Create a new post draft in the database
  *
- * @param array $draft
+ * @package Drafts
+ * @param mixed[] $draft
  */
 function create_post_draft($draft)
 {
@@ -133,15 +134,14 @@ function create_post_draft($draft)
 	);
 
 	// Get the id of the new draft
-	$draft['id_draft'] = $db->insert_id('{db_prefix}user_drafts', 'id_draft');
-
-	return $draft['id_draft'];
+	return $db->insert_id('{db_prefix}user_drafts', 'id_draft');
 }
 
 /**
  * Update a Post draft with the supplied data
  *
- * @param array $draft
+ * @package Drafts
+ * @param mixed[] $draft
  */
 function modify_post_draft($draft)
 {
@@ -177,9 +177,12 @@ function modify_post_draft($draft)
 
 /**
  * Loads a single draft
- * Validates draft id/owner match if check is set to true
- * Draft id must match the type selected (post or pm)
  *
+ * What it does:
+ * - Validates draft id/owner match if check is set to true
+ * - Draft id must match the type selected (post or pm)
+ *
+ * @package Drafts
  * @param int $id_draft - specific draft number to get from the db
  * @param int $uid - member id who created the draft
  * @param int $type - 0 for post and 1 for pm
@@ -225,11 +228,13 @@ function load_draft($id_draft, $uid, $type = 0, $drafts_keep_days = 0, $check = 
 
 /**
  * Loads all of the drafts for a user
- * Optionly can load just the drafts for a specific topic (post) or reply (pm)
  *
+ * - Optionly can load just the drafts for a specific topic (post) or reply (pm)
+ *
+ * @package Drafts
  * @param int $member_id - user id to get drafts for
  * @param int $draft_type - 0 for post, 1 for pm
- * @param int $topic - if set, load drafts for that specific topic / pm
+ * @param int|false $topic - if set, load drafts for that specific topic / pm
  * @param string $order - optional parameter to order the results
  * @param string $limit - optional parameter to limit the number returned 0,15
  */
@@ -272,10 +277,13 @@ function load_user_drafts($member_id, $draft_type = 0, $topic = false, $order = 
 
 /**
  * Deletes one or many drafts from the DB
- * Validates the drafts are from the user
- * If supplied an array of drafts will attempt to remove all of them
  *
- * @param int $id_draft
+ * What it does:
+ * - Validates the drafts are from the user
+ * - If supplied an array of drafts will attempt to remove all of them
+ *
+ * @package Drafts
+ * @param int[]|int $id_draft
  * @param int $member_id
  * @param bool $check
  */
@@ -304,11 +312,15 @@ function deleteDrafts($id_draft, $member_id = -1, $check = true)
 
 /**
  * Retrieve how many drafts the given user has.
- * This function checks for expired lifetime on drafts (they would be removed
+ *
+ * What it does:
+ * - This function checks for expired lifetime on drafts (they would be removed
  * by a scheduled task), and doesn't count those.
  *
+ * @package Drafts
  * @param int $member_id
  * @param int $draft_type
+ * @return integer
  */
 function draftsCount($member_id, $draft_type = 0)
 {
@@ -337,13 +349,14 @@ function draftsCount($member_id, $draft_type = 0)
 /**
  * Given a list of userid's for a PM, finds the member name associated with the ID
  * so it can be presented to the user.
- *  - keeps track of bcc and to names for the PM
  *
+ * - keeps track of bcc and to names for the PM
+ *
+ * @package Drafts
  * @todo this is the same as whats in PersonalMessage.controller, when that gets refractored
- *       this should go away and use the refractored PM subs
- *
- * @param array $allRecipients
- * @param array $recipient_ids
+ * this should go away and use the refractored PM subs
+ * @param int[] $allRecipients
+ * @param mixed[] $recipient_ids
  */
 function draftsRecipients($allRecipients, $recipient_ids)
 {
@@ -370,6 +383,7 @@ function draftsRecipients($allRecipients, $recipient_ids)
 /**
  * Get all drafts older than x days
  *
+ * @package Drafts
  * @param int $days
  */
 function getOldDrafts($days)
@@ -387,7 +401,6 @@ function getOldDrafts($days)
 			'poster_time_old' => time() - (86400 * $days),
 		)
 	);
-
 	while ($row = $db->fetch_row($request))
 		$drafts[] = (int) $row[0];
 	$db->free_result($request);
@@ -397,8 +410,11 @@ function getOldDrafts($days)
 
 /**
  * Saves a post draft in the user_drafts table
- * The core draft feature must be enabled, as well as the post draft option
- * Determines if this is a new or an existing draft
+ *
+ * - The core draft feature must be enabled, as well as the post draft option
+ * - Determines if this is a new or an existing draft
+ *
+ * @package Drafts
  */
 function saveDraft()
 {
@@ -437,16 +453,18 @@ function saveDraft()
 	$post_errors = Error_Context::context('post', 1);
 
 	// Prepare and clean the data, load the draft array
-	$draft['id_draft'] = $id_draft;
-	$draft['topic_id'] = empty($_REQUEST['topic']) ? 0 : (int) $_REQUEST['topic'];
-	$draft['board'] = $board;
-	$draft['icon'] = empty($_POST['icon']) ? 'xx' : preg_replace('~[\./\\\\*:"\'<>]~', '', $_POST['icon']);
-	$draft['smileys_enabled'] = isset($_POST['ns']) ? 0 : 1;
-	$draft['locked'] = isset($_POST['lock']) ? (int) $_POST['lock'] : 0;
-	$draft['sticky'] = isset($_POST['sticky']) && !empty($modSettings['enableStickyTopics']) ? (int) $_POST['sticky'] : 0;
-	$draft['subject'] = strtr(Util::htmlspecialchars($_POST['subject']), array("\r" => '', "\n" => '', "\t" => ''));
-	$draft['body'] = Util::htmlspecialchars($_POST['message'], ENT_QUOTES);
-	$draft['id_member'] = $user_info['id'];
+	$draft = array(
+		'id_draft' => $id_draft,
+		'topic_id' => empty($_REQUEST['topic']) ? 0 : (int) $_REQUEST['topic'],
+		'board' => $board,
+		'icon' => empty($_POST['icon']) ? 'xx' : preg_replace('~[\./\\\\*:"\'<>]~', '', $_POST['icon']),
+		'smileys_enabled' => isset($_POST['ns']) ? 0 : 1,
+		'locked' => isset($_POST['lock']) ? (int) $_POST['lock'] : 0,
+		'sticky' => isset($_POST['sticky']) && !empty($modSettings['enableStickyTopics']) ? (int) $_POST['sticky'] : 0,
+		'subject' => strtr(Util::htmlspecialchars($_POST['subject']), array("\r" => '', "\n" => '', "\t" => '')),
+		'body' => Util::htmlspecialchars($_POST['message'], ENT_QUOTES),
+		'id_member' => $user_info['id'],
+	);
 
 	// The message and subject still need a bit more work
 	preparsecode($draft['body']);
@@ -495,10 +513,12 @@ function saveDraft()
 
 /**
  * Saves a PM draft in the user_drafts table
- * The core draft feature must be enabled, as well as the pm draft option
- * Determines if this is a new or and update to an existing pm draft
  *
- * @param array $recipientList
+ * - The core draft feature must be enabled, as well as the pm draft option
+ * - Determines if this is a new or and update to an existing pm draft
+ *
+ * @package Drafts
+ * @param mixed[] $recipientList
  */
 function savePMDraft($recipientList)
 {
@@ -543,11 +563,13 @@ function savePMDraft($recipientList)
 		$recipientList = unserialize($draft_info['to_list']);
 
 	// Prepare the data
-	$draft['id_pm_draft'] = $id_pm_draft;
-	$draft['reply_id'] = empty($_POST['replied_to']) ? 0 : (int) $_POST['replied_to'];
-	$draft['body'] = Util::htmlspecialchars($_POST['message'], ENT_QUOTES);
-	$draft['subject'] = strtr(Util::htmlspecialchars($_POST['subject']), array("\r" => '', "\n" => '', "\t" => ''));
-	$draft['id_member'] = $user_info['id'];
+	$draft = array(
+		'id_pm_draft' => $id_pm_draft,
+		'reply_id' => empty($_POST['replied_to']) ? 0 : (int) $_POST['replied_to'],
+		'body' => Util::htmlspecialchars($_POST['message'], ENT_QUOTES),
+		'subject' => strtr(Util::htmlspecialchars($_POST['subject']), array("\r" => '', "\n" => '', "\t" => '')),
+		'id_member' => $user_info['id'],
+	);
 
 	// message and subject always need a bit more work
 	preparsecode($draft['body']);
@@ -593,10 +615,12 @@ function savePMDraft($recipientList)
 
 /**
  * Reads a draft in from the user_drafts table
- * Only loads the draft of a given type 0 for post, 1 for pm draft
- * Validates that the draft is the users draft
- * Optionally loads the draft in to context or superglobal for loading in to the form
  *
+ * - Only loads the draft of a given type 0 for post, 1 for pm draft
+ * - Validates that the draft is the users draft
+ * - Optionally loads the draft in to context or superglobal for loading in to the form
+ *
+ * @package Drafts
  * @param int $id_draft - draft to load
  * @param int $type - type of draft
  * @param bool $check - validate the user
@@ -619,7 +643,6 @@ function loadDraft($id_draft, $type = 0, $check = true, $load = false)
 	$draft_info = load_draft($id_draft, $user_info['id'], $type, $drafts_keep_days, $check);
 
 	// Load it up for the templates as well
-	$recipients = array();
 	if (!empty($load) && !empty($draft_info))
 	{
 		if ($type === 0)

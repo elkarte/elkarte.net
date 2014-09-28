@@ -20,6 +20,9 @@ require_once(SOURCEDIR . '/CurlFetchWebdata.class.php');
 $project_name = 'elkarte';
 $username = '';
 $password = '';
+// But we store the real ones in another file so that they are not accidentaly
+// pushed online through git
+require_once('secure/tx_credentials.php');
 
 // Some name
 $file_name = 'translators.txt';

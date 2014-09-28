@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Release Candidate 1
  *
  *
  * Adding options to one of the setting screens isn't hard.
@@ -30,24 +30,24 @@
  * Here's a quick explanation of how to add a new item:
  *
  * - A text input box.  For textual values.
- *			array('text', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
+ *     array('text', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
  * - A text input box.  For numerical values.
- *			array('int', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
+ *     array('int', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
  * - A text input box.  For floating point values.
- *			array('float', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
+ *     array('float', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
  * - A large text input box. Used for textual values spanning multiple lines.
- *			array('large_text', 'nameInModSettingsAndSQL', 'OptionalNumberOfRows'),
+ *     array('large_text', 'nameInModSettingsAndSQL', 'OptionalNumberOfRows'),
  * - A check box.  Either one or zero. (boolean)
- *			array('check', 'nameInModSettingsAndSQL'),
+ *     array('check', 'nameInModSettingsAndSQL'),
  * - A selection box.  Used for the selection of something from a list.
- *			array('select', 'nameInModSettingsAndSQL', array('valueForSQL' => $txt['displayedValue'])),
- *			Note that just saying array('first', 'second') will put 0 in the SQL for 'first'.
+ *     array('select', 'nameInModSettingsAndSQL', array('valueForSQL' => $txt['displayedValue'])),
+ *     Note that just saying array('first', 'second') will put 0 in the SQL for 'first'.
  * - A password input box. Used for passwords, no less!
- *			array('password', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
+ *     array('password', 'nameInModSettingsAndSQL', 'OptionalInputBoxWidth'),
  * - A permission - for picking groups who have a permission.
- *			array('permissions', 'manage_groups'),
+ *     array('permissions', 'manage_groups'),
  * - A BBC selection box.
- *			array('bbc', 'sig_bbc'),
+ *     array('bbc', 'sig_bbc'),
  *
  * For each option:
  *  - type (see above), variable name, size/possible values.
@@ -78,21 +78,25 @@ class Settings_Form
 	protected $_config_vars;
 
 	/**
-	 * Helper method, it sets up the context for the settings.
+	 * Helper method, it sets up the context for the settings which will be saved
+	 * to the settings.php file
+	 *
+	 * What it does:
 	 * - The basic usage of the six numbered key fields are
 	 * - array(0 ,1, 2, 3, 4, 5
 	 *    0 variable name - the name of the saved variable
 	 *    1 label - the text to show on the settings page
 	 *    2 saveto - file or db, where to save the variable name - value pair
-	 *    3 type - type of data to save, int, float, text, check
-	 *    4 size - false or field size
+	 *    3 type - type of data to display int, float, text, check, select, password
+	 *    4 size - false or field size, if type is select, this needs to be an array of
+	 *				select options
 	 *    5 help - '' or helptxt variable name
 	 *  )
-	 *
-	 * the following named keys are also permitted
-	 *	'disabled' => 'postinput' => 'preinput' =>
-	 *
-	 * @param array $config_vars
+	 * - The following named keys are also permitted
+	 *  'disabled' =>
+	 *  'postinput' =>
+	 *  'preinput' =>
+	 *	'subtext' =>
 	 */
 	public function prepare_file()
 	{
@@ -165,11 +169,17 @@ class Settings_Form
 	/**
 	 * Helper method, it sets up the context for database settings.
 	 *
-	 * @param array $config_vars
+	 * @param mixed[] $config_vars
 	 */
-	static function prepare_db(&$config_vars)
+	public static function prepare_db(&$config_vars)
 	{
 		global $txt, $helptxt, $context, $modSettings;
+		static $known_rules = null;
+
+		if ($known_rules === null)
+			$known_rules = array(
+				'nohtml' => 'htmlspecialchars_decode[' . ENT_NOQUOTES . ']',
+			);
 
 		loadLanguage('Help');
 
@@ -231,6 +241,34 @@ class Settings_Form
 					{
 						foreach ($config_var[2] as $key => $item)
 							$context['config_vars'][$config_var[1]]['data'][] = array($key, $item);
+					}
+				}
+
+				// Revert masks if necessary
+				if (isset($config_var['mask']))
+				{
+					$rules = array();
+
+					if (!is_array($config_var['mask']))
+						$config_var['mask'] = array($config_var['mask']);
+					foreach ($config_var['mask'] as $key => $mask)
+					{
+						if (isset($known_rules[$mask]))
+							$rules[$config_var[1]][] = $known_rules[$mask];
+						elseif ($key == 'custom' && isset($mask['revert']))
+							$rules[$config_var[1]][] = $mask['revert'];
+					}
+
+					if (!empty($rules))
+					{
+						$rules[$config_var[1]] = implode('|', $rules[$config_var[1]]);
+
+						require_once(SUBSDIR . '/DataValidator.class.php');
+						$validator = new Data_Validator();
+						$validator->sanitation_rules($rules);
+						$validator->validate(array($config_var[1] => $context['config_vars'][$config_var[1]]['value']));
+
+						$context['config_vars'][$config_var[1]]['value'] = $validator->{$config_var[1]};
 					}
 				}
 
@@ -324,8 +362,10 @@ class Settings_Form
 
 	/**
 	 * This method saves the settings.
+	 *
 	 * It will put them in Settings.php or in the settings table.
 	 *
+	 * What it does:
 	 * - Used to save those settings set from ?action=admin;area=serversettings.
 	 * - Requires the admin_forum permission.
 	 * - Contains arrays of the types of data to save into Settings.php.
@@ -430,10 +470,19 @@ class Settings_Form
 	/**
 	 * Helper method for saving database settings.
 	 *
-	 * @param array $config_vars
+	 * @param mixed[] $config_vars
 	 */
-	static function save_db(&$config_vars)
+	public static function save_db(&$config_vars)
 	{
+		static $known_rules = null;
+
+		if ($known_rules === null)
+			$known_rules = array(
+				'nohtml' => 'Util::htmlspecialchars[' . ENT_QUOTES . ']',
+				'email' => 'valid_email',
+				'url' => 'valid_url',
+			);
+
 		validateToken('admin-dbsc');
 
 		$inlinePermissions = array();
@@ -466,7 +515,36 @@ class Settings_Form
 				$setArray[$var[1]] = (float) $_POST[$var[1]];
 			// Text!
 			elseif ($var[0] == 'text' || $var[0] == 'large_text')
-				$setArray[$var[1]] = $_POST[$var[1]];
+			{
+				if (isset($var['mask']))
+				{
+					$rules = array();
+
+					if (!is_array($var['mask']))
+						$var['mask'] = array($var['mask']);
+					foreach ($var['mask'] as $key => $mask)
+					{
+						if (isset($known_rules[$mask]))
+							$rules[$var[1]][] = $known_rules[$mask];
+						elseif ($key == 'custom' && isset($mask['apply']))
+							$rules[$var[1]][] = $mask['apply'];
+					}
+
+					if (!empty($rules))
+					{
+						$rules[$var[1]] = implode('|', $rules[$var[1]]);
+
+						require_once(SUBSDIR . '/DataValidator.class.php');
+						$validator = new Data_Validator();
+						$validator->sanitation_rules($rules);
+						$validator->validate($_POST);
+
+						$setArray[$var[1]] = $validator->{$var[1]};
+					}
+				}
+				else
+					$setArray[$var[1]] = $_POST[$var[1]];
+			}
 			// Passwords!
 			elseif ($var[0] == 'password')
 			{
@@ -507,9 +585,11 @@ class Settings_Form
 
 	/**
 	 * Update the Settings.php file.
+	 *
 	 * Typically this method is used from admin screens, just like this entire class.
 	 * They're also available for addons and integrations.
 	 *
+	 * What it does:
 	 * - updates the Settings.php file with the changes supplied in config_vars.
 	 * - expects config_vars to be an associative array, with the keys as the
 	 *   variable names in Settings.php, and the values the variable values.
@@ -521,9 +601,9 @@ class Settings_Form
 	 * - attempts to create a backup file and will use it should the writing of the
 	 *   new settings file fail
 	 *
-	 * @param array $config_vars
+	 * @param mixed[] $config_vars
 	 */
-	static function save_file($config_vars)
+	public static function save_file($config_vars)
 	{
 		global $context;
 
@@ -626,7 +706,7 @@ class Settings_Form
 		else
 			$tmp_cache = CACHEDIR;
 
-		$test_fp = @fopen($tmp_cache . '/settings_update.tmp', "w+");
+		$test_fp = @fopen($tmp_cache . '/settings_update.tmp', 'w+');
 		if ($test_fp)
 		{
 			fclose($test_fp);
@@ -645,15 +725,15 @@ class Settings_Form
 		clearstatcache();
 		if (filemtime(BOARDDIR . '/Settings.php') === $last_settings_change)
 		{
-			// save the old before we do anything
+			// Save the old before we do anything
 			$settings_backup_fail = !@is_writable(BOARDDIR . '/Settings_bak.php') || !@copy(BOARDDIR . '/Settings.php', BOARDDIR . '/Settings_bak.php');
 			$settings_backup_fail = !$settings_backup_fail ? (!file_exists(BOARDDIR . '/Settings_bak.php') || filesize(BOARDDIR . '/Settings_bak.php') === 0) : $settings_backup_fail;
 
-			// write out the new
+			// Write out the new
 			$write_settings = implode('', $settingsArray);
 			$written_bytes = file_put_contents(BOARDDIR . '/Settings.php', $write_settings, LOCK_EX);
 
-			// survey says ...
+			// Survey says ...
 			if ($written_bytes !== strlen($write_settings) && !$settings_backup_fail)
 			{
 				// Well this is not good at all, lets see if we can save this
@@ -679,7 +759,7 @@ class Settings_Form
 	 *  - either, an empty string for a horizontal rule.
 	 *  - or, a string for a titled section.
 	 *
-	 * @param array $config_vars = null array of config vars, if null the method returns the current configuration
+	 * @param mixed[]|null $config_vars = null array of config vars, if null the method returns the current configuration
 	 */
 	public function settings($config_vars = null)
 	{

@@ -16,7 +16,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -87,14 +87,14 @@ function messageDetails($id_msg, $id_topic = 0, $attachment_type = 0)
 /**
  * Get some basic info of a certain message
  * Will use query_see_board unless $override_permissions is set to true
- * Will return additional topic information if $topic_basics is set to true
+ * Will return additional topic information if $detailed is set to true
  * Returns an associative array of the results or false on error
  *
  * @param int $id_msg
  * @param boolean $override_permissions
- * @param boolean $topic_basics
+ * @param boolean $detailed
  */
-function basicMessageInfo($id_msg, $override_permissions = false, $topic_basics = false)
+function basicMessageInfo($id_msg, $override_permissions = false, $detailed = false)
 {
 	global $modSettings;
 
@@ -106,10 +106,10 @@ function basicMessageInfo($id_msg, $override_permissions = false, $topic_basics 
 	$request = $db->query('', '
 		SELECT
 			m.id_member, m.id_topic, m.id_board, m.id_msg, m.body, m.subject,
-			m.poster_name, m.poster_email, m.poster_time, m.approved' . ($topic_basics === false ? '' : ',
-			t.id_first_msg, t.num_replies, t.unapproved_posts, t.id_first_msg, t.id_member_started, t.approved AS topic_approved') . '
+			m.poster_name, m.poster_email, m.poster_time, m.approved' . ($detailed === false ? '' : ',
+			t.id_first_msg, t.num_replies, t.unapproved_posts, t.id_last_msg, t.id_member_started, t.approved AS topic_approved') . '
 		FROM {db_prefix}messages AS m' . ($override_permissions === true ? '' : '
-			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})') . ($topic_basics === false ? '' : '
+			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board AND {query_see_board})') . ($detailed === false ? '' : '
 			LEFT JOIN {db_prefix}topics AS t ON (t.id_topic = m.id_topic)') . '
 		WHERE id_msg = {int:message}' . (!$modSettings['postmod_active'] || allowedTo('approve_posts') ? '' : '
 			AND m.approved = 1') . '
@@ -160,7 +160,7 @@ function checkMessagePermissions($message)
 /**
  * Prepare context for a message.
  *
- * @param int $message the message id
+ * @param mixed[] $message the message array
  */
 function prepareMessageContext($message)
 {
@@ -169,7 +169,7 @@ function prepareMessageContext($message)
 	// Load up 'em attachments!
 	foreach ($message['attachment_stuff'] as $attachment)
 	{
-		$context['current_attachments'][] = array(
+		$context['attachments']['current'][] = array(
 			'name' => htmlspecialchars($attachment['filename'], ENT_COMPAT, 'UTF-8'),
 			'size' => $attachment['filesize'],
 			'id' => $attachment['id_attach'],
@@ -195,7 +195,6 @@ function prepareMessageContext($message)
 	if (! $message['message']['approved'] && !$context['show_approval'])
 		$context['show_approval'] = allowedTo('approve_posts');
 }
-
 
 /**
  * This function removes all the messages of a certain user that are *not*
@@ -237,7 +236,6 @@ function removeNonTopicMessages($memID)
  *
  * @param int $message The message id
  * @param bool $decreasePostCount if true users' post count will be reduced
- * @return array an array to set the cookie on with domain and path in it, in that order
  */
 function removeMessage($message, $decreasePostCount = true)
 {
@@ -654,6 +652,7 @@ function removeMessage($message, $decreasePostCount = true)
 
 		// Delete follow-ups too
 		require_once(SUBSDIR . '/FollowUps.subs.php');
+
 		// If it is an entire topic
 		if ($row['id_first_msg'] == $message)
 		{
@@ -704,8 +703,8 @@ function removeMessage($message, $decreasePostCount = true)
  * If $topicID is passed, the message is updated to point to the new topic.
  *
  * @param int $msg_id message ID
- * @param int $topicID = null topic ID, if null is passed the ID of the topic is retrieved and returned
- * @return mixed, int topic ID if any, or false
+ * @param integer|null $topicID = null topic ID, if null is passed the ID of the topic is retrieved and returned
+ * @return int|false int topic ID if any, or false
  */
 function associatedTopic($msg_id, $topicID = null)
 {
@@ -830,7 +829,7 @@ function nextMessage($id_msg, $id_topic)
  *
  * @param int $start the offset of the message/s
  * @param int $id_topic the id of the topic
- * @param array $params an (optional) array of params, includes:
+ * @param mixed[] $params an (optional) array of params, includes:
  *      - 'not_in' => array - of messages to exclude
  *      - 'include' => array - of messages to explicitely include
  *      - 'only_approved' => true/false - include or exclude the unapproved messages
@@ -882,7 +881,7 @@ function messageAt($start, $id_topic, $params = array())
  * Finds an open report for a certain message if it exists and increase the
  * number of reports for that message, otherwise it creates one
 
- * @param array $message array of several message details (id_msg, id_topic, etc.)
+ * @param mixed[] $message array of several message details (id_msg, id_topic, etc.)
  * @param string $poster_comment the comment made by the reporter
  *
  */
@@ -998,25 +997,28 @@ function countNewPosts($topic, $topicinfo, $timestamp)
 
 /**
  * Loads the details from a message
- * @param array $msg_selects
- * @param array $msg_tables
- * @param array $msg_parameters
- * @param string $options
- * @return array
+ *
+ * @param string[] $msg_selects
+ * @param string[] $msg_tables
+ * @param mixed[] $msg_parameters
+ * @param mixed[] $options
+ * @return A request object
  */
-function loadMessageDetails($msg_selects, $msg_tables, $msg_parameters, $options)
+function loadMessageRequest($msg_selects, $msg_tables, $msg_parameters, $options = array())
 {
 	$db = database();
 
 	$request = $db->query('', '
 		SELECT
-			m.id_msg, m.icon, m.subject, m.poster_time, m.poster_ip, m.id_member, m.modified_time, m.modified_name, m.body,
-			m.smileys_enabled, m.poster_name, m.poster_email, m.approved,
-			m.id_msg_modified < {int:new_from} AS is_read
-			' . (!empty($msg_selects) ? implode(',', $msg_selects) : '') . '
+			m.id_msg, m.icon, m.subject, m.poster_time, m.poster_ip, m.id_member,
+			m.modified_time, m.modified_name, m.body, m.smileys_enabled,
+			m.poster_name, m.poster_email, m.approved' . (isset($msg_parameters['new_from']) ? ',
+			m.id_msg_modified < {int:new_from} AS is_read' : '') . '
+			' . (!empty($msg_selects) ? ',' . implode(',', $msg_selects) : '') . '
 		FROM {db_prefix}messages AS m
-			' . (!empty($msg_tables) ? implode("\n\t", $msg_tables) : '') . '
+			' . (!empty($msg_tables) ? implode("\n\t\t\t", $msg_tables) : '') . '
 		WHERE m.id_msg IN ({array_int:message_list})
+			' . (!empty($options['additional_conditions']) ? $options['additional_conditions'] : '') . '
 		ORDER BY m.id_msg' . (empty($options['view_newest_first']) ? '' : ' DESC'),
 		$msg_parameters
 	);
@@ -1025,13 +1027,46 @@ function loadMessageDetails($msg_selects, $msg_tables, $msg_parameters, $options
 }
 
 /**
+ * Returns the details from a message or several messages
+ * Uses loadMessageRequest to query the database
+ *
+ * @param string[] $msg_selects
+ * @param string[] $msg_tables
+ * @param mixed[] $msg_parameters
+ * @param mixed[] $options
+ * @return array
+ */
+function loadMessageDetails($msg_selects, $msg_tables, $msg_parameters, $options = array())
+{
+	$db = database();
+
+	if (!is_array($msg_parameters['message_list']))
+	{
+		$single = true;
+		$msg_parameters['message_list'] = array($msg_parameters['message_list']);
+	}
+	else
+		$single = false;
+
+	$request = loadMessageRequest($msg_selects, $msg_tables, $msg_parameters, $options);
+
+	$return = array();
+	while ($row = $db->fetch_assoc($request))
+		$return[] = $row;
+	$db->free_result($request);
+
+	if ($single)
+		return $return[0];
+	else
+		return $return;
+}
+
+/**
  * Checks, which messages can be removed from a certain member.
  *
- * @global type $user_info
- * @global type $modSettings
  * @param int $topic
- * @param array $messages
- * @param bol $allowed_all
+ * @param int[] $messages
+ * @param bool $allowed_all
  * @return array
  */
 function determineRemovableMessages($topic, $messages, $allowed_all)
@@ -1072,7 +1107,7 @@ function determineRemovableMessages($topic, $messages, $allowed_all)
  *
  * @param int $topic
  * @param bool $include_unapproved
- * @param array $selection
+ * @param int[] $selection
  */
 function countSplitMessages($topic, $include_unapproved, $selection = array())
 {
@@ -1132,8 +1167,8 @@ function mailFromMesasge($id_msg)
  * parameters 1 and 2, respectively.
  * Used by updateStats('message').
  *
- * @param bool $increment = null If true and $max_msg_id != null, then increment the total messages by one, otherwise recount all messages and get the max message id
- * @param int $max_msg_id = null, Only used if $increment === true
+ * @param bool|null $increment = null If true and $max_msg_id != null, then increment the total messages by one, otherwise recount all messages and get the max message id
+ * @param int|null $max_msg_id = null, Only used if $increment === true
  */
 function updateMessageStats($increment = null, $max_msg_id = null)
 {
@@ -1173,7 +1208,7 @@ function updateMessageStats($increment = null, $max_msg_id = null)
  * Used by updateStats('subject').
  *
  * @param int $id_topic
- * @param string $subject
+ * @param string|null $subject
  */
 function updateSubjectStats($id_topic, $subject = null)
 {

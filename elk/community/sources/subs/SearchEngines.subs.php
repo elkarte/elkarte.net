@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -23,6 +23,7 @@ if (!defined('ELK'))
 /**
  * Do we think the current user is a spider?
  *
+ * @package SearchEngines
  * @return int
  */
 function spiderCheck()
@@ -51,18 +52,20 @@ function spiderCheck()
 			$spider_data[] = $row;
 		$db->free_result($request);
 
+		// Save it in the cache
 		cache_put_data('spider_search', $spider_data, 300);
 	}
 
 	if (empty($spider_data))
 		return false;
 
-	// We need user agent
+	// We need the user agent
 	$req = request();
 
 	// Always attempt IPv6 first.
 	if (strpos($_SERVER['REMOTE_ADDR'], ':') !== false)
 		$ip_parts = convertIPv6toInts($_SERVER['REMOTE_ADDR']);
+	// Then xxx.xxx.xxx.xxx next
 	else
 		preg_match('/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/', $_SERVER['REMOTE_ADDR'], $ip_parts);
 
@@ -104,6 +107,8 @@ function spiderCheck()
 
 /**
  * Log the spider presence online.
+ *
+ * @package SearchEngines
  */
 function logSpider()
 {
@@ -151,7 +156,10 @@ function logSpider()
 		{
 			$req = request();
 			$url = $_GET + array('USER_AGENT' => $req->user_agent());
-			unset($url['sesc'], $url[$context['session_var']]);
+			if (isset($context['session_var']))
+				unset($url['sesc'], $url[$context['session_var']]);
+			else
+				unset($url['sesc']);
 			$url = serialize($url);
 		}
 		else
@@ -167,8 +175,9 @@ function logSpider()
 }
 
 /**
- * This function takes any unprocessed hits
- * and updates stats accordingly.
+ * This function takes any unprocessed hits and updates stats accordingly.
+ *
+ * @package SearchEngines
  */
 function consolidateSpiderStats()
 {
@@ -236,6 +245,8 @@ function consolidateSpiderStats()
 
 /**
  * Recache spider names.
+ *
+ * @package SearchEngines
  */
 function recacheSpiderNames()
 {
@@ -258,7 +269,8 @@ function recacheSpiderNames()
 /**
  * Sort the search engine table by user agent name to avoid misidentification of engine.
  *
- * @deprecated the ordering is done in the query, probably not needed
+ * @package SearchEngines
+ * @deprecated since 1.0 - the ordering is done in the query, probably not needed
  */
 function sortSpiderTable()
 {
@@ -278,6 +290,7 @@ function sortSpiderTable()
  * Return spiders, within the limits specified by parameters
  * (used by createList() callbacks)
  *
+ * @package SearchEngines
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -308,6 +321,7 @@ function getSpiders($start, $items_per_page, $sort)
 /**
  * Return details of one spider from its ID
  *
+ * @package SearchEngines
  * @param int $spider_id id of a spider
  */
 function getSpiderDetails($spider_id)
@@ -333,6 +347,7 @@ function getSpiderDetails($spider_id)
  * Return the registered spiders count.
  * (used by createList() callbacks)
  *
+ * @package SearchEngines
  * @return int
  */
 function getNumSpiders()
@@ -355,6 +370,7 @@ function getNumSpiders()
  * Retrieve spider logs within the specified limits.
  * (used by createList() callbacks)
  *
+ * @package SearchEngines
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -385,6 +401,7 @@ function getSpiderLogs($start, $items_per_page, $sort)
  * Returns the count of spider logs.
  * (used by createList() callbacks)
  *
+ * @package SearchEngines
  * @return int
  */
 function getNumSpiderLogs()
@@ -408,6 +425,7 @@ function getNumSpiderLogs()
  * limits.
  * (used by createList() callbacks)
  *
+ * @package SearchEngines
  * @param int $start
  * @param int $items_per_page
  * @param string $sort
@@ -438,7 +456,8 @@ function getSpiderStats($start, $items_per_page, $sort)
  * Get the number of spider stat rows from the log spider stats table
  * (used by createList() callbacks)
  *
- * @param int $time (optional) if specified counts only the entries before that date
+ * @package SearchEngines
+ * @param int|null $time (optional) if specified counts only the entries before that date
  * @return int
  */
 function getNumSpiderStats($time = null)
@@ -462,6 +481,7 @@ function getNumSpiderStats($time = null)
 /**
  * Remove spider logs older than the passed time
  *
+ * @package SearchEngines
  * @param int $time a time value
  */
 function removeSpiderOldLogs($time)
@@ -481,6 +501,7 @@ function removeSpiderOldLogs($time)
 /**
  * Remove spider logs older than the passed time
  *
+ * @package SearchEngines
  * @param int $time a time value
  */
 function removeSpiderOldStats($time)
@@ -500,7 +521,8 @@ function removeSpiderOldStats($time)
 /**
  * Remove all the entries connected to a certain spider (description, entries, stats)
  *
- * @param array $spiders_id an array of spider ids
+ * @package SearchEngines
+ * @param int[] $spiders_id an array of spider ids
  */
 function removeSpiders($spiders_id)
 {
@@ -531,6 +553,8 @@ function removeSpiders($spiders_id)
 
 /**
  * Returns the last time any spider was seen around
+ *
+ * @package SearchEngines
  */
 function spidersLastSeen()
 {
@@ -554,6 +578,8 @@ function spidersLastSeen()
 
 /**
  * Returns an array of dates ranging from the first appearance of a spider and the last
+ *
+ * @package SearchEngines
  */
 function spidersStatsDates()
 {
@@ -597,6 +623,7 @@ function spidersStatsDates()
 /**
  * Update an existing or inserts a new spider entry
  *
+ * @package SearchEngines
  * @param int $id
  * @param string $name spider name
  * @param string $agent ua of the spider

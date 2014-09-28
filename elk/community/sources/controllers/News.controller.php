@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  *
  */
@@ -33,6 +33,12 @@ class News_Controller extends Action_Controller
 	private $_query_this_board = null;
 
 	/**
+	 * Holds the limit for the number of items to get
+	 * @var int
+	 */
+	private $_limit;
+
+	/**
 	 * Dispatcher. Forwards to the action to execute.
 	 *
 	 * @see Action_Controller::action_index()
@@ -45,16 +51,18 @@ class News_Controller extends Action_Controller
 
 	/**
 	 * Outputs xml data representing recent information or a profile.
-	 * Can be passed 4 subactions which decide what is output:
-	 *  'recent' for recent posts,
-	 *  'news' for news topics,
-	 *  'members' for recently registered members,
-	 *  'profile' for a member's profile.
-	 * To display a member's profile, a user id has to be given. (;u=1)
-	 * Outputs an rss feed instead of a proprietary one if the 'type' $_GET
+	 *
+	 * What it does:
+	 * - Can be passed 4 subactions which decide what is output:
+	 *   'recent' for recent posts,
+	 *   'news' for news topics,
+	 *   'members' for recently registered members,
+	 *   'profile' for a member's profile.
+	 * - To display a member's profile, a user id has to be given. (;u=1) e.g. ?action=.xml;sa=profile;u=1;type=atom
+	 * - Outputs an rss feed instead of a proprietary one if the 'type' $_GET
 	 * parameter is 'rss' or 'rss2'.
-	 * Accessed via ?action=.xml.
-	 * Does not use any templates, sub templates, or template layers.
+	 * - Accessed via ?action=.xml
+	 * - Does not use any templates, sub templates, or template layers.
 	 *
 	 * @uses Stats language file.
 	 */
@@ -68,10 +76,11 @@ class News_Controller extends Action_Controller
 			obExit(false);
 
 		loadLanguage('Stats');
+		$txt['xml_rss_desc'] = replaceBasicActionUrl($txt['xml_rss_desc']);
 
 		// Default to latest 5.  No more than whats defined in the ACP or 255
 		$limit = empty($modSettings['xmlnews_limit']) ? 5 : min($modSettings['xmlnews_limit'], 255);
-		$this->limit = empty($_GET['limit']) || (int) $_GET['limit'] < 1 ? $limit : min((int) $_GET['limit'], $limit);
+		$this->_limit = empty($_GET['limit']) || (int) $_GET['limit'] < 1 ? $limit : min((int) $_GET['limit'], $limit);
 
 		// Handle the cases where a board, boards, or category is asked for.
 		$this->_query_this_board = '1=1';
@@ -100,7 +109,7 @@ class News_Controller extends Action_Controller
 
 			// Try to limit the number of messages we look through.
 			if ($total_cat_posts > 100 && $total_cat_posts > $modSettings['totalMessages'] / 15)
-				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 400 - $this->limit * 5);
+				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 400 - $this->_limit * 5);
 		}
 		elseif (!empty($_REQUEST['boards']))
 		{
@@ -128,7 +137,7 @@ class News_Controller extends Action_Controller
 
 			// The more boards, the more we're going to look through...
 			if ($total_posts > 100 && $total_posts > $modSettings['totalMessages'] / 12)
-				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 500 - $this->limit * 5);
+				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 500 - $this->_limit * 5);
 		}
 		elseif (!empty($board))
 		{
@@ -141,13 +150,13 @@ class News_Controller extends Action_Controller
 
 			// Try to look through just a few messages, if at all possible.
 			if ($boards_data[$board]['num_posts'] > 80 && $boards_data[$board]['num_posts'] > $modSettings['totalMessages'] / 10)
-				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 600 - $this->limit * 5);
+				$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 600 - $this->_limit * 5);
 		}
 		else
 		{
 			$this->_query_this_board = '{query_see_board}' . (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0 ? '
 				AND b.id_board != ' . $modSettings['recycle_board'] : '');
-			$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 100 - $this->limit * 5);
+			$context['optimize_msg']['lowest'] = 'm.id_msg >= ' . max(0, $modSettings['maxMsgID'] - 100 - $this->_limit * 5);
 		}
 
 		// If format isn't set, rss2 is default
@@ -178,7 +187,7 @@ class News_Controller extends Action_Controller
 		}
 
 		// We only want some information, not all of it.
-		$cachekey = array($xml_format, $_GET['action'], $this->limit, $subAction);
+		$cachekey = array($xml_format, $_GET['action'], $this->_limit, $subAction);
 		foreach (array('board', 'boards', 'c') as $var)
 		{
 			if (isset($_REQUEST[$var]))
@@ -204,9 +213,9 @@ class News_Controller extends Action_Controller
 		$feed_title = htmlspecialchars(strip_tags($context['forum_name']), ENT_COMPAT, 'UTF-8') . (isset($feed_title) ? $feed_title : '');
 
 		// This is an xml file....
-		ob_end_clean();
+		@ob_end_clean();
 		if (!empty($modSettings['enableCompressedOutput']))
-			@ob_start('ob_gzhandler');
+			ob_start('ob_gzhandler');
 		else
 			ob_start();
 
@@ -235,7 +244,7 @@ class News_Controller extends Action_Controller
 			<generator>ElkArte</generator>
 			<ttl>30</ttl>
 			<image>
-				<url>', $settings['default_theme_dir'], '/images/logo.png</url>
+				<url>', $settings['default_theme_url'], '/images/logo.png</url>
 				<title>', $feed_title, '</title>
 				<link>', $scripturl, '</link>
 			</image>';
@@ -271,7 +280,6 @@ class News_Controller extends Action_Controller
 				<description><![CDATA[
 					', template_webslice_header_above(), '
 					', template_webslice_recent_posts(), '
-					', template_webslice_header_below(), '
 				]]></description>
 			</item>
 		</channel>
@@ -279,6 +287,7 @@ class News_Controller extends Action_Controller
 		}
 		elseif ($xml_format == 'atom')
 		{
+			$url_parts = array();
 			foreach (array('board', 'boards', 'c') as $var)
 				if (isset($_REQUEST[$var]))
 					$url_parts[] = $var . '=' . (is_array($_REQUEST[$var]) ? implode(',', $_REQUEST[$var]) : $_REQUEST[$var]);
@@ -339,7 +348,7 @@ class News_Controller extends Action_Controller
 	 * The array will be generated to match the format.
 	 *
 	 * @param string $xml_format
-	 * @return array
+	 * @return mixed[]
 	 */
 	public function action_xmlmembers($xml_format)
 	{
@@ -350,9 +359,11 @@ class News_Controller extends Action_Controller
 
 		// Find the most recent members.
 		require_once(SUBSDIR . '/Members.subs.php');
-		$members = recentMembers((int) $this->limit);
+		$members = recentMembers((int) $this->_limit);
 
+		// No data yet
 		$data = array();
+
 		foreach ($members as $member)
 		{
 			// Make the data look rss-ish.
@@ -391,12 +402,11 @@ class News_Controller extends Action_Controller
 	}
 
 	/**
-	 * Get the latest topics information from a specific board,
-	 * to display later.
+	 * Get the latest topics information from a specific board, to display later.
 	 * The returned array will be generated to match the xmf_format.
 	 *
-	 * @param $xml_format
-	 * @return array, array of topics
+	 * @param string $xml_format one of rss, rss2, rdf, atom
+	 * @return mixed[] array of topics
 	 */
 	public function action_xmlnews($xml_format)
 	{
@@ -404,7 +414,7 @@ class News_Controller extends Action_Controller
 
 		// Get the latest topics from a board
 		require_once(SUBSDIR . '/News.subs.php');
-		$results = getXMLNews($this->_query_this_board, $board, $this->limit);
+		$results = getXMLNews($this->_query_this_board, $board, $this->_limit);
 
 		// Prepare it for the feed in the format chosen (rss, atom, etc)
 		$data = array();
@@ -412,7 +422,7 @@ class News_Controller extends Action_Controller
 		{
 			// Limit the length of the message, if the option is set.
 			if (!empty($modSettings['xmlnews_maxlen']) && Util::strlen(str_replace('<br />', "\n", $row['body'])) > $modSettings['xmlnews_maxlen'])
-				$row['body'] = strtr(shorten_text(str_replace('<br />', "\n", $row['body']), $modSettings['xmlnews_maxlen'], true), array("\n" => '<br />'));
+				$row['body'] = strtr(Util::shorten_text(str_replace('<br />', "\n", $row['body']), $modSettings['xmlnews_maxlen'], true), array("\n" => '<br />'));
 
 			$row['body'] = parse_bbc($row['body'], $row['smileys_enabled'], $row['id_msg']);
 
@@ -427,7 +437,7 @@ class News_Controller extends Action_Controller
 					'title' => cdata_parse($row['subject']),
 					'link' => $scripturl . '?topic=' . $row['id_topic'] . '.0',
 					'description' => cdata_parse($row['body']),
-					'author' => in_array(showEmailAddress(!empty($row['hide_email']), $row['id_member']), array('yes', 'yes_permission_override')) ? $row['posterEmail'] . ' ('.$row['posterName'].')' : null,
+					'author' => in_array(showEmailAddress(!empty($row['hide_email']), $row['id_member']), array('yes', 'yes_permission_override')) ? $row['poster_email'] . ' (' . $row['poster_name'] . ')' : $row['poster_name'],
 					'comments' => $scripturl . '?action=post;topic=' . $row['id_topic'] . '.0',
 					'category' => '<![CDATA[' . $row['bname'] . ']]>',
 					'pubDate' => gmdate('D, d M Y H:i:s \G\M\T', $row['poster_time']),
@@ -436,7 +446,7 @@ class News_Controller extends Action_Controller
 
 				// Add the poster name on if we are rss2
 				if ($xml_format == 'rss2')
-					$data[sizeof($data) - 1]['dc:creator'] = $row['poster_name'];
+					$data[count($data) - 1]['dc:creator'] = $row['poster_name'];
 			}
 			// RDF Format anyone
 			elseif ($xml_format == 'rdf')
@@ -496,8 +506,8 @@ class News_Controller extends Action_Controller
 	 * Get the recent topics to display.
 	 * The returned array will be generated to match the xml_format.
 	 *
-	 * @param $xml_format
-	 * @return array, of recent posts
+	 * @param string $xml_format one of rss, rss2, rdf, atom
+	 * @return mixed[] of recent posts
 	 */
 	public function action_xmlrecent($xml_format)
 	{
@@ -505,7 +515,7 @@ class News_Controller extends Action_Controller
 
 		// Get the latest news
 		require_once(SUBSDIR . '/News.subs.php');
-		$results = getXMLRecent($this->_query_this_board, $board, $this->limit);
+		$results = getXMLRecent($this->_query_this_board, $board, $this->_limit);
 
 		// Loop on the results and prepare them in the format requested
 		$data = array();
@@ -513,7 +523,7 @@ class News_Controller extends Action_Controller
 		{
 			// Limit the length of the message, if the option is set.
 			if (!empty($modSettings['xmlnews_maxlen']) && Util::strlen(str_replace('<br />', "\n", $row['body'])) > $modSettings['xmlnews_maxlen'])
-				$row['body'] = strtr(shorten_text(str_replace('<br />', "\n", $row['body']), $modSettings['xmlnews_maxlen'], true), array("\n" => '<br />'));
+				$row['body'] = strtr(Util::shorten_text(str_replace('<br />', "\n", $row['body']), $modSettings['xmlnews_maxlen'], true), array("\n" => '<br />'));
 
 			$row['body'] = parse_bbc($row['body'], $row['smileys_enabled'], $row['id_msg']);
 
@@ -528,16 +538,16 @@ class News_Controller extends Action_Controller
 					'title' => $row['subject'],
 					'link' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'],
 					'description' => cdata_parse($row['body']),
-					'author' => in_array(showEmailAddress(!empty($row['hide_email']), $row['id_member']), array('yes', 'yes_permission_override')) ? $row['poster_email'] : null,
+					'author' => in_array(showEmailAddress(!empty($row['hide_email']), $row['id_member']), array('yes', 'yes_permission_override')) ? $row['poster_email'] : $row['poster_name'],
 					'category' => cdata_parse($row['bname']),
 					'comments' => $scripturl . '?action=post;topic=' . $row['id_topic'] . '.0',
 					'pubDate' => gmdate('D, d M Y H:i:s \G\M\T', $row['poster_time']),
 					'guid' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg']
 				);
 
-				// add the poster name on if we are rss2
+				// Add the poster name on if we are rss2
 				if ($xml_format == 'rss2')
-					$data[sizeof($data) - 1]['dc:creator'] = $row['poster_name'];
+					$data[count($data) - 1]['dc:creator'] = $row['poster_name'];
 			}
 			elseif ($xml_format == 'rdf')
 			{
@@ -604,8 +614,8 @@ class News_Controller extends Action_Controller
 	 * Get the profile information for member into an array,
 	 * which will be generated to match the xml_format.
 	 *
-	 * @param $xml_format
-	 * @return array, of profile data.
+	 * @param string $xml_format one of rss, rss2, rdf, atom
+	 * @return mixed[] array of profile data.
 	 */
 	public function action_xmlprofile($xml_format)
 	{
@@ -623,6 +633,9 @@ class News_Controller extends Action_Controller
 			return array();
 
 		$profile = &$memberContext[$uid];
+
+		// No feed data yet
+		$data = array();
 
 		if ($xml_format == 'rss' || $xml_format == 'rss2')
 			$data = array(array(
@@ -741,8 +754,22 @@ function fix_possible_url($val)
 	if (empty($modSettings['queryless_urls']) || ($context['server']['is_cgi'] && ini_get('cgi.fix_pathinfo') == 0 && @get_cfg_var('cgi.fix_pathinfo') == 0) || (!$context['server']['is_apache'] && !$context['server']['is_lighttpd']))
 		return $val;
 
-	$val = preg_replace_callback('~^' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+)(#[^"]*)?$~', create_function('$m', 'global $scripturl; return $scripturl . \'/\' . strtr("$m[1]", \'&;=\', \'//,\') . \'.html\' . (isset($m[2]) ? $m[2] : "");'), $val);
+	$val = preg_replace_callback('~^' . preg_quote($scripturl, '/') . '\?((?:board|topic)=[^#"]+)(#[^"]*)?$~', 'fix_possible_url_callback', $val);
 	return $val;
+}
+
+/**
+ * Callback function for the preg_replace_callback in fix_possible_url
+ * Invoked when queryless_urls are enabled and the system supports them
+ * Updated URLs to be of "queryless" style
+ *
+ * @param mixed[] $matches
+ */
+function fix_possible_url_callback($matches)
+{
+	global $scripturl;
+
+	return $scripturl . '/' . strtr($matches[1], '&;=', '//,') . '.html' . (isset($matches[2]) ? $matches[2] : '');
 }
 
 /**
@@ -833,12 +860,12 @@ function cdata_parse($data, $ns = '')
  * Additionally formats data based on the specific format passed.
  * This function is recursively called to handle sub arrays of data.
 
- * @param array $data the array to output as xml data
+ * @param mixed[] $data the array to output as xml data
  * @param int $i the amount of indentation to use.
- * @param string $tag if specified, it will be used instead of the keys of data.
- * @param string $xml_format
+ * @param string|null $tag if specified, it will be used instead of the keys of data.
+ * @param string $xml_format  one of rss, rss2, rdf, atom
  */
-function dumpTags($data, $i, $tag = null, $xml_format = '')
+function dumpTags($data, $i, $tag = null, $xml_format = 'rss')
 {
 	// For every array in the data...
 	foreach ($data as $key => $val)

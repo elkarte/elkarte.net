@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0 Beta 2
  *
  * This file contains javascript associated with the new fader
  */
@@ -61,5 +61,7 @@ function elk_NewsFader(oOptions)
 
 	$(sControlId).html('<li>' + sItemTemplate.replace('%1$s', aFaderItems[0]) + '</li>');
 
-	fadeOut();
+	// Start fading in and out, but only if there is more than one item.
+	if (aFaderItems.length > 1)
+		fadeOut();
 }

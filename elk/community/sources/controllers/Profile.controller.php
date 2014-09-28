@@ -15,7 +15,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -28,7 +28,7 @@ if (!defined('ELK'))
 class Profile_Controller extends Action_Controller
 {
 	/**
-	 * If the save was sucessful or not
+	 * If the save was successful or not
 	 * @var boolean
 	 */
 	private $_completed_save = false;
@@ -63,25 +63,28 @@ class Profile_Controller extends Action_Controller
 		// Is this the profile of the user himself or herself?
 		$context['user']['is_owner'] = $memID == $user_info['id'];
 
-		/* Define all the sections within the profile area!
-			We start by defining the permission required - then we take this and turn it into the relevant context ;)
-			Possible fields:
-				For Section:
-					string $title:		Section title.
-					array $areas:		Array of areas within this section.
-
-				For Areas:
-					string $label:		Text string that will be used to show the area in the menu.
-					string $file:		Optional text string that may contain a file name that's needed for inclusion in order to display the area properly.
-					string $custom_url:	Optional href for area.
-					string $function:	Function to execute for this section.
-					bool $enabled:		Should area be shown?
-					string $sc:			Session check validation to do on save - note without this save will get unset - if set.
-					bool $hidden:		Does this not actually appear on the menu?
-					bool $password:		Whether to require the user's password in order to save the data in the area.
-					array $subsections:	Array of subsections, in order of appearance.
-					array $permission:	Array of permissions to determine who can access this area. Should contain arrays $own and $any.
-		*/
+		/**
+		 * Define all the sections within the profile area!
+		 * We start by defining the permission required - then we take this and turn
+		 * it into the relevant context ;)
+		 *
+		 * Possible fields:
+		 *   For Section:
+		 *    - string $title: Section title.
+		 *    - array $areas:  Array of areas within this section.
+		 *
+		 *   For Areas:
+		 *    - string $label:      Text string that will be used to show the area in the menu.
+		 *    - string $file:       Optional text string that may contain a file name that's needed for inclusion in order to display the area properly.
+		 *    - string $custom_url: Optional href for area.
+		 *    - string $function:   Function to execute for this section.
+		 *    - bool $enabled:      Should area be shown?
+		 *    - string $sc:         Session check validation to do on save - note without this save will get unset - if set.
+		 *    - bool $hidden:       Does this not actually appear on the menu?
+		 *    - bool $password:     Whether to require the user's password in order to save the data in the area.
+		 *    - array $subsections: Array of subsections, in order of appearance.
+		 *    - array $permission:  Array of permissions to determine who can access this area. Should contain arrays $own and $any.
+		 */
 		$profile_areas = array(
 			'info' => array(
 				'title' => $txt['profileInfo'],
@@ -133,7 +136,7 @@ class Profile_Controller extends Action_Controller
 						'enabled' => !empty($modSettings['drafts_enabled']) && $context['user']['is_owner'],
 						'permission' => array(
 							'own' => 'profile_view_own',
-							'any' =>  array(),
+							'any' => array(),
 						),
 					),
 					'showlikes' => array(
@@ -148,7 +151,7 @@ class Profile_Controller extends Action_Controller
 						),
 						'permission' => array(
 							'own' => 'profile_view_own',
-							'any' =>  array(),
+							'any' => array(),
 						),
 					),
 					'permissions' => array(
@@ -397,14 +400,12 @@ class Profile_Controller extends Action_Controller
 		// Set a few options for the menu.
 		$menuOptions = array(
 			'disable_url_session_check' => true,
+			'hook' => 'profile',
 			'extra_url_parameters' => array(
 				'u' => $context['id_member'],
 			),
 			'default_include_dir' => CONTROLLERDIR,
 		);
-
-		// Let them modify profile areas easily.
-		call_integration_hook('integrate_profile_areas', array(&$profile_areas, &$menuOptions));
 
 		// Actually create the menu!
 		$profile_include_data = createMenu($profile_areas, $menuOptions);
@@ -538,8 +539,11 @@ class Profile_Controller extends Action_Controller
 					// Does the integration want to check passwords?
 					$good_password = in_array(true, call_integration_hook('integrate_verify_password', array($cur_profile['member_name'], $_POST['oldpasswrd'], false)), true);
 
+					// Start up the password checker, we have work to do
+					require_once(SUBSDIR . '/Auth.subs.php');
+
 					// Bad password!!!
-					if (!$good_password && $user_info['passwd'] != sha1(strtolower($user_profile[$memID]['member_name']) . un_htmlspecialchars(stripslashes($_POST['oldpasswrd']))))
+					if (!$good_password && !validateLoginPassword($_POST['oldpasswrd'], $user_info['passwd'], $user_profile[$memID]['member_name']))
 						$post_errors[] = 'bad_password';
 
 					// Warn other elements not to jump the gun and do custom changes!
@@ -586,7 +590,7 @@ class Profile_Controller extends Action_Controller
 			{
 				require_once(CONTROLLERDIR . '/ProfileOptions.controller.php');
 				$controller = new ProfileOptions_Controller();
-				$controller->action_authentication($memID, true);
+				$controller->action_authentication(true);
 			}
 			elseif (in_array($current_area, array('account', 'forumprofile', 'theme', 'contactprefs')))
 				saveProfileFields();

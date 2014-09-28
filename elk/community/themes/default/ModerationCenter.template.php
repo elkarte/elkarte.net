@@ -11,9 +11,17 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
+
+/**
+ * Someone else did that for us, let's use it.
+ */
+function template_ModerationCenter_init()
+{
+	loadTemplate('GenericMessages');
+}
 
 /**
  * Template for the main page of moderation center.
@@ -65,25 +73,31 @@ function template_latest_news()
 
 	// This requires a lot of javascript...
 	echo '
-								<script src="', $scripturl, '?action=viewadminfile;filename=current-version.js"></script>
-								<script src="', $scripturl, '?action=viewadminfile;filename=latest-news.js"></script>
+								<span style="display:none" id="installedVersion">??</span>
+								<span style="display:none" id="latestVersion">??</span>
 								<script><!-- // --><![CDATA[
-									var oAdminIndex = new elk_AdminIndex({
-										sSelf: \'oAdminCenter\',
-										bLoadAnnouncements: true,
-										sAnnouncementTemplate: ', JavaScriptEscape('
-											<dl>
-												%content%
-											</dl>
-										'), ',
-										sAnnouncementMessageTemplate: ', JavaScriptEscape('
-											<dt><a href="%href%">%subject%</a> ' . $txt['on'] . ' %time%</dt>
-											<dd>
-												%message%
-											</dd>
-										'), ',
-										sAnnouncementContainerId: \'ourAnnouncements\'
-									});
+						var oAdminCenter = new elk_AdminIndex({
+							bLoadAnnouncements: true,
+							sAnnouncementTemplate: ', JavaScriptEscape('
+								<dl>
+									%content%
+								</dl>
+							'), ',
+							sAnnouncementMessageTemplate: ', JavaScriptEscape('
+								<dt><a href="%href%">%subject%</a> ' . $txt['on'] . ' %time%</dt>
+								<dd>
+									%message%
+								</dd>
+							'), ',
+							sAnnouncementContainerId: \'ourAnnouncements\',
+
+							bLoadVersions: true,
+							slatestVersionContainerId: \'latestVersion\',
+							sinstalledVersionContainerId: \'installedVersion\',
+							sVersionOutdatedTemplate: ', JavaScriptEscape('
+								<span class="alert">%currentVersion%</span>
+							'), '
+						});
 								// ]]></script>';
 }
 
@@ -263,13 +277,13 @@ function template_action_required()
  */
 function template_reported_posts()
 {
-	global $context, $txt, $scripturl;
+	global $context, $txt, $scripturl, $options;
 
 	echo '
 					<form id="reported_posts" action="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';start=', $context['start'], '" method="post" accept-charset="UTF-8">
-						<h3 class="category_header">
+						<h2 class="category_header">
 							', $context['view_closed'] ? $txt['mc_reportedp_closed'] : $txt['mc_reportedp_active'], '
-						</h3>';
+						</h2>';
 
 	if (!empty($context['reports']))
 		template_pagesection();
@@ -277,44 +291,17 @@ function template_reported_posts()
 	$alternate = 0;
 	foreach ($context['reports'] as $report)
 	{
-		echo '
-						<div class="topic clear">
-							<div class="', ++$alternate % 2 ? 'windowbg' : 'windowbg2', ' core_posts">
-								<div class="content">
-									<h5>
-										<strong>', !empty($report['board_name']) ? '<a href="' . $scripturl . '?board=' . $report['board'] . '.0">' . $report['board_name'] . '</a>' : '??', ' / <a href="', $report['topic_href'], '">', $report['subject'], '</a></strong> ', $txt['mc_reportedp_by'], ' <strong>', $report['author']['link'], '</strong>
-									</h5>
-									<div class="smalltext">
-										', $txt['mc_reportedp_last_reported'], ': ', $report['last_updated'], '&nbsp;-&nbsp;';
+		$report['class'] = ++$alternate % 2 ? 'windowbg' : 'windowbg2';
+		$report['title'] = '<strong>' . (!empty($report['board_name']) ? '<a href="' . $scripturl . '?board=' . $report['board'] . '.0">' . $report['board_name'] . '</a>' : '??') . ' / <a href="' . $report['topic_href'] . '">' . $report['subject'] . '</a></strong> ' . $txt['mc_reportedp_by'] . ' <strong>' . $report['author']['link'] . '</strong>';
 
 		// Prepare the comments...
 		$comments = array();
 		foreach ($report['comments'] as $comment)
 			$comments[$comment['member']['id']] = $comment['member']['link'];
+		$report['date'] = $txt['mc_reportedp_last_reported'] . ': ' . $report['last_updated'] . '&nbsp;-&nbsp;' . '
+										' . $txt['mc_reportedp_reported_by'] . ': ' . implode(', ', $comments);
 
-		echo '
-										', $txt['mc_reportedp_reported_by'], ': ', implode(', ', $comments), '
-									</div>
-									<hr />
-									', $report['body'], '
-
-									<ul class="quickbuttons">
-										<li class="listlevel1 quickmod_check">', !$context['view_closed'] ? '
-											<input class="input_check" type="checkbox" name="close[]" value="' . $report['id'] . '" />' : '', '
-										</li>
-										<li class="listlevel1">
-											<a href="', $report['report_href'], '" class="linklevel1 details_button">', $txt['mc_reportedp_details'], '</a>
-										</li>
-										<li class="listlevel1">
-											<a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';ignore=', (int) !$report['ignore'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" ', !$report['ignore'] ? 'onclick="return confirm(\'' . $txt['mc_reportedp_ignore_confirm'] . '\');"' : '', ' class="linklevel1 ignore_button">', $report['ignore'] ? $txt['mc_reportedp_unignore'] : $txt['mc_reportedp_ignore'], '</a>
-										</li>
-										<li class="listlevel1">
-											<a href="', $scripturl, '?action=moderate;area=reports', $context['view_closed'] ? ';sa=closed' : '', ';close=', (int) !$report['closed'], ';rid=', $report['id'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], '" class="linklevel1 close_button">', $context['view_closed'] ? $txt['mc_reportedp_open'] : $txt['mc_reportedp_close'], '</a>
-										</li>
-									</ul>
-								</div>
-							</div>
-						</div>';
+		template_simple_message($report);
 	}
 
 	// Were none found?
@@ -326,7 +313,7 @@ function template_reported_posts()
 							</div>
 						</div>';
 	else
-		template_pagesection(false, false, array('extra' => !$context['view_closed'] ? '<input type="submit" name="close_selected" value="' . $txt['mc_reportedp_close_selected'] . '" class="right_submit" />' : ''));
+		template_pagesection(false, false, array('extra' => !$context['view_closed'] && !empty($options['display_quick_mod']) && $options['display_quick_mod'] == 1 ? '<input type="submit" name="close_selected" value="' . $txt['mc_reportedp_close_selected'] . '" class="right_submit" />' : ''));
 
 	echo '
 						<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -341,66 +328,31 @@ function template_unapproved_posts()
 {
 	global $options, $context, $txt, $scripturl;
 
-	template_pagesection();
-
 	// Just a big div of it all really...
 	echo '
 				<form action="', $scripturl, '?action=moderate;area=postmod;start=', $context['start'], ';sa=', $context['current_view'], '" method="post" accept-charset="UTF-8">
-					<div id="unapprovedposts" class="forumposts">
-						<h3 class="category_header hdicon cat_img_posts">
+						<h2 class="category_header hdicon cat_img_posts">
 							', $context['header_title'], '
-						</h3>';
+						</h2>';
 
 	// No posts?
 	if (empty($context['unapproved_items']))
 		echo '
 						<div class="windowbg2 core_posts">
-							<div class="content">
-								<p class="centertext">', $txt['mc_unapproved_' . $context['current_view'] . '_none_found'], '</p>
-							</div>
+							<p class="centertext">', $txt['mc_unapproved_' . $context['current_view'] . '_none_found'], '</p>
 						</div>';
+	else
+		template_pagesection();
 
 	// Loop through and show each unapproved post
 	foreach ($context['unapproved_items'] as $item)
 	{
-		echo '
-						<div class="', $item['alternate'] == 0 ? 'windowbg2' : 'windowbg', ' core_posts">
-							<div class="content">
-								<div class="counter">', $item['counter'], '</div>
-								<div class="topic_details">
-									<h5><strong>', $item['category']['link'], ' / ', $item['board']['link'], ' / ', $item['link'], '</strong></h5>
-									<span class="smalltext">', $txt['mc_unapproved_by'], ' <strong>', $item['poster']['link'], '</strong> ', ': ', $item['time'], '</span>
-								</div>
-								<div class="inner">', $item['body'], '</div>
-								<ul class="quickbuttons">';
+		$item['class'] = $item['alternate'] == 0 ? 'windowbg2' : 'windowbg';
+		$item['title'] = '<h5><strong>' . $item['category']['link'] . ' / ' . $item['board']['link'] . ' / ' . $item['link'] . '</strong></h5>';
+		$item['date'] = $txt['mc_unapproved_by'] . ' <strong>' . $item['poster']['link'] . '</strong> : ' . $item['time'];
 
-		// Quick moderation checkbox?
-		if (!empty($options['display_quick_mod']) && $options['display_quick_mod'] == 1)
-			echo '
-									<li class="listlevel1 quickmod_check">
-										<input type="checkbox" name="item[]" value="', $item['id'], '" class="input_check" />
-									</li>';
-
-		// Approve and remove buttons
-		echo '
-									<li class="listlevel1">
-										<a class="linklevel1 approve_button" href="', $scripturl, '?action=moderate;area=postmod;sa=', $context['current_view'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], ';approve=', $item['id'], '">', $txt['approve'], '</a>
-									</li>';
-
-		if ($item['can_delete'])
-			echo '
-									<li class="listlevel1">
-										<a class="linklevel1 unapprove_button" href="', $scripturl, '?action=moderate;area=postmod;sa=', $context['current_view'], ';start=', $context['start'], ';', $context['session_var'], '=', $context['session_id'], ';delete=', $item['id'], '">', $txt['remove'], '</a>
-									</li>';
-
-		echo '
-								</ul>
-							</div>
-						</div>';
+		template_simple_message($item);
 	}
-
-	echo '
-					</div>';
 
 	// Quick moderation checkbox action selection
 	$quick_mod = '';
@@ -418,7 +370,8 @@ function template_unapproved_posts()
 						</noscript>
 					</div>';
 
-	template_pagesection(false, false, array('extra' => $quick_mod));
+	if (!empty($context['unapproved_items']))
+		template_pagesection(false, false, array('extra' => $quick_mod));
 
 	echo '
 					<input type="hidden" name="', $context['session_var'], '" value="', $context['session_id'], '" />
@@ -448,7 +401,7 @@ function template_viewmodreport()
 										<a class="linklevel1 close_button" href="', $scripturl, '?action=moderate;area=reports;close=', (int) !$context['report']['closed'], ';rid=', $context['report']['id'], ';', $context['session_var'], '=', $context['session_id'], '">', $context['report']['closed'] ? $txt['mc_reportedp_open'] : $txt['mc_reportedp_close'], '</a>
 									</li>
 									<li class="listlevel1">
-										<a class="linklevel1 ignore_button" href="', $scripturl, '?action=moderate;area=reports;ignore=', (int) !$context['report']['ignore'], ';rid=', $context['report']['id'], ';', $context['session_var'], '=', $context['session_id'], '" ', !$context['report']['ignore'] ? 'onclick="return confirm(\'' . $txt['mc_reportedp_ignore_confirm'] . '\');"' : '', '>', $context['report']['ignore'] ? $txt['mc_reportedp_unignore'] : $txt['mc_reportedp_ignore'], '</a>
+										<a class="linklevel1 ignore_button" href="', $scripturl, '?action=moderate;area=reports;ignore=', (int) !$context['report']['ignore'], ';rid=', $context['report']['id'], ';', $context['session_var'], '=', $context['session_id'], '" ', !$context['report']['ignore'] ? 'onclick="return confirm(' . JavaScriptEscape($txt['mc_reportedp_ignore_confirm']) . ');"' : '', '>', $context['report']['ignore'] ? $txt['mc_reportedp_unignore'] : $txt['mc_reportedp_ignore'], '</a>
 									</li>
 								</ul>
 							</div>
@@ -495,7 +448,7 @@ function template_viewmodreport()
 /**
  * Callback function for showing a watched users post in the table.
  *
- * @param array $post
+ * @param mixed[] $post
  */
 function template_user_watch_post_callback($post)
 {
@@ -610,8 +563,8 @@ function template_show_notice()
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 		<title>', $context['page_title'], '</title>
-		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index.css?beta10" />
-		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index', $context['theme_variant'], '.css?beta10" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/index.css', CACHE_STALE, '" />
+		<link rel="stylesheet" href="', $settings['theme_url'], '/css/', $context['theme_variant_url'], 'index', $context['theme_variant'], '.css', CACHE_STALE, '" />
 	</head>
 	<body>
 		<h2 class="category_header">', $txt['show_notice'], '</h2>
@@ -713,38 +666,5 @@ function template_warn_template()
 				return ajax_getTemplatePreview();
 			});
 		});
-
-		function ajax_getTemplatePreview ()
-		{
-			$.ajax({
-				type: "POST",
-				url: "' . $scripturl . '?action=xmlpreview;xml",
-				data: {item: "warning_preview", title: $("#template_title").val(), body: $("#template_body").val(), user: $(\'input[name="u"]\').attr("value")},
-				context: document.body
-			})
-			.done(function(request) {
-				$("#box_preview").css({display:""});
-				$("#template_preview").html($(request).find(\'body\').text());
-				if ($(request).find("error").text() != \'\')
-				{
-					$("#errors").css({display:""});
-					var errors_html = \'\',
-						errors = $(request).find(\'error\').each(function() {
-						errors_html += $(this).text() + \'<br />\';
-					});
-
-					$(document).find("#error_list").html(errors_html);
-				}
-				else
-				{
-					$("#errors").css({display:"none"});
-					$("#error_list").html(\'\');
-				}
-
-				return false;
-			});
-
-			return false;
-		}
 	// ]]></script>';
 }

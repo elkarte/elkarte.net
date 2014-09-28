@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -50,10 +50,13 @@ class ProfileAccount_Controller extends Action_Controller
 		// make sure the sub-template is set...
 		loadTemplate('ProfileAccount');
 		$context['sub_template'] = 'issueWarning';
-
 		// We need this because of template_load_warning_variables
 		loadTemplate('Profile');
 		loadJavascriptFile('profile.js');
+		// jQuery-UI FTW!
+		$modSettings['jquery_include_ui'] = true;
+		loadCSSFile('jquery.ui.slider.css');
+		loadCSSFile('jquery.ui.theme.css');
 
 		// Get all the actual settings.
 		list ($modSettings['warning_enable'], $modSettings['user_limit']) = explode(',', $modSettings['warning_settings']);
@@ -222,7 +225,7 @@ class ProfileAccount_Controller extends Action_Controller
 		$context['page_title'] = $txt['profile_issue_warning'];
 
 		// Let's use a generic list to get all the current warnings
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		require_once(SUBSDIR . '/Profile.subs.php');
 
 		// Work our the various levels.
@@ -380,7 +383,7 @@ class ProfileAccount_Controller extends Action_Controller
 					'{MESSAGE}' => '[url=' . $scripturl . '?msg=' . $warning_for_message . ']' . un_htmlspecialchars($warned_message_subject) . '[/url]',
 					'{SCRIPTURL}' => $scripturl,
 					'{FORUMNAME}' => $mbname,
-					'{REGARDS}' => $txt['regards_team']
+					'{REGARDS}' => replaceBasicActionUrl($txt['regards_team'])
 				)
 			);
 	}
@@ -388,7 +391,7 @@ class ProfileAccount_Controller extends Action_Controller
 	/**
 	 * Present a screen to make sure the user wants to be deleted.
 	 */
-	function action_deleteaccount()
+	public function action_deleteaccount()
 	{
 		global $txt, $context, $modSettings, $cur_profile;
 
@@ -412,7 +415,7 @@ class ProfileAccount_Controller extends Action_Controller
 	/**
 	 * Actually delete an account.
 	 */
-	function action_deleteaccount2()
+	public function action_deleteaccount2()
 	{
 		global $user_info, $context, $cur_profile, $user_profile, $modSettings;
 
@@ -507,7 +510,7 @@ class ProfileAccount_Controller extends Action_Controller
 	 * Activate an account.
 	 * This function is called from the profile account actions area.
 	 */
-	function action_activateaccount()
+	public function action_activateaccount()
 	{
 		global $context, $user_profile, $modSettings;
 

@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -22,7 +22,11 @@ if (!defined('ELK'))
 
 /**
  * This class is the administration mailing controller.
- * It handles mail configuration, it displays and allows to remove items from the mail queue.
+ *
+ * - It handles mail configuration,
+ * - It displays and allows to remove items from the mail queue.
+ *
+ * @package Mail
  */
 class ManageMail_Controller extends Action_Controller
 {
@@ -34,7 +38,9 @@ class ManageMail_Controller extends Action_Controller
 
 	/**
 	 * Main dispatcher.
-	 * This function checks permissions and passes control through to the relevant section.
+	 *
+	 * - This function checks permissions and passes control through to the relevant section.
+	 *
 	 * @see Action_Controller::action_index()
 	 * @uses Help and MangeMail language files
 	 */
@@ -46,7 +52,7 @@ class ManageMail_Controller extends Action_Controller
 		loadLanguage('ManageMail');
 
 		// We'll need the utility functions from here.
-		require_once(SUBSDIR . '/Settings.class.php');
+		require_once(SUBSDIR . '/SettingsForm.class.php');
 
 		$subActions = array(
 			'browse' => array($this, 'action_browse', 'permission' => 'admin_forum'),
@@ -54,13 +60,8 @@ class ManageMail_Controller extends Action_Controller
 			'settings' => array($this, 'action_mailSettings_display', 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_mail', array(&$subActions));
-
-		// By default we want to browse
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'browse';
-
-		$context['sub_action'] = $subAction;
-		$context['page_title'] = $txt['mailqueue_title'];
+		// Action control
+		$action = new Action('manage_mail');
 
 		// Load up all the tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -69,14 +70,20 @@ class ManageMail_Controller extends Action_Controller
 			'description' => $txt['mailqueue_desc'],
 		);
 
+		// By default we want to browse, call integrate_sa_manage_mail
+		$subAction = $action->initialize($subActions, 'browse');
+
+		// Final bits
+		$context['sub_action'] = $subAction;
+		$context['page_title'] = $txt['mailqueue_title'];
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'browse');
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Display the mail queue...
+	 *
 	 * @uses ManageMail template
 	 */
 	public function action_browse()
@@ -120,9 +127,8 @@ class ManageMail_Controller extends Action_Controller
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
-							return Util::strlen($rowData[\'subject\']) > 50 ? sprintf(\'%1$s...\', Util::htmlspecialchars(Util::substr($rowData[\'subject\'], 0, 47))) : Util::htmlspecialchars($rowData[\'subject\']);
+							return Util::shorten_text(Util::htmlspecialchars($rowData[\'subject\'], 50));
 						'),
-						'class' => 'smalltext',
 					),
 					'sort' => array(
 						'default' => 'subject',
@@ -140,7 +146,6 @@ class ManageMail_Controller extends Action_Controller
 								'recipient' => true,
 							),
 						),
-						'class' => 'smalltext',
 					),
 					'sort' => array(
 						'default' => 'recipient',
@@ -162,7 +167,7 @@ class ManageMail_Controller extends Action_Controller
 							// But if not, revert to priority 0.
 							return isset($txt[$txtKey]) ? $txt[$txtKey] : $txt[\'mq_mpriority_1\'];
 						'),
-						'class' => 'centertext smalltext',
+						'class' => 'centertext',
 					),
 					'sort' => array(
 						'default' => 'priority',
@@ -177,7 +182,6 @@ class ManageMail_Controller extends Action_Controller
 						'function' => create_function('$rowData', '
 							return time_since(time() - $rowData[\'time_sent\']);
 						'),
-						'class' => 'smalltext',
 					),
 					'sort' => array(
 						'default' => 'time_sent',
@@ -187,13 +191,11 @@ class ManageMail_Controller extends Action_Controller
 				'check' => array(
 					'header' => array(
 						'value' => '<input type="checkbox" onclick="invertAll(this, this.form);" class="input_check" />',
-						'class' => 'centertext',
 					),
 					'data' => array(
 						'function' => create_function('$rowData', '
 							return \'<input type="checkbox" name="delete[]" value="\' . $rowData[\'id_mail\'] . \'" class="input_check" />\';
 						'),
-						'class' => 'centertext',
 					),
 				),
 			),
@@ -205,19 +207,21 @@ class ManageMail_Controller extends Action_Controller
 			'additional_rows' => array(
 				array(
 					'position' => 'bottom_of_list',
+					'class' => 'submitbutton',
 					'value' => '
 						<input type="submit" name="delete_redirects" value="' . $txt['quickmod_delete_selected'] . '" onclick="return confirm(\'' . $txt['quickmod_confirm'] . '\');" class="right_submit" />
-						<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=mailqueue;sa=clear;' . $context['session_var'] . '=' . $context['session_id'] . '" onclick="return confirm(\'' . $txt['mailqueue_clear_list_warning'] . '\');">' . $txt['mailqueue_clear_list'] . '</a> ',
+						<a class="linkbutton" href="' . $scripturl . '?action=admin;area=mailqueue;sa=clear;' . $context['session_var'] . '=' . $context['session_id'] . '" onclick="return confirm(\'' . $txt['mailqueue_clear_list_warning'] . '\');">' . $txt['mailqueue_clear_list'] . '</a> ',
 				),
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 	}
 
 	/**
 	 * Allows to view and modify the mail settings.
+	 *
 	 * @uses show_settings sub template
 	 */
 	public function action_mailSettings_display()
@@ -241,8 +245,6 @@ class ManageMail_Controller extends Action_Controller
 		}
 
 		$config_vars = $this->_mailSettings->settings();
-
-		call_integration_hook('integrate_modify_mail_settings', array(&$config_vars));
 
 		// Saving?
 		if (isset($_GET['save']))
@@ -320,7 +322,7 @@ class ManageMail_Controller extends Action_Controller
 	{
 		global $txt, $modSettings, $txtBirthdayEmails;
 
-		// we need $txtBirthdayEmails
+		// We need $txtBirthdayEmails
 		loadLanguage('EmailTemplates');
 
 		$body = $txtBirthdayEmails[(empty($modSettings['birthday_email']) ? 'happy_birthday' : $modSettings['birthday_email']) . '_body'];
@@ -355,6 +357,9 @@ class ManageMail_Controller extends Action_Controller
 				'birthday_body' => array('var_message', 'birthday_body', 'var_message' => nl2br($body), 'disabled' => true, 'size' => ceil(strlen($body) / 25)),
 		);
 
+		// Add new settings with a nice hook, makes them available for admin settings search as well
+		call_integration_hook('integrate_modify_mail_settings', array(&$config_vars));
+
 		return $config_vars;
 	}
 
@@ -369,8 +374,8 @@ class ManageMail_Controller extends Action_Controller
 	/**
 	 * This function clears the mail queue of all emails, and at the end redirects to browse.
 	 *
-	 * Note force clearing the queue may cause a site to exceed hosting mail limit quotas
-	 * Some hosts simple loose these excess emails, others queue them server side, up to a limit
+	 * - Note force clearing the queue may cause a site to exceed hosting mail limit quotas
+	 * - Some hosts simple loose these excess emails, others queue them server side, up to a limit
 	 */
 	public function action_clear()
 	{

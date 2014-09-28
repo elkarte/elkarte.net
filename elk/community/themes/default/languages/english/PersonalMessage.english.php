@@ -1,10 +1,7 @@
 <?php
 // Version: 1.0; PersonalMessage
 
-global $context;
-
 $txt['pm_inbox'] = 'Personal Messages Index';
-$txt['send_message'] = 'Send message';
 $txt['pm_add'] = 'Add';
 $txt['make_bcc'] = 'Add BCC';
 $txt['pm_to'] = 'To';
@@ -18,7 +15,6 @@ $txt['delete_message'] = 'Delete Messages';
 // Don't translate "PMBOX" in this string.
 $txt['delete_all'] = 'Delete all messages in your PMBOX';
 $txt['delete_all_confirm'] = 'Are you sure you want to delete all messages?';
-$txt['recipient'] = 'Recipient';
 
 $txt['delete_selected_confirm'] = 'Are you sure you want to delete all selected personal messages?';
 
@@ -45,8 +41,7 @@ $txt['pm_mark_unread'] = 'Mark as Unread';
 
 // Message Pruning.
 $txt['pm_prune'] = 'Prune messages';
-$txt['pm_prune_desc1'] = 'Delete all personal messages older than';
-$txt['pm_prune_desc2'] = 'days.';
+$txt['pm_prune_desc'] = 'Delete all personal messages older than %1$s days.';
 $txt['pm_prune_warning'] = 'Are you sure you wish to prune your personal messages?';
 
 // Actions Drop Down.

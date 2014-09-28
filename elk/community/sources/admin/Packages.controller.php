@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -24,6 +24,8 @@ if (!defined('ELK'))
  * This class is the administration package manager controller.
  * Its main job is to install/uninstall, allow to browse, packages.
  * In fact, just about everything related to addon packages, including FTP connections when necessary.
+ *
+ * @package Packages
  */
 class Packages_Controller extends Action_Controller
 {
@@ -61,15 +63,14 @@ class Packages_Controller extends Action_Controller
 			'flush' => array($this, 'action_flush'),
 			'examine' => array($this, 'action_examine'),
 			'showoperations' => array($this, 'action_showoperations'),
+			// The following two belong to PackageServers,
+			// for UI's sake moved here at least temporarily
+			'servers' => array('file' => 'PackageServers.controller.php', 'controller' => 'PackageServers_Controller', 'function' => 'action_list'),
+			'upload' => array('file' => 'PackageServers.controller.php', 'controller' => 'PackageServers_Controller', 'function' => 'action_upload'),
 		);
 
-		// Work out exactly who it is we are calling.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'browse';
-
 		// Set up action/subaction stuff.
-		$action = new Action();
-		$action->initialize($subActions, 'browse');
-		$context['sub_action'] = $subAction;
+		$action = new Action('packages');
 
 		// Set up some tabs...
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -87,8 +88,22 @@ class Packages_Controller extends Action_Controller
 				'options' => array(
 					'description' => $txt['package_install_options_desc'],
 				),
+				// The following two belong to PackageServers,
+				// for UI's sake moved here at least temporarily
+				'servers' => array(
+					'description' => $txt['download_packages_desc'],
+				),
+				'upload' => array(
+					'description' => $txt['upload_packages_desc'],
+				),
 			),
 		);
+
+		// Work out exactly who it is we are calling. call integrate_sa_packages
+		$subAction = $action->initialize($subActions, 'browse');
+
+		// Set up for the template
+		$context['sub_action'] = $subAction;
 
 		// Lets just do it!
 		$action->dispatch($subAction);
@@ -102,7 +117,7 @@ class Packages_Controller extends Action_Controller
 		global $txt, $context, $scripturl, $settings;
 
 		// You have to specify a file!!
-		if (!isset($_REQUEST['package']) || $_REQUEST['package'] == '')
+		if (!isset($_REQUEST['package']) || trim($_REQUEST['package']) == '')
 			redirectexit('action=admin;area=packages');
 
 		$context['filename'] = preg_replace('~[\.]+~', '.', $_REQUEST['package']);
@@ -121,13 +136,14 @@ class Packages_Controller extends Action_Controller
 		if (file_exists(BOARDDIR . '/packages/temp'))
 			deltree(BOARDDIR . '/packages/temp', false);
 
+		// Attempt to create the temp directory
 		if (!mktree(BOARDDIR . '/packages/temp', 0755))
 		{
 			deltree(BOARDDIR . '/packages/temp', false);
 			if (!mktree(BOARDDIR . '/packages/temp', 0777))
 			{
 				deltree(BOARDDIR . '/packages/temp', false);
-				create_chmod_control(array(BOARDDIR . '/packages/temp/delme.tmp'), array('destination_url' => $scripturl . '?action=admin;area=packages;sa=' . $_REQUEST['sa'] . ';package=' . $_REQUEST['package'], 'crash_on_error' => true));
+				create_chmod_control(array(BOARDDIR . '/packages/temp/delme.tmp'), array('destination_url' => $scripturl . '?action=admin;area=packages;sa=' . $_REQUEST['sa'] . ';package=' . $context['filename'], 'crash_on_error' => true));
 
 				deltree(BOARDDIR . '/packages/temp', false);
 				if (!mktree(BOARDDIR . '/packages/temp', 0777))
@@ -437,7 +453,7 @@ class Packages_Controller extends Action_Controller
 						elseif (isset($mod_action['filename']) && preg_match('~([\w]*)/([\w]*)\.template\.php$~', $mod_action['filename'], $matches))
 							$actual_filename = strtolower($matches[1] . '/' . $matches[2] . '.template.php||' . $action['filename']);
 						else
-							$actual_filename = $key;
+							$actual_filename = $operation_key;
 
 						// We just need it for actual parse changes.
 						if (!in_array($mod_action['type'], array('error', 'result', 'opened', 'saved', 'end', 'missing', 'skipping', 'chmod')))
@@ -897,7 +913,7 @@ class Packages_Controller extends Action_Controller
 		$context['install_finished'] = false;
 
 		// We're gonna be needing the table db functions! ...Sometimes.
-		$table = db_table();
+		$table_installer = db_table();
 
 		// @todo Make a log of any errors that occurred and output them?
 		if (!empty($install_log))
@@ -934,7 +950,7 @@ class Packages_Controller extends Action_Controller
 				elseif ($action['type'] == 'code' && !empty($action['filename']))
 				{
 					// This is just here as reference for what is available.
-					global $txt, $modSettings, $context, $settings, $forum_version;
+					global $txt, $modSettings, $context;
 
 					// Now include the file and be done with it ;).
 					if (file_exists(BOARDDIR . '/packages/temp/' . $context['base_path'] . $action['filename']))
@@ -961,7 +977,7 @@ class Packages_Controller extends Action_Controller
 				elseif ($action['type'] == 'database' && !empty($action['filename']) && (!$context['uninstalling'] || !empty($_POST['do_db_changes'])))
 				{
 					// These can also be there for database changes.
-					global $txt, $modSettings, $context, $settings, $forum_version;
+					global $txt, $modSettings, $context;
 
 					// Let the file work its magic ;)
 					if (file_exists(BOARDDIR . '/packages/temp/' . $context['base_path'] . $action['filename']))
@@ -1013,30 +1029,18 @@ class Packages_Controller extends Action_Controller
 			if (!$context['uninstalling'])
 			{
 				// Any db changes from older version?
-				$table_log = $table->package_log();
+				$table_log = $table_installer->package_log();
 				if (!empty($old_db_changes))
 					$db_package_log = empty($table_log) ? $old_db_changes : array_merge($old_db_changes, $table_log);
+				else
+					$db_package_log = $table_log;
 
 				// If there are some database changes we might want to remove then filter them out.
 				if (!empty($db_package_log))
 				{
 					// We're really just checking for entries which are create table AND add columns (etc).
 					$tables = array();
-
-					/**
-					 * Table sorting function used in usort
-					 *
-					 * @param array $a
-					 * @param array $b
-					 */
-					function sort_table_first($a, $b)
-					{
-						if ($a[0] == $b[0])
-							return 0;
-						return $a[0] == 'remove_table' ? -1 : 1;
-					}
-					usort($db_package_log, 'sort_table_first');
-
+					usort($db_package_log, array($this, '_sort_table_first'));
 					foreach ($db_package_log as $k => $log)
 					{
 						if ($log[0] == 'remove_table')
@@ -1044,6 +1048,7 @@ class Packages_Controller extends Action_Controller
 						elseif (in_array($log[1], $tables))
 							unset($db_package_log[$k]);
 					}
+
 					$package_installed['db_changes'] = serialize($db_package_log);
 				}
 				else
@@ -1072,11 +1077,11 @@ class Packages_Controller extends Action_Controller
 			foreach ($package_installed['db_changes'] as $change)
 			{
 				if ($change[0] == 'remove_table' && isset($change[1]))
-					$table->db_drop_table($change[1]);
+					$table_installer->db_drop_table($change[1]);
 				elseif ($change[0] == 'remove_column' && isset($change[2]))
-					$table->db_remove_column($change[1], $change[2]);
+					$table_installer->db_remove_column($change[1], $change[2]);
 				elseif ($change[0] == 'remove_index' && isset($change[2]))
-					$table->db_remove_index($change[1], $change[2]);
+					$table_installer->db_remove_index($change[1], $change[2]);
 			}
 		}
 
@@ -1092,6 +1097,20 @@ class Packages_Controller extends Action_Controller
 
 		// Restore file permissions?
 		create_chmod_control(array(), array(), true);
+	}
+
+	/**
+	 * Table sorting function used in usort
+	 *
+	 * @param string[] $a
+	 * @param string[] $b
+	 */
+	private function _sort_table_first($a, $b)
+	{
+		if ($a[0] == $b[0])
+			return 0;
+
+		return $a[0] == 'remove_table' ? -1 : 1;
 	}
 
 	/**
@@ -1238,12 +1257,12 @@ class Packages_Controller extends Action_Controller
 	{
 		global $txt, $scripturl, $context, $forum_version, $settings;
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		$context['page_title'] .= ' - ' . $txt['browse_packages'];
 		$context['forum_version'] = $forum_version;
 		$installed = $context['sub_action'] == 'installed' ? true : false;
-		$context['package_types'] = $installed ? array('modification') : array('modification', 'avatar', 'language', 'unknown');
+		$context['package_types'] = $installed ? array('modification') : array('modification', 'avatar', 'language', 'smiley', 'unknown');
 
 		foreach ($context['package_types'] as $type)
 		{
@@ -1355,7 +1374,8 @@ class Packages_Controller extends Action_Controller
 				'additional_rows' => array(
 					array(
 						'position' => 'bottom_of_list',
-						'value' => ($context['sub_action'] == 'browse' ? '<div class="smalltext">' . $txt['package_installed_key'] . '<img src="' . $settings['images_url'] . '/icons/package_installed.png" alt="" class="centericon" /> ' . $txt['package_installed_current'] . '<img src="' . $settings['images_url'] . '/icons/package_old.png" alt="" class="centericon" /> ' . $txt['package_installed_old'] . '</div>' : '<a class="linkbutton_right" href="' . $scripturl . '?action=admin;area=packages;sa=flush;' . $context['session_var'] . '=' . $context['session_id'] . '" onclick="return confirm(\'' . $txt['package_delete_list_warning'] . '\');">' . $txt['delete_list'] . '</a>'),
+						'class' => 'submitbutton',
+						'value' => ($context['sub_action'] == 'browse' ? '<div class="smalltext">' . $txt['package_installed_key'] . '<img src="' . $settings['images_url'] . '/icons/package_installed.png" alt="" class="centericon" /> ' . $txt['package_installed_current'] . '<img src="' . $settings['images_url'] . '/icons/package_old.png" alt="" class="centericon" /> ' . $txt['package_installed_old'] . '</div>' : '<a class="linkbutton" href="' . $scripturl . '?action=admin;area=packages;sa=flush;' . $context['session_var'] . '=' . $context['session_id'] . '" onclick="return confirm(\'' . $txt['package_delete_list_warning'] . '\');">' . $txt['delete_list'] . '</a>'),
 					),
 				),
 			);
@@ -1369,6 +1389,7 @@ class Packages_Controller extends Action_Controller
 
 	/**
 	 * Test an FTP connection.
+	 *
 	 * @uses Xml Template, generic_xml sub template
 	 */
 	public function action_ftptest()
@@ -1488,6 +1509,21 @@ class Packages_Controller extends Action_Controller
 		// Load up any custom themes we may want to install into...
 		$theme_paths = getThemesPathbyID();
 
+		// For uninstall operations we only consider the themes in which the package is installed.
+		if (isset($_REQUEST['reverse']) && !empty($_REQUEST['install_id']))
+		{
+			$install_id = (int) $_REQUEST['install_id'];
+			if ($install_id > 0)
+			{
+				$old_themes = loadThemesAffected($install_id);
+				foreach ($theme_paths as $id => $data)
+				{
+					if ($id != 1 && !in_array($id, $old_themes))
+						unset($theme_paths[$id]);
+				}
+			}
+		}
+
 		// Boardmod?
 		if (isset($_REQUEST['boardmod']))
 			$mod_actions = parseBoardMod(@file_get_contents(BOARDDIR . '/packages/temp/' . $context['base_path'] . $_REQUEST['filename']), true, $reverse, $theme_paths);
@@ -1537,7 +1573,7 @@ class Packages_Controller extends Action_Controller
 
 		if (empty($package_ftp) && !isset($_POST['skip_ftp']))
 		{
-			require_once(SUBSDIR . '/FTPConnection.class.php');
+			require_once(SUBSDIR . '/FtpConnection.class.php');
 			$ftp = new Ftp_Connection(null);
 			list ($username, $detect_path, $found_path) = $ftp->detect_path(BOARDDIR);
 
@@ -1933,37 +1969,12 @@ class Packages_Controller extends Action_Controller
 			// Haven't counted the items yet?
 			if (empty($context['total_items']))
 			{
-				/**
-				 * Counts all the directorys under a given path
-				 *
-				 * @param string $dir
-				 */
-				function count_directories__recursive($dir)
-				{
-					global $context;
-
-					$count = 0;
-					$dh = @opendir($dir);
-					while ($entry = readdir($dh))
-					{
-						if ($entry != '.' && $entry != '..' && is_dir($dir . '/' . $entry))
-						{
-							$context['directory_list'][$dir . '/' . $entry] = 1;
-							$count++;
-							$count += count_directories__recursive($dir . '/' . $entry);
-						}
-					}
-					closedir($dh);
-
-					return $count;
-				}
-
 				foreach ($context['file_tree'] as $path => $data)
 				{
 					if (is_dir($path))
 					{
 						$context['directory_list'][$path] = 1;
-						$context['total_items'] += count_directories__recursive($path);
+						$context['total_items'] += $this->count_directories__recursive($path);
 						$context['total_items']++;
 					}
 				}
@@ -1974,27 +1985,8 @@ class Packages_Controller extends Action_Controller
 			{
 				$context['special_files'] = array();
 
-				/**
-				 * Builds a list of special files recursively for a given path
-				 *
-				 * @param string $path
-				 * @param array $data
-				 */
-				function build_special_files__recursive($path, &$data)
-				{
-					global $context;
-
-					if (!empty($data['writable_on']))
-						if ($context['predefined_type'] === 'standard' || $data['writable_on'] === 'restrictive')
-							$context['special_files'][$path] = 1;
-
-					if (!empty($data['contents']))
-						foreach ($data['contents'] as $name => $contents)
-							build_special_files__recursive($path . '/' . $name, $contents);
-				}
-
 				foreach ($context['file_tree'] as $path => $data)
-					build_special_files__recursive($path, $data);
+					$this->build_special_files__recursive($path, $data);
 			}
 			// Free doesn't need special files.
 			elseif ($context['predefined_type'] === 'free')
@@ -2058,17 +2050,62 @@ class Packages_Controller extends Action_Controller
 	}
 
 	/**
+	 * Builds a list of special files recursively for a given path
+	 *
+	 * @param string $path
+	 * @param mixed[] $data
+	 */
+	public function build_special_files__recursive($path, &$data)
+	{
+		global $context;
+
+		if (!empty($data['writable_on']))
+			if ($context['predefined_type'] === 'standard' || $data['writable_on'] === 'restrictive')
+				$context['special_files'][$path] = 1;
+
+		if (!empty($data['contents']))
+			foreach ($data['contents'] as $name => $contents)
+				$this->build_special_files__recursive($path . '/' . $name, $contents);
+	}
+
+	/**
+	 * Recursive counts all the directorys under a given path
+	 *
+	 * @param string $dir
+	 */
+	public function count_directories__recursive($dir)
+	{
+		global $context;
+
+		$count = 0;
+		$dh = @opendir($dir);
+		while ($entry = readdir($dh))
+		{
+			if ($entry != '.' && $entry != '..' && is_dir($dir . '/' . $entry))
+			{
+				$context['directory_list'][$dir . '/' . $entry] = 1;
+				$count++;
+				$count += $this->count_directories__recursive($dir . '/' . $entry);
+			}
+		}
+		closedir($dh);
+
+		return $count;
+	}
+
+	/**
 	 * Get a listing of all the packages
-	 * Determines if the package is a mod, avatar, language package
-	 * Determines if the package has been installed or not
+	 *
+	 * - Determines if the package is a mod, avatar, language package
+	 * - Determines if the package has been installed or not
 	 *
 	 * @param int $start
 	 * @param int $items_per_page
 	 * @param string $sort
-	 * @param array $params
+	 * @param string $params 'type' type of package
 	 * @param bool $installed
 	 */
-	function list_packages($start, $items_per_page, $sort, $params, $installed)
+	public function list_packages($start, $items_per_page, $sort, $params, $installed)
 	{
 		global $scripturl, $context, $forum_version;
 		static $instadds, $packages;
@@ -2147,8 +2184,10 @@ class Packages_Controller extends Action_Controller
 			$sort_id = array(
 				'mod' => 1,
 				'modification' => 1,
+				'addon' => 1,
 				'avatar' => 1,
 				'language' => 1,
+				'smiley' => 1,
 				'unknown' => 1,
 			);
 			while ($package = readdir($dir))
@@ -2191,7 +2230,7 @@ class Packages_Controller extends Action_Controller
 				if (!empty($packageInfo))
 				{
 					$packageInfo['installed_id'] = isset($installed_adds[$packageInfo['id']]) ? $installed_adds[$packageInfo['id']]['id'] : 0;
-					$packageInfo['sort_id'] = $sort_id[$packageInfo['type']];
+					$packageInfo['sort_id'] = isset($sort_id[$packageInfo['type']]) ? $sort_id[$packageInfo['type']] : $sort_id['unknown'];
 					$packageInfo['is_installed'] = isset($installed_adds[$packageInfo['id']]);
 					$packageInfo['is_current'] = $packageInfo['is_installed'] && ($installed_adds[$packageInfo['id']]['version'] == $packageInfo['version']);
 					$packageInfo['is_newer'] = $packageInfo['is_installed'] && ($installed_adds[$packageInfo['id']]['version'] > $packageInfo['version']);
@@ -2261,7 +2300,7 @@ class Packages_Controller extends Action_Controller
 							}
 						}
 
-						// no uninstall found for this version, lets see if one exists for another
+						// No uninstall found for this version, lets see if one exists for another
 						if ($packageInfo['can_uninstall'] === false && $uninstall->exists('@for') && empty($_SESSION['version_emulate']))
 						{
 							$reset = true;
@@ -2275,11 +2314,12 @@ class Packages_Controller extends Action_Controller
 						}
 					}
 
-					// Modification.
-					if ($packageInfo['type'] == 'modification' || $packageInfo['type'] == 'mod')
+					// Add-on / Modification
+					if ($packageInfo['type'] == 'addon' || $packageInfo['type'] == 'modification' || $packageInfo['type'] == 'mod')
 					{
 						$sort_id['modification']++;
 						$sort_id['mod']++;
+						$sort_id['addon']++;
 						if ($installed)
 						{
 							if (!empty($context['available_modification'][$packageInfo['id']]))
@@ -2300,6 +2340,13 @@ class Packages_Controller extends Action_Controller
 						$sort_id[$packageInfo['type']]++;
 						$packages['avatar'][strtolower($packageInfo[$sort])] = md5($package);
 						$context['available_avatar'][md5($package)] = $packageInfo;
+					}
+					// Smiley package.
+					elseif ($packageInfo['type'] == 'smiley')
+					{
+						$sort_id[$packageInfo['type']]++;
+						$packages['smiley'][strtolower($packageInfo[$sort])] = md5($package);
+						$context['available_smiley'][md5($package)] = $packageInfo;
 					}
 					// Language package.
 					elseif ($packageInfo['type'] == 'language')
@@ -2335,8 +2382,9 @@ class Packages_Controller extends Action_Controller
 /**
  * Checks the permissions of all the areas that will be affected by the package
  *
+ * @package Packages
  * @param string $path
- * @param array $data
+ * @param mixed[] $data
  * @param int $level
  */
 function fetchPerms__recursive($path, &$data, $level)
@@ -2505,7 +2553,10 @@ function fetchPerms__recursive($path, &$data, $level)
 
 /**
  * Function called to briefly pause execution of directory/file chmod actions
- * Called by action_perms_save().
+ *
+ * - Called by action_perms_save().
+ *
+ * @package Packages
  */
 function pausePermsSave()
 {

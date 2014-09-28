@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -66,7 +66,7 @@ function recountOpenReports($flush = true)
  *  - Sets $context['total_unapproved_posts']
  *  - approve_query is set to list of boards they can see
  *
- * @param string $approve_query
+ * @param string|null $approve_query
  * @return array of values
  */
 function recountUnapprovedPosts($approve_query = null)
@@ -117,7 +117,7 @@ function recountUnapprovedPosts($approve_query = null)
 /**
  * How many falied emails (that they can see) do we have?
  *
- * @param string $approve_query
+ * @param string|null $approve_query
  */
 function recountFailedEmails($approve_query = null)
 {
@@ -174,7 +174,7 @@ function totalReports($status = 0)
 /**
  * Changes a property of all the reports passed (and the user can see)
  *
- * @param array $reports_id an array of report IDs
+ * @param int[]|int $reports_id an array of report IDs
  * @param string $property the property to update ('close' or 'ignore')
  * @param int $status the status of the property (mainly: 0 or 1)
  */
@@ -214,7 +214,7 @@ function updateReportsStatus($reports_id, $property = 'close', $status = 0)
  *  - Reported posts
  *  - Members awaiting approval (activation, deletion, group requests)
  *
- * @param int $brd
+ * @param int|null $brd
  */
 function loadModeratorMenuCounts($brd = null)
 {
@@ -508,13 +508,17 @@ function warningTemplateCount($template_type = 'warntpl')
 }
 
 /**
- * Get all issued warnings in the system.
+ * Get all issued warnings in the system given the specified query parameters
  *
- * @param $start
- * @param $items_per_page
- * @param $sort
+ * Callback for createList() in ModerationCenter_Controller::action_viewWarningLog().
+ *
+ * @param int $start
+ * @param int $items_per_page
+ * @param string $sort
+ * @param string|null $query_string
+ * @param mixed[] $query_params
  */
-function warnings($start, $items_per_page, $sort)
+function warnings($start, $items_per_page, $sort, $query_string = '', $query_params = array())
 {
 	global $scripturl;
 
@@ -527,12 +531,13 @@ function warnings($start, $items_per_page, $sort)
 		FROM {db_prefix}log_comments AS lc
 			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = lc.id_member)
 			LEFT JOIN {db_prefix}members AS mem2 ON (mem2.id_member = lc.id_recipient)
-		WHERE lc.comment_type = {string:warning}
+		WHERE lc.comment_type = {string:warning}' . (!empty($query_string) ? '
+			AND ' . $query_string : '') . '
 		ORDER BY ' . $sort . '
 		LIMIT ' . $start . ', ' . $items_per_page,
-		array(
+		array_merge($query_params, array(
 			'warning' => 'warning',
-		)
+		))
 	);
 	$warnings = array();
 	while ($row = $db->fetch_assoc($request))
@@ -554,21 +559,29 @@ function warnings($start, $items_per_page, $sort)
 }
 
 /**
- * Get the total count of all current warnings.
+ * Get the count of all current warnings.
+ *
+ * Callback for createList() in ModerationCenter_Controller::action_viewWarningLog().
+ *
+ * @param string|null $query_string
+ * @param mixed[] $query_params
  *
  * @return int
  */
-function warningCount()
+function warningCount($query_string = '', $query_params = array())
 {
 	$db = database();
 
 	$request = $db->query('', '
 		SELECT COUNT(*)
-		FROM {db_prefix}log_comments
-		WHERE comment_type = {string:warning}',
-		array(
+		FROM {db_prefix}log_comments AS lc
+			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = lc.id_member)
+			LEFT JOIN {db_prefix}members AS mem2 ON (mem2.id_member = lc.id_recipient)
+		WHERE comment_type = {string:warning}' . (!empty($query_string) ? '
+			AND ' . $query_string : ''),
+		array_merge($query_params, array(
 			'warning' => 'warning',
-		)
+		))
 	);
 	list ($totalWarns) = $db->fetch_row($request);
 	$db->free_result($request);
@@ -748,7 +761,7 @@ function getModReports($status = 0, $start = 0, $limit = 10)
 /**
  * Grabs all the comments made by the reporters to a set of reports
  *
- * @param array $id_reports an array of report ids
+ * @param int[] $id_reports an array of report ids
  */
 function getReportsUserComments($id_reports)
 {
@@ -1030,7 +1043,7 @@ function watchedUserPostsCount($approve_query, $warning_watch)
  * @param int $items_per_page
  * @param string $sort
  * @param string $approve_query
- * @param array $delete_boards
+ * @param int[] $delete_boards
  */
 function watchedUserPosts($start, $items_per_page, $sort, $approve_query, $delete_boards)
 {
@@ -1405,4 +1418,100 @@ function warningDailyLimit($member)
 	$db->free_result($request);
 
 	return $current_applied;
+}
+
+/**
+ * Make sure the "current user" (uses $user_info) cannot go outside of the limit for the day.
+ *
+ * @param string $approve_query additional condition for the query
+ * @param string $current_view defined whether return the topics (first
+ *                messages) or the messages. If set to 'topics' it returns
+ *                the topics, otherwise the messages
+ * @param mixed[] $boards_allowed array of arrays, it must contain three
+ *                 indexes:
+ *                  - delete_own_boards
+ *                  - delete_any_boards
+ *                  - delete_own_replies
+ *                 each of which must be an array of boards the user is allowed
+ *                 to perform a certain action (return of boardsAllowedTo)
+ * @param int $start start of the query LIMIT
+ * @param int $limit number of elements to return (default 10)
+ */
+function getUnapprovedPosts($approve_query, $current_view, $boards_allowed, $start, $limit = 10)
+{
+	global $context, $scripturl, $user_info;
+
+	$db = database();
+
+	$request = $db->query('', '
+		SELECT m.id_msg, m.id_topic, m.id_board, m.subject, m.body, m.id_member,
+			IFNULL(mem.real_name, m.poster_name) AS poster_name, m.poster_time, m.smileys_enabled,
+			t.id_member_started, t.id_first_msg, b.name AS board_name, c.id_cat, c.name AS cat_name
+		FROM {db_prefix}messages AS m
+			INNER JOIN {db_prefix}topics AS t ON (t.id_topic = m.id_topic)
+			INNER JOIN {db_prefix}boards AS b ON (b.id_board = m.id_board)
+			LEFT JOIN {db_prefix}members AS mem ON (mem.id_member = m.id_member)
+			LEFT JOIN {db_prefix}categories AS c ON (c.id_cat = b.id_cat)
+		WHERE m.approved = {int:not_approved}
+			AND t.id_first_msg ' . ($current_view == 'topics' ? '=' : '!=') . ' m.id_msg
+			AND {query_see_board}
+			' . $approve_query . '
+		LIMIT {int:start}, {int:limit}',
+		array(
+			'start' => $start,
+			'limit' => $limit,
+			'not_approved' => 0,
+		)
+	);
+	$unapproved_items = array();
+	for ($i = 1; $row = $db->fetch_assoc($request); $i++)
+	{
+		// Can delete is complicated, let's solve it first... is it their own post?
+		if ($row['id_member'] == $user_info['id'] && ($boards_allowed['delete_own_boards'] == array(0) || in_array($row['id_board'], $boards_allowed['delete_own_boards'])))
+			$can_delete = true;
+		// Is it a reply to their own topic?
+		elseif ($row['id_member'] == $row['id_member_started'] && $row['id_msg'] != $row['id_first_msg'] && ($boards_allowed['delete_own_replies'] == array(0) || in_array($row['id_board'], $boards_allowed['delete_own_replies'])))
+			$can_delete = true;
+		// Someone elses?
+		elseif ($row['id_member'] != $user_info['id'] && ($boards_allowed['delete_any_boards'] == array(0) || in_array($row['id_board'], $boards_allowed['delete_any_boards'])))
+			$can_delete = true;
+		else
+			$can_delete = false;
+
+		$unapproved_items[] = array(
+			'id' => $row['id_msg'],
+			'alternate' => $i % 2,
+			'counter' => $context['start'] + $i,
+			'href' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'],
+			'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['id_msg'] . '#msg' . $row['id_msg'] . '">' . $row['subject'] . '</a>',
+			'subject' => $row['subject'],
+			'body' => parse_bbc($row['body'], $row['smileys_enabled'], $row['id_msg']),
+			'time' => standardTime($row['poster_time']),
+			'html_time' => htmlTime($row['poster_time']),
+			'timestamp' => forum_time(true, $row['poster_time']),
+			'poster' => array(
+				'id' => $row['id_member'],
+				'name' => $row['poster_name'],
+				'link' => $row['id_member'] ? '<a href="' . $scripturl . '?action=profile;u=' . $row['id_member'] . '">' . $row['poster_name'] . '</a>' : $row['poster_name'],
+				'href' => $scripturl . '?action=profile;u=' . $row['id_member'],
+			),
+			'topic' => array(
+				'id' => $row['id_topic'],
+			),
+			'board' => array(
+				'id' => $row['id_board'],
+				'name' => $row['board_name'],
+				'link' => '<a href="' . $scripturl . '?board=' . $row['id_board'] . '.0">' . $row['board_name'] . '</a>',
+			),
+			'category' => array(
+				'id' => $row['id_cat'],
+				'name' => $row['cat_name'],
+				'link' => '<a href="' . $scripturl . '#c' . $row['id_cat'] . '">' . $row['cat_name'] . '</a>',
+			),
+			'can_delete' => $can_delete,
+		);
+	}
+	$db->free_result($request);
+
+	return $unapproved_items;
 }

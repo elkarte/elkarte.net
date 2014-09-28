@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -44,7 +44,7 @@ class Poll_Controller extends Action_Controller
 	 * Must be called with a topic and option specified.
 	 * Requires the poll_vote permission.
 	 * Upon successful completion of action will direct user back to topic.
-	 * Accessed via ?action=vote.
+	 * Accessed via ?action=poll;sa=vote.
 	 *
 	 * @uses Post language file.
 	 */
@@ -86,7 +86,7 @@ class Poll_Controller extends Action_Controller
 				}
 
 				// Has the poll been reset since guest voted?
-				if ($row['reset_poll'] > $guestvoted[1])
+				if (isset($guestvoted[1]) && $row['reset_poll'] > $guestvoted[1])
 				{
 					// Remove the poll info from the cookie to allow guest to vote again
 					unset($guestinfo[$i]);
@@ -113,7 +113,6 @@ class Poll_Controller extends Action_Controller
 		elseif (!empty($row['change_vote']) && !$user_info['is_guest'] && empty($_POST['options']))
 		{
 			checkSession('request');
-			$pollOptions = array();
 
 			// Find out what they voted for before.
 			$pollOptions = determineVote($user_info['id'], $row['id_poll']);
@@ -164,7 +163,7 @@ class Poll_Controller extends Action_Controller
 			$_COOKIE['guest_poll_vote'] = empty($_COOKIE['guest_poll_vote']) ? '' : $_COOKIE['guest_poll_vote'];
 
 			// ;id,timestamp,[vote,vote...]; etc
-			$_COOKIE['guest_poll_vote'] .= ';' . $row['id_poll'] . ',' . time() . ',' . (count($pollOptions) > 1 ? explode(',' . $pollOptions) : $pollOptions[0]);
+			$_COOKIE['guest_poll_vote'] .= ';' . $row['id_poll'] . ',' . time() . ',' . (count($pollOptions) > 1 ? implode(',', $pollOptions) : $pollOptions[0]);
 
 			// Increase num guest voters count by 1
 			increaseGuestVote($row['id_poll']);
@@ -565,7 +564,7 @@ class Poll_Controller extends Action_Controller
 
 		// Now we've done all our error checking, let's get the core poll information cleaned... question first.
 		$_POST['question'] = Util::htmlspecialchars($_POST['question']);
-		$_POST['question'] = Util::truncate($_POST['question'], 255);
+		$_POST['question'] = Util::substr($_POST['question'], 0, 255);
 
 		$_POST['poll_hide'] = (int) $_POST['poll_hide'];
 		$_POST['poll_expire'] = isset($_POST['poll_expire']) ? (int) $_POST['poll_expire'] : 0;
@@ -676,9 +675,9 @@ class Poll_Controller extends Action_Controller
 	 * Requires poll_remove_any permission, unless it's the poll starter
 	 * with poll_remove_own permission.
 	 * Upon successful completion of action will direct user back to topic.
-	 * Accessed via ?action=removepoll.
+	 * Accessed via ?action=poll;sa=remove.
 	 */
-	public function action_removepoll()
+	public function action_remove()
 	{
 		global $topic, $user_info;
 

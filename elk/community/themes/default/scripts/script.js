@@ -9,7 +9,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  * This file contains javascript utility functions
  */
@@ -26,6 +26,7 @@ var ua = navigator.userAgent.toLowerCase(),
 	is_chrome = !!window.chrome, // Chrome 1+, Opera 15+
 	is_ie = !!document.documentMode, // IE8+
 	is_webkit = ua.indexOf('applewebkit') !== -1;
+	is_osx = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
 // Versions of ie < 9 do not have this built in
 if (!('getElementsByClassName' in document))
@@ -106,32 +107,61 @@ function sendXMLDocument(sUrl, sContent, funcCallback)
  * php_unhtmlspecialchars, php_addslashes, removeEntities, easyReplace
  */
 
-// A property we'll be needing for php_to8bit.
-String.prototype.oCharsetConversion = {
-	from: '',
-	to: ''
-};
-
 /**
- * Convert a UTF8 string to an 8 bit representation (like in PHP).
+ * Convert a UTF8 string to an 8 bit representation
+ *
+ * - Simulate php utf8_encode function
+ * - Surrogate handling leveraged from php.js which is licensed under the MIT licenses.
  */
-String.prototype.php_to8bit = function ()
-{
-	var n,
-		sReturn = '';
+String.prototype.php_to8bit = function () {
+	var sReturn = '',
+		iStart = 0,
+		iEnd = 0,
+		iTextLen = this.length;
 
-	for (var i = 0, iTextLen = this.length; i < iTextLen; i++)
+	for (var i = 0; i < iTextLen; i++)
 	{
-		n = this.charCodeAt(i);
-		if (n < 128)
-			sReturn += String.fromCharCode(n);
-		else if (n < 2048)
-			sReturn += String.fromCharCode(192 | n >> 6) + String.fromCharCode(128 | n & 63);
-		else if (n < 65536)
-			sReturn += String.fromCharCode(224 | n >> 12) + String.fromCharCode(128 | n >> 6 & 63) + String.fromCharCode(128 | n & 63);
+		// Character code (UTF 16)
+		var cc = this.charCodeAt(i),
+			sUtf8enc = null;
+
+		// Simple Ascii
+		if (cc < 128)
+			iEnd++;
+		// Simple two Byte
+		else if (cc < 2048)
+			sUtf8enc = String.fromCharCode((192 | cc >> 6), (128 | cc & 63));
+		// Simple three Byte if not a surrogate pair
+		else if ((cc & 0xF800) !== 0xD800)
+			sUtf8enc = String.fromCharCode((224 | cc >> 12), (128 | cc >> 6 & 63), (128 | cc & 63));
 		else
-			sReturn += String.fromCharCode(240 | n >> 18) + String.fromCharCode(128 | n >> 12 & 63) + String.fromCharCode(128 | n >> 6 & 63) + String.fromCharCode(128 | n & 63);
+		{
+			// Character code for the next Byte
+			var cc2 = this.charCodeAt(++i);
+
+			// Valid surrogate pairs must have matched lead and trail
+			if ((cc & 0xFC00) !== 0xD800 || (cc2 & 0xFC00) !== 0xDC00)
+				sUtf8enc = String.fromCharCode((224 | 65533 >> 12), (128 | 65533 >> 6 & 63), (128 | 65533 & 63));
+			else
+			{
+				cc = ((cc & 0x3FF) << 10) + (cc2 & 0x3FF) + 0x10000;
+				sUtf8enc = String.fromCharCode(240 | cc >> 18, (128 | cc >> 12 & 63), (128 | cc >> 6 & 63), (128 | cc & 63));
+			}
+		}
+
+		// Had to encode the character?
+		if (sUtf8enc !== null)
+		{
+			if (iEnd > iStart)
+				sReturn += this.slice(iStart, iEnd);
+
+			sReturn += sUtf8enc;
+			iStart = iEnd = i + 1;
+		}
 	}
+
+	if (iEnd > iStart)
+		sReturn += this.slice(iStart, iTextLen);
 
 	return sReturn;
 };
@@ -272,9 +302,9 @@ function reqWin(desktopURL, alternateWidth, alternateHeight, noScrollbars)
 function reqOverlayDiv(desktopURL, sHeader, sIcon)
 {
 	// Set up our div details
-	var sAjax_indicator = '<div class="centertext"><img src="' + elk_images_url + '/loading.gif" ></div>';
+	var sAjax_indicator = '<div class="centertext"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
 
-	sIcon = elk_images_url + '/' + (typeof(sIcon) === 'string' ? sIcon : 'helptopics.png'),
+	sIcon = elk_images_url + '/' + (typeof(sIcon) === 'string' ? sIcon : 'helptopics.png');
 	sHeader = typeof(sHeader) === 'string' ? sHeader : help_popup_heading_text;
 
 	// Create the div that we are going to load
@@ -314,8 +344,8 @@ function smc_Popup(oOptions)
 // Show the popup div & prepare the close events
 smc_Popup.prototype.show = function ()
 {
-	popup_class = 'popup_window ' + (this.opt.custom_class ? this.opt.custom_class : 'description');
-	icon = this.opt.icon ? '<img src="' + this.opt.icon + '" class="icon" alt="" /> ' : '';
+	var popup_class = 'popup_window ' + (this.opt.custom_class ? this.opt.custom_class : 'description');
+	var icon = this.opt.icon ? '<img src="' + this.opt.icon + '" class="icon" alt="" /> ' : '';
 
 	// Create the div that will be shown - max-height added here - essential anyway,
 	// so better here than in the CSS.
@@ -423,19 +453,23 @@ function submitonce(theform)
 	elk_formSubmitted = true;
 }
 
-function submitThisOnce(oControl)
+function submitThisOnce(oControl, bReadOnly)
 {
 	// oControl might also be a form.
 	var oForm = 'form' in oControl ? oControl.form : oControl,
 		aTextareas = oForm.getElementsByTagName('textarea');
 
+	bReadOnly = typeof bReadOnly == 'undefined' ? true : bReadOnly;
 	for (var i = 0, n = aTextareas.length; i < n; i++)
-		aTextareas[i].readOnly = true;
+		aTextareas[i].readOnly = bReadOnly;
 
+	// If in a second the form is not gone, there may be a problem somewhere
+	// (e.g. HTML5 required attribute), so release the textareas
+	window.setTimeout(function() {submitThisOnce(oControl, false);}, 1000);
 	return !elk_formSubmitted;
 }
 
-// Deprecated, as innerHTML is supported everywhere.
+// @deprecated since 1.0 - innerHTML is supported everywhere.
 function setInnerHTML(oElement, sToValue)
 {
 	if (oElement)
@@ -557,9 +591,9 @@ function elk_sessionKeepAlive()
 		lastKeepAliveCheck = curTime;
 	}
 
-	window.setTimeout('elk_sessionKeepAlive();', 1200000);
+	window.setTimeout(function() {elk_sessionKeepAlive();}, 1200000);
 }
-window.setTimeout('elk_sessionKeepAlive();', 1200000);
+window.setTimeout(function() {elk_sessionKeepAlive();}, 1200000);
 
 /**
  * Set a theme option through javascript. / ajax
@@ -567,23 +601,15 @@ window.setTimeout('elk_sessionKeepAlive();', 1200000);
  * @param {string} option name being set
  * @param {string} value of the option
  * @param {string} theme its being set or null for all
- * @param {string} cur_session_id
- * @param {string} cur_session_var
  * @param {string} additional_vars to use in the url request that will be sent
  */
-function elk_setThemeOption(option, value, theme, cur_session_id, cur_session_var, additional_vars)
+function elk_setThemeOption(option, value, theme, additional_vars)
 {
-	// Compatibility.
-	if (cur_session_id === null)
-		cur_session_id = elk_session_id;
-	if (typeof(cur_session_var) === 'undefined')
-		cur_session_var = 'sesc';
-
 	if (additional_vars === null)
 		additional_vars = '';
 
 	var tempImage = new Image();
-	tempImage.src = elk_prepareScriptUrl(elk_scripturl) + 'action=jsoption;var=' + option + ';val=' + value + ';' + cur_session_var + '=' + cur_session_id + additional_vars + (theme === null ? '' : '&th=' + theme) + ';time=' + (new Date().getTime());
+	tempImage.src = elk_prepareScriptUrl(elk_scripturl) + 'action=jsoption;var=' + option + ';val=' + value + ';' + elk_session_var + '=' + elk_session_id + additional_vars + (theme === null ? '' : '&th=' + theme) + ';time=' + (new Date().getTime());
 }
 
 /**
@@ -595,7 +621,9 @@ function elk_avatarResize()
 
 	for (var i = 0; i < possibleAvatars.length; i++)
 	{
-		var tempAvatars = []; j = 0;
+		var tempAvatars = [],
+			j = 0;
+
 		if (possibleAvatars[i].className !== 'avatar')
 			continue;
 
@@ -641,28 +669,24 @@ function elk_avatarResize()
  */
 function hashLoginPassword(doForm, cur_session_id, token)
 {
-	// Compatibility.
-	if (cur_session_id === null)
-		cur_session_id = elk_session_id;
-
-	if (typeof(hex_sha1) === 'undefined')
+	// Don't have our hash lib availalbe?
+	if (typeof(hex_sha256) === 'undefined')
 		return;
 
 	// Are they using an email address?
 	if (doForm.user.value.indexOf('@') !== -1)
 		return;
 
-	// Unless the browser is Opera, the password will not save properly.
-	if (!('opera' in window))
-		doForm.passwrd.autocomplete = 'off';
+	doForm.passwrd.autocomplete = 'off';
 
-	doForm.hash_passwrd.value = hex_sha1(hex_sha1(doForm.user.value.php_to8bit().php_strtolower() + doForm.passwrd.value.php_to8bit()) + cur_session_id + token);
+	// Fill in the hidden fields with our sha hash
+	doForm.hash_passwrd.value = hex_sha256(doForm.user.value.php_strtolower() + doForm.passwrd.value);
 
-	// It looks nicer to fill it with asterisks, but Firefox will try to save that.
-	if (is_ff !== -1)
-		doForm.passwrd.value = '';
-	else
-		doForm.passwrd.value = doForm.passwrd.value.replace(/./g, '*');
+	// If the form also contains the old hash input fill it to smooth transitions
+	if ('old_hash_passwrd' in doForm && typeof(hex_sha1) !== 'undefined')
+		doForm.old_hash_passwrd.value = hex_sha1(hex_sha1(doForm.user.value.php_strtolower() + doForm.passwrd.value) + cur_session_id + (typeof token === 'undefined' ? '' : token));
+
+	doForm.passwrd.value = doForm.passwrd.value.replace(/./g, '*');
 }
 
 /**
@@ -675,11 +699,11 @@ function hashLoginPassword(doForm, cur_session_id, token)
  */
 function hashAdminPassword(doForm, username, cur_session_id, token)
 {
-	// Missing sha1.js?
-	if (typeof(hex_sha1) === 'undefined')
+	// Missing sha256.js?
+	if (typeof(hex_sha256) === 'undefined')
 		return;
 
-	doForm.admin_hash_pass.value = hex_sha1(hex_sha1(username.php_to8bit().php_strtolower() + doForm.admin_pass.value.php_to8bit()) + cur_session_id + token);
+	doForm.admin_hash_pass.value = hex_sha256(username.php_strtolower() + doForm.admin_pass.value);
 	doForm.admin_pass.value = doForm.admin_pass.value.replace(/./g, '*');
 }
 
@@ -693,11 +717,11 @@ function hashAdminPassword(doForm, username, cur_session_id, token)
  */
 function hashModeratePassword(doForm, username, cur_session_id, token)
 {
-	// Missing sha1.js?
-	if (typeof(hex_sha1) === 'undefined')
+	// Missing sha256.js?
+	if (typeof(hex_sha256) === 'undefined')
 		return;
 
-	doForm.moderate_hash_pass.value = hex_sha1(hex_sha1(username.php_to8bit().php_strtolower() + doForm.moderate_pass.value.php_to8bit()) + cur_session_id + token);
+	doForm.moderate_hash_pass.value = hex_sha256(username.php_strtolower() + doForm.moderate_pass.value);
 	doForm.moderate_pass.value = doForm.moderate_pass.value.replace(/./g, '*');
 }
 
@@ -997,7 +1021,7 @@ elk_Toggle.prototype.changeState = function(bCollapse, bInit)
 		this.oCookie.set(this.opt.oCookieOptions.sCookieName, this.bCollapsed ? '1' : '0');
 
 	if (!bInit && 'oThemeOptions' in this.opt && this.opt.oThemeOptions.bUseThemeSettings)
-		elk_setThemeOption(this.opt.oThemeOptions.sOptionName, this.bCollapsed ? '1' : '0', 'sThemeId' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sThemeId : null, elk_session_id, elk_session_var, 'sAdditionalVars' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sAdditionalVars : null);
+		elk_setThemeOption(this.opt.oThemeOptions.sOptionName, this.bCollapsed ? '1' : '0', 'sThemeId' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sThemeId : null, 'sAdditionalVars' in this.opt.oThemeOptions ? this.opt.oThemeOptions.sAdditionalVars : null);
 };
 
 elk_Toggle.prototype.toggle = function()
@@ -1170,7 +1194,8 @@ JumpTo.prototype.showSelect = function ()
 
 	for (var i = this.opt.iCurBoardChildLevel; i > 0; i--)
 		sChildLevelPrefix += this.opt.sBoardChildLevelIndicator;
-	if (sChildLevelPrefix != '')
+
+	if (sChildLevelPrefix !== '')
 		sChildLevelPrefix = sChildLevelPrefix + this.opt.sBoardPrefix;
 
 	document.getElementById(this.opt.sContainerId).innerHTML = this.opt.sJumpToTemplate.replace(/%select_id%/, this.opt.sContainerId + '_select').replace(/%dropdown_list%/, '<select ' + (this.opt.bDisabled === true ? 'disabled="disabled" ' : 0) + (this.opt.sClassName !== undefined ? 'class="' + this.opt.sClassName + '" ' : '') + 'name="' + (this.opt.sCustomName !== undefined ? this.opt.sCustomName : this.opt.sContainerId + '_select') + '" id="' + this.opt.sContainerId + '_select" ' + ('implementation' in document ? '' : 'onmouseover="grabJumpToContent(this);" ') + ('onbeforeactivate' in document ? 'onbeforeactivate' : 'onfocus') + '="grabJumpToContent(this);"><option value="' + (this.opt.bNoRedirect !== undefined && this.opt.bNoRedirect === true ? this.opt.iCurBoardId : '?board=' + this.opt.iCurBoardId + '.0') + '">' + sChildLevelPrefix + this.opt.sCurBoardName.removeEntities() + '</option></select>&nbsp;' + (this.opt.sGoButtonLabel !== undefined ? '<input type="button" class="button_submit" value="' + this.opt.sGoButtonLabel + '" onclick="window.location.href = \'' + elk_prepareScriptUrl(elk_scripturl) + 'board=' + this.opt.iCurBoardId + '.0\';" />' : ''));
@@ -1218,8 +1243,9 @@ JumpTo.prototype.fillSelect = function (aBoardsAndCategories)
 		{
 			for (j = aBoardsAndCategories[i].childLevel, sChildLevelPrefix = ''; j > 0; j--)
 				sChildLevelPrefix += this.opt.sBoardChildLevelIndicator;
-			if (sChildLevelPrefix != '')
-				sChildLevelPrefix = sChildLevelPrefix + this.opt.sBoardPrefix
+
+			if (sChildLevelPrefix !== '')
+				sChildLevelPrefix = sChildLevelPrefix + this.opt.sBoardPrefix;
 		}
 
 		oOption = document.createElement('option');
@@ -1256,6 +1282,14 @@ JumpTo.prototype.fillSelect = function (aBoardsAndCategories)
 			if (this.selectedIndex > 0 && this.options[this.selectedIndex].value)
 				window.location.href = elk_scripturl + this.options[this.selectedIndex].value.substr(elk_scripturl.indexOf('?') === -1 || this.options[this.selectedIndex].value.substr(0, 1) !== '?' ? 0 : 1);
 		};
+
+	// Handle custom function hook before showing the new select.
+	if ('funcOnAfterFill' in this.opt)
+	{
+		this.tmpMethod = this.opt.funcOnBeforeCollapse;
+		this.tmpMethod(this);
+		delete this.tmpMethod;
+	}
 };
 
 /**
@@ -1273,9 +1307,6 @@ JumpTo.prototype.fillSelect = function (aBoardsAndCategories)
  *	iTopicId:
  *	sAction:
  *	sLabelIconList:
- *	sSessionId:
- *	sSessionVar:
- *	sScriptUrl:
  *
  * The following are style elements that can be passed
  *	sBoxBackground:
@@ -1302,10 +1333,6 @@ function IconList(oOptions)
 	this.funcParent = this;
 	this.iCurMessageId = 0;
 	this.iCurTimeout = 0;
-
-	// Add backwards compatibility with old themes.
-	if (!('sSessionVar' in this.opt))
-		this.opt.sSessionVar = 'sesc';
 
 	// Set a default Action
 	if (!('sAction' in this.opt) || this.opt.sAction === null)
@@ -1539,35 +1566,26 @@ function elkSelectText(oCurElement, bActOnElement)
 	else
 		oCodeArea = oCurElement.parentNode.nextSibling;
 
+	// Did not find it, bail
 	if (typeof(oCodeArea) !== 'object' || oCodeArea === null)
 		return false;
 
-	// Start off with my favourite, internet explorer.
+	// Start off with internet explorer < 9.
 	if ('createTextRange' in document.body)
 	{
 		var oCurRange = document.body.createTextRange();
 		oCurRange.moveToElementText(oCodeArea);
 		oCurRange.select();
 	}
-	// Firefox at el.
+	// All the rest
 	else if (window.getSelection)
 	{
-		var oCurSelection = window.getSelection();
-
-		// Safari is special!
-		if (oCurSelection.setBaseAndExtent)
-		{
-			var oLastChild = oCodeArea.lastChild;
-			oCurSelection.setBaseAndExtent(oCodeArea, 0, oLastChild, 'innerText' in oLastChild ? oLastChild.innerText.length : oLastChild.textContent.length);
-		}
-		else
-		{
-			var curRange = document.createRange();
+		var oCurSelection = window.getSelection(),
+			curRange = document.createRange();
 
 			curRange.selectNodeContents(oCodeArea);
 			oCurSelection.removeAllRanges();
 			oCurSelection.addRange(curRange);
-		}
 	}
 
 	return false;
@@ -1610,7 +1628,7 @@ function applyWindowClasses(oList)
 
 	oListItems = oList.getElementsByTagName("li");
 
-	for (i = 0; i < oListItems.length; i++)
+	for (var i = 0; i < oListItems.length; i++)
 	{
 		// Skip dummies.
 		if (oListItems[i].id === "")
@@ -1669,7 +1687,7 @@ function generateDays(offset)
 
 	days = monthLength[monthElement.value - 1];
 
-	for (i = 1; i <= days; i++)
+	for (var i = 1; i <= days; i++)
 		dayElement.options[dayElement.length] = new Option(i, i);
 
 	if (selected < days)
@@ -1701,17 +1719,29 @@ function initSearch()
  *
  * @param {type} ids
  * @param {string} aFormID
+ * @param {string} sInputName
  */
-function selectBoards(ids, aFormID)
+function selectBoards(ids, aFormName, sInputName)
 {
 	var toggle = true,
-		aForm = document.getElementById(aFormID);
+		i = 0;
+
+	for (var f = 0, max = document.forms.length; f < max; f++)
+	{
+		if (document.forms[f].name == aFormName)
+		{
+			aForm = document.forms[f];
+			break;
+		}
+	}
+	if (typeof aForm == 'undefined')
+		return;
 
 	for (i = 0; i < ids.length; i++)
-		toggle = toggle && aForm["brd" + ids[i]].checked;
+		toggle = toggle && aForm[sInputName + '[' + ids[i] + ']'].checked;
 
 	for (i = 0; i < ids.length; i++)
-		aForm["brd" + ids[i]].checked = !toggle;
+		aForm[sInputName + '[' + ids[i] + ']'].checked = !toggle;
 }
 
 /**
@@ -1737,51 +1767,22 @@ function expandCollapse(id, icon, speed)
 }
 
 /**
- * Maintains the personal message rule options to conform with the rule choice
- * so that the form only makes available the proper choices (input, select, none, etc)
+ * Highlight a selection box by adding the highlight2 class
  *
- * @param {string} optNum
+ * @param string container_id
  */
-function updateRuleDef(optNum)
+function initHighlightSelection(container_id)
 {
-	if (document.getElementById("ruletype" + optNum).value === "gid")
-	{
-		document.getElementById("defdiv" + optNum).style.display = "none";
-		document.getElementById("defseldiv" + optNum).style.display = "";
-	}
-	else if (document.getElementById("ruletype" + optNum).value === "bud" || document.getElementById("ruletype" + optNum).value === "")
-	{
-		document.getElementById("defdiv" + optNum).style.display = "none";
-		document.getElementById("defseldiv" + optNum).style.display = "none";
-	}
-	else
-	{
-		document.getElementById("defdiv" + optNum).style.display = "";
-		document.getElementById("defseldiv" + optNum).style.display = "none";
-	}
-}
-
-/**
- * Highlight a selection box by changing its class name
- * @todo depreciated?
- *
- * @param {type} box
- */
-function highlightSelected(box)
-{
-	if (prevClass !== "")
-		prevDiv.className = prevClass;
-
-	prevDiv = document.getElementById(box);
-	prevClass = prevDiv.className;
-
-	prevDiv.className = "highlight2";
+	$('#' + container_id + ' [name="def_language"]').click(function (ev) {
+		$('#' + container_id + ' .standard_row').removeClass('highlight2');
+		$(this).parent().parent().addClass('highlight2');
+	});
 }
 
 /**
  * Auto submits a paused form, such as a maintenance task
  */
-function doAutoSubmit()
+function doAutoSubmit(countdown, txt_message, formName)
 {
 	var formID = typeof(formName) !== 'undefined' ? formName : "autoSubmit";
 
@@ -1793,5 +1794,5 @@ function doAutoSubmit()
 	document.forms[formID].cont.value = txt_message + ' (' + countdown + ')';
 	countdown--;
 
-	setTimeout("doAutoSubmit();", 1000);
+	setTimeout(function() {doAutoSubmit(countdown, txt_message, formID);}, 1000);
 }

@@ -16,7 +16,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -30,26 +30,33 @@ function loadForumTests()
 {
 	global $errorTests;
 
-	/*
+	/**
 	 * This array is defined like so:
 	 *
-	 * string check_query:	Query to be executed when testing if errors exist.
-	 * string check_type:	Defines how it knows if a problem was found. If set to count looks for the
-	 *						first variable from check_query being > 0. Anything else it looks for some
-	 *						results. If not	set assumes you want results.
-	 * string fix_it_query:	When doing fixes if an error was detected this query is executed to "fix" it.
-	 * string fix_query:	The query to execute to get data when doing a fix. If not set check_query is used again.
-	 * array fix_collect:	This array is used if the fix is basically gathering all broken ids and then
-	 *						doing something with it.
-	 *						- string index:	The value returned from the main query and passed to the processing function.
-	 * 						- process:	A function passed an array of ids to execute the fix on.
-	 * function fix_processing:
-	 * 				Function called for each row returned from fix_query to execute whatever fixes are required.
-	 * function fix_full_processing:
-	 * 				As above but does the while loop and everything itself - except the freeing.
-	 * array force_fix:	If this is set then the error types included within this array will also be assumed broken.
-	 * 				Note: At the moment only processes these if they occur after the primary error in the array.
-	*/
+	 * string check_query: Query to be executed when testing if errors exist.
+	 * string check_type: Defines how it knows if a problem was found. If set to
+	 *                    count looks for the first variable from check_query
+	 *                    being > 0. Anything else it looks for some results.
+	 *                    If not set assumes you want results.
+	 * string fix_it_query: When doing fixes if an error was detected this query
+	 *                      is executed to "fix" it.
+	 * string fix_query: The query to execute to get data when doing a fix.
+	 *                   If not set check_query is used again.
+	 * array fix_collect: This array is used if the fix is basically gathering
+	 *                    all broken ids and then doing something with it.
+	 *                     - string index: The value returned from the main query
+	 *                                     and passed to the processing function.
+	 *                     - process: A function passed an array of ids to
+	 *                                execute the fix on.
+	 * function fix_processing: Function called for each row returned from fix_query
+	 *                          to execute whatever fixes are required.
+	 * function fix_full_processing: As above but does the while loop and everything
+	 *                               itself - except the freeing.
+	 * array force_fix: If this is set then the error types included within this
+	 *                  array will also be assumed broken.
+	 *                  Note: At the moment only processes these if they occur after
+	 *                  the primary error in the array.
+	 */
 
 	// This great array contains all of our error checks, fixes, etc etc etc.
 	$errorTests = array(
@@ -1338,7 +1345,7 @@ function createSalvageArea()
 		$salvageBoardID = $db->insert_id('{db_prefix}boards', 'id_board');
 	}
 
-	// @deprecated the ordering is done in the query, probably not needed
+	// @deprecated since 1.0 - the ordering is done in the query, probably not needed
 	$db->query('alter_table', '
 		ALTER TABLE {db_prefix}boards
 		ORDER BY board_order',
@@ -1356,10 +1363,10 @@ function createSalvageArea()
  * If max_substep is set, $_GET['substep'] / $max_substep is the percent
  * done this step is.
  *
- * @param array $to_fix
+ * @param mixed[] $to_fix
  * @param string $current_step_description
  * @param int $max_substep = none
- * @param force $force = false
+ * @param boolean $force = false
  */
 function pauseRepairProcess($to_fix, $current_step_description, $max_substep = 0, $force = false)
 {
@@ -1406,11 +1413,13 @@ function pauseRepairProcess($to_fix, $current_step_description, $max_substep = 0
 
 /**
  * Checks for errors in steps, until 5 seconds have passed.
- * It keeps track of the errors it did find, so that the actual repair
- * won't have to recheck everything.
  *
- * @param $do_fix
- * @return array, the errors found.
+ * - It keeps track of the errors it did find, so that the actual repair
+ * won't have to recheck everything.
+ * - returns the errors found.
+ * 
+ * @param boolean $do_fix
+ * @return mixed[]
  */
 function findForumErrors($do_fix = false)
 {

@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -33,13 +33,14 @@ class Recent_Controller extends Action_Controller
 	public function action_index()
 	{
 		// Figure out what action to do
+		$this->action_recent();
 	}
 
 	/**
 	 * Find the ten most recent posts.
 	 * Accessed by action=recent.
 	 */
-	function action_recent()
+	public function action_recent()
 	{
 		global $txt, $scripturl, $user_info, $context, $modSettings, $board;
 
@@ -55,11 +56,13 @@ class Recent_Controller extends Action_Controller
 			$_REQUEST['start'] = 95;
 
 		$query_parameters = array();
+
+		// Recent posts by category id's
 		if (!empty($_REQUEST['c']) && empty($board))
 		{
 			$categories = array_map('intval', explode(',', $_REQUEST['c']));
 
-			if (count($categories) == 1)
+			if (count($categories) === 1)
 			{
 				require_once(SUBSDIR . '/Categories.subs.php');
 				$name = categoryName($categories[0]);
@@ -73,15 +76,16 @@ class Recent_Controller extends Action_Controller
 				);
 			}
 
+			// Find the number of posts in these categorys, exclude the recycle board.
 			require_once(SUBSDIR . '/Boards.subs.php');
-
-			$boards_posts = boardsPosts(array(), $categories);
+			$boards_posts = boardsPosts(array(), $categories, false, false);
 			$total_cat_posts = array_sum($boards_posts);
 			$boards = array_keys($boards_posts);
 
 			if (empty($boards))
 				fatal_lang_error('error_no_boards_selected');
 
+			// The query for getting the messages
 			$query_this_board = 'b.id_board IN ({array_int:boards})';
 			$query_parameters['boards'] = $boards;
 
@@ -95,14 +99,15 @@ class Recent_Controller extends Action_Controller
 
 			$context['page_index'] = constructPageIndex($scripturl . '?action=recent;c=' . implode(',', $categories), $_REQUEST['start'], min(100, $total_cat_posts), 10, false);
 		}
+		// Or recent posts by board id's?
 		elseif (!empty($_REQUEST['boards']))
 		{
 			$_REQUEST['boards'] = explode(',', $_REQUEST['boards']);
 			foreach ($_REQUEST['boards'] as $i => $b)
 				$_REQUEST['boards'][$i] = (int) $b;
 
+			// Fetch the number of posts for the supplied board IDs
 			require_once(SUBSDIR . '/Boards.subs.php');
-
 			$boards_posts = boardsPosts($_REQUEST['boards'], array());
 			$total_posts = array_sum($boards_posts);
 			$boards = array_keys($boards_posts);
@@ -110,6 +115,7 @@ class Recent_Controller extends Action_Controller
 			if (empty($boards))
 				fatal_lang_error('error_no_boards_selected');
 
+			// Build the query for finding the messages
 			$query_this_board = 'b.id_board IN ({array_int:boards})';
 			$query_parameters['boards'] = $boards;
 
@@ -123,6 +129,7 @@ class Recent_Controller extends Action_Controller
 
 			$context['page_index'] = constructPageIndex($scripturl . '?action=recent;boards=' . implode(',', $_REQUEST['boards']), $_REQUEST['start'], min(100, $total_posts), 10, false);
 		}
+		// Or just the recent posts for a specific board
 		elseif (!empty($board))
 		{
 			require_once(SUBSDIR . '/Boards.subs.php');
@@ -141,16 +148,18 @@ class Recent_Controller extends Action_Controller
 
 			$context['page_index'] = constructPageIndex($scripturl . '?action=recent;board=' . $board . '.%1$d', $_REQUEST['start'], min(100, $board_data[$board]['num_posts']), 10, true);
 		}
+		// All the recent posts across boards and categories it is then
 		else
 		{
 			$query_this_board = '{query_wanna_see_board}' . (!empty($modSettings['recycle_enable']) && $modSettings['recycle_board'] > 0 ? '
-						AND b.id_board != {int:recycle_board}' : ''). '
+						AND b.id_board != {int:recycle_board}' : '') . '
 						AND m.id_msg >= {int:max_id_msg}';
 			$query_parameters['max_id_msg'] = max(0, $modSettings['maxMsgID'] - 100 - $_REQUEST['start'] * 6);
 			$query_parameters['recycle_board'] = $modSettings['recycle_board'];
 
-			// @todo This isn't accurate because we ignore the recycle bin.
-			$context['page_index'] = constructPageIndex($scripturl . '?action=recent', $_REQUEST['start'], min(100, $modSettings['totalMessages']), 10, false);
+			// Set up the pageindex
+			require_once(SUBSDIR . '/Boards.subs.php');
+			$context['page_index'] = constructPageIndex($scripturl . '?action=recent', $_REQUEST['start'], min(100, sumRecentPosts()), 10, false);
 		}
 
 		$context['linktree'][] = array(
@@ -222,6 +231,9 @@ class Recent_Controller extends Action_Controller
 			)
 		);
 
+		// Provide an easy way for integration to interact with the recent display items
+		call_integration_hook('integrate_recent_message_list', array($messages, &$permissions));
+
 		// Now go through all the permissions, looking for boards they can do it on.
 		foreach ($permissions as $type => $list)
 		{
@@ -244,19 +256,48 @@ class Recent_Controller extends Action_Controller
 					// Okay, looks like they can do it for these posts.
 					foreach ($board_ids[$type][$board_id] as $counter)
 						if ($type == 'any' || $context['posts'][$counter]['poster']['id'] == $user_info['id'])
-							$context['posts'][$counter][$allowed] = true;
+							$context['posts'][$counter]['tests'][$allowed] = true;
 				}
 			}
 		}
 
 		$quote_enabled = empty($modSettings['disabledBBC']) || !in_array('quote', explode(',', $modSettings['disabledBBC']));
-		foreach ($context['posts'] as $counter => $dummy)
+		foreach ($context['posts'] as $counter => $post)
 		{
 			// Some posts - the first posts - can't just be deleted.
-			$context['posts'][$counter]['can_delete'] &= $context['posts'][$counter]['delete_possible'];
+			$context['posts'][$counter]['tests']['can_delete'] &= $context['posts'][$counter]['delete_possible'];
 
 			// And some cannot be quoted...
-			$context['posts'][$counter]['can_quote'] = $context['posts'][$counter]['can_reply'] && $quote_enabled;
+			$context['posts'][$counter]['tests']['can_quote'] = $context['posts'][$counter]['tests']['can_reply'] && $quote_enabled;
+
+			// Let's add some buttons here!
+			$context['posts'][$counter]['buttons'] = array(
+				// How about... even... remove it entirely?!
+				'remove' => array(
+					'href' => $scripturl . '?action=deletemsg;msg=' . $post['id'] . ';topic=' . $post['topic'] . ';recent;' . $context['session_var'] . '=' . $context['session_id'],
+					'text' => $txt['remove'],
+					'test' => 'can_delete',
+					'custom' => 'onclick="return confirm(' . JavaScriptEscape($txt['remove_message'] . '?') . ');"',
+				),
+				// Can we request notification of topics?
+				'notify' => array(
+					'href' => $scripturl . '?action=notify;topic=' . $post['topic'] . '.' . $post['start'],
+					'text' => $txt['notify'],
+					'test' => 'can_mark_notify',
+				),
+				// If they *can* reply?
+				'reply' => array(
+					'href' => $scripturl . '?action=post;topic=' . $post['topic'] . '.' . $post['start'],
+					'text' => $txt['reply'],
+					'test' => 'can_reply',
+				),
+				// If they *can* quote?
+				'quote' => array(
+					'href' => $scripturl . '?action=post;topic=' . $post['topic'] . '.' . $post['start'] . ';quote=' . $post['id'],
+					'text' => $txt['quote'],
+					'test' => 'can_quote',
+				),
+			);
 		}
 	}
 
@@ -264,7 +305,7 @@ class Recent_Controller extends Action_Controller
 	 * Find unread topics and replies.
 	 * Accessed by action=unread and action=unreadreplies
 	 */
-	function action_unread()
+	public function action_unread()
 	{
 		global $board, $txt, $scripturl;
 		global $user_info, $context, $settings, $modSettings, $options;
@@ -277,7 +318,7 @@ class Recent_Controller extends Action_Controller
 		// Prefetching + lots of MySQL work = bad mojo.
 		if (isset($_SERVER['HTTP_X_MOZ']) && $_SERVER['HTTP_X_MOZ'] == 'prefetch')
 		{
-			ob_end_clean();
+			@ob_end_clean();
 			header('HTTP/1.1 403 Forbidden');
 			die;
 		}
@@ -393,7 +434,6 @@ class Recent_Controller extends Action_Controller
 		if (!isset($_REQUEST['sort']) || !isset($sort_methods[$_REQUEST['sort']]))
 		{
 			$context['sort_by'] = 'last_post';
-			$_REQUEST['sort'] = 't.id_last_msg';
 			$ascending = isset($_REQUEST['asc']);
 
 			$context['querystring_sort_limits'] = $ascending ? ';asc' : '';
@@ -402,13 +442,14 @@ class Recent_Controller extends Action_Controller
 		else
 		{
 			$context['sort_by'] = $_REQUEST['sort'];
-			$_REQUEST['sort'] = $sort_methods[$_REQUEST['sort']];
 			$ascending = !isset($_REQUEST['desc']);
 
 			$context['querystring_sort_limits'] = ';sort=' . $context['sort_by'] . ($ascending ? '' : ';desc');
 		}
+		$_REQUEST['sort'] = $sort_methods[$context['sort_by']];
 
 		$context['sort_direction'] = $ascending ? 'up' : 'down';
+		$context['sort_title'] = $ascending ? $txt['sort_desc'] : $txt['sort_asc'];
 
 		// Trick
 		$txt['starter'] = $txt['started_by'];
@@ -416,7 +457,7 @@ class Recent_Controller extends Action_Controller
 		foreach ($sort_methods as $key => $val)
 			$context['topics_headers'][$key] = array(
 				'url' => $scripturl . '?action=unread' . ($context['showing_all_topics'] ? ';all' : '') . sprintf($context['querystring_board_limits'], $_REQUEST['start']) . ';sort=subject' . ($context['sort_by'] == 'subject' && $context['sort_direction'] == 'up' ? ';desc' : ''),
-				'sort_dir_img' => $context['sort_by'] == $key ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" />' : '',
+				'sort_dir_img' => $context['sort_by'] == $key ? '<img class="sort" src="' . $settings['images_url'] . '/sort_' . $context['sort_direction'] . '.png" alt="" title="' . $context['sort_title'] .'" />' : '',
 			);
 
 		if (!empty($_REQUEST['c']) && is_array($_REQUEST['c']) && count($_REQUEST['c']) == 1)
@@ -435,12 +476,15 @@ class Recent_Controller extends Action_Controller
 		);
 
 		if ($context['showing_all_topics'])
+		{
 			$context['linktree'][] = array(
 				'url' => $scripturl . '?action=' . $_REQUEST['action'] . ';all' . sprintf($context['querystring_board_limits'], 0) . $context['querystring_sort_limits'],
 				'name' => $txt['unread_topics_all']
 			);
+			$txt['unread_topics_visit_none'] = str_replace('{unread_all_url}', $scripturl . '?action=unread;all', $txt['unread_topics_visit_none']);
+		}
 		else
-			$txt['unread_topics_visit_none'] = strtr($txt['unread_topics_visit_none'], array('?action=unread;all' => '?action=unread;all' . sprintf($context['querystring_board_limits'], 0) . $context['querystring_sort_limits']));
+			$txt['unread_topics_visit_none'] = str_replace('{unread_all_url}', $scripturl . '?action=unread;all' . sprintf($context['querystring_board_limits'], 0) . $context['querystring_sort_limits'], $txt['unread_topics_visit_none']);
 
 		loadTemplate('Recent');
 		$context['sub_template'] = $_REQUEST['action'] == 'unread' ? 'unread' : 'replies';
@@ -451,6 +495,16 @@ class Recent_Controller extends Action_Controller
 
 		$is_topics = $_REQUEST['action'] == 'unread';
 
+		// If empty, no preview at all
+		if (empty($modSettings['message_index_preview']))
+			$preview_bodies = '';
+		// If 0 means everything
+		elseif (empty($modSettings['preview_characters']))
+			$preview_bodies = 'ml.body AS last_body, ms.body AS first_body,';
+		// Default: a SUBSTRING
+		else
+			$preview_bodies = 'SUBSTRING(ml.body, 1, ' . ($modSettings['preview_characters'] + 256) . ') AS last_body, SUBSTRING(ms.body, 1, ' . ($modSettings['preview_characters'] + 256) . ') AS first_body,';
+
 		// This part is the same for each query.
 		$select_clause = '
 					ms.subject AS first_subject, ms.poster_time AS first_poster_time, ms.id_topic, t.id_board, b.name AS bname,
@@ -458,8 +512,9 @@ class Recent_Controller extends Action_Controller
 					ml.poster_time AS last_poster_time, IFNULL(mems.real_name, ms.poster_name) AS first_poster_name,
 					IFNULL(meml.real_name, ml.poster_name) AS last_poster_name, ml.subject AS last_subject,
 					ml.icon AS last_icon, ms.icon AS first_icon, t.id_poll, t.is_sticky, t.locked, ml.modified_time AS last_modified_time,
-					IFNULL(lt.id_msg, IFNULL(lmr.id_msg, -1)) + 1 AS new_from, SUBSTRING(ml.body, 1, 385) AS last_body,
-					SUBSTRING(ms.body, 1, 385) AS first_body, ml.smileys_enabled AS last_smileys, ms.smileys_enabled AS first_smileys, t.id_first_msg, t.id_last_msg';
+					IFNULL(lt.id_msg, IFNULL(lmr.id_msg, -1)) + 1 AS new_from,
+					' . $preview_bodies . '
+					ml.smileys_enabled AS last_smileys, ms.smileys_enabled AS first_smileys, t.id_first_msg, t.id_last_msg';
 
 		if ($context['showing_all_topics'])
 			$earliest_msg = earliest_msg();
@@ -697,12 +752,13 @@ class Recent_Controller extends Action_Controller
 					)
 					SELECT t.id_topic, t.id_board, t.id_last_msg, IFNULL(lmr.id_msg, 0) AS id_msg' . (!in_array($_REQUEST['sort'], array('t.id_last_msg', 't.id_topic')) ? ', ' . $_REQUEST['sort'] . ' AS sort_key' : '') . '
 					FROM {db_prefix}messages AS m
-						INNER JOIN {db_prefix}topics AS t ON (t.id_topic = m.id_topic)
+						INNER JOIN {db_prefix}topics AS t ON (t.id_topic = m.id_topic)' . ($modSettings['enable_unwatch'] ? '
+						LEFT JOIN {db_prefix}log_topics AS lt ON (t.id_topic = lt.id_topic AND lt.id_member = {int:current_member})' : '') . '
 						LEFT JOIN {db_prefix}log_mark_read AS lmr ON (lmr.id_board = t.id_board AND lmr.id_member = {int:current_member})' . (isset($sortKey_joins[$_REQUEST['sort']]) ? $sortKey_joins[$_REQUEST['sort']] : '') . '
 					WHERE m.id_member = {int:current_member}' . (!empty($board) ? '
-						AND t.id_board = {int:current_board}' : '') .
-						($modSettings['postmod_active'] ? ' AND t.approved = {int:is_approved}' : '') .
-						($modSettings['enable_unwatch'] ? ' AND IFNULL(lt.unwatched, 0) != 1' : '') . '
+						AND t.id_board = {int:current_board}' : '') . ($modSettings['postmod_active'] ? '
+						AND t.approved = {int:is_approved}' : '') . ($modSettings['enable_unwatch'] ? '
+						AND IFNULL(lt.unwatched, 0) != 1' : '') . '
 					GROUP BY m.id_topic',
 					array(
 						'current_board' => $board,
@@ -743,6 +799,7 @@ class Recent_Controller extends Action_Controller
 				);
 				list ($num_topics) = $db->fetch_row($request);
 				$db->free_result($request);
+				$min_message = 0;
 			}
 			else
 			{
@@ -875,19 +932,22 @@ class Recent_Controller extends Action_Controller
 
 		while ($row = $db->fetch_assoc($request))
 		{
-			if ($row['id_poll'] > 0 && $modSettings['pollMode'] == '0')
-				continue;
-
 			$topic_ids[] = $row['id_topic'];
 
-			if (!empty($settings['message_index_preview']))
+			if (!empty($modSettings['message_index_preview']))
 			{
 				// Limit them to 128 characters - do this FIRST because it's a lot of wasted censoring otherwise.
-				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], $row['first_smileys'], $row['id_first_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
-				$row['first_body'] = shorten_text($row['first_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+				$row['first_body'] = strip_tags(strtr(parse_bbc($row['first_body'], false, $row['id_first_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
+				$row['first_body'] = Util::shorten_text($row['first_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
 
-				$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], $row['last_smileys'], $row['id_last_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
-				$row['last_body'] = shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+				// No reply then they are the same, no need to process it again
+				if ($row['num_replies'] == 0)
+					$row['last_body'] == $row['first_body'];
+				else
+				{
+					$row['last_body'] = strip_tags(strtr(parse_bbc($row['last_body'], false, $row['id_last_msg']), array('<br />' => "\n", '&nbsp;' => ' ')));
+					$row['last_body'] = Util::shorten_text($row['last_body'], !empty($modSettings['preview_characters']) ? $modSettings['preview_characters'] : 128, true);
+				}
 
 				// Censor the subject and message preview.
 				censorText($row['first_subject']);
@@ -923,11 +983,7 @@ class Recent_Controller extends Action_Controller
 			if ($topic_length > $messages_per_page)
 			{
 				$start = -1;
-				$pages = constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d;topicseen', $start, $topic_length, $messages_per_page, true, array('prev_next' => false));
-
-				// If we can use all, show it.
-				if (!empty($modSettings['enableAllMessages']) && $topic_length < $modSettings['enableAllMessages'])
-					$pages .= ' &nbsp;<a href="' . $scripturl . '?topic=' . $row['id_topic'] . '.0;all">' . $txt['all'] . '</a>';
+				$pages = constructPageIndex($scripturl . '?topic=' . $row['id_topic'] . '.%1$d;topicseen', $start, $topic_length, $messages_per_page, true, array('prev_next' => false, 'all' => !empty($modSettings['enableAllMessages']) && $topic_length < $modSettings['enableAllMessages']));
 			}
 			else
 				$pages = '';
@@ -983,13 +1039,14 @@ class Recent_Controller extends Action_Controller
 					'href' => $scripturl . '?topic=' . $row['id_topic'] . ($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . ';topicseen#msg' . $row['id_last_msg'],
 					'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . ($row['num_replies'] == 0 ? '.0' : '.msg' . $row['id_last_msg']) . ';topicseen#msg' . $row['id_last_msg'] . '" rel="nofollow">' . $row['last_subject'] . '</a>'
 				),
+				'default_preview' => trim($row[!empty($modSettings['message_index_preview']) && $modSettings['message_index_preview'] == 2 ? 'last_body' : 'first_body']),
 				'new_from' => $row['new_from'],
 				'new_href' => $scripturl . '?topic=' . $row['id_topic'] . '.msg' . $row['new_from'] . ';topicseen#new',
 				'href' => $scripturl . '?topic=' . $row['id_topic'] . ($row['num_replies'] == 0 ? '.0' : '.msg' . $row['new_from']) . ';topicseen' . ($row['num_replies'] == 0 ? '' : 'new'),
 				'link' => '<a href="' . $scripturl . '?topic=' . $row['id_topic'] . ($row['num_replies'] == 0 ? '.0' : '.msg' . $row['new_from']) . ';topicseen#msg' . $row['new_from'] . '" rel="nofollow">' . $row['first_subject'] . '</a>',
 				'is_sticky' => !empty($modSettings['enableStickyTopics']) && !empty($row['is_sticky']),
 				'is_locked' => !empty($row['locked']),
-				'is_poll' => $modSettings['pollMode'] == '1' && $row['id_poll'] > 0,
+				'is_poll' => !empty($modSettings['pollMode']) && $row['id_poll'] > 0,
 				'is_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicPosts'] : $row['num_replies'] >= $modSettings['hotTopicPosts'],
 				'is_very_hot' => !empty($modSettings['useLikesNotViews']) ? $row['num_likes'] >= $modSettings['hotTopicVeryPosts'] : $row['num_replies'] >= $modSettings['hotTopicVeryPosts'],
 				'is_posted_in' => false,
@@ -1008,7 +1065,7 @@ class Recent_Controller extends Action_Controller
 				)
 			);
 
-			$context['topics'][$row['id_topic']]['first_post']['started_by'] = sprintf($txt['topic_started_by'], $context['topics'][$row['id_topic']]['first_post']['member']['link'], $context['topics'][$row['id_topic']]['board']['link']);
+			$context['topics'][$row['id_topic']]['first_post']['started_by'] = sprintf($txt['topic_started_by_in'], '<strong>' . $context['topics'][$row['id_topic']]['first_post']['member']['link'] . '</strong>', '<em>' . $context['topics'][$row['id_topic']]['board']['link'] . '</em>');
 			determineTopicClass($context['topics'][$row['id_topic']]);
 		}
 		$db->free_result($request);

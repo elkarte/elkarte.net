@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -91,18 +91,6 @@ class Modlog_Controller extends Action_Controller
 			deleteLogAction($context['log_type'], $context['hoursdisable'], $_POST['delete']);
 		}
 
-		// Do the column stuff!
-		$sort_types = array(
-			'action' =>'lm.action',
-			'time' => 'lm.log_time',
-			'member' => 'mem.real_name',
-			'group' => 'mg.group_name',
-			'ip' => 'lm.ip',
-		);
-
-		// Setup the direction stuff...
-		$context['order'] = isset($_REQUEST['sort']) && isset($sort_types[$_REQUEST['sort']]) ? $_REQUEST['sort'] : 'time';
-
 		// If we're coming from a search, get the variables.
 		if (!empty($_REQUEST['params']) && empty($_REQUEST['is_search']))
 		{
@@ -110,13 +98,16 @@ class Modlog_Controller extends Action_Controller
 			$search_params = @unserialize($search_params);
 		}
 
-		// This array houses all the valid search types.
+		// This array houses all the valid quick search types.
 		$searchTypes = array(
 			'action' => array('sql' => 'lm.action', 'label' => $txt['modlog_action']),
 			'member' => array('sql' => 'mem.real_name', 'label' => $txt['modlog_member']),
-			'group' => array('sql' => 'mg.group_name', 'label' => $txt['modlog_position']),
+			'position' => array('sql' => 'mg.group_name', 'label' => $txt['modlog_position']),
 			'ip' => array('sql' => 'lm.ip', 'label' => $txt['modlog_ip'])
 		);
+
+		// Setup the allowed search
+		$context['order'] = isset($_REQUEST['sort']) && isset($searchTypes[$_REQUEST['sort']]) ? $_REQUEST['sort'] : 'member';
 
 		if (!isset($search_params['string']) || (!empty($_REQUEST['search']) && $search_params['string'] != $_REQUEST['search']))
 			$search_params_string = empty($_REQUEST['search']) ? '' : $_REQUEST['search'];
@@ -124,7 +115,7 @@ class Modlog_Controller extends Action_Controller
 			$search_params_string = $search_params['string'];
 
 		if (isset($_REQUEST['search_type']) || empty($search_params['type']) || !isset($searchTypes[$search_params['type']]))
-			$search_params_type = isset($_REQUEST['search_type']) && isset($searchTypes[$_REQUEST['search_type']]) ? $_REQUEST['search_type'] : (isset($searchTypes[$context['order']]) ? $context['order'] : 'member');
+			$search_params_type = isset($_REQUEST['search_type']) && isset($searchTypes[$_REQUEST['search_type']]) ? $_REQUEST['search_type'] : $context['order'];
 		else
 			$search_params_type = $search_params['type'];
 
@@ -145,10 +136,16 @@ class Modlog_Controller extends Action_Controller
 		// If they are searching by action, then we must do some manual intervention to search in their language!
 		if ($search_params['type'] == 'action' && !empty($search_params['string']))
 		{
+			// Build a regex which looks for the words
+			$regex = '';
+			$search = explode(' ', $search_params['string']);
+			foreach ($search as $word)
+				$regex .= '(?=[\w\s]*' . $word . ')';
+
 			// For the moment they can only search for ONE action!
 			foreach ($txt as $key => $text)
 			{
-				if (substr($key, 0, 10) == 'modlog_ac_' && strpos($text, $search_params['string']) !== false)
+				if (strpos($key, 'modlog_ac_') === 0 && preg_match('~' . $regex . '~i', $text))
 				{
 					$search_params['string'] = substr($key, 10);
 					break;
@@ -156,7 +153,7 @@ class Modlog_Controller extends Action_Controller
 			}
 		}
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// This is all the information required for a moderation/admin log listing.
 		$listOptions = array(
@@ -278,15 +275,17 @@ class Modlog_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'below_table_data',
 					'value' => '
-						' . $txt['modlog_search'] . ' (' . $txt['modlog_by'] . ': ' . $context['search']['label'] . '):
-						<input type="text" name="search" size="18" value="' . Util::htmlspecialchars($context['search']['string']) . '" class="input_text" />
-						<input type="submit" name="is_search" value="' . $txt['modlog_go'] . '" class="button_submit" />
-						' . ($context['can_delete'] ? '|&nbsp;
-						<input type="submit" name="remove" value="' . $txt['modlog_remove'] . '" onclick="return confirm(\'' . $txt['modlog_remove_selected_confirm'] . '\');" class="right_submit" />
-						<input type="submit" name="removeall" value="' . $txt['modlog_removeall'] . '" onclick="return confirm(\'' . $txt['modlog_remove_all_confirm'] . '\');" class="right_submit" />' : ''),
-					'class' => 'floatright',
+						<div id="quick_log_search">
+							' . $txt['modlog_search'] . ' (' . $txt['modlog_by'] . ': ' . $context['search']['label'] . ')
+							<input type="text" name="search" size="18" value="' . Util::htmlspecialchars($context['search']['string']) . '" class="input_text" />
+							<input type="submit" name="is_search" value="' . $txt['modlog_go'] . '" class="button_submit" />
+							' . ($context['can_delete'] ? '|&nbsp;
+							<input type="submit" name="remove" value="' . $txt['modlog_remove'] . '" onclick="return confirm(\'' . $txt['modlog_remove_selected_confirm'] . '\');" class="right_submit" />
+							<input type="submit" name="removeall" value="' . $txt['modlog_removeall'] . '" onclick="return confirm(\'' . $txt['modlog_remove_all_confirm'] . '\');" class="right_submit" />' : '') . '
+						</div>',
 				),
 			),
 		);
@@ -309,7 +308,7 @@ class Modlog_Controller extends Action_Controller
 	 * @param int $items_per_page
 	 * @param string $sort
 	 * @param string $query_string
-	 * @param array $query_params
+	 * @param mixed[] $query_params
 	 * @param int $log_type
 	 */
 	public function getModLogEntries($start, $items_per_page, $sort, $query_string, $query_params, $log_type)
@@ -324,7 +323,7 @@ class Modlog_Controller extends Action_Controller
 	 * Uses list_getModLogEntryCount in modlog subs
 	 *
 	 * @param string $query_string
-	 * @param array $query_params
+	 * @param mixed[] $query_params
 	 * @param int $log_type
 	 */
 	public function getModLogEntryCount($query_string, $query_params, $log_type)

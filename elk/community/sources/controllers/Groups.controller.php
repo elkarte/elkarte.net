@@ -14,7 +14,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -32,7 +32,7 @@ class Groups_Controller extends Action_Controller
 	 *
 	 * @see Action_Controller::action_index()
 	 */
-	function action_index()
+	public function action_index()
 	{
 		global $context;
 
@@ -46,18 +46,17 @@ class Groups_Controller extends Action_Controller
 		);
 
 		// I don't think we know what to do... throw dies?
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'list';
-		$context['sub_action'] = $subAction;
-
 		$action = new Action();
-		$action->initialize($subActions, 'list');
+		$subAction = $action->initialize($subActions, 'list');
+		$context['sub_action'] = $subAction;
 		$action->dispatch($subAction);
 	}
 
 	/**
 	 * Set up templates and pre-requisites for any request processed by this class.
-	 * Called automagically before any action_() call.
-	 * It handles permission checks, and puts the moderation bar on as required.
+	 *
+	 * - Called automagically before any action_() call.
+	 * - It handles permission checks, and puts the moderation bar on as required.
 	 */
 	public function pre_dispatch()
 	{
@@ -105,7 +104,7 @@ class Groups_Controller extends Action_Controller
 		$base_url = $scripturl . (isset($context['admin_menu_name']) ? '?action=admin;area=membergroups;sa=members' : (isset($context['moderation_menu_name']) ? '?action=moderate;area=viewgroups;sa=members' : '?action=groups;sa=members'));
 
 		// Making a list is not hard with this beauty.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 
 		// Use the standard templates for showing this.
 		$listOptions = array(
@@ -214,13 +213,15 @@ class Groups_Controller extends Action_Controller
 
 	/**
 	 * Display members of a group, and allow adding of members to a group.
-	 * It can be called from ManageMembergroups if it needs templating within the admin environment.
-	 * It shows a list of members that are part of a given membergroup.
-	 * It is called by ?action=moderate;area=viewgroups;sa=members;group=x
-	 * It requires the manage_membergroups permission.
-	 * It allows to add and remove members from the selected membergroup.
-	 * It allows sorting on several columns.
-	 * It redirects to itself.
+	 *
+	 * What it does:
+	 * - It can be called from ManageMembergroups if it needs templating within the admin environment.
+	 * - It shows a list of members that are part of a given membergroup.
+	 * - It is called by ?action=moderate;area=viewgroups;sa=members;group=x
+	 * - It requires the manage_membergroups permission.
+	 * - It allows to add and remove members from the selected membergroup.
+	 * - It allows sorting on several columns.
+	 * - It redirects to itself.
 	 * @uses ManageMembergroups template, group_members sub template.
 	 */
 	public function action_members()
@@ -233,6 +234,7 @@ class Groups_Controller extends Action_Controller
 		if (in_array($current_group, array(-1, 0, 3)))
 			fatal_lang_error('membergroup_does_not_exist', false);
 
+		// These will be needed
 		require_once(SUBSDIR . '/Membergroups.subs.php');
 		require_once(SUBSDIR . '/Members.subs.php');
 
@@ -246,17 +248,20 @@ class Groups_Controller extends Action_Controller
 		$context['group']['icons'] = !empty($context['group']['icons'][0]) && !empty($context['group']['icons'][1]) ? str_repeat('<img src="' . $settings['images_url'] . '/group_icons/' . $context['group']['icons'][1] . '" alt="*" />', $context['group']['icons'][0]) : '';
 		$context['group']['can_moderate'] = allowedTo('manage_membergroups') && (allowedTo('admin_forum') || $context['group']['group_type'] != 1);
 
+		// The template is very needy
 		$context['linktree'][] = array(
 			'url' => $scripturl . '?action=groups;sa=members;group=' . $context['group']['id'],
 			'name' => $context['group']['name'],
 		);
 		$context['can_send_email'] = allowedTo('send_email_to_members');
+		$context['sort_direction'] = isset($_REQUEST['desc']) ? 'down' : 'up';
+		$context['start'] = $_REQUEST['start'];
+		$context['can_moderate_forum'] = allowedTo('moderate_forum');
 
 		// @todo: use createList
 
 		// Load all the group moderators, for fun.
 		$context['group']['moderators'] = array();
-
 		$moderators = getGroupModerators($current_group);
 		foreach ($moderators as $id_member => $name)
 		{
@@ -269,7 +274,7 @@ class Groups_Controller extends Action_Controller
 				$context['group']['can_moderate'] = true;
 		}
 
-		// If this group is hidden then it can only "exists" if the user can moderate it!
+		// If this group is hidden then it can only "exist" if the user can moderate it!
 		if ($context['group']['hidden'] && !$context['group']['can_moderate'])
 			fatal_lang_error('membergroup_does_not_exist', false);
 
@@ -283,6 +288,7 @@ class Groups_Controller extends Action_Controller
 		// Removing member from group?
 		if (isset($_POST['remove']) && !empty($_REQUEST['rem']) && is_array($_REQUEST['rem']) && $context['group']['assignable'])
 		{
+			// Security first
 			checkSession();
 			validateToken('mod-mgm');
 
@@ -295,6 +301,7 @@ class Groups_Controller extends Action_Controller
 		// Must be adding new members to the group...
 		elseif (isset($_REQUEST['add']) && (!empty($_REQUEST['toAdd']) || !empty($_REQUEST['member_add'])) && $context['group']['assignable'])
 		{
+			// Make sure you can do this
 			checkSession();
 			validateToken('mod-mgm');
 
@@ -314,7 +321,7 @@ class Groups_Controller extends Action_Controller
 					unset($member_names[$index]);
 			}
 
-			// Any passed by ID?
+			// Any members passed by ID?
 			$member_ids = array();
 			if (!empty($_REQUEST['member_add']))
 			{
@@ -325,19 +332,21 @@ class Groups_Controller extends Action_Controller
 				}
 			}
 
-			// Construct the query pelements.
+			// Construct the query pelements, first for adds by name
 			if (!empty($member_ids))
 			{
 				$member_query[] = array('or' => 'member_ids');
 				$member_parameters['member_ids'] = $member_ids;
 			}
 
+			// And then adds by ID
 			if (!empty($member_names))
 			{
 				$member_query[] = array('or' => 'member_names');
 				$member_parameters['member_names'] = $member_names;
 			}
 
+			// Get back the ones that were not already in the group
 			$members = membersBy($member_query, $member_parameters);
 
 			// Do the updates...
@@ -354,20 +363,18 @@ class Groups_Controller extends Action_Controller
 			'posts' => 'posts',
 		);
 
-		// They didn't pick one, default to by name..
+		// They didn't pick one, or tried a wrong one, so default to by name..
 		if (!isset($_REQUEST['sort']) || !isset($sort_methods[$_REQUEST['sort']]))
 		{
 			$context['sort_by'] = 'name';
-			$querySort = 'real_name';
+			$querySort = 'real_name' . (isset($_REQUEST['desc']) ? ' DESC' : ' ASC');
 		}
-		// Otherwise default to ascending.
+		// Otherwise sort by what they asked
 		else
 		{
 			$context['sort_by'] = $_REQUEST['sort'];
-			$querySort = $sort_methods[$_REQUEST['sort']];
+			$querySort = $sort_methods[$_REQUEST['sort']] . (isset($_REQUEST['desc']) ? ' DESC' : ' ASC');
 		}
-
-		$context['sort_direction'] = isset($_REQUEST['desc']) ? 'down' : 'up';
 
 		// The where on the query is interesting. Non-moderators should only see people who are in this group as primary.
 		if ($context['group']['can_moderate'])
@@ -381,10 +388,9 @@ class Groups_Controller extends Action_Controller
 
 		// Create the page index.
 		$context['page_index'] = constructPageIndex($scripturl . '?action=' . ($context['group']['can_moderate'] ? 'moderate;area=viewgroups' : 'groups') . ';sa=members;group=' . $current_group . ';sort=' . $context['sort_by'] . (isset($_REQUEST['desc']) ? ';desc' : ''), $_REQUEST['start'], $context['total_members'], $modSettings['defaultMaxMembers']);
-		$context['start'] = $_REQUEST['start'];
-		$context['can_moderate_forum'] = allowedTo('moderate_forum');
 
-		$context['members'] = membersBy($where, array($where => $current_group), true);
+		// Fetch the members that meet the where criteria
+		$context['members'] = membersBy($where, array($where => $current_group, 'order' => $querySort), true);
 		foreach ($context['members'] as $id => $row)
 		{
 			$last_online = empty($row['last_login']) ? $txt['never'] : standardTime($row['last_login']);
@@ -496,7 +502,6 @@ class Groups_Controller extends Action_Controller
 							assignGroupsToMember($id, $groups['primary'], $groups['add']);
 						}
 
-						$lastLng = $user_info['language'];
 						foreach ($concerned['email_details'] as $email)
 						{
 							$replacements = array(
@@ -513,7 +518,6 @@ class Groups_Controller extends Action_Controller
 					else
 					{
 						// Same as for approving, kind of.
-						$lastLng = $user_info['language'];
 						foreach ($concerned['email_details'] as $email)
 						{
 							$custom_reason = isset($_POST['groupreason']) && isset($_POST['groupreason'][$email['rid']]) ? $_POST['groupreason'][$email['rid']] : '';
@@ -539,7 +543,7 @@ class Groups_Controller extends Action_Controller
 		}
 
 		// We're going to want this for making our list.
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		require_once(SUBSDIR . '/Membergroups.subs.php');
 
 		// This is all the information required for a group listing.

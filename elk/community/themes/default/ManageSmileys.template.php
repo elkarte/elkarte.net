@@ -11,7 +11,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:  	BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -92,7 +92,7 @@ function template_modifyset()
 								<option value="', $smiley_set_dir['id'], '"', $smiley_set_dir['current'] ? ' selected="selected"' : '', $smiley_set_dir['selectable'] ? '' : ' disabled="disabled"', '>', $smiley_set_dir['id'], '</option>';
 
 		echo '
-							</select> ';
+							</select>';
 	}
 
 	echo '
@@ -150,7 +150,7 @@ function template_modifysmiley()
 
 	foreach ($context['smiley_sets'] as $smiley_set)
 		echo '
-							<option value="', $smiley_set['path'], '"', $context['selected_set'] == $smiley_set['path'] ? ' selected="selected"' : '', '>', $smiley_set['name'], '</option>';
+								<option value="', $smiley_set['path'], '"', $context['selected_set'] == $smiley_set['path'] ? ' selected="selected"' : '', '>', $smiley_set['name'], '</option>';
 
 	echo '
 							</select>)
@@ -172,14 +172,14 @@ function template_modifysmiley()
 	else
 	{
 		echo '
-							<select name="smiley_filename" id="smiley_filename" onchange="updatePreview();">';
+								<select name="smiley_filename" id="smiley_filename" onchange="updatePreview();">';
 
 		foreach ($context['filenames'] as $filename)
 			echo '
-								<option value="', $filename['id'], '"', $filename['selected'] ? ' selected="selected"' : '', '>', $filename['id'], '</option>';
+									<option value="', $filename['id'], '"', $filename['selected'] ? ' selected="selected"' : '', '>', $filename['id'], '</option>';
 
 		echo '
-							</select>';
+								</select>';
 	}
 
 	echo '
@@ -262,7 +262,7 @@ function template_addsmiley()
 
 	foreach ($context['smiley_sets'] as $smiley_set)
 		echo '
-								<option value="', $smiley_set['path'], '"', $context['selected_set'] == $smiley_set['path'] ? ' selected="selected"' : '', '>', $smiley_set['name'], '</option>';
+										<option value="', $smiley_set['path'], '"', $context['selected_set'] == $smiley_set['path'] ? ' selected="selected"' : '', '>', $smiley_set['name'], '</option>';
 
 	echo '
 								</select>
@@ -279,12 +279,13 @@ function template_addsmiley()
 	{
 		echo '
 									<select name="smiley_filename" id="smiley_filename" onchange="updatePreview();selectMethod(\'existing\');">';
+
 		foreach ($context['filenames'] as $filename)
 			echo '
-									<option value="', $filename['id'], '"', $filename['selected'] ? ' selected="selected"' : '', '>', $filename['id'], '</option>';
+										<option value="', $filename['id'], '"', $filename['selected'] ? ' selected="selected"' : '', '>', $filename['id'], '</option>';
 
 		echo '
-								</select>';
+									</select>';
 	}
 
 	echo '

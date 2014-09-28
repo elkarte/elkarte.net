@@ -1,8 +1,6 @@
 <?php
 // Version: 1.0; ManageMembers
 
-global $context;
-
 $txt['groups'] = 'Groups';
 $txt['viewing_groups'] = 'Viewing Membergroups';
 
@@ -49,7 +47,7 @@ $txt['membergroups_min_posts'] = 'Required posts';
 $txt['membergroups_online_color'] = 'Color in online list';
 $txt['membergroups_icon_count'] = 'Number of icon images';
 $txt['membergroups_icon_image'] = 'Icon image filename';
-$txt['membergroups_icon_image_note'] = 'Upload icon images in to the default theme directory to enable selection.';
+$txt['membergroups_icon_image_note'] = 'Upload icon images in to the default theme directory to enable selection.<br />Select the icon to change it.';
 $txt['membergroups_max_messages'] = 'Max personal messages';
 $txt['membergroups_max_messages_note'] = '0 = unlimited';
 $txt['membergroups_max_messages_desc'] = 'Here you can set the limit of personal messages a user can keep on the server.<br />
@@ -104,7 +102,7 @@ $txt['admin_browse_outstanding_warn'] = 'all affected members?';
 $txt['admin_browse_w_approve'] = 'Approve';
 $txt['admin_browse_w_activate'] = 'Activate';
 $txt['admin_browse_w_delete'] = 'Delete';
-$txt['admin_browse_w_reject'] = 'Reject';
+$txt['admin_browse_w_reject'] = 'Reject (Delete)';
 $txt['admin_browse_w_remind'] = 'Remind';
 $txt['admin_browse_w_approve_deletion'] = 'Approve (Delete Accounts)';
 $txt['admin_browse_w_email'] = 'and send email';

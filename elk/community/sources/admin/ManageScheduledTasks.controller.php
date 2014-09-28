@@ -13,7 +13,7 @@
  * copyright:	2011 Simple Machines (http://www.simplemachines.org)
  * license:		BSD, See included LICENSE.TXT for terms and conditions.
  *
- * @version 1.0 Beta
+ * @version 1.0
  *
  */
 
@@ -21,16 +21,19 @@ if (!defined('ELK'))
 	die('No access...');
 
 /**
- * ManageScheduledTasks admin Controller: handles the administration pages
+ * ManageScheduledTasks admin Controller: handles the scheduled task pages
  * which allow to see and edit and run the systems scheduled tasks
+ *
+ * @package ScheduledTasks
  */
 class ManageScheduledTasks_Controller extends Action_Controller
 {
 	/**
 	 * Scheduled tasks management dispatcher.
-	 * This function checks permissions and delegates to the appropriate function
+	 *
+	 * - This function checks permissions and delegates to the appropriate function
 	 * based on the sub-action.
-	 * Everything here requires admin_forum permission.
+	 * - Everything here requires admin_forum permission.
 	 *
 	 * @uses ManageScheduledTasks template file
 	 * @uses ManageScheduledTasks language file
@@ -50,13 +53,8 @@ class ManageScheduledTasks_Controller extends Action_Controller
 			'tasks' => array($this, 'action_tasks', 'permission' => 'admin_forum'),
 		);
 
-		call_integration_hook('integrate_manage_scheduled_tasks', array(&$subActions));
-
-		// We need to find what's the action.
-		$subAction = isset($_REQUEST['sa']) && isset($subActions[$_REQUEST['sa']]) ? $_REQUEST['sa'] : 'tasks';
-
-		$context['page_title'] = $txt['maintain_info'];
-		$context['sub_action'] = $subAction;
+		// Control those actions
+		$action = new Action('manage_scheduled_tasks');
 
 		// Now for the lovely tabs. That we all love.
 		$context[$context['admin_menu_name']]['tab_data'] = array(
@@ -73,9 +71,14 @@ class ManageScheduledTasks_Controller extends Action_Controller
 			),
 		);
 
+		// We need to find what's the action. call integrate_sa_manage_scheduled_tasks
+		$subAction = $action->initialize($subActions, 'tasks');
+
+		// Page details
+		$context['page_title'] = $txt['maintain_info'];
+		$context['sub_action'] = $subAction;
+
 		// Call the right function for this sub-action.
-		$action = new Action();
-		$action->initialize($subActions, 'tasks');
 		$action->dispatch($subAction);
 	}
 
@@ -127,32 +130,12 @@ class ManageScheduledTasks_Controller extends Action_Controller
 
 			// Lets get it on!
 			require_once(SUBSDIR . '/ScheduledTask.class.php');
-			$task = new ScheduledTask();
+			call_integration_include_hook('integrate_autotask_include');
 
 			ignore_user_abort(true);
+
 			foreach ($nextTasks as $task_id => $taskname)
-			{
-				$start_time = microtime(true);
-
-				// The methods got to exist for the tasks.
-				if (!method_exists($task, $taskname))
-					continue;
-
-				// Try to stop a timeout, this would be bad...
-				@set_time_limit(300);
-				if (function_exists('apache_reset_timeout'))
-					@apache_reset_timeout();
-
-				// Do the task...
-				$completed = $task->{$taskname}();
-
-				// Log that we did it ;)
-				if ($completed)
-				{
-					$total_time = round(microtime(true) - $start_time, 3);
-					logTask($task_id, $total_time);
-				}
-			}
+				run_this_task($task_id, $taskname);
 
 			// Things go as expected?  If not save the error in session
 			if (!empty($context['scheduled_errors']))
@@ -178,7 +161,7 @@ class ManageScheduledTasks_Controller extends Action_Controller
 					'data' => array(
 						'sprintf' => array(
 							'format' => '
-								<a href="' . $scripturl . '?action=admin;area=scheduledtasks;sa=taskedit;tid=%1$d">%2$s</a><br /><span class="smalltext">%3$s</span>',
+								<a href="' . $scripturl . '?action=admin;area=scheduledtasks;sa=taskedit;tid=%1$d"><i class="fa fa-pencil-square-o"></i> %2$s</a><br /><span class="smalltext">%3$s</span>',
 							'params' => array(
 								'id' => false,
 								'name' => false,
@@ -244,6 +227,7 @@ class ManageScheduledTasks_Controller extends Action_Controller
 			),
 			'additional_rows' => array(
 				array(
+					'class' => 'submitbutton',
 					'position' => 'below_table_data',
 					'value' => '
 						<input type="submit" name="run" value="' . $txt['scheduled_tasks_run_now'] . '" class="right_submit" />
@@ -257,7 +241,7 @@ class ManageScheduledTasks_Controller extends Action_Controller
 			),
 		);
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'view_scheduled_tasks';
@@ -418,6 +402,18 @@ class ManageScheduledTasks_Controller extends Action_Controller
 						'reverse' => 'lst.time_taken DESC',
 					),
 				),
+				'task_completed' => array(
+					'header' => array(
+						'value' => $txt['scheduled_log_completed'],
+					),
+					'data' => array(
+						'function' => create_function('$rowData', '
+							global $settings, $txt;
+
+							return \'<img src="\' . $settings[\'images_url\'] . \'/admin/complete_\' . ($rowData[\'task_completed\'] ? \'success\' : \'fail\') . \'.png" alt="\' . sprintf($txt[$rowData[\'task_completed\'] ? \'maintain_done\' : \'maintain_fail\'], $rowData[\'name\']) . \'" />\';
+						'),
+					),
+				),
 			),
 			'form' => array(
 				'href' => $context['admin_area'] == 'scheduledtasks' ? $scripturl . '?action=admin;area=scheduledtasks;sa=tasklog' : $scripturl . '?action=admin;area=logs;sa=tasklog',
@@ -439,7 +435,7 @@ class ManageScheduledTasks_Controller extends Action_Controller
 
 		createToken('admin-tl');
 
-		require_once(SUBSDIR . '/List.class.php');
+		require_once(SUBSDIR . '/GenericList.class.php');
 		createList($listOptions);
 
 		$context['sub_template'] = 'show_list';
