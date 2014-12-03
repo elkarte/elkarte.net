@@ -41,17 +41,28 @@ h3 {
 	text-shadow: 1px 1px 1px #777;
 	display: inline-block;
 	float: right;
+	padding: 0 0 10px 10px;
+	margin-top: -15px;
 }
-
 .text-red {
 	color: orange;
 	text-shadow: 1px 1px 1px #777;
 	float: right;
+	padding: 0 0 10px 10px;
+	margin-top: -15px;
 }
 .text-blue {
 	color: #5dcbe7;
 	text-shadow: 1px 1px 1px #777;
 	float: right;
+	padding: 0 0 10px 10px;
+	margin-top: -15px;
+}
+.text-gold {
+	color: #DAA520;
+	float: right;
+	padding: 0 0 10px 10px;
+	margin-top: -15px;
 }
 .box {
 	padding: 0;
