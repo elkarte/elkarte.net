@@ -68,7 +68,7 @@ echo '
 				</div>
 				<div class="extended">
 				<div class="buttons">
-					<a class="button_submit btn" href="https://github.com/elkarte/Elkarte/releases/download/v1.0.1/ElkArte_v1-0-1_install.zip">
+					<a class="button_submit btn" href="https://github.com/elkarte/Elkarte/releases/download/v1.0.2/ElkArte_v1-0-2_install.zip">
 						<i class="fa fa-download fa-15x"></i> Download ElkArte
 					</a>
 					<a class="button_submit btn" href="https://github.com/elkarte/Elkarte/fork">
