@@ -9,16 +9,22 @@ ul.features {
 	vertical-align: top;
 }
 a.btn {
-	color: #444;
+	color: #222;
 }
 #upshrink .collapse {
 	display: block;
 }
+:before, :after {
+	box-sizing: initial;
+}
 .collapse {
 	display: block;
 }
-#search_form input, #search_form select {
+#search_form input, #search_form select, #top_section_notice input, #top_section_notice select {
 	font: 87.5%/150% "Segoe UI","Helvetica Neue","Liberation Sans","Nimbus Sans L","Trebuchet MS",Arial,sans-serif;
+}
+.top_button  {
+	max-height: none;
 }
 #news {
 	display: none;
