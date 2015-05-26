@@ -26,7 +26,7 @@ echo '
 					<div class="panel-body">
 						<h2>What is ElkArte?<i class="fa fa-group fa-2x text-green"></i></h2>
 						<p class="lead">ElkArte is a modern, free, powerful community building forum software.  It is completely free to use and is licensed with an open source BSD-3 clause license.</p>
-						<p>Initially based on the well known Simple Machines Forum (SMF), it began with an overall of the code in order to modernise, implement new features and make a forum software be relevant in a time of unprecedented social interaction.  It has grown to become a modern and feature rich forum package to meet the demands of today\'s discussion groups.</p>
+						<p>Initially based on the well known Simple Machines Forum (SMF), it began with an overhaul of the code in order to modernize, implement new features and make a forum software be relevant in a time of unprecedented social interaction.  It has grown to become a modern, feature rich forum package to meet the demands of today\'s discussion groups.</p>
 						<p>Enjoy the benefits of Volunteers from around the world who spend time making ElkArte what it is today.</p>
 					</div>
 				</div>
@@ -34,7 +34,7 @@ echo '
 				<div class="panel panel-default">
 					<div class="panel-body">
 						<h2>ElkArte Features:<i class="fa fa-gear fa-fw fa-2x text-blue"></i></h2>
-						<p class="lead">ElkArte is designed to provide you with all the features you need for a full featured community forum and website right out of the box</p>.<p>With an extensive default feature set, there is no need to make a lot of additions to get your site up and running.  Just some of our highlights include:</p>
+						<p class="lead">ElkArte is designed to provide you with all the features you need for a full featured community forum and website right out of the box.</p><p>With an extensive default feature set, there is no need to make a lot of additions to get your site up and running.  Just some of our highlights include:</p>
 						<ul class="features">
 							<li>@Mentioning users including notifications</li>
 							<li>Likes for posts and topics</li>
@@ -100,25 +100,28 @@ echo '
 					</div>
 				</div>
 			</div>
-
 			<div class="col-md-4">
-				<div>
-					<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.3/ElkArte_v1-0-3_install.zip">
-						<i class="fa fa-download fa-15x pull-left"></i>Download ElkArte
-					</a>
-					<a class="btn btn-info btn-lg btn-block" href="http://themes.elkarte.net">
-						<i class="fa fa-paint-brush fa-15x pull-left"></i>Themes for ElkArte
-					</a>
-					<a class="btn btn-info btn-lg btn-block" href="http://addons.elkarte.net">
-						<i class="fa fa-gears fa-15x pull-left"></i>Addons for ElkArte
-					</a>
-					<a class="btn btn-info btn-lg btn-block" href="https://github.com/elkarte/Elkarte/fork">
-						<i class="fa fa-github fa-15x pull-left"></i>Fork ElkArte
-					</a>
-					<a href="https://plus.google.com/105539428142197633453" rel="publisher"></a>
+				<div class="row">
+					<div class="col-md-1"></div>
+						<div class="col-md-10">
+							<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.3/ElkArte_v1-0-3_install.zip">
+								<i class="fa fa-download fa-15x pull-left"></i>Download ElkArte
+							</a>
+							<a class="btn btn-info btn-lg btn-block" href="http://themes.elkarte.net">
+								<i class="fa fa-paint-brush fa-15x pull-left"></i>Themes for ElkArte
+							</a>
+							<a class="btn btn-info btn-lg btn-block" href="http://addons.elkarte.net">
+								<i class="fa fa-gears fa-15x pull-left"></i>Addons for ElkArte
+							</a>
+							<a class="btn btn-info btn-lg btn-block" href="https://github.com/elkarte/Elkarte/fork">
+								<i class="fa fa-github fa-15x pull-left"></i>Fork ElkArte
+							</a>
+							<a href="https://plus.google.com/105539428142197633453" rel="publisher"></a>
+						</div>
+					<div class="col-md-1"></div>
 				</div>
 				<br />
-				<div class="panel well">
+				<div class="panel well hidden-xs">
 					<ul id="ext">
 						<li class="column">
 							<h4><a href="//github.com/elkarte/Elkarte"><i class="fa fa-code fa-15x"></i> Development</a></h4>
@@ -126,13 +129,13 @@ echo '
 								<li><a href="//github.com/elkarte/Elkarte"><i class="fa fa-check-square-o"></i> Give back and contribute on GitHub.</a></li>
 								<li><a href="//github.com/elkarte/Elkarte/issues"><i class="fa fa-check-square-o"></i> Report and resolve bugs</a></li>
 							</ul>
-							<h4><a href="http://www.elkarte.net/community/"><i class="fa fa-comment fa-15x"></i> Support</a></h4>
+							<h4 class="toppad"><a href="http://www.elkarte.net/community/"><i class="fa fa-comment fa-15x"></i> Support</a></h4>
 							<ul class="ext">
 								<li><a href="http://www.elkarte.net/community/"><i class="fa fa-check-square-o"></i> Join our support community.</a></li>
 								<li><a href="//github.com/elkarte/Elkarte/wiki"><i class="fa fa-check-square-o"></i> Wiki Documentation</a></li>
 							</ul>
 						</li>
-						<li class="column">
+						<li class="column toppad">
 							<h4><i class="fa fa-github fa-15x"></i> Recent commits</h4>
 							<div id="git_commits"></div>
 						</li>
@@ -160,7 +163,7 @@ addInlineJavascript('
 
 		var contribs = "";
 		$.ajax({
-			url : "//api.github.com/repos/elkarte/Elkarte/contributors",
+			url : "//api.github.com/repos/elkarte/Elkarte/contributors?per_page=60",
 			dataType : "jsonp",
 				success : function ( returndata ) {
 				$.each( returndata.data, function ( i, item ) {

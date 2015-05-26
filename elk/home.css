@@ -9,7 +9,7 @@ ul.features {
 	vertical-align: top;
 }
 a.btn {
-	color: #222;
+	color: #444;
 }
 #upshrink .collapse {
 	display: block;
@@ -94,10 +94,20 @@ a.btn {
 	margin: 0 0 10px 0;
 	border-bottom: 2px dotted #222;
 }
+.toppad {
+	padding-top: 1em;
+}
 .column a:link, .column a:visited {
 	color: #222;
 	display: block;
 }
 .commits {
 	text-align: left;
+}
+
+@media screen and (max-width: 50em) {
+
+	body {
+		padding-top: 55px;
+	}
 }
