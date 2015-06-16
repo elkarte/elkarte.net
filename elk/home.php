@@ -90,9 +90,9 @@ echo '
 				<div class="panel well">
 					<div class="panel-body">
 						<h2>ElkArte Contributors!<i class="fa fa-cubes fa-fw fa-2x text-gold"></i></h2>
-						<p>This is a list of generous people who have contributed to the <a href="https://github.com/elkarte/Elkarte/">ElkArte project hosted on <i class="fa fa-github fa-fw"></i>Github.</a></p>
+						<p>This is a list of generous people who have contributed to the <a href="//github.com/elkarte/Elkarte/">ElkArte project hosted on <i class="fa fa-github fa-fw"></i>Github.</a></p>
 						<p id="contribs"></p>
-						<p id="trans">This is a list of the awesome language translators who have contributed to <a https://www.transifex.com/projects/p/elkarte/">ElkArte on <i class="fa fa-language fa-fw"></i>Transifex</a>, making it possible for people around the world to use ElkArte in their native langauges.
+						<p id="trans">This is a list of the awesome language translators who have contributed to <a href="//www.transifex.com/projects/p/elkarte/">ElkArte on <i class="fa fa-language fa-fw"></i>Transifex</a>, making it possible for people around the world to use ElkArte in their native langauges.
 							<p id="translators">', require_once("./tx_contrib.php"), '</p>
 						</p>
 						<p>Many other people have also contributed by submitting patches, constructive discussions and support.</p>
