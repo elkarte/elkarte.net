@@ -92,7 +92,7 @@ echo '
 						<h2>ElkArte Contributors!<i class="fa fa-cubes fa-fw fa-2x text-gold"></i></h2>
 						<p>This is a list of generous people who have contributed to the <a href="https://github.com/elkarte/Elkarte/">ElkArte project hosted on <i class="fa fa-github fa-fw"></i>Github.</a></p>
 						<p id="contribs"></p>
-						<p id="trans">This is a list of the awesome language translators who have contributed to <a https://www.transifex.com/organization/elkarte/dashboard">ElkArte on <i class="fa fa-language fa-fw"></i>Transifex</a>, making it possible for people around the world to use ElkArte in their native langauges.
+						<p id="trans">This is a list of the awesome language translators who have contributed to <a https://www.transifex.com/projects/p/elkarte/">ElkArte on <i class="fa fa-language fa-fw"></i>Transifex</a>, making it possible for people around the world to use ElkArte in their native langauges.
 							<p id="translators">', require_once("./tx_contrib.php"), '</p>
 						</p>
 						<p>Many other people have also contributed by submitting patches, constructive discussions and support.</p>
@@ -104,7 +104,7 @@ echo '
 				<div class="row">
 					<div class="col-md-1"></div>
 						<div class="col-md-10">
-							<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.3/ElkArte_v1-0-3_install.zip">
+							<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.4/ElkArte_v1-0-4_install.zip">
 								<i class="fa fa-download fa-15x pull-left"></i>Download ElkArte
 							</a>
 							<a class="btn btn-info btn-lg btn-block" href="http://themes.elkarte.net">
@@ -113,8 +113,11 @@ echo '
 							<a class="btn btn-info btn-lg btn-block" href="http://addons.elkarte.net">
 								<i class="fa fa-gears fa-15x pull-left"></i>Addons for ElkArte
 							</a>
-							<a class="btn btn-info btn-lg btn-block" href="https://github.com/elkarte/Elkarte/fork">
-								<i class="fa fa-github fa-15x pull-left"></i>Fork ElkArte
+							<a class="btn btn-info btn-lg btn-block" href="http://translations.elkarte.net/">
+								<i class="fa fa-language fa-15x pull-left"></i>Translations for ElkArte
+							</a>
+							<a class="btn btn-info btn-lg btn-block" href="https://github.com/elkarte">
+								<i class="fa fa-github fa-15x pull-left"></i>ElkArte on GitHub
 							</a>
 							<a href="https://plus.google.com/105539428142197633453" rel="publisher"></a>
 						</div>
