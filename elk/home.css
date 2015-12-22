@@ -101,8 +101,8 @@ a.btn {
 	color: #222;
 	display: block;
 }
-.commits {
-	text-align: left;
+#git_commits > ul  > li {
+	margin: 5px 0;
 }
 
 @media screen and (max-width: 50em) {

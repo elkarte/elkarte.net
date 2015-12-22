@@ -13,7 +13,7 @@ $ssi_layers = array('html', 'body');
 $context['page_title'] = 'ElkArte, Free and Open Source Community Forum Software';
 $context['html_headers'] = '
 	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.css" />
-	<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+	<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
 	<link rel="stylesheet" href="home.css" />';
 
 require_once('community/SSI.php');
@@ -24,10 +24,10 @@ echo '
 			<div class="col-md-8">
 				<div class="panel panel-default">
 					<div class="panel-body">
-						<h2>What is ElkArte?<i class="fa fa-group fa-2x text-green"></i></h2>
-						<p class="lead">ElkArte is a modern, free, powerful community building forum software.  It is completely free to use and is licensed with an open source BSD-3 clause license.</p>
-						<p>Initially based on the well known Simple Machines Forum (SMF), it began with an overhaul of the code in order to modernize, implement new features and make a forum software be relevant in a time of unprecedented social interaction.  It has grown to become a modern, feature rich forum package to meet the demands of today\'s discussion groups.</p>
-						<p>Enjoy the benefits of Volunteers from around the world who spend time making ElkArte what it is today.</p>
+						<h2>What is ElkArte?<i class="fa fa-gift fa-2x text-green"></i></h2>
+						<p class="lead">ElkArte is a modern, powerful community building forum software.  It is completely free to use and is licensed with an open source BSD-3 clause license.</p>
+						<p>It is created by volunteers who believe in freedom of software. Initially based on Simple Machines Forum (SMF), it began with a complete overhaul of the code in order to modernize, implement new features and make a forum software be relevant in a time of unprecedented social interaction.  It has grown to become a modern, feature rich forum package to meet the demands of today\'s discussion groups.</p>
+						<p>Enjoy the benefits of Volunteers from around the world who spend time and have fun making ElkArte what it is today.</p>
 					</div>
 				</div>
 
@@ -59,7 +59,7 @@ echo '
 
 				<div class="panel panel-default">
 					<div class="panel-body">
-						<h2>Using another forum software?<i class="fa fa-question-circle fa-fw fa-2x text-red"></i></h2>
+						<h2>Using another forum software?<i class="fa fa-magic fa-fw fa-2x text-red"></i></h2>
 						<p class="lead">Switching to ElkArte is fast and easy!</p>
 						<p>Simply install ElkArte using our quick Installer, then utilizing the <a href="//github.com/OpenImporter/openimporter"><strong>Open Importer Engine</strong></a> you can migrate to ElkArte from many other popular forums including SMF, phpBB, MyBB, vBulletin, XenForo, IPB and more.</p>
 						<div class="text-center">
@@ -104,7 +104,7 @@ echo '
 				<div class="row">
 					<div class="col-md-1"></div>
 						<div class="col-md-10">
-							<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.4/ElkArte_v1-0-4_install.zip">
+							<a class="btn btn-success btn-lg btn-block" href="http://github.com/elkarte/Elkarte/releases/download/v1.0.6/ElkArte_v1-0-6_install.zip">
 								<i class="fa fa-download fa-15x pull-left"></i>Download ElkArte
 							</a>
 							<a class="btn btn-info btn-lg btn-block" href="http://themes.elkarte.net">
@@ -138,7 +138,7 @@ echo '
 								<li><a href="//github.com/elkarte/Elkarte/wiki"><i class="fa fa-check-square-o"></i> Wiki Documentation</a></li>
 							</ul>
 						</li>
-						<li class="column toppad">
+						<li class="toppad">
 							<h4><i class="fa fa-github fa-15x"></i> Recent commits</h4>
 							<div id="git_commits"></div>
 						</li>
@@ -146,10 +146,16 @@ echo '
 				</div>
 			</div>
 		</div>
-	</div>';
+	</div>
+	<script src="./github.commits.widget.js"></script>';
 
 addInlineJavascript('
-	$( document ).ready( function () {
+	$(document).ready(function () {
+        $("#git_commits").githubInfoWidget({ 
+			user: "elkarte", repo: "Elkarte", branch: "development", last: 15, limitMessageTo: 200, avatarSize: 60 
+		});
+
+		/*
 		var pulls = "";
 		$.ajax({
 			url : "//api.github.com/repos/elkarte/Elkarte/commits?page=1&per_page=10",
@@ -163,6 +169,7 @@ addInlineJavascript('
 				$( \'#git_commits\' ).append( pulls );
 				}
 		});
+		*/
 
 		var contribs = "";
 		$.ajax({
