@@ -39,7 +39,7 @@ echo '
 							<li>@Mentioning users including notifications</li>
 							<li>Likes for posts and topics</li>
 							<li>Drafts, including auto save</li>
-							<li>OpenID 2.0</li>
+							<li>OpenID 2.0 (BC Math must be available)</li>
 							<li>Two built in modern, responsive themes</li>
 							<li>Integrated video embedding for youtube, vimeo and dailymotion</li>
 							<li>Drag and drop ordering in the administration interface</li>
