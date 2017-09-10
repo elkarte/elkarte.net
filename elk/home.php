@@ -129,7 +129,7 @@ echo '
 						<li class="column">
 							<h4><a href="//github.com/elkarte/Elkarte"><i class="fa fa-code fa-15x"></i> Development</a></h4>
 							<ul class="ext">
-								<li><a href="//github.com/elkarte/Elkarte"><i class="fa fa-check-square-o"></i> Give back and contribute on GitHub.</a></li>
+								<li><a href="//github.com/elkarte/Elkarte"><i class="fa fa-check-square-o"></i> Give feedback and contribute on GitHub.</a></li>
 								<li><a href="//github.com/elkarte/Elkarte/issues"><i class="fa fa-check-square-o"></i> Report and resolve bugs</a></li>
 							</ul>
 							<h4 class="toppad"><a href="http://www.elkarte.net/community/"><i class="fa fa-comment fa-15x"></i> Support</a></h4>
