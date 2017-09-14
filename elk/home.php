@@ -33,7 +33,7 @@ echo '
 
 				<div class="panel panel-default">
 					<div class="panel-body">
-						<h2>ElkArte Features:<i class="fa fa-gear fa-fw fa-2x text-blue"></i></h2>
+						<h2>ElkArte Features<i class="fa fa-gear fa-fw fa-2x text-blue"></i></h2>
 						<p class="lead">ElkArte is designed to provide you with all the features you need for a full featured community forum and website right out of the box.</p><p>With an extensive default feature set, there is no need to make a lot of additions to get your site up and running.  Just some of our highlights include:</p>
 						<ul class="features">
 							<li>@Mentioning users including notifications</li>
@@ -129,12 +129,12 @@ echo '
 						<li class="column">
 							<h4><a href="//github.com/elkarte/Elkarte"><i class="fa fa-code fa-15x"></i> Development</a></h4>
 							<ul class="ext">
-								<li><a href="//github.com/elkarte/Elkarte"><i class="fa fa-check-square-o"></i> Give back and contribute on GitHub.</a></li>
+								<li><a href="//github.com/elkarte/Elkarte"><i class="fa fa-check-square-o"></i> Give feedback and contribute on GitHub</a></li>
 								<li><a href="//github.com/elkarte/Elkarte/issues"><i class="fa fa-check-square-o"></i> Report and resolve bugs</a></li>
 							</ul>
 							<h4 class="toppad"><a href="http://www.elkarte.net/community/"><i class="fa fa-comment fa-15x"></i> Support</a></h4>
 							<ul class="ext">
-								<li><a href="http://www.elkarte.net/community/"><i class="fa fa-check-square-o"></i> Join our support community.</a></li>
+								<li><a href="http://www.elkarte.net/community/"><i class="fa fa-check-square-o"></i> Join our support community</a></li>
 								<li><a href="//github.com/elkarte/Elkarte/wiki"><i class="fa fa-check-square-o"></i> Wiki Documentation</a></li>
 							</ul>
 						</li>
